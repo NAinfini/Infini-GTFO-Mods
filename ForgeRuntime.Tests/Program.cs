@@ -15,6 +15,7 @@ var tests = new (string Name, Action Run)[]
     ("false condition stops actions", FalseConditionStops),
     ("extension action runs under Forge trigger scheduling", ExtensionAction),
     ("missing or duplicate rule capabilities fail closed", RuleValidation),
+    ("provider host preserves canonical ownership and extension openness", ProviderHostChecks.Run),
 };
 
 var failures = new List<string>();
