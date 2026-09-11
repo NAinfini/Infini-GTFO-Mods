@@ -76,8 +76,8 @@ public sealed class ForgeLogicRuntime
     {
         ArgumentNullException.ThrowIfNull(definition);
         ValidateToken(definition.Id, "rule id");
-        if (!definition.TriggerId.StartsWith("forge.trigger.", StringComparison.Ordinal))
-            throw new ArgumentException("Rules must begin at a canonical Forge trigger.", nameof(definition));
+        // Trigger ownership is validated by CanonicalTriggerRuntime. Canonical Forge
+        // triggers and reviewed extension triggers therefore share one rule engine.
         if (definition.Conditions is null || definition.Actions is null)
             throw new ArgumentException("Rule condition/action lists are required.", nameof(definition));
         if (definition.Conditions.Count > 256 || definition.Actions.Count > 1024)
@@ -173,7 +173,7 @@ public sealed class ForgeLogicRuntime
     {
         ValidateToken(value, $"{kind} capability id");
         var canonical = $"forge.{kind}.";
-        if (!value.StartsWith(canonical, StringComparison.Ordinal) && !value.Contains('.', StringComparison.Ordinal))
+        if (!value.StartsWith(canonical, StringComparison.Ordinal) && !value.Contains(".", StringComparison.Ordinal))
             throw new ArgumentException($"Invalid {kind} capability id.", nameof(value));
     }
 
