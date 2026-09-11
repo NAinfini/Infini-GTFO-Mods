@@ -236,5 +236,5 @@ static void RuleValidation()
     using var rule = logic.InstallRule(new ForgeRuleDefinition("one", "forge.trigger.door.opened",
         Array.Empty<ForgeConditionStep>(), new[] { new ForgeActionStep("forge.action.test") }));
     Throws<InvalidOperationException>(() => logic.InstallRule(new ForgeRuleDefinition("one", "forge.trigger.door.opened",
-        Array.Empty<ForgeConditionStep>(), new[] { new ForgeActionStep("forge.action.test") }));
+        Array.Empty<ForgeConditionStep>(), new[] { new ForgeActionStep("forge.action.test") })));
 }
