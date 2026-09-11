@@ -57,6 +57,7 @@ public sealed class CanonicalTriggerRuntime
     private readonly Func<bool> _isHost;
     private readonly int _traceCapacity;
     private readonly Dictionary<string, List<Observer>> _observers = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _extensionTriggers = new(StringComparer.Ordinal);
     private readonly HashSet<string> _processed = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _state = new(StringComparer.Ordinal);
     private readonly Queue<ForgeTraceEntry> _trace = new();
@@ -73,6 +74,20 @@ public sealed class CanonicalTriggerRuntime
     }
 
     public long Generation => _generation;
+
+    /// <summary>
+    /// Called only by ForgeRuntimeHost after provider ownership review. Generic trigger
+    /// scheduling remains centralized here even when the trigger semantic is community-defined.
+    /// </summary>
+    internal void RegisterExtensionTrigger(string triggerId, string ownerProviderId)
+    {
+        ValidateToken(triggerId, "trigger id", 256);
+        ValidateToken(ownerProviderId, "trigger owner", 160);
+        if (triggerId.StartsWith("forge.trigger.", StringComparison.Ordinal))
+            throw new InvalidOperationException("Canonical Forge triggers are reserved.");
+        if (!_extensionTriggers.TryAdd(triggerId, ownerProviderId))
+            throw new InvalidOperationException($"Extension trigger already registered: {triggerId}");
+    }
 
     public IDisposable Observe(string triggerId, string providerId, Action<ForgeTriggerContext> callback)
     {
@@ -102,17 +117,17 @@ public sealed class CanonicalTriggerRuntime
 
         if (!_isHost())
         {
-            Trace(ForgeTraceKind.EventRejectedNotHost, "Canonical trigger rejected on a non-host peer.", value);
+            Trace(ForgeTraceKind.EventRejectedNotHost, "Trigger rejected on a non-host peer.", value);
             return new ForgeDispatchResult(ForgeDispatchStatus.RejectedNotHost, 0, Array.Empty<ForgeObserverFailure>());
         }
 
         if (!_processed.Add(value.EventId))
         {
-            Trace(ForgeTraceKind.EventDuplicate, "Duplicate canonical trigger ignored.", value);
+            Trace(ForgeTraceKind.EventDuplicate, "Duplicate trigger ignored.", value);
             return new ForgeDispatchResult(ForgeDispatchStatus.Duplicate, 0, Array.Empty<ForgeObserverFailure>());
         }
 
-        Trace(ForgeTraceKind.EventAccepted, "Canonical trigger accepted by host scheduler.", value);
+        Trace(ForgeTraceKind.EventAccepted, "Trigger accepted by the Forge host scheduler.", value);
         if (!_observers.TryGetValue(value.TriggerId, out var observers) || observers.Count == 0)
             return new ForgeDispatchResult(ForgeDispatchStatus.Accepted, 0, Array.Empty<ForgeObserverFailure>());
 
@@ -235,11 +250,11 @@ public sealed class CanonicalTriggerRuntime
             _trace.Dequeue();
     }
 
-    private static void ValidateTriggerId(string value)
+    private void ValidateTriggerId(string value)
     {
         ValidateToken(value, "trigger id", 256);
-        if (!value.StartsWith("forge.trigger.", StringComparison.Ordinal))
-            throw new ArgumentException("Canonical trigger ids must use the forge.trigger namespace.", nameof(value));
+        if (!value.StartsWith("forge.trigger.", StringComparison.Ordinal) && !_extensionTriggers.ContainsKey(value))
+            throw new ArgumentException("Trigger is neither canonical Forge nor a registered extension trigger.", nameof(value));
     }
 
     private static void ValidatePayload(IReadOnlyDictionary<string, string>? payload)
