@@ -28,5 +28,7 @@ jobs:
         run: dotnet --info
       - name: Build dependency-free core
         run: dotnet build ForgeRuntime/ForgeRuntime.Core.csproj --configuration Release --nologo
+      - name: Restore runtime contract harness
+        run: dotnet restore ForgeRuntime.Tests/ForgeRuntime.Tests.csproj --nologo
       - name: Run runtime contract harness
         run: dotnet run --project ForgeRuntime.Tests/ForgeRuntime.Tests.csproj --configuration Release --no-restore
