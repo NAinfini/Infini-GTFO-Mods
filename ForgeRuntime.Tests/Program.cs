@@ -11,6 +11,10 @@ var tests = new (string Name, Action Run)[]
     ("new expedition clears state and increments generation", ExpeditionReset),
     ("invalid canonical namespaces fail closed", InvalidNamespace),
     ("reentrant duplicate cannot execute twice", ReentrantDuplicate),
+    ("canonical rule evaluates conditions then actions", CanonicalRule),
+    ("false condition stops actions", FalseConditionStops),
+    ("extension action runs under Forge trigger scheduling", ExtensionAction),
+    ("missing or duplicate rule capabilities fail closed", RuleValidation),
 };
 
 var failures = new List<string>();
@@ -166,4 +170,71 @@ static void ReentrantDuplicate()
     });
     runtime.Publish(E("reentrant"));
     Equal(1, count);
+}
+
+static void CanonicalRule()
+{
+    var triggers = new CanonicalTriggerRuntime(() => true);
+    var logic = new ForgeLogicRuntime(triggers);
+    var spawned = 0;
+    logic.RegisterCondition("forge.condition.has_key", "forge.core", (context, p) =>
+        context.Event.Payload?.TryGetValue("key", out var key) == true && key == p["key"]);
+    logic.RegisterAction("forge.action.enemy.spawn", "forge.core", (context, p) =>
+    {
+        spawned += int.Parse(p["count"]);
+        context.SetState("last_spawn", p["enemy"]);
+    });
+    using var rule = logic.InstallRule(new ForgeRuleDefinition(
+        "door_spawn",
+        "forge.trigger.door.opened",
+        new[] { new ForgeConditionStep("forge.condition.has_key", new Dictionary<string, string> { ["key"] = "red" }) },
+        new[] { new ForgeActionStep("forge.action.enemy.spawn", new Dictionary<string, string> { ["enemy"] = "titan", ["count"] = "3" }) }));
+    var result = triggers.Publish(new ForgeTriggerEvent("rule-event", "forge.trigger.door.opened", "door:42", 1,
+        new Dictionary<string, string> { ["key"] = "red" }));
+    Equal(ForgeDispatchStatus.Accepted, result.Status);
+    Equal(3, spawned);
+    True(logic.GetTrace().Any(row => row.Kind == ForgeLogicTraceKind.RuleCompleted));
+}
+
+static void FalseConditionStops()
+{
+    var triggers = new CanonicalTriggerRuntime(() => true);
+    var logic = new ForgeLogicRuntime(triggers);
+    var called = 0;
+    logic.RegisterCondition("forge.condition.allowed", "forge.core", (_, _) => false);
+    logic.RegisterAction("forge.action.test", "forge.core", (_, _) => called++);
+    using var rule = logic.InstallRule(new ForgeRuleDefinition("blocked", "forge.trigger.door.opened",
+        new[] { new ForgeConditionStep("forge.condition.allowed") },
+        new[] { new ForgeActionStep("forge.action.test") }));
+    triggers.Publish(E("blocked-event"));
+    Equal(0, called);
+    True(logic.GetTrace().Any(row => row.Kind == ForgeLogicTraceKind.ConditionStoppedRule));
+}
+
+static void ExtensionAction()
+{
+    var triggers = new CanonicalTriggerRuntime(() => true);
+    var logic = new ForgeLogicRuntime(triggers);
+    var created = false;
+    logic.RegisterAction("portal.action.create", "portalmod", (_, parameters) => created = parameters["id"] == "A");
+    using var rule = logic.InstallRule(new ForgeRuleDefinition("portal", "forge.trigger.door.opened",
+        Array.Empty<ForgeConditionStep>(),
+        new[] { new ForgeActionStep("portal.action.create", new Dictionary<string, string> { ["id"] = "A" }) }));
+    triggers.Publish(E("portal-event"));
+    True(created);
+    True(logic.GetTrace().Any(row => row.ProviderId == "portalmod" && row.Kind == ForgeLogicTraceKind.ActionCompleted));
+}
+
+static void RuleValidation()
+{
+    var triggers = new CanonicalTriggerRuntime(() => true);
+    var logic = new ForgeLogicRuntime(triggers);
+    logic.RegisterAction("forge.action.test", "forge.core", (_, _) => { });
+    Throws<InvalidOperationException>(() => logic.RegisterAction("forge.action.test", "other", (_, _) => { }));
+    Throws<InvalidOperationException>(() => logic.InstallRule(new ForgeRuleDefinition("missing", "forge.trigger.door.opened",
+        new[] { new ForgeConditionStep("forge.condition.missing") }, Array.Empty<ForgeActionStep>())));
+    using var rule = logic.InstallRule(new ForgeRuleDefinition("one", "forge.trigger.door.opened",
+        Array.Empty<ForgeConditionStep>(), new[] { new ForgeActionStep("forge.action.test") }));
+    Throws<InvalidOperationException>(() => logic.InstallRule(new ForgeRuleDefinition("one", "forge.trigger.door.opened",
+        Array.Empty<ForgeConditionStep>(), new[] { new ForgeActionStep("forge.action.test") }));
 }
