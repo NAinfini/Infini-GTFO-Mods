@@ -6,9 +6,9 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Production native sources compiled against game/Harmony doubles; no GTFO assembly is loaded. -->
-    <Compile Include="../../Native/WeaponNativeSession.cs;../../Native/WeaponNativeHooks.cs;../../Native/EquipmentNativeAdapter.cs" />
-    <Compile Include="Program.cs;GameDoubles.cs" />
+    <!-- Production native sources compiled against loader/game doubles; no GTFO assembly is loaded. -->
+    <Compile Include="../../Native/Plugin.cs;../../Native/WeaponNativeSession.cs;../../Native/WeaponNativeHooks.cs;../../Native/EquipmentNativeAdapter.cs" />
+    <Compile Include="Program.cs;GameDoubles.cs;LoaderDoubles.cs" />
     <ProjectReference Include="../../ForgeWeapon.csproj" />
   </ItemGroup>
 </Project>

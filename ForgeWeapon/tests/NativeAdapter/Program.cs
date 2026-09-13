@@ -3,11 +3,15 @@ using System.Text.Json;
 using ForgeRuntime.Framework;
 using ForgeWeapon;
 using ForgeWeapon.Native;
+using HarmonyLib;
 using Player;
 using SNetwork;
+using Host = ForgeRuntime.Plugin;
+using WeaponPlugin = ForgeWeapon.Native.Plugin;
 
-// Production WeaponNativeSession / EquipmentNativeAdapter / hook postfixes + compiled Weapon + compiled SDK.
-// Native state is a managed double: every exit case below is synthetic and NOT game-verified.
+// Production Weapon plugin / WeaponNativeSession / EquipmentNativeAdapter / hook postfixes + compiled Weapon + compiled SDK.
+// Native state is a managed double: every exit case below is synthetic and NOT game-verified. The gtfo.player
+// provider here is a fixture standing in for ForgeMap; only its SDK surface (resolver + instance lookup) is used.
 if (args.Length != 1) { Console.Error.WriteLine("Usage: NativeAdapter <report.json>"); return 2; }
 var checks = new List<object>(); int passed = 0, failed = 0;
 void Case(string name, Action test)
@@ -190,7 +194,7 @@ Case("exit.world-switch-clears-and-reobserves", () =>
     Hook(stored, p.Backpack); var old = w.EntityOf(item.Instance!)!;
     w.Kernel.BeginWorld(8); w.Tick();
     Require(w.Session!.Identity.Count == 0 && !w.Current(old), "Old world observation survived.");
-    var reissued = new EntityReference("fixture.player:a", 8, 1);
+    var reissued = new EntityReference("gtfo.player:a", 8, 1);
     w.PlayerRefs[p.Net] = reissued; w.LivePlayers.Clear(); w.LivePlayers.Add(reissued);
     Hook(stored, p.Backpack); var next = w.EntityOf(item.Instance!)!;
     Require(next.WorldEpoch == 8 && next.Id == "gtfo.equipment:8.1" && w.Current(next), "New world did not re-observe.");
@@ -241,21 +245,84 @@ Case("authority.client-or-gated-observation-ignored", () =>
     SNet.IsMaster = true; w.CanExecute = false; Hook(stored, p.Backpack); Require(w.Session.Identity.Count == 0, "Gated host recorded equipment.");
     w.CanExecute = true; w.Tick(host: false); Hook(stored, p.Backpack); Require(w.Session.Identity.Count == 0, "Client tick recorded equipment.");
 });
-Case("contract.rejected-observation-does-not-fault", () =>
+Case("owner.non-current-player-reference-is-unresolved", () =>
 {
+    // The SDK re-checks the provider's answer, so a reference its resolver no longer accepts never reaches the index.
     var w = new World(); var p = w.Player("a"); w.LivePlayers.Clear(); World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
     Hook(stored, p.Backpack);
-    Require(w.Reports.Contains("weapon.observation-rejected: equipment.owner-not-current") && !w.Session!.Faulted
-        && w.Session.Adapter.TrackedCount == 0 && w.Session.Identity.Count == 0, "Rejected observation faulted or leaked a handle.");
+    Require(w.Reports.SequenceEqual(new[] { "weapon.owner-unresolved: backpack items are not recorded without a player reference from its owning domain." })
+        && !w.Session!.Faulted && w.Session.Adapter.TrackedCount == 0 && w.Session.Identity.Count == 0, "Non-current owner was recorded or faulted.");
     w.LivePlayers.Add(p.Reference); Hook(stored, p.Backpack);
-    Require(w.Session!.Identity.Count == 1, "A rejection latched observation off.");
+    Require(w.Session!.Identity.Count == 1, "An unresolved owner latched observation off.");
 });
-Case("contract.unloaded-wielded-item-rejected", () =>
+Case("owner.resolved-through-sdk-player-lookup", () =>
+{
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
+    Hook(stored, p.Backpack); var entity = w.EntityOf(item.Instance!)!;
+    Require(w.Session!.Identity.TryResolve(entity, out var o, out _) && o!.Owner == p.Reference, "Owner was not the SDK player reference.");
+    Require(w.LookupInputs.Count > 0 && w.LookupInputs.All(i => ReferenceEquals(i, p.Net)),
+        "Weapon asked the player lookup about something other than the backpack's SNet_Player.");
+});
+Case("owner.new-player-life-retires-equipment-without-history", () =>
+{
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
+    p.Inventory.WieldedItem = (ItemEquippable)item.Instance!; Hook(stored, p.Backpack); var old = w.EntityOf(item.Instance!)!;
+    var revived = new EntityReference(p.Reference.Id, p.Reference.WorldEpoch, 2);
+    w.PlayerRefs[p.Net] = revived; w.LivePlayers.Clear(); w.LivePlayers.Add(revived);
+    Require(!w.Current(old), "Equipment stayed current after its owner's life ended.");
+    Hook(stored, p.Backpack); var next = w.EntityOf(item.Instance!)!;
+    Require(next.Id != old.Id && w.Current(next) && w.Session!.Identity.TryResolve(next, out var o, out _) && o!.Owner == revived,
+        "A new owner life did not start a new equipment life.");
+    w.Tick(); Require(w.Sink.Count == 0, "Owner life change synthesized wield history.");
+});
+Case("owner.missing-player-lookup-fails-closed", () =>
+{
+    var w = new World(playerLookup: false); var p = w.Player("a"); World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
+    Hook(stored, p.Backpack);
+    Require(w.Session!.Faulted && w.Session.Identity.Count == 0 && w.Session.Adapter.TrackedCount == 0
+        && w.Session.LastFault == "RuntimeContractException: gtfo.player"
+        && w.Reports.Count(r => r.StartsWith("Weapon equipment observation disabled", StringComparison.Ordinal)) == 1,
+        "Missing gtfo.player instance lookup did not fail closed: " + w.Session.LastFault);
+});
+Case("owner.lookup-inside-entity-inspection-is-stale-not-fault", () =>
+{
+    // Kernel entity inspection forbids nested kernel queries, so equipment cannot be observed through it; it must not latch.
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
+    Hook(stored, p.Backpack); var entity = w.EntityOf(item.Instance!)!;
+    var inspected = w.Kernel.InspectEntities(new[] { entity });
+    Require(inspected.Items.Single().Code == "stale-entity" && w.Current(entity) && !w.Session!.Faulted,
+        "Entity inspection changed equipment state: " + inspected.Items.Single().Code);
+});
+Case("contract.rejected-observation-does-not-fault", () =>
 {
     var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
     item.IsLoaded = false; p.Inventory.WieldedItem = (ItemEquippable)item.Instance!; Hook(stored, p.Backpack);
-    Require(w.Reports.Contains("weapon.observation-rejected: equipment.wielded-not-ready") && w.Session!.Identity.Count == 0
-        && !w.Session.Faulted, "Wielded unloaded item was recorded.");
+    Require(w.Reports.Contains("weapon.observation-rejected: equipment.wielded-not-ready") && !w.Session!.Faulted
+        && w.Session.Adapter.TrackedCount == 0 && w.Session.Identity.Count == 0, "Rejected observation faulted or leaked a handle.");
+    item.IsLoaded = true; Hook(stored, p.Backpack);
+    Require(w.Session!.Identity.Count == 1, "A rejection latched observation off.");
+});
+Case("log.life-wield-and-clear-lines-are-exact", () =>
+{
+    // These lines are the in-game checklist's expectations; any format drift must fail here first.
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
+    Hook(stored, p.Backpack); Hook(stored, p.Backpack);
+    p.Inventory.WieldedItem = (ItemEquippable)item.Instance!; Hook(typeof(LocalItemWielded), p.Inventory);
+    p.Backpack.Slots![(int)InventorySlot.GearStandard] = null; p.Inventory.WieldedItem = null; Hook(typeof(BackpackSlotCleared), p.Backpack);
+    World.Put(p.Backpack, InventorySlot.GearSpecial, 77, item.Instance); Hook(stored, p.Backpack);
+    w.Kernel.BeginWorld(8); w.Tick();
+    var reissued = new EntityReference("gtfo.player:a", 8, 1);
+    w.PlayerRefs[p.Net] = reissued; w.LivePlayers.Clear(); w.LivePlayers.Add(reissued);
+    Hook(stored, p.Backpack);
+    Require(w.Infos.SequenceEqual(new[]
+    {
+        "weapon.equipment-life-started id=gtfo.equipment:7.1 world=7 owner=gtfo.player:a ownerLife=1 slot=GearStandard resource=gtfo.gear:1234",
+        "weapon.wield-fact kind=equipped id=gtfo.equipment:7.1 owner=gtfo.player:a status=queued code=accepted",
+        "weapon.equipment-life-ended id=gtfo.equipment:7.1 reason=slot-changed",
+        "weapon.equipment-life-started id=gtfo.equipment:7.2 world=7 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:77",
+        "weapon.equipment-lives-cleared world=7 count=1 reason=world-changed",
+        "weapon.equipment-life-started id=gtfo.equipment:8.1 world=8 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:77"
+    }) && w.Reports.Count == 0, string.Join(" | ", w.Infos.Concat(w.Reports)));
 });
 Case("guard.unexpected-native-failure-latches", () =>
 {
@@ -277,6 +344,70 @@ Case("session.dispose-unregisters-then-unhooks", () =>
     Hook(stored, p.Backpack); session.Dispose();
     Require(w.Removes == 1 && WeaponNativeSession.Current == null, "Dispose was not idempotent or a hook revived the session.");
 });
+Case("plugin.off", () =>
+{
+    var w = new World(start: false); Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Off; Host.Runtime = w.Kernel;
+    string before = w.Kernel.ExportManifest(); new WeaponPlugin().Load();
+    Require(WeaponNativeSession.Current == null && Harmony.Patches == 0 && Harmony.Unpatches == 0 && w.Kernel.ExportManifest() == before,
+        "Off activated registration or native hooks.");
+});
+Case("plugin.missing-runtime", () =>
+{
+    Host.Runtime = null; var plugin = new WeaponPlugin(); Throws(null, plugin.Load); Throws(null, plugin.Load);
+    Require(Harmony.Patches == 0 && WeaponNativeSession.Current == null, "Unavailable host still installed patches.");
+});
+Case("plugin.existing-weapon-provider-conflict", () =>
+{
+    var w = new World(start: false); Host.Runtime = w.Kernel; using var existing = w.Kernel.RegisterModule(ModuleDefinition.Create());
+    string before = w.Kernel.ExportManifest(); Throws("provider-conflict", new WeaponPlugin().Load);
+    Require(Harmony.Patches == 0 && Harmony.Unpatches == 0 && WeaponNativeSession.Current == null && w.Kernel.ExportManifest() == before,
+        "Plugin patched or removed a provider it did not own.");
+});
+Case("plugin.partial-hook-failure", () =>
+{
+    var w = new World(start: false); Host.Runtime = w.Kernel; string before = w.Kernel.ExportManifest(); Harmony.FailPatchAt = 3;
+    Throws(null, new WeaponPlugin().Load);
+    Require(Harmony.Patches == 3 && Harmony.Unpatches == 1 && WeaponNativeSession.Current == null && w.Kernel.ExportManifest() == before,
+        "Partial native load survived rollback.");
+});
+Case("plugin.log-failure-rollback", () =>
+{
+    var w = new World(start: false); Host.Runtime = w.Kernel; string before = w.Kernel.ExportManifest();
+    var plugin = new WeaponPlugin(); plugin.Log.ThrowInfo = true; Throws(null, plugin.Load);
+    Require(Harmony.Patches == WeaponNativeHooks.Types.Count && Harmony.Unpatches == 1 && WeaponNativeSession.Current == null
+        && w.Kernel.ExportManifest() == before, "Post-registration failure leaked the module or hooks.");
+});
+Case("plugin.cleanup-failure-preserves-cause", () =>
+{
+    var w = new World(start: false); Host.Runtime = w.Kernel; string before = w.Kernel.ExportManifest();
+    var plugin = new WeaponPlugin(); plugin.Log.ThrowInfo = true; Harmony.UnpatchFailure = new InvalidOperationException("unpatch");
+    try { plugin.Load(); }
+    catch (IOException error)
+    {
+        Require(error.Data.Contains("ForgeWeapon.LoadCleanupFailure") && WeaponNativeSession.Current == null
+            && w.Kernel.ExportManifest() == before && plugin.Log.Warnings.Count == 1, "Cleanup failure replaced the cause, stayed current or kept the provider.");
+        return;
+    }
+    throw new Exception("Expected load failure.");
+});
+Case("plugin.success-owner-from-player-namespace-no-hot-reload", () =>
+{
+    var w = new World(start: false); Host.Runtime = w.Kernel; var plugin = new WeaponPlugin();
+    plugin.Load();
+    var session = WeaponNativeSession.Current;
+    Require(session != null && Harmony.Patches == WeaponNativeHooks.Types.Count && plugin.Log.Infos.Count == 1, "Weapon native session was not installed.");
+    Throws(null, plugin.Load);
+    Require(Harmony.Patches == WeaponNativeHooks.Types.Count && !plugin.Unload(), "Repeated Load or hot unload changed native lifetime.");
+    w.StartRuntime();
+    var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234); Hook(stored, p.Backpack);
+    var entity = w.EntityOf(item.Instance!)!;
+    p.Inventory.WieldedItem = (ItemEquippable)item.Instance!; Hook(typeof(LocalItemWielded), p.Inventory); w.Tick();
+    Require(w.Sink.Count == 1 && w.Sink[0].Actor == p.Reference && w.Sink[0].Target == entity, "Plugin session did not publish the gtfo.player owner.");
+    Host.CanExecuteGameplay = false; p.Inventory.WieldedItem = null; Hook(typeof(LocalItemUnwielded), p.Inventory); w.Tick();
+    Require(w.Sink.Count == 1, "Host gameplay gate did not reach the adapter.");
+    w.Kernel.StopRuntime(); session!.Dispose();
+    Require(Harmony.Unpatches == 1 && WeaponNativeSession.Current == null, "Shutdown leaked hooks or the session.");
+});
 
 var result = new { verification = "production-native-weapon-sources-with-managed-game-doubles", gameExecuted = false,
     multiplayerExecuted = false, gameVerified = false, passed, failed, checks };
@@ -294,11 +425,12 @@ sealed class World : IDisposable
     private static readonly List<World> Live = new();
     private static readonly string[] PortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
     internal RuntimeKernel Kernel { get; } = new(new("fixture.weapon.native", "1.0.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
-    internal WeaponNativeSession? Session { get; private set; }
+    internal WeaponNativeSession? Session => WeaponNativeSession.Current;
+    internal readonly List<object> LookupInputs = new();
     internal readonly Dictionary<SNet_Player, EntityReference> PlayerRefs = new();
     internal readonly HashSet<EntityReference> LivePlayers = new();
     internal readonly List<(string EventId, EntityReference Target, EntityReference Actor)> Sink = new();
-    internal readonly List<string> Reports = new();
+    internal readonly List<string> Reports = new(), Infos = new();
     internal int Installs, Removes;
     internal bool CanExecute = true;
     internal Action? DuringInstall;
@@ -308,28 +440,43 @@ sealed class World : IDisposable
 
     internal sealed record Fixture(SNet_Player Net, PlayerAgent Agent, PlayerInventoryBase Inventory, PlayerBackpack Backpack, EntityReference Reference);
 
-    internal World(bool start = true)
+    internal World(bool start = true, bool playerLookup = true)
     {
         Live.Add(this);
         SNet.IsMaster = true;
         Kernel.BeginWorld(7);
+        // Stand-in for ForgeMap's gtfo.player surface: the resolver plus, unless disabled, the SNet_Player instance lookup.
         players = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new
         {
             providers = new[] { new { id = "fixture.players", kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()
         }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>(),
-            new Dictionary<string, Func<EntityReference, bool>> { ["fixture.player"] = r => LivePlayers.Contains(r) }));
+            new Dictionary<string, Func<EntityReference, bool>> { [EquipmentNativeAdapter.PlayerKind] = r => LivePlayers.Contains(r) })
+        {
+            EntityInstanceResolvers = playerLookup ? new Dictionary<string, Func<object, EntityReference?>>
+            {
+                [EquipmentNativeAdapter.PlayerKind] = instance =>
+                {
+                    LookupInputs.Add(instance);
+                    return instance is SNet_Player player && PlayerRefs.TryGetValue(player, out var reference) ? reference : null;
+                }
+            } : null
+        });
         consumer = Kernel.RegisterModule(ConsumerModule());
         if (!start) return;
         StartSession();
-        Kernel.StartRuntime(() => Kernel.LoadPlan(Plan(), new[] { ModuleDefinition.WieldReadPermission, RecordPermission }));
-        Kernel.Advance(0, true);
+        StartRuntime();
     }
 
     internal WeaponNativeSession StartSession(Action? install = null, Action? remove = null)
-        => Session = WeaponNativeSession.Start(Kernel, () => CanExecute,
-            new WeaponPlayerReferences(p => PlayerRefs.TryGetValue(p, out var r) ? r : null, r => LivePlayers.Contains(r)),
-            Reports.Add, install ?? (() => { Installs++; DuringInstall?.Invoke(); }), remove ?? (() => Removes++));
+        => WeaponNativeSession.Start(Kernel, () => CanExecute, Reports.Add, Infos.Add,
+            install ?? (() => { Installs++; DuringInstall?.Invoke(); }), remove ?? (() => Removes++));
+
+    internal void StartRuntime()
+    {
+        Kernel.StartRuntime(() => Kernel.LoadPlan(Plan(), new[] { ModuleDefinition.WieldReadPermission, RecordPermission }));
+        Kernel.Advance(0, true);
+    }
 
     internal void Tick(bool host = true) => Kernel.Advance(++tick, host);
 
@@ -339,7 +486,7 @@ sealed class World : IDisposable
         PlayerInventoryBase inventory = synced ? new PlayerInventorySynced() : new PlayerInventoryLocal();
         inventory.Owner = agent; agent.Inventory = inventory; net.PlayerAgent = new SNet_IPlayerAgent { Target = agent };
         var backpack = new PlayerBackpack { Owner = net }; PlayerBackpackManager.Backpacks[net] = backpack;
-        var reference = new EntityReference("fixture.player:" + id, Kernel.WorldEpoch, 1);
+        var reference = new EntityReference(EquipmentNativeAdapter.PlayerKind + ":" + id, Kernel.WorldEpoch, 1);
         if (resolved) { PlayerRefs[net] = reference; LivePlayers.Add(reference); }
         return new(net, agent, inventory, backpack, reference);
     }
@@ -423,7 +570,7 @@ sealed class World : IDisposable
         if (disposed) return;
         disposed = true;
         if (Kernel.StartupState != RuntimeStartupState.Registering) Kernel.StopRuntime();
-        if (Session != null && ReferenceEquals(WeaponNativeSession.Current, Session)) Session.Dispose();
+        WeaponNativeSession.Current?.Dispose();
         consumer.Dispose(); players.Dispose();
     }
 
@@ -431,5 +578,6 @@ sealed class World : IDisposable
     {
         foreach (var world in Live.ToArray()) world.Dispose();
         Live.Clear(); PlayerBackpackManager.Backpacks.Clear(); SNet.IsMaster = true;
+        Harmony.Reset(); Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Play; Host.Runtime = null; Host.CanExecuteGameplay = true;
     }
 }

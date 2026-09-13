@@ -4,12 +4,13 @@ using ForgeRuntime.Framework;
 
 namespace ForgeWeapon.Native;
 
-/// <summary>Native equipment observation lifetime on the host's single Runtime.
-/// There is deliberately no BepInEx entry point: no domain publishes player references yet,
-/// and Weapon must not create them, so nothing in a game process can start this session.</summary>
+/// <summary>Native equipment observation lifetime on the host's single Runtime, started by <see cref="Plugin"/>.
+/// Owners are never created here: the adapter asks the SDK for the gtfo.player references ForgeMap records,
+/// and the identity session re-checks them through the same SDK entry.</summary>
 internal sealed class WeaponNativeSession : IDisposable
 {
     internal static WeaponNativeSession? Current { get; private set; }
+    internal static string? LastCleanupDiagnostic { get; private set; }
     private readonly RuntimeKernel _kernel;
     private readonly Action<string> _report;
     private readonly Action _removeHooks;
@@ -25,22 +26,22 @@ internal sealed class WeaponNativeSession : IDisposable
     { _kernel = kernel; _report = report; _removeHooks = removeHooks; }
 
     internal static WeaponNativeSession Start(RuntimeKernel kernel, Func<bool> canExecute,
-        WeaponPlayerReferences players, Action<string> report, Action installHooks, Action removeHooks)
+        Action<string> report, Action<string> info, Action installHooks, Action removeHooks)
     {
         ArgumentNullException.ThrowIfNull(kernel); ArgumentNullException.ThrowIfNull(canExecute);
-        ArgumentNullException.ThrowIfNull(players); ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(report); ArgumentNullException.ThrowIfNull(info);
         ArgumentNullException.ThrowIfNull(installHooks); ArgumentNullException.ThrowIfNull(removeHooks);
         if (Current != null)
             throw new InvalidOperationException("Weapon native observation is single-instance per process.");
         if (!kernel.IsRegistrationOpen)
-            throw new InvalidOperationException("Weapon must register before Runtime startup.");
+            throw new InvalidOperationException("Weapon must register during dependent plugin Load, before Runtime startup.");
         var session = new WeaponNativeSession(kernel, report, removeHooks);
         bool hooksAttempted = false;
         try
         {
-            session.Adapter = new EquipmentNativeAdapter(kernel, () => !session._faulted && canExecute(), players, report);
+            session.Adapter = new EquipmentNativeAdapter(kernel, () => !session._faulted && canExecute(), report, info);
             // Duplicate provider registration throws here, before any detour is attempted.
-            session.Identity = new EquipmentIdentitySession(kernel, session.Adapter.IsNativeCurrent, players.IsCurrent);
+            session.Identity = new EquipmentIdentitySession(kernel, session.Adapter.IsNativeCurrent, kernel.IsEntityCurrent);
             session.Adapter.Attach(session.Identity);
             Current = session;
             hooksAttempted = true; installHooks();
@@ -54,11 +55,7 @@ internal sealed class WeaponNativeSession : IDisposable
             if (session.Identity != null) Cleanup(session.Identity.Dispose, errors);
             if (ReferenceEquals(Current, session)) Current = null;
             session._disposed = true;
-            if (errors.Count != 0)
-            {
-                try { original.Data["ForgeWeapon.CleanupFailures"] = new AggregateException(errors); }
-                catch (Exception attachment) { session.LastReporterFailure = attachment.GetType().Name; }
-            }
+            if (errors.Count != 0) PreserveCleanupFailure(original, "ForgeWeapon.CleanupFailures", new AggregateException(errors), report);
             throw;
         }
     }
@@ -71,7 +68,8 @@ internal sealed class WeaponNativeSession : IDisposable
         try { callback(Adapter); }
         catch (Exception error)
         {
-            // Contract rejections are handled per observation inside the adapter; anything reaching here is unexpected.
+            // Contract rejections are handled per observation inside the adapter; anything reaching here is unexpected,
+            // including a missing gtfo.player instance lookup, which must stop observation rather than record ownerless items.
             _faulted = true;
             var errors = new List<Exception>();
             Cleanup(Adapter.Clear, errors);
@@ -109,6 +107,17 @@ internal sealed class WeaponNativeSession : IDisposable
         catch (Exception unavailable) { message = "<message unavailable: " + unavailable.GetType().Name + ">"; }
         var description = error.GetType().Name + ": " + message;
         return description.Length <= 2048 ? description : description[..2048];
+    }
+
+    internal static void PreserveCleanupFailure(Exception original, string key, Exception cleanup, Action<string> report)
+    {
+        // One bounded diagnostic. Hostile exception accessors or a broken logger must not replace the primary exception.
+        string diagnostic = key + ": " + Describe(cleanup);
+        try { original.Data[key] = cleanup; }
+        catch (Exception attachment) { diagnostic += "; attachment=" + attachment.GetType().Name; }
+        try { report(diagnostic); }
+        catch (Exception reporter) { diagnostic += "; reporter=" + reporter.GetType().Name; }
+        LastCleanupDiagnostic = diagnostic.Length <= 4096 ? diagnostic : diagnostic[..4096];
     }
 
     private static void Cleanup(Action action, List<Exception> errors)

@@ -105,13 +105,3 @@ namespace Player
             => Backpacks.TryGetValue(player, out backpack!);
     }
 }
-
-namespace HarmonyLib
-{
-    [AttributeUsage(AttributeTargets.Class)]
-    public sealed class HarmonyPatch : Attribute { public HarmonyPatch(Type type, string name) { } }
-    [AttributeUsage(AttributeTargets.Method)] public sealed class HarmonyPostfix : Attribute { }
-    [AttributeUsage(AttributeTargets.Method)]
-    public sealed class HarmonyPriority : Attribute { public HarmonyPriority(int priority) { } }
-    public static class Priority { public const int First = 800, Last = 0; }
-}

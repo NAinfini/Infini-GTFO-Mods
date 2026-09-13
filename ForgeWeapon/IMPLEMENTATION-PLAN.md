@@ -34,9 +34,10 @@
 - 背包存入后的读回就是初始采集，不补造历史。
 - 实例身份由原生接线按世界递增生成，读回探测严格比对指针、槽位、资源与 owner。
 - 通过公开 SDK 注册两个观察型 trigger：`forge.trigger.input.equipped` 与 `forge.trigger.input.unequipped`，所需权限 `gtfo.equipment.wield.read`。只注册 runtimeBinding。
+- 游戏加载入口 `NAinfini.ForgeWeapon`（implementation-only）：依赖宿主与 `NAinfini.ForgeMap`，带 Off 门、注册与 Hook 回滚、故障锁存，不热卸载。装备 owner 只经 SDK 的 `ResolveEntityInstance("gtfo.player", …)` 从 ForgeMap 取得、以 `IsEntityCurrent` 复核；Weapon 不猜、不自造、不读 Lookup、不引用 ForgeMap 程序集。
 
 仍未做的：
-- 游戏内加载入口。`gtfo.player` resolver 已由 ForgeMap MAP5a 注册（implementation-only），剩余阻塞是公开 SDK 没有 SNet_Player→EntityReference 的原生实例查询：编号与 lifeEpoch 归 Map 私有，唯一稳定键 Lookup 是 Steam64 账号 ID、不能作公开键，Weapon 不猜、不自造、不引用 ForgeMap。所需最小 SDK API 见 [README](README.md#原生观察接线implementation-only)；该 API 落地后再写 Weapon 插件并声明依赖 `NAinfini.ForgeMap`。
+- 游戏内核验：按 [VALIDATION.md](VALIDATION.md#游戏内核验清单未执行) 的清单在隔离 profile 由用户当主机执行，覆盖拾取、切换、收起、换槽、转交、切世界、倒地救起、检查点与隐私检查。
 - 关卡拾取物、世界掉落与部署物等非背包生成路径的采集。
 - 方法体内的虚调用与字段写入语义核验。
 - 模型挂载、rig 与动画的运行时核验：目前只有 3 条离线静态调用边（DoWieldItem→FirstPersonItemHolder.SetWieldedItem 与 PlayAnimationsForWieldedItem，UnWield→FirstPersonItemHolder.UnWield）。
@@ -45,7 +46,7 @@
 
 **未观察到的转交历史不能由最终快照补造。**
 
-退出验收：同槽位新武器、同资源多实例、转交后的旧 owner、世界切换、陈旧指针，都不混淆；无隐式的包级兼容宣称。托管替身里这五类都已覆盖（`tests/NativeAdapter` 26/26），**都没有游戏验证**，退出验收因此仍未满足。
+退出验收：同槽位新武器、同资源多实例、转交后的旧 owner、世界切换、陈旧指针，都不混淆；无隐式的包级兼容宣称。托管替身里这五类都已覆盖（`tests/NativeAdapter` 38/38，含玩家换 life 与插件加载），**都没有游戏验证**，退出验收因此仍未满足。
 
 ## W2 — 攻击、命中和接收者链
 

@@ -8,17 +8,15 @@ using SNetwork;
 
 namespace ForgeWeapon.Native;
 
-/// <summary>Player references consumed from the player-owning domain. Weapon never derives them
-/// from slots, agents, names or pointers.</summary>
-internal sealed record WeaponPlayerReferences(Func<SNet_Player, EntityReference?> Resolve,
-    Func<EntityReference, bool> IsCurrent);
-
 /// <summary>Reconciles post-body native backpack readback with the single W1 identity index.
 /// The handle table only maps already-recorded lives to native objects; facts live in the index.</summary>
 internal sealed class EquipmentNativeAdapter
 {
     // The definition key is observed on this reviewed build; datablock content revisions are not observable here.
     internal const string ResourceRevision = "gtfo-build-20403457";
+    // Player lives belong to ForgeMap. Weapon only asks the SDK which current reference an SNet_Player has,
+    // so it never derives a player from slots, agents, names, pointers or the account key.
+    internal const string PlayerKind = "gtfo.player";
     private sealed record Handle(EntityReference Entity, PlayerBackpack Backpack, IntPtr BackpackPointer,
         IntPtr ItemPointer, IntPtr InstancePointer, int SlotIndex, string ResourceId, EntityReference Owner);
     private readonly Dictionary<IntPtr, Handle> _byInstance = new();
@@ -26,18 +24,18 @@ internal sealed class EquipmentNativeAdapter
     private readonly HashSet<IntPtr> _unresolvedReported = new();
     private readonly RuntimeKernel _kernel;
     private readonly Func<bool> _canExecute;
-    private readonly WeaponPlayerReferences _players;
-    private readonly Action<string> _report;
+    private readonly Action<string> _report, _info;
     private EquipmentIdentitySession? _identity;
     private long _world = -1, _next;
 
-    internal EquipmentNativeAdapter(RuntimeKernel kernel, Func<bool> canExecute, WeaponPlayerReferences players,
-        Action<string> report)
+    // Info lines are one per life start/end, observed wield fact or table clear, so in-game checks can follow
+    // each step without a consuming plan. They carry only Forge references, slot and resource keys.
+    internal EquipmentNativeAdapter(RuntimeKernel kernel, Func<bool> canExecute, Action<string> report, Action<string> info)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
         _canExecute = canExecute ?? throw new ArgumentNullException(nameof(canExecute));
-        _players = players ?? throw new ArgumentNullException(nameof(players));
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        _info = info ?? throw new ArgumentNullException(nameof(info));
     }
 
     internal void Attach(EquipmentIdentitySession identity)
@@ -74,9 +72,13 @@ internal sealed class EquipmentNativeAdapter
         SyncWorld();
         var pointer = backpack.Pointer;
         var player = backpack.Owner;
-        var owner = player == null ? null : _players.Resolve(player);
+        var owner = player == null ? null : _kernel.ResolveEntityInstance(PlayerKind, player);
         foreach (var stale in _byInstance.Values.Where(h => h.BackpackPointer == pointer).ToArray())
-            if (owner == null || owner != stale.Owner || !Matches(stale, backpack)) Retire(stale);
+        {
+            if (owner == null) Retire(stale, "owner-unresolved");
+            else if (owner != stale.Owner) Retire(stale, "owner-changed");
+            else if (!Matches(stale, backpack)) Retire(stale, "slot-changed");
+        }
         var slots = backpack.Slots;
         if (slots == null) return;
         var inventory = Inventory(player);
@@ -97,23 +99,31 @@ internal sealed class EquipmentNativeAdapter
                     || existing.ItemPointer != item.Pointer || existing.ResourceId != resource))
             {
                 // Moved or replaced: the old life ends; no transfer or re-wield history is reconstructed.
-                Retire(existing);
+                Retire(existing, "moved-or-replaced");
                 existing = null;
             }
+            bool recorded = existing != null;
             var handle = existing ?? new Handle(NewEntity(), backpack, pointer, item.Pointer, instancePointer, index, resource, owner);
             _byInstance[instancePointer] = handle; _byEntity[handle.Entity.Id] = handle;
+            var slot = ((InventorySlot)index).ToString();
             var observation = new EquipmentObservation(handle.Entity, resource, ResourceRevision, owner,
-                ((InventorySlot)index).ToString(), EquipmentLocation.Inventory, item.IsLoaded, Wielded(inventory, item));
+                slot, EquipmentLocation.Inventory, item.IsLoaded, Wielded(inventory, item));
             try
             {
                 var published = _identity!.Record(observation);
-                if (published != null && published.Status == "rejected")
-                    _report("weapon.wield-fact-rejected: " + published.Code);
+                if (!recorded)
+                    _info("weapon.equipment-life-started id=" + handle.Entity.Id + " world=" + Number(handle.Entity.WorldEpoch)
+                        + " owner=" + owner.Id + " ownerLife=" + Number(owner.LifeEpoch) + " slot=" + slot + " resource=" + resource);
+                if (published == null) continue;
+                if (published.Status == "rejected") _report("weapon.wield-fact-rejected: " + published.Code);
+                else _info("weapon.wield-fact kind=" + (observation.IsWielded ? "equipped" : "unequipped") + " id=" + handle.Entity.Id
+                    + " owner=" + owner.Id + " status=" + published.Status + " code=" + published.Code);
             }
             catch (RuntimeContractException error)
             {
                 _report("weapon.observation-rejected: " + error.Code);
-                Retire(handle);
+                // A life that never started is not reported as ended.
+                Retire(handle, recorded ? "observation-rejected" : null);
             }
         }
     }
@@ -126,7 +136,7 @@ internal sealed class EquipmentNativeAdapter
         if (backpack.Pointer != handle.BackpackPointer || !Matches(handle, backpack)) return false;
         var item = backpack.Slots![handle.SlotIndex]!;
         var player = backpack.Owner;
-        return player != null && _players.Resolve(player) == value.Owner
+        return player != null && _kernel.ResolveEntityInstance(PlayerKind, player) == value.Owner
             && ((InventorySlot)handle.SlotIndex).ToString() == value.Slot
             && Resource(item) == value.ResourceId && item.IsLoaded == value.IsReady
             && Wielded(Inventory(player), item) == value.IsWielded;
@@ -149,16 +159,26 @@ internal sealed class EquipmentNativeAdapter
         // The index clears itself on world, authority and stop transitions; that invalidates every handle.
         // Instance IDs are a per-world sequence; within one world the sequence never rewinds, because retired
         // lives of that world still block reuse of their IDs after an authority-loss clear.
-        if (world != _world) { Clear(); _world = world; _next = 0; }
-        else if (_byInstance.Count != 0 && _identity!.Count == 0) Clear();
+        if (world != _world) { ClearObserved("world-changed"); _world = world; _next = 0; }
+        else if (_byInstance.Count != 0 && _identity!.Count == 0) ClearObserved("identity-cleared");
     }
 
-    private void Retire(Handle handle)
+    private void ClearObserved(string reason)
+    {
+        int count = _byInstance.Count;
+        Clear();
+        if (count != 0) _info("weapon.equipment-lives-cleared world=" + Number(_world) + " count=" + Number(count) + " reason=" + reason);
+    }
+
+    private void Retire(Handle handle, string? reason)
     {
         _byInstance.Remove(handle.InstancePointer);
         _byEntity.Remove(handle.Entity.Id);
         _identity!.Remove(handle.Entity);
+        if (reason != null) _info("weapon.equipment-life-ended id=" + handle.Entity.Id + " reason=" + reason);
     }
+
+    private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
     private static bool Matches(Handle handle, PlayerBackpack backpack)
     {
