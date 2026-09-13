@@ -189,6 +189,19 @@ void RejectCode(Action action, string code, string name)
     Bad(p => Step(p)["layout"]!["inputs"]!.AsArray().RemoveAt(2), "layout-mismatch", "the promoted slot is part of the derived layout");
     Bad(p => Step(p)["inputs"]!.AsArray().RemoveAt(1), "missing-input", "a required promoted input must be driven");
     Bad(p => Step(p)["layout"]!.AsObject().Remove("promoted"), "missing-field", "every layout names its promotions");
+    {
+        // An enum literal is a valid parameter, but no enum value port exists at runtime, so its promotion is refused.
+        const string enumId = "example.promote_enum";
+        var enumSeed = JsonNode.Parse(Fixture.Module(enumId).RegistryJson)!;
+        enumSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"set\":\"compare_operator\"}"));
+        s.Kernel.RegisterModule(Fixture.Module(enumId) with { RegistryJson = enumSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) });
+        var plan = JsonNode.Parse(Fixture.Plan(s.Kernel, "promote_enum", enumId))!; var layout = Step(plan)["layout"]!;
+        layout["constants"] = JsonNode.Parse("[5,null]"); layout["promoted"] = JsonNode.Parse("[1]");
+        // compare_operator is the first shared enum set, so its compiled valueSet index is 0.
+        layout["inputs"]!.AsArray().Add(JsonNode.Parse("{\"index\":2,\"type\":5,\"cardinality\":0,\"valueSet\":0,\"lifetime\":-1,\"optional\":true,\"nullable\":false}"));
+        RejectCode(() => s.Kernel.LoadPlan(plan.ToJsonString(), Fixture.Permissions), "unsupported-input-port", "an enum parameter cannot be promoted onto a runtime input");
+        Check(!s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a refused enum promotion leaves no subscription");
+    }
     Check(!s.Kernel.HasSubscribers(Fixture.Trigger(id)), "rejected promotion plans leave no subscription");
     s.Kernel.LoadPlan(Promoted().ToJsonString(), Fixture.Permissions);
     RuntimeEvent Observed(string eventId, double amount) => new(eventId, Fixture.Trigger(id), s.World, 1, "shared-scope",
