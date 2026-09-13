@@ -35,6 +35,7 @@ public sealed class Plugin : BasePlugin
         ConfiguredMode = RuntimeSettings.Mode;
         var planPath = RuntimeSettings.PlanPath.Value;
         var permissions = RuntimeSettings.AllowedPermissions.Value;
+        var logLevel = RuntimeSettings.LogLevel;
         if (ConfiguredMode == RuntimeMode.Off)
         {
             Log.LogInfo("Infini Forge Runtime Off: framework hooks disabled; dependent plugins stay inactive.");
@@ -47,7 +48,7 @@ public sealed class Plugin : BasePlugin
         {
             harmony = new Harmony(PluginGuid);
             hostAttempted = true;
-            GameRuntimeBridge.Initialize(planPath, permissions);
+            GameRuntimeBridge.Initialize(planPath, permissions, logLevel);
             harmony.PatchAll(typeof(Plugin).Assembly);
             frameworkMonitor = AddComponent<FrameworkMonitor>();
             Log.LogInfo($"{PluginName} {PluginVersion} loaded in {ConfiguredMode} mode. Framework plans require explicit path and permissions; native bindings are not game-verified.");

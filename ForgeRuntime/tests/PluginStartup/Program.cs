@@ -18,6 +18,19 @@ Probe.Case("invalid mode fails before native initialization", () => {
     var p = Probe.Plugin((RuntimeMode)77); var error = Probe.LoadError(p);
     Probe.That(error != null && !Probe.Calls.Contains("host:init"), "invalid mode crossed native startup boundary");
 });
+Probe.Case("Logging.Level defaults to error and reaches the host", () => {
+    var p = Probe.Plugin(RuntimeMode.Play); p.Load();
+    Probe.That(GameRuntimeBridge.LogLevel == ForgeRuntime.Framework.RuntimeLogLevel.Error, "default log level did not reach host initialization");
+});
+Probe.Case("configured Logging.Level reaches the host", () => {
+    var p = Probe.Plugin(RuntimeMode.Authoring); p.Config.Preset["Logging.Level"] = "info"; p.Load();
+    Probe.That(GameRuntimeBridge.LogLevel == ForgeRuntime.Framework.RuntimeLogLevel.Info, "configured log level did not reach host initialization");
+});
+Probe.Case("invalid Logging.Level fails before native initialization", () => {
+    var p = Probe.Plugin(RuntimeMode.Play); p.Config.Preset["Logging.Level"] = "trace";
+    Probe.That(Probe.LoadError(p) is InvalidOperationException && !Probe.Calls.Contains("harmony:new") && !Probe.Calls.Contains("host:init"),
+        "trace or unknown log level crossed native startup boundary");
+});
 Probe.Case("successful Load cannot be repeated", () => {
     var p = Probe.Plugin(RuntimeMode.Play); p.Load(); var before = Probe.Calls.Count;
     Probe.That(Probe.LoadError(p) is InvalidOperationException && before == Probe.Calls.Count, "same plugin initialized twice");
@@ -57,7 +70,9 @@ Probe.Case("configuration edits do not change frozen startup selection", () => {
     ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Runtime.Mode"]).Value = "Off";
     ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Framework.PlanPath"]).Value = "other.json";
     ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Framework.AllowedPermissions"]).Value = "gtfo.enemy.health.write";
+    ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Logging.Level"]).Value = "off";
     Probe.That(Plugin.ConfiguredMode == RuntimeMode.Play, "running mode silently changed");
+    Probe.That(GameRuntimeBridge.LogLevel == ForgeRuntime.Framework.RuntimeLogLevel.Error, "running log level changed without restart");
     Probe.That(GameRuntimeBridge.Plan == "content/explicit.json" && GameRuntimeBridge.Grants == "gtfo.enemy.health.read", "running plan or grants changed without restart");
 });
 Probe.Case("unwritable exception Data preserves the startup exception", () => {

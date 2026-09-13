@@ -7,6 +7,7 @@
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../Framework/ForgeRuntime.Framework.csproj" />
     <Compile Include="../../RuntimeMode.cs" Link="Production/RuntimeMode.cs" />
     <Compile Include="../../RuntimeSettings.cs" Link="Production/RuntimeSettings.cs" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" />

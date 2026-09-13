@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="../../Framework/*.cs" Link="Framework/%(Filename)%(Extension)" />
     <Compile Include="../../GameBindings/GameRuntimeBridge.cs" Link="GameRuntimeBridge.cs" />
+    <Compile Include="../../Logging/RuntimeLogWriter.cs" Link="RuntimeLogWriter.cs" />
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
     <Compile Include="../../GameBindings/FrameworkFiles.cs" Link="FrameworkFiles.cs" />

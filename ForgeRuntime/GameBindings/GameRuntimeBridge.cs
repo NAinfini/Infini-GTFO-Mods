@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using BepInEx;
 using ForgeRuntime.Framework;
+using ForgeRuntime.Logging;
 using SNetwork;
 using UnityEngine;
 
@@ -14,6 +15,7 @@ internal static class GameRuntimeBridge
     internal const string GameBuild = "20403457";
     internal const string GameAssemblySha256 = "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55";
     internal static RuntimeKernel? Kernel { get; private set; }
+    private static RuntimeLogWriter? _log;
     private static bool _inLevel, _suspended, _wasHost, _blockedUntilLobby, _dispatching, _pendingInvalidation;
     private static long _epoch, _tick;
     private static bool _pendingStop;
@@ -32,7 +34,7 @@ internal static class GameRuntimeBridge
         }
     }
 
-    internal static void Initialize(string planPath, string permissions)
+    internal static void Initialize(string planPath, string permissions, RuntimeLogLevel logLevel)
     {
         if (Kernel != null) throw new InvalidOperationException("Forge Runtime is already initialized.");
         using (var stream = File.OpenRead(Path.Combine(Paths.GameRootPath, "GameAssembly.dll")))
@@ -46,7 +48,8 @@ internal static class GameRuntimeBridge
         _permissions = permissions.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
         _pendingStop = false; _reportedLifecycleFaults = 0;
         _inLevel = _suspended = _blockedUntilLobby = _dispatching = _pendingInvalidation = false; _epoch = 1; _tick = 0;
-        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, GameBuild), new RuntimeLimits());
+        _log = new RuntimeLogWriter(Path.Combine(Paths.BepInExRootPath, RuntimeLogWriter.DirectoryName), Plugin.PluginLog, RuntimeLogLimits.Default);
+        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, GameBuild), new RuntimeLimits(), _log, logLevel);
         Kernel.BeginWorld(_epoch);
         Kernel.RegisterModule(CombatContracts.Module());
     }
@@ -148,6 +151,7 @@ internal static class GameRuntimeBridge
         // Native teardown may occur inside a handler. Block commits immediately, clean the kernel at its safe point.
         if (_dispatching) { _pendingStop = true; return; }
         Kernel?.StopRuntime();
+        _log?.Dispose(); _log = null;
         _pendingStop = _pendingInvalidation = false;
         Kernel = null;
     }

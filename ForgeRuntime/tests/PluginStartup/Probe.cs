@@ -18,7 +18,7 @@ internal static class Probe
     internal static void Case(string name, Action test)
     {
         Calls.Clear(); Faults.Clear(); Components.Clear();
-        GameRuntimeBridge.Kernel = null;
+        GameRuntimeBridge.Kernel = null; GameRuntimeBridge.LogLevel = null;
         try { test(); Console.WriteLine("PASS " + name); }
         catch (Exception error) { Failures++; Console.Error.WriteLine("FAIL " + name + ": " + error.Message); }
         finally { GameRuntimeBridge.Kernel?.StopRuntime(); GameRuntimeBridge.Kernel = null; }

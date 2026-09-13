@@ -3,16 +3,19 @@ using System;
 namespace ForgeRuntime
 {
     internal enum RuntimeMode { Off, Authoring, Play }
-    internal static class Plugin { internal static readonly TestLog PluginLog = new(); }
-    internal sealed class TestLog
-    {
-        public readonly System.Collections.Generic.List<string> Messages = new();
-        public void LogInfo(object value) => Messages.Add("info:" + value);
-        public void LogWarning(object value) => Messages.Add("warning:" + value);
-        public void LogError(object value) => Messages.Add("error:" + value);
-    }
+    internal static class Plugin { internal static readonly BepInEx.Logging.ManualLogSource PluginLog = new(); }
 }
 namespace BepInEx { public static class Paths { public static string GameRootPath = ""; public static string BepInExRootPath = ""; } }
+namespace BepInEx.Logging
+{
+    public sealed class ManualLogSource
+    {
+        public readonly System.Collections.Generic.List<string> Messages = new();
+        public void LogInfo(object value) { lock (Messages) Messages.Add("info:" + value); }
+        public void LogWarning(object value) { lock (Messages) Messages.Add("warning:" + value); }
+        public void LogError(object value) { lock (Messages) Messages.Add("error:" + value); }
+    }
+}
 namespace UnityEngine { public class MonoBehaviour { public MonoBehaviour(IntPtr pointer) { } } }
 public enum eGameStateName { Inactive, Startup, Offline, FakeLobby, NoLobby, Lobby, Generating, ReadyToStopElevatorRide, StopElevatorRide, ReadyToStartLevel, InLevel, AfterLevel, Slim, CaptureRecall, ExpeditionSuccess, ExpeditionFail, ExpeditionAbort }
 public static class GameStateManager { public static eGameStateName CurrentStateName = eGameStateName.Lobby; }

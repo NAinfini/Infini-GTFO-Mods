@@ -184,7 +184,7 @@ if (args.Length >= 2 && args[0] == "--bridge")
     void InitializeBridge()
     {
         bridgeEnemies?.Dispose();
-        GameRuntimeBridge.Initialize("missing.json", grants);
+        GameRuntimeBridge.Initialize("missing.json", grants, RuntimeLogLevel.Error);
         bridgeEnemies = new EnemyModule(GameRuntimeBridge.Kernel!, () => GameRuntimeBridge.CanExecute, message => Plugin.PluginLog.LogWarning(message));
         GameRuntimeBridge.Kernel!.RegisterModule(Recorder(context => { records.Add(context); onRecord?.Invoke(); }));
     }
