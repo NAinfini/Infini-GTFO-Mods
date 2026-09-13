@@ -1,4 +1,4 @@
-"""Run current variadic/weighted code and canonical audits; new mutations remain unavailable."""
+"""Run variadic/weighted computations and canonical audits; --mutations proves each seeded defect is detected."""
 from __future__ import annotations
 import argparse
 import datetime
@@ -87,12 +87,40 @@ def main() -> int:
         if after != before:
             raise RuntimeError('Consumed source changed during the independent validation.')
         report['checksStatus'] = 'passed'
-        report['mutations'] = {'status':'not-executed', 'cases':[row[0] for row in MUTATIONS],
-                               'reason':'New mutation automation was not delivered; baseline tests are not mutation evidence.'}
         if args.mutations:
-            report['status'] = 'blocked'
-            print('BASELINE PASS; requested new mutation coverage is unavailable.', flush=True)
-            return 2
+            # Each defect is built from a hash-checked copy and judged against the clean run's reference
+            # vectors; a copy that fails to build aborts the gate instead of counting as detected.
+            cases = []
+            copy_sources = [p for p in sources(site) if p.suffix in {'.cs', '.csproj'} and p.is_relative_to(ROOT.parent)]
+            evidence = ['authoring-registration-cases.json', 'variadic-reference.json', 'weighted-reference.json']
+            for name, relative, old, new, group in [('clean-copy', None, None, None, None)] + MUTATIONS:
+                workspace = output/'mutations'/name; workspace.mkdir(parents=True, exist_ok=False)
+                for source in copy_sources:
+                    data = source.read_bytes()
+                    if hashlib.sha256(data).hexdigest() != before[str(source)]:
+                        raise RuntimeError('Source drift before mutation snapshot.')
+                    target = workspace/source.relative_to(ROOT.parent)
+                    target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(data)
+                if old is not None:
+                    target = workspace/'ForgeTrigger'/relative
+                    text = target.read_text(encoding='utf-8-sig')
+                    if text.count(old) != 1: raise RuntimeError('Mutation anchor is not unique: '+name)
+                    target.write_text(text.replace(old, new), encoding='utf-8')
+                mutated = build(name+'-build', workspace/'ForgeTrigger/tests/Acceptance/Acceptance.csproj', workspace/'build')
+                check = workspace/'evidence'; check.mkdir()
+                for file in evidence: (check/file).write_bytes((output/file).read_bytes())
+                code = run(name, ['dotnet', str(mutated), 'check', str(check)], allow_failure=True)
+                outcome = read(check/'acceptance-result.json')
+                detected = (code == 0 and outcome['status'] == 'passed') if old is None else \
+                    (code == 1 and outcome['status'] == 'failed' and len(outcome['failures']) > 0 and groups_executed(outcome))
+                cases.append({'name':name, 'group':group, 'detected':detected, 'exitCode':code,
+                              'assertions':outcome['assertions'], 'failures':outcome['failures'][:20], 'failureCount':len(outcome['failures'])})
+                if not detected: raise RuntimeError(('Clean copy did not pass: ' if old is None else 'Mutation was not detected: ')+name)
+            report['mutations'] = {'status':'passed', 'cases':cases}
+            if hashes() != before:
+                raise RuntimeError('Consumed source changed during mutation runs.')
+        else:
+            report['mutations'] = {'status':'not-requested', 'cases':[row[0] for row in MUTATIONS]}
         report['status'] = 'passed'
         print('PASS independent baseline; this is not a runtime-support certificate.', flush=True)
         return 0

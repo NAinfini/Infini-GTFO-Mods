@@ -2,15 +2,17 @@
 
 **上次更新：2026-09-13**（由原 `VALIDATION.md` 与 `VALIDATION-CURRENT.md` 合并而成，另并入 T1-CONTRACT-MAP、T1-T7-STATUS 与四份 T2 交接记录的实际结果）。
 
-## 当前结论：完整入口受阻于缺失的新 mutation 覆盖
+## 当前结论：完整入口通过（托管与跨语言证据）
 
 ```powershell
 python ForgeTrigger/tools/validate-trigger.py --mutations
 ```
 
-**2026-09-13 U-RUNTIME 迁移后执行**（`artifacts/trigger-20260913-094711`），进程退出 0，summary `status=blocked`、`checksStatus=passed`：pure、r3（1561 项；14 种错误实现，检出 14 种）、t1 均通过；independent 的基线 2625 项通过，但可变端口与权重抽样的新错误实现覆盖不可用，所以记为 blocked。此前"t1 因共享 heal 作者元数据标记失败"在本次不再复现（作者元数据 `metadataReady=true`）。
+**2026-09-13 Runtime 提升参数落地后执行**（`artifacts/trigger-20260913-101425`），进程退出 0，summary `status=passed`：pure（C# 1613 项，10 种错误实现全部检出）、t1（C# 928、TypeScript 392，`metadataReady=true`）、independent（Acceptance 2625 项，77 组可变端口与 300 组权重样例，6 种新错误实现全部检出）、r3（1561 项，14 种错误实现全部检出）。
 
-**blocked 不是通过**，不能作为发布或整体完成的判定；缺口见下面"错误实现检出"。
+同日较早的 `artifacts/trigger-20260913-100541` 在 t1 C# 失败：网站工作树的计划 layout 已带 `promoted` 字段，当时的 SDK 按未知字段拒绝。Runtime 实现提升参数后重跑即上面的通过记录；失败记录保留。
+
+**通过不等于可执行或可发布**：`runtimeReady=false`、`publicationReady=false`，T1 的 domain 差异门槛仍未过，全部证据都没有加载 GTFO。
 
 ## 各套件的最后记录
 
@@ -26,7 +28,7 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 | 空间跨端样例 | 78 组 237 项 | 已由 C# SpatialTests 实际消费，不再只是 TypeScript 预览 |
 | T1 跨语言 | TypeScript 125、C# 75 | 27 个共享计划：3 接受、24 按预期理由在两种语言里拒绝 |
 | T1 目录审计 | 424 基础节点跨 8 类；56 个 typed 作者定义 | 190 个 Action 留在领域侧；56 个 ID 都在目录中且 0 个运行绑定 |
-| Acceptance（可变端口与权重） | 2082 项断言 | 77 组可变端口样例、300 组权重样例、780 项 BigInt 参考断言 |
+| Acceptance（可变端口与权重） | 2625 项断言 | 77 组可变端口样例、300 组权重样例 |
 | 作者元数据审计 | 52 个可登记元数据、9 个 variadic 精确拒绝、1 个共享 canonical 逐字段对照 | `runtimeReady=false`；52 个可登记元数据不等于 52 个可执行节点 |
 
 只有 `Pow` 使用 1e-14 相对误差，其余共享数值、向量与布尔输出精确匹配。**这不是任意平台任意输入的位级一致保证。**
@@ -37,7 +39,7 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 纯计算与集合的 10 种错误实现全部被检出，其中最初四种分别产生：ties-to-even 舍入 4 项失败、减法变加法 6 项失败、忽略显式种子 23 项失败、除零返回零 2 项失败。R3、空间与筛选的 14 种错误实现全部被检出：7 种覆盖原有的角色与空间边界（owner 回退、忽略 receiver、反向关系、unknown 变 false、球边界排除、连锁重复访问、平局排序不稳定），7 种覆盖新的筛选边界。
 
-新增的可变端口与权重抽样的六项错误实现**没有验证过**。当时 runner 的写入被工具安全检查拦截，半成品移到了 `handoff/validate-independent.incomplete.txt`；现在 `tools/validate-independent.py` 已存在，需要重跑确认。原十种 mutation 通过不能算作新的 weighted 与 variadic 错误实现已验证。
+可变端口与权重抽样的 6 种错误实现由 `tools/validate-independent.py --mutations` 执行：先把 hash 校验过的源码复制成原样副本（2625 项全部通过），再逐个注入错误、构建并用原样运行导出的参考向量检查，要求退出码 1、失败清单非空且两组检查都实际执行。结果：variadic 只取尾部 26 项失败、全部取尾部 14 项、并集配对 12 项；weighted 忽略质量 162 项、总是替换 176 项、忽略熵预算 2 项。运行前后源码 hash 一致。
 
 ## 已经解决的历史阻塞
 
@@ -45,13 +47,15 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 **生命周期订阅注销保护也已合入。** 曾经 417 项中剩余 2 项失败（`entity observer disposed lifecycle subscription`、`subscription remains intact`），根因是 `RemoveLifecycleObserver` 允许实体观察回调注销生命周期订阅。现在只在实体观察期间禁止该入口，普通清理、停止后清理与生命周期回调自注销都保留。`handoff/` 下的隔离补丁提案（`r3-observer-candidate.*`、`r3-observer-followup.*`）已经无效，不要再应用。
 
+**independent 缺失的 mutation 覆盖已补上。** 早先 runner 半成品曾放在 `handoff/validate-independent.incomplete.txt`，完整入口因此记为 blocked；现在由 `validate-independent.py` 实际执行，半成品已删除。
+
 **SDK 不支持 variadic 也已解除。** `RuntimeRegistry` 曾把 `graph.variadic` 当未知字段拒绝，导致 T1 的 C# 注册在 `RuntimeJson.Shape → RuntimeRegistry.Validate` 处失败。Runtime 的 R4a 能校验该元数据并按精确 revision 解析端口；U-RUNTIME 的 plan v2 加载器会按注册合同展开 variadic/portGroups，但 T1 的作者定义没有运行绑定，**元数据可登记不等于图已可执行**。
 
 历史失败日志全部保留在各自的 `artifacts/` 目录里，不用后来的绿色结果覆盖它们。
 
 ## 复跑
 
-完整入口（会失败，这是当前真实状态）：
+完整入口：
 
 ```powershell
 python ForgeTrigger/tools/validate-trigger.py --mutations

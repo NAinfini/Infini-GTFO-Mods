@@ -135,7 +135,7 @@ def main() -> int:
         errors=[]; blocked=[]
         for name,scope in report['scopes'].items():
             if scope.get('status')=='passed' and scope.get('exitCode')==0: continue
-            if name in {'t1','independent'} and scope.get('status')=='blocked' and scope.get('exitCode')==2 and scope.get('checksStatus')=='passed':
+            if name=='t1' and scope.get('status')=='blocked' and scope.get('exitCode')==2 and scope.get('checksStatus')=='passed':
                 blocked.append(name)
             else: errors.append(name)
         report['checksStatus']='failed' if errors else 'passed'

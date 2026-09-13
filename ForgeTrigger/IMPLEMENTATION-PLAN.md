@@ -34,9 +34,9 @@
 
 未过的门槛有三处，按优先级：
 
-**共享 heal 的作者元数据分歧（已不复现）。** 2026-09-13 U-RUNTIME 迁移后 t1 子项退出 0、`metadataReady=true`；完整入口现受阻于 independent 缺失的新 mutation 覆盖，见 [验证记录](VALIDATION.md)。
+**共享 heal 的作者元数据分歧（已不复现）。** 2026-09-13 完整入口通过（`artifacts/trigger-20260913-101425`），t1 子项 `metadataReady=true`，见 [验证记录](VALIDATION.md)。
 
-**目录与 typed 定义的 domain 差异。** 审计报告识别出 58 行差异：56 个当前作者定义相对目录多了 session，2 个记录在案的原生 Trigger fixture 定义与其目录 domain 不同。记录在案的原生 fixture 不是当前游戏支持的证据。所有者必须逐条定论，不能静默放宽或收窄某个 canonical 定义。
+**目录与 typed 定义的 domain 差异。** 2026-09-13 审计识别出 60 行差异：56 个作者定义相对目录多了 session；2 个作者定义多了 logic；`forge.trigger.combat.damage_applied` 与 `health_changed` 这 2 个记录在案的原生 fixture 定义缺目录的 player、多出 map/room/logic。两侧文件都归网站所有（目录与 `logic-primitives.ts`、原生 fixture），明细已交网站会话裁定。记录在案的原生 fixture 不是当前游戏支持的证据。所有者必须逐条定论，不能静默放宽或收窄某个 canonical 定义。
 
 **资源 revision 闭包语义。** 一个文本合法但不存在于资源目录里的 revision 当前被接受为 provenance。套件如实记录这个事实，不宣称有拒绝保证。
 
@@ -48,7 +48,7 @@
 
 **权重抽样的正式作者合同。** `forge.selector.target.weighted` 仍是规划目录项。需要网站给出正式的参数与端口合同，本包再接图绑定。`WithReplacement` 的结果是明确的 occurrence 列表，**不能直接伪装成禁止重复的 Runtime `entity`（`cardinality: many`）端口**。
 
-**可变端口的图接入。** 网站已把 all/any、add/multiply/minimum/maximum、union/intersection、sequence 升级为 1.1.0 并加上 variadic 元数据（重复输入用 `input_count`，sequence 用 `step_count`，作者参数范围 2…32），Runtime 的 R4a 已能校验和解析这些元数据但明确拒绝执行。本包等 R4 的完整 lowering 落地后再实现对应版本的计算、集合与控制接入。**不能删掉 variadic 字段、忽略版本断言、把新定义降级成旧定义，或把 Selector/Condition 包装成 Action 来制造通过结果。** 历史回归确需 1.0.0 时必须显式锁定并消费该版本的真实定义，与 1.1.0 的支持状态分开记录；生产导出不能自动降级。
+**可变端口的图接入。** 网站已把 all/any、add/multiply/minimum/maximum、union/intersection、sequence 升级为 1.1.0 并加上 variadic 元数据（重复输入用 `input_count`，sequence 用 `step_count`，作者参数范围 2…32），Runtime 的 Plan v2 加载器已能按参数展开这些元数据，但只执行 trigger→action 线性步骤，纯节点与控制节点没有 lowering。本包等 R4 的完整 lowering 落地后再实现对应版本的计算、集合与控制接入。**不能删掉 variadic 字段、忽略版本断言、把新定义降级成旧定义，或把 Selector/Condition 包装成 Action 来制造通过结果。** 历史回归确需 1.0.0 时必须显式锁定并消费该版本的真实定义，与 1.1.0 的支持状态分开记录；生产导出不能自动降级。
 
 **原生查询与提交前重验证。** LOS、碰撞、导航可达性都还没有；领域提交前的重新核验链路未接通。
 
