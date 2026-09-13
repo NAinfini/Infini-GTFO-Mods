@@ -8,7 +8,8 @@ namespace ForgeRuntime.Framework;
 
 /// <summary>One wired action input. The plan names both ends by frame slot; names are resolved once at load.</summary>
 internal sealed record StepInput(string Name, string EventPort, JsonElement Port);
-internal sealed record ResolvedStep(string NodeId, string BindingId, JsonElement Parameters, IReadOnlyList<StepInput> Inputs);
+/// <summary>Promoted names are parameters whose value arrives through an input; dispatch merges and revalidates them.</summary>
+internal sealed record ResolvedStep(string NodeId, string BindingId, JsonElement Parameters, IReadOnlyList<StepInput> Inputs, IReadOnlySet<string> Promoted);
 internal sealed record ResolvedEntry(string NodeId, string BindingId, IReadOnlyList<ResolvedStep> Steps);
 internal sealed record ResolvedPlan(string Id, string ResourceId, string ResourceRevision, string Domain, RuntimeLimits Limits,
     IReadOnlyList<ResolvedEntry> Entries, IReadOnlySet<string> Bindings, string Fingerprint);
@@ -20,7 +21,7 @@ internal sealed record ResolvedPlan(string Id, string ResourceId, string Resourc
 /// </summary>
 internal static class RuntimePlan
 {
-    private sealed record Node(string Id, string BindingId, JsonElement Parameters, JsonElement Contract);
+    private sealed record Node(string Id, string BindingId, JsonElement Parameters, JsonElement Contract, IReadOnlySet<string> Promoted);
 
     internal static ResolvedPlan Parse(string json, RuntimeIdentity identity, RuntimeLimits ceiling, RuntimeRegistry registry, IEnumerable<string> grantedPermissions)
     {
@@ -84,19 +85,29 @@ internal static class RuntimePlan
             var definitions = RuntimeJson.Rows(graph, "parameters");
             RuntimeJson.Require(definitions.All(p => RuntimeJson.Text(p, "type") != "recipient-policy"), "unsupported-parameter", nodeId);
             var layout = row.GetProperty("layout");
-            RuntimeJson.Shape(layout, "inputs outputs constants");
+            RuntimeJson.Shape(layout, "inputs outputs constants promoted");
             var constants = RuntimeJson.Rows(layout, "constants");
             RuntimeJson.Require(constants.Length == definitions.Length, "constant-frame", nodeId);
-            // Positional constants rebuild the keyed bag; null is the compiled spelling of "not authored".
+            // Strictly increasing declaration indices; each promoted value arrives through an input slot after the resolved inputs.
+            var promoted = new HashSet<string>(StringComparer.Ordinal); var last = -1;
+            foreach (var frame in RuntimeJson.Rows(layout, "promoted"))
+            {
+                var index = Slot(frame, definitions.Length, "promotion-frame", nodeId);
+                RuntimeJson.Require(index > last, "promotion-frame", nodeId); last = index;
+                promoted.Add(RuntimeJson.Text(definitions[index], "id"));
+            }
+            // Positional constants rebuild the keyed bag; null is the compiled spelling of "not authored" or "promoted".
             var keyed = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             for (var i = 0; i < definitions.Length; i++)
             {
-                if (constants[i].ValueKind != JsonValueKind.Null) { keyed.Add(RuntimeJson.Text(definitions[i], "id"), constants[i]); continue; }
-                RuntimeJson.Require(!RuntimeJson.Flag(definitions[i], "required"), "missing-constant", nodeId + "." + RuntimeJson.Text(definitions[i], "id"));
+                var name = RuntimeJson.Text(definitions[i], "id");
+                if (promoted.Contains(name)) { RuntimeJson.Require(constants[i].ValueKind == JsonValueKind.Null, "promoted-constant", nodeId + "." + name); continue; }
+                if (constants[i].ValueKind != JsonValueKind.Null) { keyed.Add(name, constants[i]); continue; }
+                RuntimeJson.Require(!RuntimeJson.Flag(definitions[i], "required"), "missing-constant", nodeId + "." + name);
             }
             var parameters = RuntimeJson.From(keyed);
-            RuntimeJson.Parameters(parameters, capability);
-            var contract = RuntimeGraphContracts.Resolve(graph, parameters);
+            RuntimeJson.Parameters(parameters, capability, promoted);
+            var contract = RuntimeGraphContracts.Resolve(graph, parameters, promoted);
             foreach (var side in new[] { "inputs", "outputs" })
                 RuntimeJson.Require(RuntimeJson.StableText(layout.GetProperty(side)) == RuntimeJson.StableText(RuntimeGraphContracts.Layout(contract, side)), "layout-mismatch", nodeId + "." + side);
             var inputs = RuntimeJson.Rows(contract, "inputs"); var outputs = RuntimeJson.Rows(contract, "outputs");
@@ -115,7 +126,7 @@ internal static class RuntimePlan
                 RuntimeJson.Require(RuntimeGraphContracts.RuntimeValueTypes.Contains(type) && (!RuntimeGraphContracts.Many(port) || type == "entity"),
                     kind == "trigger" ? "unsupported-event-port" : "unsupported-input-port", nodeId + "." + RuntimeJson.Text(port, "id"));
             }
-            return new Node(nodeId, bindingId, parameters, contract);
+            return new Node(nodeId, bindingId, parameters, contract, promoted);
         }
 
         var entries = new List<ResolvedEntry>(); var total = 0;
@@ -149,7 +160,7 @@ internal static class RuntimePlan
                 }
                 foreach (var target in targets.Where(p => RuntimeJson.Text(p, "type") != "execution" && !RuntimeJson.Flag(p, "optional")))
                     RuntimeJson.Require(inputs.Any(i => i.Name == RuntimeJson.Text(target, "id")), "missing-input", node.Id + "." + RuntimeJson.Text(target, "id"));
-                steps.Add(new ResolvedStep(node.Id, node.BindingId, node.Parameters, inputs));
+                steps.Add(new ResolvedStep(node.Id, node.BindingId, node.Parameters, inputs, node.Promoted));
             }
             RuntimeJson.Require(steps.Count > 0, "empty-entrypoint", trigger.Id); total += steps.Count;
             entries.Add(new ResolvedEntry(trigger.Id, trigger.BindingId, steps));

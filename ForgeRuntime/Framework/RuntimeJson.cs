@@ -142,9 +142,9 @@ public static class RuntimeJson
                         default: throw new RuntimeContractException("unsupported-port", type);
         }
     }
-    internal static void Parameters(JsonElement parameters, JsonElement capability)
+    internal static void Parameters(JsonElement parameters, JsonElement capability, IReadOnlySet<string>? promoted = null)
     {
-        var definitions = Rows(capability.GetProperty("graph"), "parameters");
+        var definitions = Rows(capability.GetProperty("graph"), "parameters").Where(p => promoted == null || !promoted.Contains(Text(p, "id"))).ToArray();
         Shape(parameters, string.Join(" ", definitions.Where(p => Flag(p, "required")).Select(p => Text(p, "id"))),
             string.Join(" ", definitions.Where(p => !Flag(p, "required")).Select(p => Text(p, "id"))));
         foreach (var definition in definitions)

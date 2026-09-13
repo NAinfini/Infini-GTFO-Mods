@@ -253,8 +253,8 @@ internal static class RuntimeGraphContracts
         }
     }
 
-    /// <summary>Expands variable ports and port groups; metadata and port order are preserved.</summary>
-    internal static JsonElement Resolve(JsonElement graph, JsonElement parameters)
+    /// <summary>Expands variable ports and port groups, then appends promoted value parameters as inputs; metadata and port order are preserved.</summary>
+    internal static JsonElement Resolve(JsonElement graph, JsonElement parameters, IReadOnlySet<string>? promoted = null)
     {
         var resolved = graph.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone(), StringComparer.Ordinal);
         long Size(string name, long minimum)
@@ -289,7 +289,32 @@ internal static class RuntimeGraphContracts
                 ports.InsertRange(end, added);
                 resolved[side] = RuntimeJson.From(ports);
             }
+        if (promoted is { Count: > 0 })
+        {
+            var definitions = RuntimeJson.Rows(graph, "parameters");
+            // Declaration order, not authoring order: the compiled frame must not depend on click order.
+            var moved = definitions.Where(p => promoted.Contains(RuntimeJson.Text(p, "id"))).ToArray();
+            var names = string.Join(" ", moved.Select(p => RuntimeJson.Text(p, "id")));
+            RuntimeJson.Require(moved.Length == promoted.Count && moved.All(p => RuntimeJson.Text(p, "role") == "value"), "promotion-role", names);
+            var inputs = resolved["inputs"].EnumerateArray().Concat(moved.Select(PromotedPort)).ToArray();
+            RuntimeJson.Require(inputs.Select(p => RuntimeJson.Text(p, "id")).Distinct(StringComparer.Ordinal).Count() == inputs.Length, "promotion-collision", names);
+            resolved["inputs"] = RuntimeJson.From(inputs);
+            resolved["parameters"] = RuntimeJson.From(definitions.Where(p => !promoted.Contains(RuntimeJson.Text(p, "id"))).ToArray());
+        }
         return RuntimeJson.From(resolved);
+    }
+    /// <summary>A literal moved onto an input keeps its value contract; bounds and members are rechecked per dispatch.</summary>
+    private static JsonElement PromotedPort(JsonElement parameter)
+    {
+        var type = RuntimeJson.Text(parameter, "type");
+        var port = new Dictionary<string, JsonElement>(StringComparer.Ordinal) {
+            ["id"] = parameter.GetProperty("id").Clone(), ["type"] = RuntimeJson.From(type == "recipient-policy" ? "policy" : type)
+        };
+        if (type == "recipient-policy") port["schema"] = RuntimeJson.From("forge.policy.recipient");
+        else if (Optional(parameter, "set") is { } set) port["schema"] = RuntimeJson.From(set);
+        if (parameter.TryGetProperty("unit", out var unit)) port["unit"] = unit.Clone();
+        if (!RuntimeJson.Flag(parameter, "required")) port["optional"] = RuntimeJson.From(true);
+        return RuntimeJson.From(port);
     }
     /// <summary>Dense slot frame of one resolved side, identical to the website's compiledNodeLayout.</summary>
     internal static JsonElement Layout(JsonElement resolved, string side)

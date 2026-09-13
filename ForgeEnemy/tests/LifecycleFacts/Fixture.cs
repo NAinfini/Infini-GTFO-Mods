@@ -37,7 +37,7 @@ internal static class Fixture
             nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean(), optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(),
             type = Array.IndexOf(PortTypes, p.GetProperty("type").GetString()), valueSet = -1
         }).ToArray();
-        return JsonSerializer.SerializeToNode(new { constants = Array.Empty<object>(), inputs = Slots("inputs"), outputs = Slots("outputs") })!;
+        return JsonSerializer.SerializeToNode(new { constants = Array.Empty<object>(), inputs = Slots("inputs"), outputs = Slots("outputs"), promoted = Array.Empty<int>() })!;
     }
 
     internal static int Slot(RuntimeKernel kernel, string bindingId, string side, string port)

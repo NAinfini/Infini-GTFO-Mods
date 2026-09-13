@@ -82,6 +82,28 @@ SDK 合同与注册探针 76 项、Enemy 消费方 66 项、Trigger 的 R3 消�
 
 以上都是托管替身、编译后元数据与本地原生签名证据，没有加载 GTFO，也没有安装。
 
+## 提升参数（layout.promoted）
+
+网站工作树的编译器开始为每个 layout 写出 `promoted`：严格递增的参数声明下标，被提升的参数在 `constants` 中必须为 null。加载器据此把这些 value 参数移出参数表，按声明顺序作为输入追加在展开后的输入之后（类型沿用参数；recipient-policy 变为 schema `forge.policy.recipient` 的 policy；枚举带 set；单位照抄；非必填即 optional），再与文件 layout 逐项比对。只有 role 为 value 的参数可以提升。含 recipient-policy 参数的能力在加载时仍以 `unsupported-parameter` 拒绝，policy 端口映射目前只用于与网站的合同推导保持一致。
+
+handler 不感知提升：dispatch 把事件送来的值并回 Parameters，再按注册合同重新校验边界与成员，**越界直接拒绝，不钳制**，handler 不被调用。输入仍只能来自触发事件槽位。
+
+新增拒绝码 `promotion-frame`（下标重复、逆序或越界）、`promoted-constant`（提升位置写了常量）、`promotion-role`、`promotion-collision`；删除提升槽位报 `layout-mismatch`，未驱动的必填提升输入报 `missing-input`，缺 `promoted` 字段报 `missing-field`。
+
+重跑结果：
+
+| 套件 | 结果 |
+| --- | --- |
+| Framework | 253；`--fixtures` 283，网站新增的 `promoted-constant` 与 `promoted-slot-missing` 非法计划分别报 `promoted-constant` 与 `layout-mismatch`；正例中值 7 进入 Parameters，值 500 以 `parameter-maximum` 拒绝 |
+| GraphContracts | 1911，0 失败；verify.py 通过 |
+| GameBindings | 默认 31；`--fixtures` 64 |
+| 宿主 | Architecture 36；HostIntegration 默认 42、`--host` 51（`2a20d18` 删除原型探针时去掉 2 项）；PluginStartup 35；HostConfiguration 66；LifecycleWork `--fixtures` 57；EntityObservation 75、`--probe-registration` 76 |
+| Enemy | LifecycleFacts 52/52（生成的计划与 `examples/limb-broken-heal.plan.json` 一致）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
+| Map / Weapon | MapContracts 通过；IdentityDispatchReview 20/20 |
+| Trigger | 完整入口通过，见 [Trigger 验证记录](../ForgeTrigger/VALIDATION.md) |
+
+GameBindings 的 `--bridge` 与 `--native` 本次没有重跑。全部是托管替身证据，没有加载 GTFO。
+
 ## 复跑
 
 从仓库根目录执行。宿主与 GameBindings 需要 `GTFO_BEPINEX_PATH` 或 `-p:GTFOBepInExPath=<BepInEx 目录>`。构建输出用 `--artifacts-path` 指向隔离目录，绝不写入已安装的插件目录。

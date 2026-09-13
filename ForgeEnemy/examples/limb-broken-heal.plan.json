@@ -54,7 +54,8 @@
             "type": 2,
             "valueSet": -1
           }
-        ]
+        ],
+        "promoted": []
       },
       "nodeId": "DamageObserved",
       "steps": [
@@ -109,7 +110,8 @@
                 "type": 11,
                 "valueSet": -1
               }
-            ]
+            ],
+            "promoted": []
           },
           "nodeId": "HealExplicitRecipient"
         }

@@ -310,13 +310,22 @@ public sealed partial class RuntimeKernel
                             if (pending.Event.Source != null) CheckEntity(pending.Event.Source);
                             RuntimeJson.Require(!cancelled.Contains((pending.Provider, pending.Event.ScopeId)), "scope-cancelled", pending.Event.ScopeId);
                             var inputs = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                            var merged = step.Promoted.Count == 0 ? null : step.Parameters.EnumerateObject().ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
                             foreach (var input in step.Inputs)
                             {
                                 if (!pending.Event.Outputs.TryGetProperty(input.EventPort, out var value)) continue;
-                                RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port); inputs.Add(input.Name, value);
+                                RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port);
+                                if (merged != null && step.Promoted.Contains(input.Name)) merged.Add(input.Name, value); else inputs.Add(input.Name, value);
+                            }
+                            var parameters = step.Parameters;
+                            if (merged != null)
+                            {
+                                // A computed value meets the bounds and members of the literal it replaced: rejected, never clamped.
+                                parameters = RuntimeJson.From(merged);
+                                RuntimeJson.Parameters(parameters, registry.Capabilities[RuntimeJson.Text(registry.Bindings[step.BindingId], "capabilityId")]);
                             }
                             var handler = registry.Handlers[step.BindingId];
-                            currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, step.Parameters, RuntimeJson.From(inputs));
+                            currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(inputs));
                             executed++; invoked = true;
                             result = NormalizeInvokedResult(handler(currentCommand));
                             if (result.Facts.Count > 0) PublishConfirmedFacts(result, step.BindingId, pending, simulationTick, events);

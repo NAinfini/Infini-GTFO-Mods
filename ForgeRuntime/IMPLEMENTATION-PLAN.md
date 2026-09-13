@@ -21,7 +21,7 @@
 | 事件 | `RuntimeEvent` 与 root/cause/scope/tick | 提交前后事件分开、必要的 source/owner/instigator 身份、稳定排序与跨域传播 |
 | 命令结果 | 六类 status + none/confirmed/unknown commitState | 请求量、实际量、成本、部分成功；不把 handler 抛错自动当成未提交 |
 | 时间/状态 | 有限 schedule、数值 contribution lease | 统一状态叠加、刷新与驱散、积分余数、声明的恢复；不新增专用 HoT 定时器 |
-| 图与事务 | Plan v2：位置 pin 表、按注册合同重推并逐项比对的 layout、位置常量；variadic 与 portGroups 在加载时展开；步骤输入只接触发事件槽位；recipient-policy 与提升参数明确拒绝 | 以真实 IR 明确 lowering、步骤间结果引用、预留与提交与释放 |
+| 图与事务 | Plan v2：位置 pin 表、按注册合同重推并逐项比对的 layout、位置常量；variadic 与 portGroups 在加载时展开；按 `promoted` 把 value 参数提升为输入，dispatch 并回参数并重新校验，越界拒绝；步骤输入只接触发事件槽位；含 recipient-policy 参数的能力仍明确拒绝 | 以真实 IR 明确 lowering、步骤间结果引用、预留与提交与释放 |
 | 网络与恢复 | **无**。当前只明确拒绝迁移与检查点 | 见下面 F3N 全部批次 |
 
 表中"后续"不是新增 C# 接口清单。先证明多个真实模块需要共同接口再定类型，不在骨架中放空服务、`NotImplementedException` 或万能 ServiceLocator。

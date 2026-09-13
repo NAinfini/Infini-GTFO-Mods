@@ -160,6 +160,47 @@ void RejectCode(Action action, string code, string name)
     Reject(() => s.Kernel.RegisterModule(planned with { RegistryJson = registry.ToJsonString() }), "planned catalog entry cannot register execution");
 }
 {
+    // Promotion: a value parameter becomes an input appended after the resolved inputs, driven by the event.
+    var s = new Scenario(); const string id = "example.promote"; var seen = new List<string>();
+    var module = Fixture.Module(id, ctx => {
+        seen.Add(ctx.Parameters.GetProperty("amount").GetDouble() + ":" + ctx.Inputs.TryGetProperty("amount", out _));
+        return CommandResult.Succeeded(RuntimeJson.EmptyObject);
+    });
+    var seed = JsonNode.Parse(module.RegistryJson)!;
+    seed["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"amount\",\"type\":\"number\"}"));
+    var handle = s.Kernel.RegisterModule(module with { RegistryJson = seed.ToJsonString(), EntityResolvers = s.Resolvers(id) });
+    JsonNode Step(JsonNode plan) => plan["entrypoints"]![0]!["steps"]![0]!;
+    JsonNode Promoted()
+    {
+        var plan = JsonNode.Parse(Fixture.Plan(s.Kernel, "promote", id))!; var layout = Step(plan)["layout"]!;
+        layout["constants"]![0] = null; layout["promoted"] = JsonNode.Parse("[0]");
+        layout["inputs"]!.AsArray().Add(JsonNode.Parse("{\"index\":2,\"type\":3,\"cardinality\":0,\"valueSet\":-1,\"lifetime\":-1,\"optional\":false,\"nullable\":false}"));
+        Step(plan)["inputs"]!.AsArray().Add(JsonNode.Parse("{\"slot\":2,\"fromEventSlot\":2}"));
+        return plan;
+    }
+    void Bad(Action<JsonNode> mutate, string code, string name)
+    {
+        var plan = Promoted(); mutate(plan);
+        RejectCode(() => s.Kernel.LoadPlan(plan.ToJsonString(), Fixture.Permissions), code, name);
+    }
+    Bad(p => Step(p)["layout"]!["constants"]![0] = 5, "promoted-constant", "a promoted parameter has no constant");
+    Bad(p => Step(p)["layout"]!["promoted"] = JsonNode.Parse("[0,0]"), "promotion-frame", "promoted indices are strictly increasing");
+    Bad(p => Step(p)["layout"]!["promoted"] = JsonNode.Parse("[1]"), "promotion-frame", "a promoted index names a declared parameter");
+    Bad(p => Step(p)["layout"]!["inputs"]!.AsArray().RemoveAt(2), "layout-mismatch", "the promoted slot is part of the derived layout");
+    Bad(p => Step(p)["inputs"]!.AsArray().RemoveAt(1), "missing-input", "a required promoted input must be driven");
+    Bad(p => Step(p)["layout"]!.AsObject().Remove("promoted"), "missing-field", "every layout names its promotions");
+    Check(!s.Kernel.HasSubscribers(Fixture.Trigger(id)), "rejected promotion plans leave no subscription");
+    s.Kernel.LoadPlan(Promoted().ToJsonString(), Fixture.Permissions);
+    RuntimeEvent Observed(string eventId, double amount) => new(eventId, Fixture.Trigger(id), s.World, 1, "shared-scope",
+        RuntimeJson.From(new { target = new EntityReference(id + ":1", s.World, s.Life), amount }));
+    Check(handle.Publish(Observed("in-range", 7)).Status == "queued", "promoted value event queues");
+    Check(handle.Publish(Observed("over-range", 500)).Status == "queued", "an event value outside the parameter bounds is still a valid event");
+    var tick = s.Kernel.Advance(1, true);
+    Check(seen.SequenceEqual(new[] { "7:False" }), "the handler reads the promoted value as its parameter, not as a second input");
+    Check(tick.Commands.Count == 2 && tick.Commands[1].Result.Status == "rejected" && tick.Commands[1].Result.Code == "parameter-maximum",
+        "an out-of-bounds promoted value is rejected before invocation, never clamped");
+}
+{
     // Forge Standard v0.2 registration rules mirrored from the website's validateCapabilityGraph.
     void Bad(Action<JsonNode> mutate, string? code, string name)
     {
@@ -363,7 +404,7 @@ static class Fixture
             cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0, valueSet = -1, lifetime = -1,
             optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(), nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean()
         }).ToArray();
-        object Layout(JsonElement graph, object[] constants) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants };
+        object Layout(JsonElement graph, object[] constants) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants, promoted = Array.Empty<int>() };
         int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
         var trigger = Graph(Trigger(provider)); var action = Graph(provider + ".binding.apply");
         return RuntimeJson.From(new {
