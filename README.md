@@ -1,5 +1,9 @@
 # Infini GTFO Mods
 
+> **Forge 的计划、规范、接口与状态只写在两仓统一框架里**，本仓库不另写一份：
+> - 本地（两仓并排检出，反映工作树最新内容）：[`../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md`](../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md)
+> - 远端（只反映已提交内容）：<https://github.com/NAinfini/Infini-GTFO-Model-Site/blob/main/Docs/forge-contract/FORGE-FRAMEWORK.md>
+
 GTFO 模组源码仓库。每个模组占一个目录，源码、测试、文档、资源与发行产物随所属模组保存；根目录只保留仓库导航、架构说明、Agent 交接和公共验证解决方案。
 
 本文件只做导航。**构建状态、测试计数、架构断言数和批次位置一律见 [ARCHITECTURE.md](ARCHITECTURE.md)**，不在这里重复——以前三份根文档各写一份状态数字，结果是十来处互相矛盾。
