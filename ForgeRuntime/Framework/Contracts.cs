@@ -30,6 +30,9 @@ public sealed record RuntimeModule(string ApiVersion, string RegistryJson,
 {
     /// <summary>Optional read-only targeting snapshots, owned by the same registered entity namespace.</summary>
     public IReadOnlyDictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>? EntityObservers { get; init; }
+    /// <summary>Optional native-instance lookups, owned by the same registered entity namespace. The input is whatever
+    /// native object the owning provider documents; any other object must return null rather than guess.</summary>
+    public IReadOnlyDictionary<string, Func<object, EntityReference?>>? EntityInstanceResolvers { get; init; }
 }
 
 public sealed record RuntimeEvent(string EventId, string BindingId, long WorldEpoch, long SimulationTick,

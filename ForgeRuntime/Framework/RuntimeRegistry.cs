@@ -16,6 +16,7 @@ internal sealed class RuntimeRegistry
     internal readonly Dictionary<string, (string Owner, Func<EntityReference, bool> Resolve)> Resolvers = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, string> CapabilityRegistrants = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, (string Owner, Func<EntityReference, RuntimeEntitySnapshot?> Observe)> EntityObservers = new(StringComparer.Ordinal);
+    internal readonly Dictionary<string, (string Owner, Func<object, EntityReference?> Resolve)> EntityInstanceResolvers = new(StringComparer.Ordinal);
 
     internal RuntimeRegistry() { }
     private RuntimeRegistry(RuntimeRegistry source)
@@ -27,6 +28,7 @@ internal sealed class RuntimeRegistry
         foreach (var x in source.Support) Support.Add(x.Key, x.Value);
         foreach (var x in source.Resolvers) Resolvers.Add(x.Key, x.Value);
         foreach (var x in source.EntityObservers) EntityObservers.Add(x.Key, x.Value);
+        foreach (var x in source.EntityInstanceResolvers) EntityInstanceResolvers.Add(x.Key, x.Value);
         foreach (var x in source.CapabilityRegistrants) CapabilityRegistrants.Add(x.Key, x.Value);
     }
     internal RuntimeRegistry WithModule(RuntimeModule module, string apiVersion, out string providerId)
@@ -97,6 +99,18 @@ internal sealed class RuntimeRegistry
             }
             RuntimeJson.Require(next.EntityObservers.Count <= RuntimeKernel.MaximumEntityObservers,
                 "entity-observer-budget", "Entity observer budget exceeded.");
+        }
+        if (module.EntityInstanceResolvers != null)
+        {
+            foreach (var item in module.EntityInstanceResolvers)
+            {
+                RuntimeJson.Require(RuntimeJson.IsId(item.Key) && item.Value != null,
+                    "entity-instance-resolver", "Invalid entity instance resolver.");
+                RuntimeJson.Require(next.Resolvers.TryGetValue(item.Key, out var resolver) && resolver.Owner == providerId,
+                    "entity-instance-resolver-owner", "An instance resolver requires this provider's resolver.");
+                RuntimeJson.Require(next.EntityInstanceResolvers.TryAdd(item.Key, (providerId, item.Value!)),
+                    "entity-instance-resolver-conflict", item.Key);
+            }
         }
         next.Validate();
         return next;

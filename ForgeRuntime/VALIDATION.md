@@ -104,6 +104,35 @@ handler 不感知提升：dispatch 把事件送来的值并回 Parameters，再�
 
 GameBindings 的 `--bridge` 与 `--native` 本次没有重跑。全部是托管替身证据，没有加载 GTFO。
 
+## 原生实例解析（2026-09-13）
+
+Weapon 的 W1 游戏入口需要从 `SNet_Player` 取得 ForgeMap 登记的当前 `gtfo.player` 引用，SDK 此前只有拥有者内部的核验。本批在同一个 SDK 上增加三处公开接口，规则见 [Framework README](Framework/README.md#从原生实例取得引用)：
+
+```csharp
+public IReadOnlyDictionary<string, Func<object, EntityReference?>>? EntityInstanceResolvers { get; init; } // RuntimeModule
+public EntityReference? ResolveEntityInstance(string kind, object instance);                              // RuntimeKernel
+public bool IsEntityCurrent(EntityReference reference);                                                     // RuntimeKernel
+```
+
+版本：`RuntimeKernel.ApiVersion` 保持 2.0.0，它是与网站共享的 I-MANIFEST 版本，manifest 形状没有变化。宿主插件保持 1.2.0：这是纯增量接口，此前加入 `EntityObservers` 时同样没有递增，Map、Enemy 与 Weapon 的 `BepInDependency` 和测试都锁定 1.2.0。**代价是：若已有不含这些接口的 1.2.0 构建在外流通，Weapon 在其上会以缺失方法加载失败**；首次发布这组插件前需要维护者确认是否改为 1.3.0。
+
+新增 `tests/EntityObservation/InstanceResolutionTests.cs`，分为注册（归属、非法 key、原子性、跨模块拒绝、只问拥有者、注销）、就绪状态、失败文本（异常消息与内部异常不外泄）、答案核验（他人命名空间、前缀相近、旧世界、拥有者拒绝）、观察保护、`IsEntityCurrent` 真假、manifest 不变七组。
+
+隔离 `--artifacts-path` 构建，0 警告 0 错误：
+
+| 套件 | 退出码 | 输出结尾 |
+| --- | --- | --- |
+| Framework | 0 | `Framework checks: 255 passed.` |
+| EntityObservation | 0 | `Entity contracts: 118 passed; 0 failed. No native APIs exercised.` |
+| EntityObservation `--probe-registration` | 0 | `Entity contracts: 119 passed; 0 failed.` |
+| LifecycleWork `--fixtures` | 0 | `Lifecycle work: 57 assertions passed; 0 groups failed.` |
+| GameBindings（默认，`Program.cs` 未改） | 0 | `PASS 31 native-module boundary assertions. Native API execution and multiplayer are not exercised by these doubles.` |
+| Architecture | 0 | `PASS 36 architecture boundary assertions. No GTFO hooks, gameplay, networking or installation exercised.` |
+
+消费方结果见 [Map 验证记录](../ForgeMap/VALIDATION.md#map5a--gtfoplayer-原生实例解析2026-09-13) 与 [Weapon 验证记录](../ForgeWeapon/VALIDATION.md)。LifecycleWork 首次运行漏传 `--fixtures`，只打印用法后退出，补参数重跑。测试自身修过两处：非法 key 用例原先先命中 `entity-namespace`，前缀用例原先依赖未注册的命名空间；两处都改的是测试输入，没有放宽 SDK。
+
+本批没有重跑 GameBindings 的 `--fixtures` / `--bridge` / `--native`、HostIntegration、PluginStartup、HostConfiguration、GraphContracts、Enemy 与 Trigger 套件。全部是托管替身证据，没有加载 GTFO。
+
 ## 复跑
 
 从仓库根目录执行。宿主与 GameBindings 需要 `GTFO_BEPINEX_PATH` 或 `-p:GTFOBepInExPath=<BepInEx 目录>`。构建输出用 `--artifacts-path` 指向隔离目录，绝不写入已安装的插件目录。

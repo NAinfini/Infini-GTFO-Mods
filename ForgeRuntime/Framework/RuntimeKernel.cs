@@ -91,6 +91,8 @@ public sealed partial class RuntimeKernel
         foreach (var key in registry.Resolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.Resolvers.Remove(key);
         foreach (var key in registry.EntityObservers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
             registry.EntityObservers.Remove(key);
+        foreach (var key in registry.EntityInstanceResolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
+            registry.EntityInstanceResolvers.Remove(key);
         foreach (var id in plans.Where(x => x.Value.Modules.ContainsKey(provider)).Select(x => x.Key).ToArray()) plans.Remove(id);
         RebuildSubscriptions();
     }

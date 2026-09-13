@@ -55,6 +55,37 @@ public sealed partial class RuntimeKernel
         return new(complete ? "complete" : "partial", complete ? "entities-observed" : "entity-query-incomplete",
             context, requested, distinct.Length, items);
     }
+    /// <summary>Asks only the provider owning <paramref name="kind"/> for the current reference of a native instance.
+    /// No enumeration and no other provider is consulted; an unknown or no longer current instance is null.</summary>
+    public EntityReference? ResolveEntityInstance(string kind, object instance)
+    {
+        ReadThread(); AcceptRuntimeWork(); ArgumentNullException.ThrowIfNull(kind); ArgumentNullException.ThrowIfNull(instance);
+        if (StartupState != RuntimeStartupState.Ready || !worldStarted) return null;
+        RuntimeJson.Require(registry.EntityInstanceResolvers.TryGetValue(kind, out var resolver), "entity-resolver", kind);
+        observingEntities = true;
+        try
+        {
+            EntityReference? reference;
+            // Native instances and resolver failures can carry account-level identity, so neither reaches the error text.
+            try { reference = resolver.Resolve(instance); }
+            catch (Exception) { throw new RuntimeContractException("entity-resolver-failed", kind); }
+            if (reference == null) return null;
+            // The owner's answer is only trusted after the same routed check every published reference passes.
+            if (reference.Id == null || !reference.Id.StartsWith(kind + ":", StringComparison.Ordinal)) return null;
+            try { CheckEntity(reference); }
+            catch (RuntimeContractException) { return null; }
+            return reference;
+        }
+        finally { observingEntities = false; }
+    }
+
+    public bool IsEntityCurrent(EntityReference reference)
+    {
+        ReadThread(); AcceptRuntimeWork(); ArgumentNullException.ThrowIfNull(reference);
+        try { CheckEntity(reference); return true; }
+        catch (RuntimeContractException) { return false; }
+    }
+
     private RuntimeEntityInspection InspectEntity(EntityReference reference)
     {
         RuntimeEntityInspection Failure(string code) => new(reference, null, code);

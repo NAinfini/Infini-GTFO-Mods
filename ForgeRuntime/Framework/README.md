@@ -35,6 +35,18 @@
 
 查询完成性只覆盖显式请求的引用，**从不代表扫描了整个世界或某个空间区域**。世界枚举与分页查询属于后续 R3 工作。
 
+### 从原生实例取得引用
+
+编号与 lifeEpoch 由拥有该实体种类的模块私有分配，其他模块不能猜，也不能拿原生键（例如账号 ID）自造。因此拥有者可以在 `RuntimeModule.EntityInstanceResolvers` 里按种类登记 `Func<object, EntityReference?>`，把进程内活的原生对象映射为当前引用。注册规则与 observer 相同：key 必须是合法种类且值非空（`entity-instance-resolver`），同一模块必须拥有该种类的 `EntityResolvers`（`entity-instance-resolver-owner`），重复登记原子拒绝（`entity-instance-resolver-conflict`）；注销时移除，manifest 不导出。
+
+`RuntimeKernel.ResolveEntityInstance(kind, instance)` 只问该种类的唯一拥有者，不枚举、不回退到其他模块：
+- 所属线程；Failed / Stopped 抛 `runtime-not-ready`；注册期或世界未开始时返回 null。
+- 种类没有实例解析器抛 `entity-resolver`；解析器抛出的任何异常换成 `entity-resolver-failed`，消息只有种类名、不带内部异常，**实例和由它导出的键不进入错误文本**。
+- 答案必须以 `kind:` 开头，并通过与已发布引用相同的路由核验（当前世界、拥有者 resolver），否则返回 null。
+- 解析器在实体观察保护内执行：不能变更内核，也不能再查询内核（`entity-observer-mutation`）。
+
+`RuntimeKernel.IsEntityCurrent(reference)` 公开同一条路由核验，线程与状态限制相同，返回 bool，不抛出核验失败。
+
 ## 定时脉冲
 
 `Schedule` 返回 `ScheduleResult`：`Status`（`scheduled` / `duplicate` / `rejected`）、`Code` 和**可空**的 `Handle`。只有成功时才是 `RuntimeScheduleHandle`（`NextTick`、`DispatchedPulses`、`SkippedPulses`、`Status`/`Code` 和幂等的 `Cancel()`）；重复（`duplicate-schedule`）、同 ID 改定义（`schedule-id-conflict`）和各种拒绝的 `Handle` 都是 null，此时不产生任何定时工作。
