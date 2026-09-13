@@ -1,0 +1,11 @@
+{
+  "verification": "local-file-QA-only",
+  "jsonFilesParsed": 13,
+  "missingNewDocumentationLinks": [],
+  "trailingWhitespace": [],
+  "gameBinariesOutsideIgnoredBuildDirectories": [],
+  "gitDiffCheckExit": 0,
+  "gitDiffCheckOutput": "",
+  "note": "ForgeMap is currently untracked; explicit syntax/whitespace checks cover its new files. git diff alone is insufficient.",
+  "sharedAndMapSourcesStillMatchValidatedSnapshot": true
+}

@@ -1,0 +1,13 @@
+..........................F..............
+======================================================================
+FAIL: test_cli_output_is_accepted_by_the_website_report_reader (test_import_log.ImportLogTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\tests\test_import_log.py", line 163, in test_cli_output_is_accepted_by_the_website_report_reader
+    self.assertTrue(SITE_READER.is_file(), f"the website report reader is required for this cross-end check: {SITE_READER}")
+AssertionError: False is not true : the website report reader is required for this cross-end check: C:\Users\nainf\Github\Infini-GTFO-Model-Site\site\map-balance-report.js
+
+----------------------------------------------------------------------
+Ran 41 tests in 3.274s
+
+FAILED (failures=1)

@@ -1,0 +1,4244 @@
+{
+  "kind": "test-only-spatial-vectors",
+  "gameVerified": false,
+  "assertions": 237,
+  "world": {
+    "worldEpoch": 1,
+    "relations": [],
+    "actors": {
+      "source": {
+        "id": "test.spatial:origin",
+        "worldEpoch": 1,
+        "lifeEpoch": 1
+      }
+    },
+    "entities": [
+      {
+        "ref": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "ref": {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          1,
+          0,
+          0
+        ]
+      },
+      {
+        "ref": {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          -1,
+          0,
+          0
+        ]
+      },
+      {
+        "ref": {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          3,
+          0,
+          0
+        ]
+      },
+      {
+        "ref": {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          5,
+          0,
+          0
+        ]
+      },
+      {
+        "ref": {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          0,
+          3,
+          0
+        ]
+      },
+      {
+        "ref": {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        "kind": "enemy",
+        "faction": null,
+        "lifeState": "alive",
+        "tags": [],
+        "receives": [],
+        "position": [
+          3,
+          4,
+          0
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": []
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": []
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": []
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": []
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": []
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": []
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 1
+      },
+      "inputs": {
+        "targets": [],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 2
+      },
+      "inputs": {
+        "targets": [],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 4
+      },
+      "inputs": {
+        "targets": [],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 4
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 4
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 4
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 1,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 3,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "cylinder",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "farthest",
+      "parameters": {
+        "count": 8
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:d",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:c",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 1
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 4
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:v",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:v",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "nearest",
+      "parameters": {
+        "count": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "chain",
+      "parameters": {
+        "max_hops": 4,
+        "radius": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:a",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:b",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:c",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "test.spatial:d",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "start": {
+          "id": "test.spatial:origin",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      },
+      "expected": [
+        {
+          "id": "test.spatial:a",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        },
+        {
+          "id": "test.spatial:b",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    },
+    {
+      "name": "shape_overlap",
+      "parameters": {
+        "shape": "sphere",
+        "radius": 5,
+        "height": 2
+      },
+      "inputs": {
+        "targets": [
+          {
+            "id": "test.spatial:diagonal",
+            "worldEpoch": 1,
+            "lifeEpoch": 1
+          }
+        ],
+        "center": [
+          0,
+          0,
+          0
+        ],
+        "complete": true
+      },
+      "expected": [
+        {
+          "id": "test.spatial:diagonal",
+          "worldEpoch": 1,
+          "lifeEpoch": 1
+        }
+      ]
+    }
+  ]
+}

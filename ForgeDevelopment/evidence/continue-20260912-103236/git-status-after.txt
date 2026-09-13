@@ -1,0 +1,105 @@
+ M .gitignore
+ D BetterMaps.cs
+ D BoosterRollRules.cs
+ D BoosterTweaks.cs
+ D CHANGELOG.md
+ D CasualRules.cs
+ D CasualRuntime.cs
+ D CasualSettings.cs
+ M ForgeRuntime/ForgeRuntime.Core.csproj
+ M ForgeRuntime/Framework/Contracts.cs
+ M ForgeRuntime/Framework/README.md
+ M ForgeRuntime/Framework/RuntimeKernel.State.cs
+ M ForgeRuntime/Framework/RuntimeKernel.Timing.cs
+ M ForgeRuntime/Framework/RuntimeKernel.cs
+ M ForgeRuntime/tests/Framework/Framework.csproj
+ M ForgeRuntime/tests/Framework/Program.cs
+ D GameDataTweaks.cs
+ D InfiniTweaks.csproj
+ D ItemMarkers.cs
+ D PlayerTweaks.cs
+ D Plugin.cs
+ M README.md
+ D REVIEW.md
+ D ResourceHandling.cs
+ D ResourceHud.cs
+ D StatisticPeer.cs
+ D StatisticRow.cs
+ D StatisticsSync.cs
+ D TeamStatistics.cs
+ D assets/IMAGE_PROMPT.md
+ D assets/cover.png
+ D dist/InfiniTweaks.dll
+ D dist/NAinfini-InfiniTweaks-2.0.0.zip
+ D dist/NAinfini-InfiniTweaks-2.1.0.zip
+ D dist/NAinfini-InfiniTweaks-2.1.1.zip
+ D icon.png
+ D manifest.json
+ D tests/GameDoubles.cs
+ D tests/NativeContracts/NativeContracts.csproj
+ D tests/NativeContracts/Program.cs
+ D tests/Program.cs
+ D tests/Regression.csproj
+ D tests/historical-stats.json
+?? AGENT-HANDOFF.md
+?? ARCHITECTURE.md
+?? Forge.Architecture.sln
+?? ForgeDevelopment/
+?? ForgeEnemy/
+?? ForgeMap/
+?? ForgeRuntime/AUTHORING-SCOPE.md
+?? ForgeRuntime/AsyncReportWriter.cs
+?? ForgeRuntime/AuthoringSettings.cs
+?? ForgeRuntime/CHANGELOG.md
+?? ForgeRuntime/CombatSampling.cs
+?? ForgeRuntime/DiagnosticLogClassifier.cs
+?? ForgeRuntime/DiagnosticsReport.cs
+?? ForgeRuntime/ForgeRuntime.csproj
+?? ForgeRuntime/Framework/CombatContracts.cs
+?? ForgeRuntime/Framework/ForgeRuntime.Framework.csproj
+?? ForgeRuntime/Framework/HOST-LIFECYCLE.md
+?? ForgeRuntime/Framework/LifecycleContracts.cs
+?? ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs
+?? ForgeRuntime/GameBindings/
+?? ForgeRuntime/GenerationHooks.cs
+?? ForgeRuntime/IMPLEMENTATION-PLAN.md
+?? ForgeRuntime/PERFORMANCE-REVIEW.md
+?? ForgeRuntime/PerformanceDiagnostics.cs
+?? ForgeRuntime/PerformanceSampleWindow.cs
+?? ForgeRuntime/Plugin.cs
+?? ForgeRuntime/ProjectChecks.cs
+?? ForgeRuntime/ProjectInspectionSession.cs
+?? ForgeRuntime/ProjectObjectReferences.cs
+?? ForgeRuntime/R1-INTEGRATION-HANDOFF.md
+?? ForgeRuntime/R2A-HANDOFF.md
+?? ForgeRuntime/R2A-WORK-CLEANUP-HANDOFF.md
+?? ForgeRuntime/R2B-HOST-BOOTSTRAP.md
+?? ForgeRuntime/R2B-MIGRATION-HANDOFF.md
+?? ForgeRuntime/README.md
+?? ForgeRuntime/RuntimeDiagnostics.cs
+?? ForgeRuntime/SceneInventory.cs
+?? ForgeRuntime/ShutdownSequence.cs
+?? ForgeRuntime/TelemetryBridge.cs
+?? ForgeRuntime/VALIDATION.md
+?? ForgeRuntime/WorldInspection.cs
+?? ForgeRuntime/manifest.json
+?? ForgeRuntime/scripts/
+?? ForgeRuntime/tests/Architecture/
+?? ForgeRuntime/tests/DevelopmentInspection/
+?? ForgeRuntime/tests/Framework/ExecutionResultTests.cs
+?? ForgeRuntime/tests/GameBindings/
+?? ForgeRuntime/tests/HostIntegration/
+?? ForgeRuntime/tests/LifecycleWork/
+?? ForgeRuntime/tests/PluginStartup/
+?? ForgeRuntime/tests/ProjectChecks/
+?? ForgeRuntime/tests/Reports/
+?? ForgeRuntime/tests/Samples/
+?? ForgeRuntime/tests/SceneInventory/
+?? ForgeRuntime/tests/SceneInventoryTests.cs
+?? ForgeRuntime/tests/Telemetry/
+?? ForgeRuntime/tests/test_compare_runs.py
+?? ForgeRuntime/tests/test_import_log.py
+?? ForgeRuntime/tests/test_performance_report.py
+?? ForgeTrigger/
+?? ForgeWeapon/
+?? InfiniTweaks/

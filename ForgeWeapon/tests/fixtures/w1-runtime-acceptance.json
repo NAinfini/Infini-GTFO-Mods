@@ -1,0 +1,494 @@
+{
+  "schemaVersion": 1,
+  "kind": "acceptance-specification-not-runtime-plan",
+  "verification": "not-executed",
+  "synthetic": true,
+  "runtimeBindings": [],
+  "description": "W1 handoff inputs for the single Runtime identity/transaction services. The when/expect fields specify future assertions; no private resolver, ledger, scheduler or test double executes them here. Units prefixed fixture are not native GTFO units.",
+  "cases": [
+    {
+      "id": "same-slot-replacement",
+      "requires": [
+        "R2",
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "slot": "GearStandard",
+        "oldEntity": {
+          "id": "fixture.weapon.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "currentEntity": {
+          "id": "fixture.weapon.b",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "sameDefinition": true
+      },
+      "when": "Resolve a delayed action for oldEntity after replacement in the same slot.",
+      "expect": {
+        "status": "rejected",
+        "nativeCalls": 0,
+        "costCommits": 0,
+        "reason": "slot is not instance identity"
+      }
+    },
+    {
+      "id": "same-definition-two-instances",
+      "requires": [
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "definition": "fixture.rifle",
+        "revision": "fixture-r1",
+        "entities": [
+          {
+            "id": "fixture.weapon.a",
+            "worldEpoch": 7,
+            "lifeEpoch": 1
+          },
+          {
+            "id": "fixture.weapon.b",
+            "worldEpoch": 7,
+            "lifeEpoch": 1
+          }
+        ]
+      },
+      "when": "Resolve each instance independently.",
+      "expect": {
+        "distinctInstances": 2,
+        "aliasByDefinition": false
+      }
+    },
+    {
+      "id": "transfer-invalidates-old-owner",
+      "requires": [
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "entity": {
+          "id": "fixture.weapon.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "requestOwner": {
+          "id": "fixture.player.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "currentOwner": {
+          "id": "fixture.player.b",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        }
+      },
+      "when": "Submit a queued pre-transfer action.",
+      "expect": {
+        "status": "rejected",
+        "nativeCalls": 0,
+        "costCommits": 0
+      }
+    },
+    {
+      "id": "owner-transfer-aba",
+      "requires": [
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "ownerHistory": [
+          "fixture.player.a",
+          "fixture.player.b",
+          "fixture.player.a"
+        ],
+        "requestQueuedBeforeTransfers": true
+      },
+      "when": "Deliver the old request after the item returns to the original owner.",
+      "expect": {
+        "oldOwnershipScopeStillValid": false,
+        "nativeCalls": 0,
+        "note": "R3 must specify ownership-scope invalidation; owner equality alone is insufficient"
+      }
+    },
+    {
+      "id": "world-reuse",
+      "requires": [
+        "R2",
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "requestEntity": {
+          "id": "fixture.weapon.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "currentEntity": {
+          "id": "fixture.weapon.a",
+          "worldEpoch": 8,
+          "lifeEpoch": 1
+        }
+      },
+      "when": "Deliver a command from the old expedition/checkpoint world.",
+      "expect": {
+        "status": "rejected",
+        "nativeCalls": 0
+      }
+    },
+    {
+      "id": "owner-respawn",
+      "requires": [
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "requestOwner": {
+          "id": "fixture.player.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "currentOwner": {
+          "id": "fixture.player.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 2
+        },
+        "delayedEffect": "fixture.heal"
+      },
+      "when": "Apply an old life-bound equipment effect after respawn.",
+      "expect": {
+        "status": "rejected",
+        "nativeCalls": 0,
+        "implicitRevive": false
+      }
+    },
+    {
+      "id": "replicator-key-reuse",
+      "requires": [
+        "R3",
+        "W1"
+      ],
+      "given": {
+        "sameNativeReplicatorKey": true,
+        "oldInstanceDestroyed": true,
+        "newInstanceCreated": true
+      },
+      "when": "Resolve an old reference using only the recycled native key.",
+      "expect": {
+        "status": "rejected",
+        "nativeCalls": 0,
+        "note": "No native pointer or key is a persistent content identity"
+      }
+    },
+    {
+      "id": "last-shot-competition",
+      "requires": [
+        "R5",
+        "W3"
+      ],
+      "given": {
+        "unit": "round",
+        "available": 1,
+        "capacity": 10,
+        "transactions": [
+          {
+            "id": "shot-a",
+            "reserve": 1
+          },
+          {
+            "id": "shot-b",
+            "reserve": 1
+          }
+        ]
+      },
+      "when": "Submit both requests at the same tick through the single Runtime resource owner.",
+      "expect": {
+        "successfulCommits": 1,
+        "rejectedTransactions": 1,
+        "actualCost": 1,
+        "balance": 0,
+        "nativeShots": 1
+      }
+    },
+    {
+      "id": "shot-miss-still-costs",
+      "requires": [
+        "R5",
+        "W2",
+        "W3"
+      ],
+      "given": {
+        "unit": "round",
+        "available": 1,
+        "costPerShot": 1,
+        "nativeShotCommitted": true,
+        "hitCount": 0
+      },
+      "when": "Commit the fired shot that missed.",
+      "expect": {
+        "actualCost": 1,
+        "balance": 0,
+        "damageFacts": 0,
+        "refundForMiss": false
+      }
+    },
+    {
+      "id": "duplicate-shot-sync-hit",
+      "requires": [
+        "R3",
+        "R5",
+        "W2",
+        "W3"
+      ],
+      "given": {
+        "unit": "round",
+        "available": 5,
+        "attackId": "fixture.attack.1",
+        "callbacks": [
+          "local-shot",
+          "synced-shot",
+          "hit-observed",
+          "damage-observed"
+        ],
+        "nativeBaseDamageAlreadyCommitted": true
+      },
+      "when": "Deliver all observations, including a duplicate local callback, for one attack.",
+      "expect": {
+        "actualCost": 1,
+        "balance": 4,
+        "resubmittedBaseDamage": 0,
+        "note": "Callbacks are observations, not independent cost or damage requests"
+      }
+    },
+    {
+      "id": "cancel-or-expire-reservation",
+      "requires": [
+        "R5",
+        "W3"
+      ],
+      "given": {
+        "unit": "use",
+        "available": 1,
+        "reserved": 1,
+        "expiresAtTick": 20,
+        "attemptCommitAtTick": 20,
+        "nativeSubmitted": false
+      },
+      "when": "Commit at the excluded expiry boundary; also cover explicit cancellation before commit.",
+      "expect": {
+        "commitState": "none",
+        "nativeCalls": 0,
+        "heldAfterRelease": 0,
+        "balance": 1
+      }
+    },
+    {
+      "id": "reload-capacity-limit",
+      "requires": [
+        "R5",
+        "W3"
+      ],
+      "given": {
+        "unit": "round",
+        "clip": 9,
+        "clipCapacity": 10,
+        "reserve": 5,
+        "requestedTransfer": 3
+      },
+      "when": "Transfer reserve rounds into the clip atomically.",
+      "expect": {
+        "actualTransfer": 1,
+        "clip": 10,
+        "reserve": 4,
+        "unfulfilled": 2,
+        "createdRounds": 0
+      }
+    },
+    {
+      "id": "reload-source-limit",
+      "requires": [
+        "R5",
+        "W3"
+      ],
+      "given": {
+        "unit": "round",
+        "clip": 4,
+        "clipCapacity": 10,
+        "reserve": 2,
+        "requestedTransfer": 6
+      },
+      "when": "Transfer with insufficient reserve.",
+      "expect": {
+        "actualTransfer": 2,
+        "clip": 6,
+        "reserve": 0,
+        "unfulfilled": 4,
+        "createdRounds": 0
+      }
+    },
+    {
+      "id": "illegal-placement-release",
+      "requires": [
+        "R5",
+        "MAP2",
+        "W3",
+        "W5"
+      ],
+      "given": {
+        "unit": "use",
+        "available": 1,
+        "reserved": 1,
+        "surfaceValid": false,
+        "nativeSubmitted": false
+      },
+      "when": "Reject placement before native submission.",
+      "expect": {
+        "status": "rejected",
+        "commitState": "none",
+        "nativeSpawns": 0,
+        "balance": 1,
+        "heldAfterRelease": 0
+      }
+    },
+    {
+      "id": "deployed-but-readback-unknown",
+      "requires": [
+        "R5",
+        "W3",
+        "W5"
+      ],
+      "given": {
+        "unit": "use",
+        "availableBefore": 1,
+        "reserved": 1,
+        "nativeSubmissionAttempted": true,
+        "entityCreationObserved": true,
+        "costReadbackAvailable": false
+      },
+      "when": "Native placement may have committed, but its complete cost receipt cannot be read.",
+      "expect": {
+        "commitState": "unknown",
+        "actualCost": null,
+        "autoRefund": false,
+        "automaticResubmit": false,
+        "preserveSubmissionEvidence": true
+      }
+    },
+    {
+      "id": "duplicate-recall",
+      "requires": [
+        "R3",
+        "R5",
+        "W3",
+        "W5"
+      ],
+      "given": {
+        "deployedEntity": {
+          "id": "fixture.deployable.a",
+          "worldEpoch": 7,
+          "lifeEpoch": 1
+        },
+        "recallRequestId": "fixture.recall.1",
+        "deliveries": 2,
+        "inventorySpace": 1
+      },
+      "when": "Deliver a duplicated recall transaction after the first committed.",
+      "expect": {
+        "returnedItems": 1,
+        "duplicateItemGrants": 0,
+        "nativeRemovalCommits": 1
+      }
+    },
+    {
+      "id": "periodic-energy-exhaustion",
+      "requires": [
+        "R5",
+        "R6",
+        "W3",
+        "W4"
+      ],
+      "given": {
+        "unit": "fixture-energy",
+        "available": 1,
+        "costPerPulse": 0.5,
+        "scheduledTicks": [
+          10,
+          20,
+          30
+        ]
+      },
+      "when": "Reserve each pulse cost before its ordinary Action.",
+      "expect": {
+        "effectivePulses": 2,
+        "rejectedPulses": 1,
+        "actualCost": 1,
+        "balance": 0,
+        "freePulseAfterExhaustion": false
+      }
+    },
+    {
+      "id": "full-capacity-no-change",
+      "requires": [
+        "R5",
+        "W3"
+      ],
+      "given": {
+        "unit": "fixture-energy",
+        "balance": 10,
+        "capacity": 10,
+        "requestedAddition": 5
+      },
+      "when": "Apply a capacity-limited resource addition.",
+      "expect": {
+        "actualAddition": 0,
+        "unfulfilled": 5,
+        "balance": 10,
+        "resourceChangedFacts": 0
+      }
+    },
+    {
+      "id": "submitted-cost-is-not-reversible-buff",
+      "requires": [
+        "R5",
+        "R6",
+        "W3",
+        "W4"
+      ],
+      "given": {
+        "nativeShotAndCostCommitted": true,
+        "sourceDestroyedAfterCommit": true
+      },
+      "when": "Release source-owned leases and cancel remaining scheduled work.",
+      "expect": {
+        "undoCommittedDamage": false,
+        "refundCommittedShot": false,
+        "oldScheduledPulses": 0
+      }
+    },
+    {
+      "id": "all-target-budget-not-truncated",
+      "requires": [
+        "R3",
+        "R6",
+        "T4",
+        "W5"
+      ],
+      "given": {
+        "coverage": "all",
+        "matchedTargets": 5,
+        "targetBudget": 3,
+        "historicalPositionsAvailable": false
+      },
+      "when": "Evaluate the field branch and later resume after a skipped tick.",
+      "expect": {
+        "status": "rejected",
+        "actionsSubmitted": 0,
+        "silentlySelectedTargets": 0,
+        "retroactiveHitsUsingCurrentPositions": 0
+      }
+    }
+  ]
+}

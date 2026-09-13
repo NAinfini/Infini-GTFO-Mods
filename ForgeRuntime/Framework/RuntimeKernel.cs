@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -60,14 +60,14 @@ public sealed partial class RuntimeKernel
         var actual = RuntimeJson.From(Limits); var ceiling = RuntimeJson.From(new RuntimeLimits());
         foreach (var property in actual.EnumerateObject()) RuntimeJson.Integer(property.Value, 1, ceiling.GetProperty(property.Name).GetInt32());
     }
-    private void Thread()
-        => RuntimeJson.Require(Environment.CurrentManagedThreadId == threadId, "wrong-thread", "Runtime APIs must run on the owning simulation thread.");
+    private void Thread() { ReadThread(); AcceptRuntimeWork(); }
     private void Mutable()
-    { Thread(); RuntimeJson.Require(!advancing, "reentrant-mutation", "Cannot change registration, plans or world during dispatch."); }
+    { ReadThread(); NoLifecycleMutation(); RuntimeJson.Require(!advancing, "reentrant-mutation", "Cannot change registration, plans or world during dispatch."); }
     internal bool IsRegistered(string provider, long token) => modules.TryGetValue(provider, out var current) && current == token;
     public RuntimeModuleHandle RegisterModule(RuntimeModule module)
     {
-        Mutable(); RuntimeJson.Require(modules.Count < 128, "module-budget", "Module capacity reached.");
+        Mutable(); RuntimeJson.Require(IsRegistrationOpen, "registration-closed", "Module registration is frozen before host startup.");
+        RuntimeJson.Require(modules.Count < 128, "module-budget", "Module capacity reached.");
         var next = registry.WithModule(module, ApiVersion, out var provider);
         RuntimeJson.Require(next.Providers.Count <= 2048 && next.Capabilities.Count <= 2048 && next.Bindings.Count <= 2048, "registry-budget", "Registration capacity reached.");
         registry = next; var token = ++generation; modules.Add(provider, token);
@@ -83,23 +83,26 @@ public sealed partial class RuntimeKernel
             RuntimeJson.Require(!ownedCaps.Contains(RuntimeJson.Text(binding, "capabilityId")) && !RuntimeJson.Strings(binding.GetProperty("requires")).Any(ownedBindings.Contains), "module-in-use", "Another module still requires this module's contracts/bindings.");
         RuntimeJson.Require(!stateLeases.Values.Any(l => l.Handle.ProviderId != provider && ownedCaps.Contains(l.Key.Definition)), "module-in-use", "Another module still holds a lease of this definition.");
         StopScheduledSource(provider, null, "module-unregistered"); StopStateSource(provider, null, "module-unregistered");
+        RemoveLifecycleObservers(provider, handle.Generation);
         modules.Remove(provider); registry.Providers.Remove(provider);
         foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Support.Remove(id); }
         foreach (var id in ownedCaps) { registry.Capabilities.Remove(id); registry.CapabilityRegistrants.Remove(id); }
         foreach (var key in registry.Resolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.Resolvers.Remove(key);
+        foreach (var key in registry.EntityObservers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
+            registry.EntityObservers.Remove(key);
         foreach (var id in plans.Where(x => x.Value.Modules.ContainsKey(provider)).Select(x => x.Key).ToArray()) plans.Remove(id);
         RebuildSubscriptions();
     }
     public string ExportManifest()
     {
-        Thread(); return RuntimeJson.StableText(RuntimeJson.From(new {
+        ReadThread(); return RuntimeJson.StableText(RuntimeJson.From(new {
             schemaVersion = 1, runtime = Identity, registry = registry.Snapshot(),
             bindingSupport = registry.Support.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => x.Value).ToArray(), limits = Limits
         }));
     }
     public void LoadPlan(string json, IEnumerable<string> grantedPermissions)
     {
-        Mutable(); RuntimeJson.Require(plans.Count < 128, "plan-budget", "Plan capacity reached.");
+        Mutable(); AcceptRuntimeWork(true); RuntimeJson.Require(plans.Count < 128, "plan-budget", "Plan capacity reached.");
         var plan = RuntimePlan.Parse(json, Identity, Limits, registry, grantedPermissions);
         RuntimeJson.Require(!plans.ContainsKey(plan.Id), "plan-conflict", plan.Id);
         var providers = plan.Bindings.Select(b => RuntimeJson.Text(registry.Bindings[b], "providerId"))
@@ -119,20 +122,22 @@ public sealed partial class RuntimeKernel
                 work.Add(new Work(plan, entry));
             }
     }
-    public bool HasSubscribers(string bindingId) { Thread(); return subscriptions.ContainsKey(bindingId); }
+    public bool HasSubscribers(string bindingId) { ReadThread(); return subscriptions.ContainsKey(bindingId); }
     public void BeginWorld(long worldEpoch)
     {
-        Mutable(); RuntimeJson.Integer(worldEpoch);
+        Mutable(); AcceptRuntimeWork(true); RuntimeJson.Integer(worldEpoch);
         RuntimeJson.Require(!worldStarted || worldEpoch > WorldEpoch, "world-epoch", "A new world must advance its epoch.");
+        long? previousWorldEpoch = worldStarted ? WorldEpoch : null;
         StopScheduledSource(null, null, "world-ended"); StopStateSource(null, null, "world-ended");
         WorldEpoch = worldEpoch; worldStarted = true; CurrentTick = -1; worldHost = null; scheduledThisTick = 0;
         queue.Clear(); history.Clear(); cancelled.Clear(); planTickUsage.Clear(); eventsThisTick = commandsThisTick = 0;
+        NotifyLifecycle(RuntimeLifecycleKind.WorldChanged, previousWorldEpoch);
     }
     internal int CancelScope(RuntimeModuleHandle handle, string scopeId)
     {
         Thread(); RuntimeJson.Require(handle.IsRegistered, "module-unregistered", handle.ProviderId);
         RuntimeJson.Text(scopeId);
-        RuntimeJson.Require(cancelled.Count < MaximumEventHistory || cancelled.Contains((handle.ProviderId, scopeId)), "scope-budget", "Cancelled scope capacity reached.");
+        RuntimeJson.Require(cancelled.Count < MaximumEventHistory || cancelled.Contains((handle.ProviderId, scopeId)), "scope-budget", scopeId);
         cancelled.Add((handle.ProviderId, scopeId));
         var affected = queue.UnorderedItems.Count(x => x.Element.Provider == handle.ProviderId && x.Element.Event.ScopeId == scopeId);
         StopScheduledSource(handle.ProviderId, scopeId, "scope-cancelled"); StopStateSource(handle.ProviderId, scopeId, "scope-cancelled");
@@ -140,9 +145,10 @@ public sealed partial class RuntimeKernel
     }
     internal DispatchResult Publish(RuntimeModuleHandle handle, RuntimeEvent value)
     {
-        Thread();
+        ReadThread();
         try
         {
+            AcceptRuntimeWork();
             RuntimeJson.Require(handle.IsRegistered, "module-unregistered", handle.ProviderId);
             RuntimeJson.Require(registry.Bindings.TryGetValue(value.BindingId, out var binding) && RuntimeJson.Text(binding, "providerId") == handle.ProviderId, "binding-owner", value.BindingId);
             if (!subscriptions.TryGetValue(value.BindingId, out var registeredWork)) return new DispatchResult("ignored", "no-consumer", value.EventId);
@@ -209,7 +215,48 @@ public sealed partial class RuntimeKernel
         if (type == "entity") CheckEntity(RuntimeJson.Entity(value));
         else if (type == "entity-list") foreach (var item in value.EnumerateArray()) CheckEntity(RuntimeJson.Entity(item));
     }
-    public TickResult Advance(long simulationTick, bool isHost)
+    private static CommandResult PreInvocationFailure(RuntimeContractException error)
+    {
+        var code = CommandResult.TruncateCode(error.Code);
+        var detail = CommandResult.TruncateDetail(error.Message);
+        return code is "scope-cancelled" or "schedule-cancelled" or "binding-lifecycle" or "stale-entity" or "stale-world"
+            ? CommandResult.Cancelled(code, detail)
+            : CommandResult.Rejected(code, detail);
+    }
+    private static CommandResult NormalizeInvokedResult(CommandResult? result)
+    {
+        if (result == null) return CommandResult.FailedUnknown("null-result", "Handler returned null after invocation.");
+        if (CommandResultRules.TryValidate(result, out var violation)) return result;
+        var detail = CommandResult.TruncateDetail($"Invalid handler result ({violation}): status={result.Status}, commitState={result.CommitState}.");
+        return CommandResult.FailedUnknown(result.Outputs, "invalid-handler-result", detail, result.Facts.ToArray());
+    }
+    private void PublishConfirmedFacts(CommandResult result, string stepBindingId, Pending pending, long simulationTick, List<EventReceipt> events)
+    {
+        var owner = RuntimeJson.Text(registry.Bindings[stepBindingId], "providerId");
+        if (!modules.TryGetValue(owner, out var moduleGeneration))
+        {
+            for (var i = 0; i < result.Facts.Count; i++)
+                events.Add(new EventReceipt("fact:" + WorldEpoch + ":" + (++sequence), "rejected", "module-unregistered"));
+            return;
+        }
+        var handle = new RuntimeModuleHandle(this, owner, moduleGeneration);
+        for (var i = 0; i < result.Facts.Count; i++)
+        {
+            var fact = result.Facts[i];
+            var factId = "fact:" + WorldEpoch + ":" + (++sequence);
+            try
+            {
+                var dispatch = Publish(handle, new RuntimeEvent(factId, fact.BindingId, WorldEpoch, simulationTick, pending.Event.ScopeId, fact.Outputs, pending.Event.Source));
+                if (dispatch.Status == "rejected") events.Add(new EventReceipt(factId, dispatch.Status, dispatch.Code));
+            }
+            catch (Exception error)
+            {
+                var code = error is RuntimeContractException contract ? CommandResult.TruncateCode(contract.Code) : "fact-publish-failed";
+                events.Add(new EventReceipt(factId, "rejected", code));
+            }
+        }
+    }
+    private TickResult AdvanceCore(long simulationTick, bool isHost)
     {
         Thread(); RuntimeJson.Require(!advancing && worldStarted, "dispatch-lifecycle", "World must be started and dispatch cannot be recursive.");
         RuntimeJson.Integer(simulationTick); RuntimeJson.Require(simulationTick >= CurrentTick, "time-reversal", "Simulation time cannot go backwards.");
@@ -254,7 +301,7 @@ public sealed partial class RuntimeKernel
                     foreach (var step in item.Entry.Steps)
                     {
                         var commandId = RuntimeJson.StableText(RuntimeJson.From(new[] { pending.Provider, pending.Event.EventId, item.Plan.Plan.Id, step.NodeId }));
-                        CommandResult result; var invoked = false;
+                        CommandResult? result = null; var invoked = false;
                         try
                         {
                             RuntimeJson.Require(item.Plan.Modules.All(m => IsRegistered(m.Key, m.Value)), "binding-lifecycle", step.BindingId);
@@ -267,26 +314,26 @@ public sealed partial class RuntimeKernel
                                 var name = RuntimeJson.Text(port, "id"); if (!step.Inputs.TryGetValue(name, out var from) || !pending.Event.Outputs.TryGetProperty(from, out var value)) continue;
                                 RuntimeJson.ValidateValue(value, port); ValidateEntities(value, port); inputs.Add(name, value);
                             }
+                            var handler = registry.Handlers[step.BindingId];
                             currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, step.Parameters, RuntimeJson.From(inputs));
-                            executed++; invoked = true; result = registry.Handlers[step.BindingId](currentCommand) ?? CommandResult.Failed("null-result");
-                            if (result.Status == "succeeded")
-                            {
-                                var owner = RuntimeJson.Text(registry.Bindings[step.BindingId], "providerId");
-                                var facts = result.Facts;
-                                for (var i = 0; i < facts.Count; i++)
-                                {
-                                    var fact = facts[i];
-                                    var factId = "fact:" + WorldEpoch + ":" + (++sequence);
-                                    var dispatch = Publish(new RuntimeModuleHandle(this, owner, modules[owner]), new RuntimeEvent(factId, fact.BindingId, WorldEpoch, simulationTick, pending.Event.ScopeId, fact.Outputs, pending.Event.Source));
-                                    if (dispatch.Status == "rejected") events.Add(new EventReceipt(factId, dispatch.Status, dispatch.Code));
-                                }
-                            }
+                            executed++; invoked = true;
+                            result = NormalizeInvokedResult(handler(currentCommand));
+                            if (result.Facts.Count > 0) PublishConfirmedFacts(result, step.BindingId, pending, simulationTick, events);
                         }
-                        catch (RuntimeContractException ex) { result = invoked ? CommandResult.Failed("invalid-handler-result", ex.Code + ": " + ex.Message) : CommandResult.Rejected(ex.Code, ex.Message); }
-                        catch (Exception ex) { result = CommandResult.Failed("handler-exception", ex.GetType().Name + ": " + ex.Message); }
+                        catch (RuntimeContractException ex) when (!invoked)
+                        { result = PreInvocationFailure(ex); }
+                        catch (Exception ex) when (!invoked)
+                        { result = CommandResult.Rejected("precondition-failed", CommandResult.TruncateDetail(ex.GetType().Name + ": " + ex.Message)); }
+                        catch (RuntimeContractException ex)
+                        { result = CommandResult.FailedUnknown("handler-exception", CommandResult.TruncateDetail(ex.GetType().Name + ": " + ex.Message)); }
+                        catch (Exception ex)
+                        { result = CommandResult.FailedUnknown("handler-exception", CommandResult.TruncateDetail(ex.GetType().Name + ": " + ex.Message)); }
                         finally { currentCommand = null; }
-                        commands.Add(new CommandReceipt(commandId, pending.Event.EventId, pending.Event.CauseId, pending.Event.RootEventId ?? pending.Event.EventId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, step.BindingId, WorldEpoch, simulationTick, result));
-                        if (result.Status != "succeeded") break;
+                        var commandResult = result ?? (invoked
+                            ? CommandResult.FailedUnknown("null-result", "Handler returned null after invocation.")
+                            : CommandResult.Rejected("precondition-failed", "Precondition failed before handler invocation."));
+                        commands.Add(new CommandReceipt(commandId, pending.Event.EventId, pending.Event.CauseId, pending.Event.RootEventId ?? pending.Event.EventId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, step.BindingId, WorldEpoch, simulationTick, commandResult));
+                        if (commandResult.Status != CommandStatuses.Succeeded) break;
                     }
                 }
                 if (pending.Schedule != null && pending.Schedule.Handle.Status == "active" && pending.Schedule.Index >= pending.Schedule.TotalPulses)

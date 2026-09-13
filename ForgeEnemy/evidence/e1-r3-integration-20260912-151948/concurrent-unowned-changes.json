@@ -1,0 +1,6 @@
+[
+  "ForgeTrigger/Targeting/ObservedEntityNodes.cs",
+  "ForgeTrigger/tests/R3Consumers/Program.cs",
+  "ForgeTrigger/tests/R3Consumers/SpatialTests.cs",
+  "ForgeTrigger/tools/validate-trigger.py"
+]

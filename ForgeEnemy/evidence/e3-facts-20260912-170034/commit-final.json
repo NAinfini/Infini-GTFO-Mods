@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "verification": "existing-EnemyModule-source-and-compiled-SDK-with-test-doubles",
+  "nativeGameExecuted": false,
+  "multiplayerExecuted": false,
+  "utc": "2026-09-12T21:40:53.2607233+00:00",
+  "enemyModuleSourceSha256": "7AEEBB63853171EF108189D78535251A1E68DBE0238BC56A517C6BA1685EDE7C",
+  "gameDoublesSourceSha256": "E6EB041110111F4E536558A11B159CF94796ED013F5A80D324C7D5DAF44866A4",
+  "frameworkAssemblySha256": "EEC0F4116575285EADB4E703B5BBE39BE8D040CCEC00C07E3D47D8AFA362D4D8",
+  "fixtureSha256": "B1C1DBA75B2D2C1E2B2222B13BEF9FCB308F59086076A7B6E0F2360AC2EE8FF7",
+  "migrationHealthSourceSha256": "6D5057CFFDDEBFA476D51FEDDF7ABE2E1E6507C67B866B4D2982B851B8F44634",
+  "existingPath": {
+    "passed": 32,
+    "failed": 0
+  },
+  "migrationBoundary": {
+    "passed": 20,
+    "failed": 0
+  },
+  "passed": 52,
+  "failed": 0,
+  "checks": [
+    {
+      "Id": "existing-path.heal.actual-five",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.full-no-packet",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.clamp",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.dead-no-revive",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.initial-client",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.removed-after-submit",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.invalid-readback",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.submit-throws",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.heal.throw-after-mutation",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.health-fell",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.health-rose",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.maximum-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.authority-lost",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.client-now",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.died",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.world-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.life-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.receiver-replaced",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.negative-native-quantization",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.preflight.noop-state-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.identity.duplicate-spawn",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.identity.wrapper-not-new-life",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.identity.captured-old-token-after-pool-reuse",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.identity.pointer-mutated",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.identity.foreign-despawn-token",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.identity.old-world",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.damage.single-consumption",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.damage.zero-window-not-replayed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.damage.two-real-hits-same-tick",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.damage.rejected-window-not-replayed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.damage.old-world",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "existing-path.damage.foreign-owner",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.actual-five",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.full-no-packet",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.clamp",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.dead-no-revive",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.initial-client",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.removed-after-submit",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.invalid-readback",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.submit-throws",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.heal.throw-after-mutation",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.health-fell",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.health-rose",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.maximum-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.authority-lost",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.client-now",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.died",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.world-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.life-changed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.receiver-replaced",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.negative-native-quantization",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "migration-boundary.preflight.noop-state-changed",
+      "Passed": true,
+      "Detail": "passed"
+    }
+  ]
+}

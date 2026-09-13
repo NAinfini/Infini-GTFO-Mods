@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Target Name="RequireExplicitSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(ForgeFrameworkAssembly)' == '' or !Exists('$(ForgeFrameworkAssembly)')"
+      Text="Pass -p:ForgeFrameworkAssembly=... with the explicitly selected, built SDK DLL. The probe records its hash." />
+  </Target>
+  <ItemGroup>
+    <!-- Real compiled SDK, no shared SDK build output or in-progress source writes. -->
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+    <None Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.source.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "scope": "Enemy existing plugin failure and lifetime safety",
+  "utc": "2026-09-12T20:54:35.144327+00:00",
+  "gameExecuted": false,
+  "multiplayerExecuted": false,
+  "installed": false,
+  "committed": false,
+  "pushed": false,
+  "newGameplayBindings": 0,
+  "productionFiles": [
+    "ForgeEnemy/Native/EnemyPluginSession.cs",
+    "ForgeEnemy/Native/Plugin.cs"
+  ],
+  "sourceHashes": {
+    "ForgeEnemy/Native/EnemyPluginSession.cs": {
+      "before": "77d7a7b1b33fed4ef70b0de825e61596471e37a6ed4cbad13071c7a5d69afa44",
+      "after": "3a38213f39757c347db2beb55bc9d6a9d76dce035e7c6c413a40b8b1521249ec"
+    },
+    "ForgeEnemy/Native/Plugin.cs": {
+      "before": "c2207a3eb98303119607fc2a90033e15f152a27bdd28b2522966740c4b715a52",
+      "after": "5dc389e3b46e15d54f63f6887234efffe59855425867963d3ad3b35ef6d01a65"
+    },
+    "ForgeEnemy/tests/NativePlugin/Program.cs": {
+      "before": "631f100ab3b6eb3e2731f0a9df1caeff8155b00bd05d0b18d80c265bfae0f00c",
+      "after": "528fb50576faf8448a65892a4f356a213264901d786662dbf968af04728f5b9d"
+    },
+    "ForgeEnemy/tests/NativePlugin/GameDoubles.cs": {
+      "before": "92cbae2737470e3805b629cd81e40b288a84cece7ca41e709526150fd8621a37",
+      "after": "e99058b53530afe5f880b91f815f58c810321d7280139e0aeb581b9b967d2635"
+    },
+    "ForgeEnemy/tests/NativePlugin/LoaderDoubles.cs": {
+      "before": "a24c29c7cdbe38554553ec92c51a86902d28d9aee1729d9b7113188950e2a55c",
+      "after": "f96651a93bc472a5fed7498b80bda5fd534704cdf94e557572984eb389094ad3"
+    }
+  },
+  "pluginTests": {
+    "initialPassed": 12,
+    "initialTotal": 18,
+    "finalPassed": 24,
+    "finalFailed": 0
+  },
+  "regressions": {
+    "receiver": 40,
+    "entityObservation": 66,
+    "commitExisting": 32,
+    "commitRepeatedHelper": 20,
+    "framework": 253,
+    "nativeLayout": 28,
+    "nativeEvidence": 107
+  },
+  "mutationChecks": {
+    "baselinePassed": true,
+    "behavioralRegressionsDetected": 6,
+    "redundantOuterThreadCheckProbe": "retained separately; protection in EnemyModule remains, not counted as detected"
+  },
+  "builtAssemblies": {
+    "host-baseline\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll": "5427db7d7744466c7831368146c91815ad5bd9fcf95d6a0bb51199114fe6bfa1",
+    "host-baseline\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll": "7614fc21719fac200e961d123b55c3c5420121badbff122fea8f508ef114898a",
+    "native-confirmed\\bin\\ForgeEnemy.Native\\release\\ForgeEnemy.Native.dll": "20098c55f3c2a21f08b8dc5e31cfc5e4678153e642e2e934fea39e1b2786bcfa"
+  },
+  "blockedWork": {
+    "path": "ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs",
+    "tool": "Remote Desktop Commander write_file",
+    "result": "tool could not determine request safety; creation denied",
+    "fileExists": false,
+    "retriedThroughAlternateMethod": false
+  },
+  "remaining": [
+    "new death-flow and limb-break facts",
+    "E2 native collision/navigation/spawn requirements",
+    "remaining E3 combat receivers and E4-E7 mechanisms",
+    "real GTFO host/client and recovery verification"
+  ],
+  "evidenceScope": "Command-time inputs and explicitly built SDK; not a whole-workspace atomic snapshot."
+}

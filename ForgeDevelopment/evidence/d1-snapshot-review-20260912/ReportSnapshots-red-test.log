@@ -1,0 +1,19 @@
+FAIL: snapshot timestamp is captured before Enqueue returns
+FAIL: queued metadata is immutable
+FAIL: queued events exclude later observations
+FAIL: queued aggregate count is immutable
+FAIL: queued aggregate timing is immutable
+FAIL: queued random-state evidence is immutable
+FAIL: queued issue count is immutable
+FAIL: queued checks exclude later checks
+FAIL: rebinding a report cannot replace the queued world
+FAIL: queued scan tick stays at capture time
+FAIL: queued scan stays pending after completion and cancellation
+FAIL: second request captures its own metadata
+FAIL: second request freezes its own observation set
+FAIL: second request freezes its own issue count
+FAIL: second request retains completed world and tick
+FAIL: later cancellation does not mutate a queued complete receipt
+FAIL: verified source snapshot survives later rebinding
+FAIL: coalescing replaces the snapshot, not a live report
+Forge Development report snapshots: 19/37 passed

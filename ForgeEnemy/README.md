@@ -1,0 +1,66 @@
+# ForgeEnemy
+
+敌人实例、健康与战斗接收器、AI 与感知与移动、弱点与技能，以及生成的空间要求。遭遇的数量、时机和分布归 Map；Enemy 不复制地图的遭遇调度。
+
+**这是六个包里唯一有真实 BepInEx 插件和已注册 binding 的模块。** 仓库整体状态见 [ARCHITECTURE.md](../ARCHITECTURE.md)，未完成批次见 [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)，验证结果见 [VALIDATION.md](VALIDATION.md)。
+
+## 工程结构
+
+`ForgeEnemy/Native/ForgeEnemy.Native.csproj` 是真实插件，标记 `[BepInPlugin("NAinfini.ForgeEnemy", "Infini Forge Enemy", "1.0.0")]` 与 `[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]`。它只引用宿主与唯一 SDK，不附带第二份 SDK，通过公开的 `Plugin.Runtime` 注册同一个内核。唯一生产接收器是 `Native/EnemyModule.cs`；Runtime 不再创建 Enemy provider，也不再编译 Enemy Hook。
+
+`ForgeEnemy/ForgeEnemy.csproj` 是托管辅助工程（`Receivers/` 下的身份表、治疗提交、伤害观察窗口、线程边界），**不是另一个游戏插件，不应当作玩家发行包**。`ModuleDefinition.cs` 现在只保留包身份常量 `ProviderId` 与 `Version`，`Create()` 方法已删除——因此不可能与 Native 的真实 provider 重复注册。
+
+Off 模式下插件不注册也不打 Hook。Load 是单次尝试，失败后必须重启进程；原生 IL2CPP Hook 是进程级的，热重载没有已验证的恢复合同，`Unload()` 返回 false。
+
+## 当前 binding（全部 implementation-only）
+
+Native 插件持有 **5 个** binding 与 **5 个** Hook；Runtime 保留 4 个世界与会话 Hook。共享的 canonical 定义在 SDK 的 `CombatContracts` 里，共 5 个。
+
+| binding | 已实现范围 | canonical / 权限 |
+| --- | --- | --- |
+| `damage_applied` | 观察指定原生承伤调用窗口的实际 HP 损失；未知攻击来源不反推 | `forge.trigger.combat.damage_applied` |
+| `heal` | 存活敌人的显式目标治疗：量化、提交前复核、实际读回、unknown 结果 | `forge.action.combat.heal` |
+| `health_changed` | 仅本 Forge 治疗实际产生的正生命变化；不宣称覆盖全部原生治疗 | `forge.trigger.combat.health_changed` |
+| `death_started` | 同生命的 `OnDead` 正常返回且原生状态为 dead | `forge.trigger.enemy.death_started` / `gtfo.enemy.lifecycle.read` |
+| `limb_broken` | 同生命、同 receiver 的索引部位在 `DestroyLimb` 窗口中由未破坏变为已破坏 | `forge.trigger.combat.limb_broken` / `gtfo.enemy.limbs.read`；输出 target 与 limb_id |
+
+治疗使用已核验的 GTFO Steam build `20403457` 的 `SendSetHealth`，预检原生 `SFloat16` 精度并同步读回报告实际变化。小于精度的正治疗不能倒扣血；满血或零有效量不发送变化事实。未知攻击者不推断；玩家治疗与普通伤害命令尚未实现。
+
+**死亡事实不是击杀。** `death_started` 不是 `forge.trigger.combat.killed`：从 `OnDead` 推不出攻击者、致命一击、奖励、伤害原因或尸体清理成功。同一生命只认领一次死亡窗口；重复与嵌套回调、未知完成、缺少消费者或队列拒绝都不会重开旧事件。
+
+**肢体事实要求观察到真实转换。** 由 `Dam_EnemyDamageLimb.DestroyLimb` 的 prefix/postfix 捕获 false→true，同时核对 world/life、敌人指针与 ID、receiver、owner、`m_limbID` 与 `DamageLimbs[id]`。最多接受 256 个索引部位；超限、缺部位、换组件、读回不稳定或权限与阶段丢失时不伪造事实。同一生命内被其他模组恢复的部位不在当前的再破坏支持范围，新生命单独开始。原生调用抛错而没有正常 postfix 时不发布完成事实，也不自动补发。
+
+root 与 cause 由 Runtime 原有的 Publish 调用链维护，native 外部入口不推断 source、owner 或 instigator。排队后如果原 target 失效，Runtime 在动作执行前拒绝旧引用，不改投新生命。
+
+## 原生实体观察
+
+Native 观察返回精确引用、位置、生命状态，以及有效的 `health.heal` 接收能力。**阵营保持 unknown，标签为空**——未知字段不从种类、名称或当前 AI 目标填补。坐标是当前 `EnemyAgent.Position` 值：这不是碰撞净空、出生适配性、历史成员资格、LOS 证据或作者到世界的变换。查询完整性只覆盖显式引用，从不代表枚举了全部敌人或某个空间区域内的全部对象。观察受 provider 现有的玩法门槛限制。
+
+## 接收器与插件的安全边界
+
+这些是已经复现并修好的具体缺陷，改动时不要退回去：
+
+重复出生观察是幂等的——相同 native 实例保留原生命期，真实销毁后重生才分配新 life，**不按 managed wrapper 身份猜新生命**。销毁令牌捕获生命期：`CaptureDespawn` / `CompleteDespawn` 校验模块所有者、world/life 和 native 指针，旧令牌不能删同指针的新生命。伤害观察只消费一次：同一 token 的重复回调、零损失和被拒绝的回调都不重放，同 tick 两次真实独立伤害不会被合并。提交结果保持准确：发包后异常、receiver 或 owner 或上限或权限变化返回 failed 或 unknown，不伪造 actualAmount 也不重试；量化异常返回 failed/none 且未发包，不匹配的 receiver owner 在提交前拒绝。
+
+插件会话的回调与释放先核对模拟线程再执行。正常卸载先请求 Runtime 注销；调度重入或被依赖时不能提前卸 Hook，也不破坏后续合法清理。失败启动先锁上玩法门槛再回滚，即使注销受阻，残留的 receiver 也是惰性的。Load 之后的失败在 finally 里清空静态 Session；只读或抛异常的 `Exception.Data` 不能让 Session 保持发布状态，也不能掩盖主要失败。异常 Message 抛错、为 null 或过长时仍有有界诊断，不形成反复执行或记录的循环。`LastCleanupDiagnostic` 只保存最近一条有界诊断（最多 4096 字符），**不是游戏状态注册表、重试队列或计时器**。
+
+## 复跑
+
+从仓库根运行，先把 `GTFO_BEPINEX_PATH` 设为合法的本地编译引用目录。输出必须用隔离路径，不写入已安装的 profile：
+
+```powershell
+$out = Join-Path $env:TEMP ('forge-enemy-qa-' + [guid]::NewGuid().ToString('N'))
+dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $out
+$hostDll = Join-Path $out 'bin/ForgeRuntime/release/ForgeRuntime.dll'
+$sdkDll = Join-Path $out 'bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll'
+dotnet build ForgeEnemy/Native/ForgeEnemy.Native.csproj -c Release --artifacts-path $out `
+  "-p:ForgeRuntimeAssembly=$hostDll" "-p:ForgeFrameworkAssembly=$sdkDll"
+```
+
+各测试套件的命令与边界见 [VALIDATION.md](VALIDATION.md) 和各测试目录的 README：[提交路径审计](tests/CommitAudit/README.md)、[实体观察](tests/EntityObservation/README.md)、[生命周期事实](tests/LifecycleFacts/README.md)。可复用的示例计划见 [断肢后 +5 HP](examples/limb-broken-heal.plan.json)——它由通过的实际 Runtime→Heal 联调用例导出，**不在游戏里自动加载**，仍需明确的计划路径、权限和实机验收。
+
+## 边界
+
+以上全部是 **implementation-only**：源码存在、托管测试通过、原生签名与元数据已静态核对，**没有一条完成 GTFO 实机验收**。原生读取、替身、编译和元数据是不同的证据层，任何一层通过都不代表游戏或多人已通过。E1 的下一个门槛是真实游戏加载与原生 Hook 与主客机验证，不是再次创建或迁移同名 provider。
+
+E2 的碰撞、导航、出生空间，E3 剩余的 damage 与 status 与击杀因果与 Boss 阶段，以及 E4–E7 都未完成。开发与发布包尚未生成；Native DLL 不能据当前构建宣称玩家发行资格。

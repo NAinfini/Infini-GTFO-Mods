@@ -1,0 +1,11 @@
+--- a/ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs
++++ b/ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs
+@@ -97,7 +97,7 @@
+     internal bool IsLifecycleObserverActive(long id)
+     { ReadThread(); return lifecycleObservers.ContainsKey(id); }
+     internal void RemoveLifecycleObserver(long id)
+-    { ReadThread(); lifecycleObservers.Remove(id); }
++    { ReadThread(); NoEntityObservationMutation(); lifecycleObservers.Remove(id); }
+     private void RemoveLifecycleObservers(string provider, long moduleGeneration)
+     {
+         foreach (var observer in lifecycleObservers.Values

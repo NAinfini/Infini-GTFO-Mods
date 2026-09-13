@@ -58,7 +58,8 @@ public sealed partial class RuntimeKernel
     }
     internal bool ReleaseLease(RuntimeStateLeaseHandle handle)
     {
-        Thread();
+        // Terminal handle disposal is cleanup, not new runtime work.
+        ReadThread(); NoLifecycleMutation();
         if (!stateLeases.TryGetValue((handle.ProviderId, handle.LeaseId), out var lease) || !ReferenceEquals(lease.Handle, handle)) return false;
         EndLease(lease, "released", "explicit-release"); return true;
     }

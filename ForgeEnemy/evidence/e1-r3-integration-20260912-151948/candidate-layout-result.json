@@ -1,0 +1,124 @@
+{
+  "verification": "compiled-assembly-metadata-only",
+  "mode": "cutover",
+  "gameExecuted": false,
+  "hostSha256": "86E3E2046DFBC92624EAE0AB9ABA4C2EF1FC1D49B5A2F4DABDF0215704F7A6B7",
+  "sdkSha256": "609344D96DAFDA2300F97E1DAAA735B8CFB69D4BBEB3D8E6847694CBA6C79967",
+  "enemySha256": "FFE5F400C9BC6A93F882FAAACEE2EA05BE243012CDC5D4CADB96BCFACFB86B78",
+  "passed": 28,
+  "failed": 0,
+  "checks": [
+    {
+      "Id": "host.no-enemy-assembly-reference",
+      "Passed": true
+    },
+    {
+      "Id": "host.receiver-placement",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.single-receiver",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.no-embedded-kernel",
+      "Passed": true
+    },
+    {
+      "Id": "host.no-embedded-kernel",
+      "Passed": true
+    },
+    {
+      "Id": "sdk.no-game-dependency",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.only-host-and-sdk",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.same-sdk-identity",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.three-hooks",
+      "Passed": true
+    },
+    {
+      "Id": "host.exact-hook-set",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemySpawned",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemySpawned.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemySpawned.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemyDespawned",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDespawned.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDespawned.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemyDamage",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDamage.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDamage.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDamage.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDamage.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.identity",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.runtime-dependency",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.public-host-entry",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.off-gate",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.tested-session",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.no-second-update-loop",
+      "Passed": true
+    },
+    {
+      "Id": "host.no-implicit-enemy",
+      "Passed": true
+    }
+  ]
+}

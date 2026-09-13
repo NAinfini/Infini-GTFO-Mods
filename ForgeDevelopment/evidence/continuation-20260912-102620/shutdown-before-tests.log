@@ -1,0 +1,12 @@
+Forge Development shutdown: 10/21 passed
+FAIL: reporter failure stays isolated at cleanup stage 0
+FAIL: every cleanup stage runs once after reporter failure at 0
+FAIL: reporter failure stays isolated at cleanup stage 1
+FAIL: every cleanup stage runs once after reporter failure at 1
+FAIL: reporter failure stays isolated at cleanup stage 2
+FAIL: every cleanup stage runs once after reporter failure at 2
+FAIL: reporter failure stays isolated at cleanup stage 3
+FAIL: every cleanup stage runs once after reporter failure at 3
+FAIL: reporter failure stays isolated at cleanup stage 4
+FAIL: all failing actions/reporters still finish the sequence
+FAIL: each failed action gets one bounded reporting attempt

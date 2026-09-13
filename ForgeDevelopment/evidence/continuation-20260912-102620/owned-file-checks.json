@@ -1,0 +1,66 @@
+[
+  {
+    "path": "ForgeRuntime/ShutdownSequence.cs",
+    "baselineSha256": "fa67a9af2e363180b875a55d864b0b24b1dd2db4c576f42058918dce151e22ca",
+    "sha256": "eefb1913350bf62aeb5f7014f1db785f73de6b6991ac850ab51b678f0f4d79fe",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeRuntime/tests/DevelopmentInspection/WorldDoubles.cs",
+    "baselineSha256": "7c1e3cc1ad4e944e7a262abd21b6184457170fc9e9915e4eb570bede41ee9026",
+    "sha256": "4d49107292da669b35552c54c49cd7a5cbb47e8b18db59d5c2606381c51a9c1f",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+    "baselineSha256": "952e622987250894c38d53a5c48e9ae7554d98af1fc972447d4216bd24c0c7e6",
+    "sha256": "36aa25071e3c5e6d91c927ef244f1ba59adeb380b9b7fbdd97e3760123447e6b",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeRuntime/tests/test_import_log.py",
+    "baselineSha256": "176ecc70ee0a65bb8bb55c5a28ade3147bd8298b47d77c0979e0362253f47e0e",
+    "sha256": "b20485778652f130fb5c60722ab480a6562d3c7f6dbfc706835f47ae039fdd7c",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+    "baselineSha256": null,
+    "sha256": "a3b73c2a405de3155371ae17a97a0c6d4051ef2955123474843a00266eb672b1",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeDevelopment/tests/Shutdown/Program.cs",
+    "baselineSha256": null,
+    "sha256": "8c734dcca82060aae7f5d4b69d9cc1eec9091dee021dabcd2d68221725411975",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeDevelopment/tests/Shutdown/ReceiptTests.cs",
+    "baselineSha256": null,
+    "sha256": "5495b7fb1b6afd9c3b78b3b9c526937f68742d75df9f68dadbc90f380efd1eaa",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  },
+  {
+    "path": "ForgeDevelopment/D1-INTEGRATION-REVIEW.md",
+    "baselineSha256": null,
+    "sha256": "4e357f1f346310adc9411a91053e4afc8b6e1084c2a67b01c534dd5f1cb0ce5a",
+    "utf8": true,
+    "whitespace": true,
+    "conflictMarkers": false
+  }
+]

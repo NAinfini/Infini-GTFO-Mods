@@ -1,0 +1,295 @@
+{
+  "schemaVersion": 1,
+  "verification": "native-reader-and-single-provider-source-with-compiled-r3-sdk-and-game-doubles",
+  "gameExecuted": false,
+  "multiplayerExecuted": false,
+  "sdkProvenance": "frozen-worktree",
+  "receiverSha256": "F94043F538B98AC26E4C88EC75999721CD886D2DE0DBB123664166C9A1BAC3BC",
+  "readerSha256": "1068E7928416DF8119CDE391A41376CF3071E615C641FF338766120C8DD8C853",
+  "sdkSha256": "1DBFD210CB0BD548FCC0EC4C634BAA95F9F75F030A37CBE1EEAD303405B6A4E3",
+  "utc": "2026-09-12T18:54:04.7706332+00:00",
+  "passed": 32,
+  "failed": 24,
+  "checks": [
+    {
+      "Id": "native-reader.healthy",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.full",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.dead",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.missing-health",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.bad-owner",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.unsetup-health",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.nan-health",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.bad-max",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.above-max",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.zero-native",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.unsetup-enemy",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.nan-position",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.unstable-position",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.wrong-id",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "native-reader.frozen",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "snapshot.exact-native-data",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: entity-query-incomplete: entity-observer-unavailable\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 13\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "snapshot.no-silent-host-support",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "snapshot.full-health-still-receives-heal",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_2() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 27\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "snapshot.dead-no-heal",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_3() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 32\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.missing-component",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.zero-receiver-pointer",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.receiver-unsetup",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.missing-owner",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.wrong-owner",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.zero-health",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.nan-health",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.infinite-maximum",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.above-maximum",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.negative-maximum",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "receiver.negative-health",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec__DisplayClass0_0.\u003C\u003CMain\u003E$\u003Eb__45() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 51\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "unavailable.not-setup",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "unavailable.zero-native-pointer",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "unavailable.nan-position",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "unavailable.infinite-position",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "unavailable.moving-during-read",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "snapshot.reader-exception",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Native reader failure was hidden.\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_20() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 69\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "snapshot.frozen-values",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_21() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 73\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "snapshot.negative-coordinates",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_22() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 82\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "snapshot.wrong-native-id",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.registration-not-ready",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.world-reset",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: New world did not use a new reference.\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_25() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 98\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "lifecycle.same-pointer-new-life",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Old life or teardown token survived.\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_26() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 104\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "lifecycle.clear-during-native-read",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.gate-lost-during-read",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.replaced-life-during-read",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.wrong-reference-from-reader",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.client-observation-unavailable",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.stopped",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "lifecycle.unregistered",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "query.mixed-is-incomplete",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Incomplete query silently truncated.\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_34() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 147\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "query.duplicates-and-empty",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Reference dedupe failed.\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_35() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 153\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "query.budget-no-truncation",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "query.tick-budget-not-reset-by-advance",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Early budget rejection.\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_37() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 163\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "query.simulation-thread",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "query.observer-cannot-mutate-runtime",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Read-only observation mutated the shared world.\r\n   at Checks.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 18\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_39() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 175\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    },
+    {
+      "Id": "actors.no-fallback-and-no-inferred-enemy",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Entity observation is not complete; no implicit partial selection is allowed.\r\n   at ForgeRuntime.Framework.RuntimeJson.Require(Boolean condition, String code, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\RuntimeJson.cs:line 48\r\n   at ForgeRuntime.Framework.RuntimeEntityQueryResult.RequireComplete() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\EntityObservationContracts.cs:line 99\r\n   at Program.\u003C\u003Ec.\u003C\u003CMain\u003E$\u003Eb__0_40() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Program.cs:line 181\r\n   at Checks.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\Checks.cs:line 9"
+    }
+  ]
+}

@@ -1,0 +1,326 @@
+--- a/ForgeRuntime/GameBindings/EnemyModule.cs
++++ b/ForgeRuntime/GameBindings/EnemyModule.cs
+@@ -16,8 +16,24 @@
+     internal const string HealthChangedBinding = ProviderId + ".binding.health_changed";
+     internal const double MinimumAmount = 0.000001;
+     internal const double MaximumAmount = 1000000;
+-    private sealed record Entry(EnemyAgent Enemy, EntityReference Reference);
+-    internal sealed record DamageObservation(EntityReference Target, float HealthBefore, IntPtr DamagePointer);
++    private sealed record Entry(EnemyAgent Enemy, EntityReference Reference, IntPtr EnemyPointer);
++    internal sealed record DespawnObservation(EnemyModule Owner, EntityReference Target, IntPtr EnemyPointer);
++    internal sealed class DamageObservation
++    {
++        private readonly EnemyModule _owner;
++        private bool _consumed;
++        internal EntityReference Target { get; }
++        internal float HealthBefore { get; }
++        internal IntPtr DamagePointer { get; }
++        internal DamageObservation(EnemyModule owner, EntityReference target, float healthBefore, IntPtr damagePointer)
++        { _owner = owner; Target = target; HealthBefore = healthBefore; DamagePointer = damagePointer; }
++        internal bool TryConsume(EnemyModule owner)
++        {
++            if (!ReferenceEquals(_owner, owner) || _consumed) return false;
++            _consumed = true;
++            return true;
++        }
++    }
+     private readonly Dictionary<ushort, Entry> _entities = new();
+     private readonly RuntimeKernel _kernel;
+     private readonly Func<bool> _canExecute;
+@@ -42,16 +58,32 @@
+     internal EntityReference TrackSpawn(EnemyAgent enemy)
+     {
+         if (enemy == null) throw new ArgumentNullException(nameof(enemy));
++        if (enemy.Pointer == IntPtr.Zero) throw new ArgumentException("Enemy must have a native instance.", nameof(enemy));
++        // A new wrapper alone is not a new native life; despawn/world boundaries retire the old life.
++        if (_entities.TryGetValue(enemy.GlobalID, out var existing)
++            && existing.Reference.WorldEpoch == _kernel.WorldEpoch && existing.EnemyPointer == enemy.Pointer
++            && Resolve(existing.Reference) != null) return existing.Reference;
+         var reference = new EntityReference("gtfo.enemy:" + enemy.GlobalID.ToString(CultureInfo.InvariantCulture),
+             _kernel.WorldEpoch, checked(++_nextLife));
+-        _entities[enemy.GlobalID] = new Entry(enemy, reference);
++        _entities[enemy.GlobalID] = new Entry(enemy, reference, enemy.Pointer);
+         return reference;
+     }
+ 
+-    internal void TrackDespawn(EnemyAgent enemy)
+-    {
+-        if (enemy != null && _entities.TryGetValue(enemy.GlobalID, out var entry) && entry.Enemy.Pointer == enemy.Pointer)
+-            _entities.Remove(enemy.GlobalID);
++    // Synchronous native entry. Deferred work must retain CaptureDespawn's token, not an EnemyAgent pointer.
++    internal void TrackDespawn(EnemyAgent enemy) => CompleteDespawn(CaptureDespawn(enemy));
++
++    internal DespawnObservation? CaptureDespawn(EnemyAgent enemy)
++    {
++        if (enemy == null || !_entities.TryGetValue(enemy.GlobalID, out var entry)
++            || entry.EnemyPointer != enemy.Pointer || Resolve(entry.Reference) == null) return null;
++        return new DespawnObservation(this, entry.Reference, entry.EnemyPointer);
++    }
++
++    internal void CompleteDespawn(DespawnObservation? observation)
++    {
++        if (observation == null || !ReferenceEquals(observation.Owner, this)) return;
++        var entry = Resolve(observation.Target);
++        if (entry != null && entry.EnemyPointer == observation.EnemyPointer) _entities.Remove(entry.Enemy.GlobalID);
+     }
+ 
+     private Entry? Resolve(EntityReference reference)
+@@ -60,7 +92,7 @@
+         if (reference.WorldEpoch != _kernel.WorldEpoch || !reference.Id.StartsWith(prefix, StringComparison.Ordinal)
+             || !ushort.TryParse(reference.Id.AsSpan(prefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var id)
+             || !_entities.TryGetValue(id, out var entry) || entry.Reference != reference || entry.Enemy == null
+-            || entry.Enemy.GlobalID != id) return null;
++            || entry.Enemy.GlobalID != id || entry.Enemy.Pointer != entry.EnemyPointer) return null;
+         return entry;
+     }
+     private bool IsCurrent(EntityReference reference) => Resolve(reference) != null;
+@@ -69,14 +101,19 @@
+     {
+         if (!_canExecute() || !SNet.IsMaster || !_kernel.HasSubscribers(DamageBinding) || damage == null || damage.Owner == null) return null;
+         if (!_entities.TryGetValue(damage.Owner.GlobalID, out var entry)
+-            || entry.Enemy == null || entry.Enemy.Pointer != damage.Owner.Pointer) return null;
+-        return float.IsFinite(damage.Health) ? new DamageObservation(entry.Reference, damage.Health, damage.Pointer) : null;
++            || Resolve(entry.Reference) == null || entry.EnemyPointer != damage.Owner.Pointer
++            || entry.Enemy.Damage == null || entry.Enemy.Damage.Pointer != damage.Pointer) return null;
++        return float.IsFinite(damage.Health) ? new DamageObservation(this, entry.Reference, damage.Health, damage.Pointer) : null;
+     }
+ 
+     internal void AfterDamage(Dam_EnemyDamageBase damage, DamageObservation? before)
+     {
+-        if (before == null || !_canExecute() || !SNet.IsMaster || damage == null
+-            || damage.Pointer != before.DamagePointer || Resolve(before.Target) == null || !float.IsFinite(damage.Health)) return;
++        // Consume on first delivery, including a rejected/zero-loss delivery. There is no later retry window.
++        if (before == null || !before.TryConsume(this)) return;
++        if (!_canExecute() || !SNet.IsMaster || damage == null || damage.Pointer != before.DamagePointer) return;
++        var entry = Resolve(before.Target);
++        if (entry == null || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer
++            || entry.Enemy.Damage == null || entry.Enemy.Damage.Pointer != damage.Pointer || !float.IsFinite(damage.Health)) return;
+         double actualDamage = Math.Max(0, Math.Max(0, before.HealthBefore) - Math.Max(0, damage.Health));
+         if (actualDamage == 0) return;
+         var result = _registration.Publish(new RuntimeEvent(
+@@ -95,6 +132,8 @@
+         var enemy = entry.Enemy;
+         var damage = enemy.Damage;
+         if (damage == null || !damage.IsSetup) return CommandResult.Rejected("gtfo.enemy.missing_health_receiver");
++        if (damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
++            return CommandResult.Rejected("gtfo.enemy.health_receiver_owner_mismatch");
+         if (!enemy.Alive || !(damage.Health > 0)) return CommandResult.Rejected("gtfo.enemy.not_alive");
+         double requested = context.Parameters.GetProperty("amount").GetDouble();
+         if (!double.IsFinite(requested) || requested < MinimumAmount || requested > MaximumAmount)
+@@ -103,22 +142,42 @@
+         if (!float.IsFinite(before) || !float.IsFinite(maximum) || maximum <= 0 || before > maximum)
+             return CommandResult.Rejected("gtfo.enemy.invalid_health_state");
+         double desired = Math.Min(maximum, before + requested);
+-        var encoded = new SFloat16();
+-        encoded.Set((float)desired, maximum);
+-        float quantized = encoded.Get(maximum);
++        float quantized;
++        try
++        {
++            var encoded = new SFloat16();
++            encoded.Set((float)desired, maximum);
++            quantized = encoded.Get(maximum);
++        }
++        catch (Exception error)
++        {
++            // No SendSetHealth call has occurred; unlike commit exceptions this is known uncommitted.
++            return CommandResult.Failed("gtfo.enemy.quantization_failed", error.GetType().Name);
++        }
+         if (!float.IsFinite(quantized) || quantized > maximum)
+             return CommandResult.Rejected("gtfo.enemy.invalid_native_quantization");
++        float after = before;
+         if (desired > before && quantized > before)
+         {
+-            // This build's host-only API broadcasts pSetHealthData and synchronously invokes ReceiveSetHealth.
+-            // The packet quantizes absolute HP against HealthMax; only the readback is a committed amount.
+-            damage.SendSetHealth((float)desired);
+-        }
+-        if (Resolve(target) == null || enemy.Damage == null || enemy.Damage.Pointer != damage.Pointer)
+-            return CommandResult.Failed("gtfo.enemy.receiver_changed_during_commit");
+-        float after = damage.Health;
+-        if (!float.IsFinite(after) || after < before || after > maximum)
+-            return CommandResult.Failed("gtfo.enemy.unexpected_health_readback");
++            // Crossing the native call boundary may have sent a packet even when the call throws.
++            var attempted = RuntimeJson.From(new { target, requestedAmount = requested, healthBefore = before,
++                nativeSubmissionAttempted = true });
++            try
++            {
++                damage.SendSetHealth((float)desired);
++                if (!_canExecute() || !SNet.IsMaster || Resolve(target) == null
++                    || enemy.Damage == null || enemy.Damage.Pointer != damage.Pointer
++                    || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
++                    return CommandResult.FailedUnknown(attempted, "gtfo.enemy.receiver_changed_during_commit");
++                after = damage.Health;
++                if (!enemy.Alive || damage.HealthMax != maximum || !float.IsFinite(after) || after < before || after > maximum)
++                    return CommandResult.FailedUnknown(attempted, "gtfo.enemy.unexpected_health_readback");
++            }
++            catch (Exception error)
++            {
++                return CommandResult.FailedUnknown(attempted, "gtfo.enemy.native_commit_exception", error.GetType().Name);
++            }
++        }
+         double actual = (double)after - before;
+         var output = RuntimeJson.From(new { target, requestedAmount = requested, actualAmount = actual,
+             healthBefore = before, healthAfter = after, overflowAmount = Math.Max(0, before + requested - maximum) });
+--- a/ForgeEnemy/tests/ReceiverProbe/Program.cs
++++ b/ForgeEnemy/tests/ReceiverProbe/Program.cs
+@@ -39,11 +39,18 @@
+         "A replacement gets a new life and rejects the old reference.", $"old={replacement.Ref}; new={nextRef}");
+     replacement.Module.TrackDespawn(replacement.Enemy);
+     Check("identity.old-pointer", Heal(replacement.Module, nextRef).Status == "succeeded", "Old distinct-pointer teardown cannot remove the replacement.", "Heal attempted on replacement.");
+-    var pooled = Scene(); var reusedPointer = Enemy(10);
+-    var pooledRef = pooled.Module.TrackSpawn(reusedPointer);
+-    pooled.Module.TrackDespawn(pooled.Enemy);
++    // Pointer equality alone cannot establish a new life. Capture at the observed old-life boundary.
++    var pooled = Scene(); var retired = pooled.Module.CaptureDespawn(pooled.Enemy);
++    pooled.Module.CompleteDespawn(retired);
++    var reusedPointer = Enemy(10); var pooledRef = pooled.Module.TrackSpawn(reusedPointer);
++    pooled.Module.CompleteDespawn(retired);
+     var pooledResult = Heal(pooled.Module, pooledRef);
+-    Check("E2-002.pooled-late-despawn", pooledResult.Status == "succeeded", "Old-life teardown must not remove a new life reusing its native pointer.", pooledResult.Status + "/" + pooledResult.Code);
++    Check("E2-002.captured-life-late-despawn", retired != null && pooledRef.LifeEpoch != pooled.Ref.LifeEpoch
++        && Heal(pooled.Module, pooled.Ref).Status == "rejected" && pooledResult.Status == "succeeded",
++        "An old captured-life token cannot remove a respawn reusing ID and pointer.", pooledResult.Status + "/" + pooledResult.Code);
++    var wrapper = Scene(); var sameNative = wrapper.Module.TrackSpawn(Enemy(10));
++    Check("identity.wrapper-not-life", sameNative == wrapper.Ref,
++        "A new managed wrapper without a native life boundary is not a respawn.", sameNative.ToString());
+     var world = Scene(); world.Kernel.BeginWorld(2); world.Module.ClearWorld();
+     Check("identity.world-reset", Heal(world.Module, world.Ref).Status == "rejected", "World reset rejects the old reference.", "Old-world Heal attempted.");
+     var changed = Scene();
+@@ -85,19 +92,124 @@
+     var clientResult = Heal(client.Module, client.Ref);
+     Check("health.host-authority", clientResult.Code == "gtfo.enemy.authority_or_phase" && client.Enemy.Damage.Sends == 0,
+         "A client cannot submit native healing.", clientResult.Code);
++    SNet.IsMaster = true;
++    var throwsBefore = Scene(); throwsBefore.Enemy.Damage.Commit = _ => throw new InvalidOperationException("send failed");
++    var throwsBeforeResult = Heal(throwsBefore.Module, throwsBefore.Ref);
++    Check("commit.throw-before-readback", throwsBeforeResult.CommitState == CommitStates.Unknown && throwsBefore.Enemy.Damage.Sends == 1
++        && throwsBeforeResult.Facts.Count == 0 && !throwsBeforeResult.Outputs.TryGetProperty("actualAmount", out _),
++        "Throwing native submissions are unknown, attempted once, with no fabricated actual amount.", throwsBeforeResult.Code);
++    var throwsAfter = Scene(); throwsAfter.Enemy.Damage.Commit = value => { throwsAfter.Enemy.Damage.Health = value; throw new IOException("after commit"); };
++    var throwsAfterResult = Heal(throwsAfter.Module, throwsAfter.Ref);
++    Check("commit.throw-after-write", throwsAfterResult.CommitState == CommitStates.Unknown && throwsAfter.Enemy.Damage.Sends == 1
++        && throwsAfter.Enemy.Damage.Health == 55 && throwsAfterResult.Facts.Count == 0,
++        "A write followed by an exception must not retry or claim no commit.", throwsAfterResult.Code);
++    var maxChanged = Scene(); maxChanged.Enemy.Damage.Commit = value => { maxChanged.Enemy.Damage.Health = value; maxChanged.Enemy.Damage.HealthMax = 200; };
++    var maxResult = Heal(maxChanged.Module, maxChanged.Ref);
++    Check("commit.maximum-changed", maxResult.CommitState == CommitStates.Unknown && maxResult.Facts.Count == 0,
++        "A changed native quantization range invalidates the readback contract.", maxResult.Code);
++    var swapped = Scene(); var oldDamage = swapped.Enemy.Damage;
++    oldDamage.Commit = value => { oldDamage.Health = value; swapped.Enemy.Damage = new Dam_EnemyDamageBase { Owner = swapped.Enemy, Pointer = new IntPtr(777) }; };
++    var swapResult = Heal(swapped.Module, swapped.Ref);
++    Check("commit.component-replaced", swapResult.CommitState == CommitStates.Unknown && oldDamage.Sends == 1 && swapResult.Facts.Count == 0,
++        "A replacement damage component cannot supply readback for the old commit.", swapResult.Code);
++    var lostHost = Scene(); lostHost.Enemy.Damage.Commit = value => { lostHost.Enemy.Damage.Health = value; SNet.IsMaster = false; };
++    var lostHostResult = Heal(lostHost.Module, lostHost.Ref); SNet.IsMaster = true;
++    Check("commit.authority-lost", lostHostResult.CommitState == CommitStates.Unknown && lostHost.Enemy.Damage.Sends == 1,
++        "Authority loss during a native callback cannot claim a verified commit.", lostHostResult.Code);
++    var foreign = Scene(); var foreignToken = foreign.Module.CaptureDespawn(foreign.Enemy);
++    var other = Scene(); other.Module.CompleteDespawn(foreignToken);
++    Check("identity.foreign-despawn-token", Heal(other.Module, other.Ref).Status == "succeeded",
++        "Tokens cannot cross module/kernel ownership even with matching numerical references.", "Other receiver remains current.");
++    var sameWrapper = Scene(); var oldToken = sameWrapper.Module.CaptureDespawn(sameWrapper.Enemy);
++    sameWrapper.Module.CompleteDespawn(oldToken); var freshLife = sameWrapper.Module.TrackSpawn(sameWrapper.Enemy);
++    sameWrapper.Module.CompleteDespawn(oldToken); sameWrapper.Module.CompleteDespawn(oldToken);
++    Check("identity.same-wrapper-respawn", freshLife.LifeEpoch != sameWrapper.Ref.LifeEpoch && Heal(sameWrapper.Module, freshLife).Status == "succeeded",
++        "Observed despawn/respawn changes life even if both native and managed objects are reused.", freshLife.ToString());
++    var epochToken = sameWrapper.Module.CaptureDespawn(sameWrapper.Enemy);
++    sameWrapper.Kernel.BeginWorld(2); sameWrapper.Module.ClearWorld(); var worldLife = sameWrapper.Module.TrackSpawn(sameWrapper.Enemy);
++    sameWrapper.Module.CompleteDespawn(epochToken);
++    Check("identity.old-world-token", worldLife.WorldEpoch == 2 && Heal(sameWrapper.Module, worldLife).Status == "succeeded",
++        "Old-world teardown cannot remove a current-world instance.", worldLife.ToString());
++    var pointerChanged = Scene(); pointerChanged.Enemy.Pointer = new IntPtr(888);
++    Check("identity.pointer-mutated", Heal(pointerChanged.Module, pointerChanged.Ref).Status == "rejected",
++        "Stored native pointer changes invalidate old references.", "Old reference rejected.");
++    var idChanged = Scene(); idChanged.Enemy.GlobalID = 8;
++    Check("identity.id-mutated", Heal(idChanged.Module, idChanged.Ref).Status == "rejected",
++        "A mutated GlobalID cannot be resolved through its former reference.", "Old ID rejected.");
++    var unobserved = Scene();
++    Check("damage.no-subscribers", unobserved.Module.BeforeDamage(unobserved.Enemy.Damage) == null,
++        "No subscription means no damage observation allocation.", "No observation returned.");
++    string safetyPlan = File.ReadAllText(Path.Combine(args[0], "native-heal.plan.json"));
++    string[] safetyGrants = { "gtfo.enemy.health.read", "gtfo.enemy.health.write" };
++    var independent = Scene(); independent.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var firstHit = independent.Module.BeforeDamage(independent.Enemy.Damage);
++    independent.Enemy.Damage.Health = 40; independent.Module.AfterDamage(independent.Enemy.Damage, firstHit);
++    var secondHit = independent.Module.BeforeDamage(independent.Enemy.Damage);
++    independent.Enemy.Damage.Health = 30; independent.Module.AfterDamage(independent.Enemy.Damage, secondHit);
++    independent.Module.AfterDamage(independent.Enemy.Damage, firstHit);
++    var independentTick = independent.Kernel.Advance(1, true);
++    Check("damage.two-hits-same-tick", independentTick.Commands.Count == 2 && independent.Enemy.Damage.Sends == 2 && independent.Enemy.Damage.Health == 40,
++        "Two distinct same-tick damage windows each execute once; a replay adds nothing.", $"commands={independentTick.Commands.Count}; health={independent.Enemy.Damage.Health}");
++    var zeroHit = Scene(); zeroHit.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var zeroToken = zeroHit.Module.BeforeDamage(zeroHit.Enemy.Damage);
++    zeroHit.Module.AfterDamage(zeroHit.Enemy.Damage, zeroToken);
++    zeroHit.Enemy.Damage.Health = 40; zeroHit.Module.AfterDamage(zeroHit.Enemy.Damage, zeroToken);
++    Check("damage.zero-window-consumed", zeroHit.Kernel.Advance(1, true).Commands.Count == 0 && zeroHit.Enemy.Damage.Sends == 0,
++        "A zero-loss window cannot later acquire unrelated damage by replay.", "No follow-up action.");
++    var rejectedHit = Scene(); rejectedHit.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var rejectedToken = rejectedHit.Module.BeforeDamage(rejectedHit.Enemy.Damage); rejectedHit.Enemy.Damage.Health = 40;
++    SNet.IsMaster = false; rejectedHit.Module.AfterDamage(rejectedHit.Enemy.Damage, rejectedToken); SNet.IsMaster = true;
++    rejectedHit.Module.AfterDamage(rejectedHit.Enemy.Damage, rejectedToken);
++    Check("damage.rejected-window-consumed", rejectedHit.Kernel.Advance(1, true).Commands.Count == 0 && rejectedHit.Enemy.Damage.Sends == 0,
++        "Rejected callbacks cannot be retried when authority returns.", "No replayed damage fact.");
++    var pipeline = Scene(); pipeline.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var pipelineDamage = pipeline.Module.BeforeDamage(pipeline.Enemy.Damage); pipeline.Enemy.Damage.Health = 40;
++    pipeline.Module.AfterDamage(pipeline.Enemy.Damage, pipelineDamage);
++    pipeline.Enemy.Damage.Commit = value => { pipeline.Enemy.Damage.Health = value; throw new InvalidOperationException("native callback"); };
++    var pipelineTick = pipeline.Kernel.Advance(1, true); pipeline.Kernel.Advance(2, true);
++    Check("commit.kernel-unknown-no-retry", pipelineTick.Commands.Count == 1 && pipelineTick.Commands[0].Result.CommitState == CommitStates.Unknown
++        && pipelineTick.Commands[0].Result.Code == "gtfo.enemy.native_commit_exception" && pipeline.Enemy.Damage.Sends == 1
++        && pipeline.Enemy.Damage.Health == 45 && pipeline.Kernel.QueuedEvents == 0,
++        "The real kernel preserves unknown and never retries or publishes an unverified health fact.", $"commands={pipelineTick.Commands.Count}; sends={pipeline.Enemy.Damage.Sends}");
++    var issuer = Scene(); issuer.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var impostor = Scene(); impostor.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var issuerToken = issuer.Module.BeforeDamage(issuer.Enemy.Damage); issuer.Enemy.Damage.Health = 40; impostor.Enemy.Damage.Health = 40;
++    impostor.Module.AfterDamage(impostor.Enemy.Damage, issuerToken);
++    issuer.Module.AfterDamage(issuer.Enemy.Damage, issuerToken);
++    Check("damage.token-owner", impostor.Kernel.Advance(1, true).Commands.Count == 0 && issuer.Kernel.Advance(1, true).Commands.Count == 1,
++        "A foreign module cannot publish or consume another receiver's observation.", "Only issuer dispatched.");
++    var componentHit = Scene(); componentHit.Kernel.LoadPlan(safetyPlan, safetyGrants);
++    var formerComponent = componentHit.Enemy.Damage; var componentToken = componentHit.Module.BeforeDamage(formerComponent);
++    formerComponent.Health = 40; componentHit.Enemy.Damage = new Dam_EnemyDamageBase { Owner = componentHit.Enemy, Pointer = new IntPtr(999) };
++    componentHit.Module.AfterDamage(formerComponent, componentToken);
++    Check("damage.replaced-component", componentHit.Kernel.Advance(1, true).Commands.Count == 0,
++        "A retired damage component cannot publish facts for its replacement.", "No stale-component fact.");
++    var prepare = Scene(); SFloat16.Preview = (_, _) => throw new InvalidOperationException("quantizer");
++    var prepareResult = Heal(prepare.Module, prepare.Ref); SFloat16.Preview = (value, _) => value;
++    Check("commit.preparation-failure", prepareResult.CommitState == CommitStates.None && prepareResult.Code == "gtfo.enemy.quantization_failed"
++        && prepare.Enemy.Damage.Sends == 0, "Failures before submission are known uncommitted.", prepareResult.Code);
++    var wrongOwner = Scene(); wrongOwner.Enemy.Damage.Owner = Enemy(20);
++    var wrongOwnerResult = Heal(wrongOwner.Module, wrongOwner.Ref);
++    Check("health.owner-mismatch", wrongOwnerResult.Code == "gtfo.enemy.health_receiver_owner_mismatch" && wrongOwner.Enemy.Damage.Sends == 0,
++        "A mismatched receiver owner is rejected before native submission.", wrongOwnerResult.Code);
++    var changedOwner = Scene(); changedOwner.Enemy.Damage.Commit = value => { changedOwner.Enemy.Damage.Health = value; changedOwner.Enemy.Damage.Owner = Enemy(20); };
++    var ownerResult = Heal(changedOwner.Module, changedOwner.Ref);
++    Check("commit.owner-changed", ownerResult.CommitState == CommitStates.Unknown && ownerResult.Facts.Count == 0,
++        "A receiver owner changed during native submission cannot verify the old target.", ownerResult.Code);
+ }
+ catch (Exception error) { Check("probe.error", false, "Every probe executes without harness errors.", error.ToString()); }
+ finally { SNet.IsMaster = true; SFloat16.Preview = (value, _) => value; }
+ int failed = checks.Count(c => !c.Passed);
+ using var sdkStream = File.OpenRead(typeof(RuntimeKernel).Assembly.Location);
+ using var sdkHash = System.Security.Cryptography.SHA256.Create();
+-var report = new { schemaVersion = 1, verification = "production-source-and-frozen-sdk-with-test-doubles", gameExecuted = false,
++var report = new { receiverSourceSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "EnemyModule.source.cs")))),
++    scenarioRevision = "captured-life-despawn-v2", schemaVersion = 2, verification = "production-source-and-explicit-compiled-sdk-with-test-doubles", gameExecuted = false,
+     frameworkAssemblySha256 = Convert.ToHexString(sdkHash.ComputeHash(sdkStream)),
+     utc = DateTimeOffset.UtcNow, passed = checks.Count - failed, failed, checks };
+ string reportPath = Path.GetFullPath(args[1]);
+ Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+ File.WriteAllText(reportPath, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+ foreach (var check in checks.Where(c => !c.Passed)) Console.Error.WriteLine("FAIL " + check.Id + ": " + check.Observed);
+-Console.WriteLine($"{(failed == 0 ? "PASS" : "FAIL")} {checks.Count - failed}/{checks.Count} receiver probes; failures remain open and are NOT treated as expected passes.");
++Console.WriteLine($"{(failed == 0 ? "PASS" : "FAIL")} {checks.Count - failed}/{checks.Count} receiver probes; native game execution and multiplayer are NOT exercised.");
+ return failed == 0 ? 0 : 1;
+ internal sealed record ProbeCheck(string Id, bool Passed, string Expected, string Observed);
+--- a/ForgeEnemy/tests/ReceiverProbe/ReceiverProbe.csproj
++++ b/ForgeEnemy/tests/ReceiverProbe/ReceiverProbe.csproj
+@@ -12,6 +12,7 @@
+     <!-- Real compiled SDK, no shared SDK build output or in-progress source writes. -->
+     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+     <Compile Include="../../../ForgeRuntime/GameBindings/EnemyModule.cs" Link="EnemyModule.cs" />
++    <None Include="../../../ForgeRuntime/GameBindings/EnemyModule.cs" Link="EnemyModule.source.cs" CopyToOutputDirectory="PreserveNewest" />
+     <Compile Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.cs" />
+   </ItemGroup>
+ </Project>

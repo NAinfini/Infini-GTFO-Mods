@@ -1,0 +1,17 @@
+PASS Off excludes diagnostics and native startup
+PASS Play independent of diagnostic binding failures
+PASS Authoring retains requested components
+PASS invalid mode fails before native initialization
+PASS successful Load cannot be repeated
+PASS rollback continues through cleanup and logger errors
+PASS last-stage failure cleans performance component
+PASS partial host failure does not stop unstarted diagnostics
+PASS failed cleanup cannot expose partially loaded host
+PASS configuration edits do not change frozen startup selection
+PASS diagnostic partial initialization unwinds
+PASS unwritable exception Data preserves the startup exception
+PASS startup failure at component:add:FrameworkMonitor
+PASS startup failure at component:add:PerformanceMonitor
+PASS startup failure at hook:patch
+Plugin bootstrap: 42 assertions passed; 0 scenarios failed.
+Production Plugin.cs with managed BepInEx/Unity/Harmony doubles; no game injection.

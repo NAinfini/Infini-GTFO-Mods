@@ -1,0 +1,22 @@
+﻿[
+    {
+        "Project":  "ForgeRuntime/ForgeRuntime.csproj",
+        "BuildExit":  1,
+        "TestExit":  null
+    },
+    {
+        "Project":  "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+        "BuildExit":  0,
+        "TestExit":  0
+    },
+    {
+        "Project":  "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+        "BuildExit":  0,
+        "TestExit":  0
+    },
+    {
+        "Project":  "ForgeRuntime/tests/Reports/Reports.csproj",
+        "BuildExit":  0,
+        "TestExit":  0
+    }
+]

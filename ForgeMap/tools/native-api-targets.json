@@ -1,0 +1,256 @@
+[
+  {
+    "type": "AIGraph.AIG_CourseNode",
+    "methods": [
+      "GetCourseNode",
+      "TryGetCourseNode",
+      "TryGetValidSpawnNode",
+      "get_IsValid"
+    ]
+  },
+  {
+    "type": "AIGraph.pCourseNode",
+    "methods": [
+      "Set",
+      "TryGet"
+    ]
+  },
+  {
+    "type": "ChainedPuzzles.CP_Bioscan_Core",
+    "methods": [
+      "OnDestroy",
+      "OnSyncStateChange",
+      "Setup",
+      "add_Master_OnScanStateChanged"
+    ]
+  },
+  {
+    "type": "ChainedPuzzles.ChainedPuzzleInstance",
+    "methods": [
+      "OnDestroy",
+      "OnStateChange",
+      "Setup"
+    ]
+  },
+  {
+    "type": "Enemies.EnemyAllocator",
+    "methods": [
+      "ResetAllowedToSpawn",
+      "SpawnEnemy",
+      "get_AllowedToSpawn"
+    ]
+  },
+  {
+    "type": "Enemies.EnemyGroup",
+    "methods": [
+      "GetSpawnData",
+      "OnGroupSpawnCompleted",
+      "Spawn"
+    ]
+  },
+  {
+    "type": "Enemies.EnemyGroupScoreSpawnData",
+    "methods": [
+      "GenerateRandomPlacements",
+      "GetTotalEnemyCount"
+    ]
+  },
+  {
+    "type": "Enemies.EnemySync",
+    "methods": [
+      "OnDespawn",
+      "OnSpawn"
+    ]
+  },
+  {
+    "type": "GameData.ComplexResourceSetDataBlock",
+    "methods": [
+      "GetApexGate",
+      "GetBulkheadGate",
+      "GetCustomGeomorph",
+      "GetMainPathBulkheadGate",
+      "GetSecurityGate"
+    ]
+  },
+  {
+    "type": "GameData.eProgressionPuzzleType",
+    "methods": []
+  },
+  {
+    "type": "LG_Geomorph",
+    "methods": [
+      "SetPlaced",
+      "SetupAreas",
+      "SetupGates"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Area",
+    "methods": [
+      "Setup",
+      "TryGetRandomEnemySpawnPointInside",
+      "get_UID",
+      "get_m_geoArea"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_BulkheadDoorController_Core",
+    "methods": [
+      "BuildBulkheadLogic",
+      "OnStateChange",
+      "Setup"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_ComputerTerminal",
+    "methods": [
+      "OnDestroy",
+      "OnStateChange",
+      "Setup",
+      "SyncIncomingTerminalCommand"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_ComputerTerminalCommandInterpreter",
+    "methods": [
+      "AddCommand",
+      "OnLevelCleanup",
+      "Ping",
+      "Query",
+      "ReceiveCommand",
+      "TryGetCommand"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Factory",
+    "methods": [
+      "InjectJob",
+      "add_OnFactoryBatchDone",
+      "add_OnFactoryBuildDone"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Factory/BatchName",
+    "methods": []
+  },
+  {
+    "type": "LevelGeneration.LG_Gate",
+    "methods": [
+      "get_IsTraversable",
+      "get_ProgressionSourceArea",
+      "get_SpawnedDoor"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Layer",
+    "methods": [
+      "CreateZone",
+      "AddZoneToLayer"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_PlaceStaticEnemyInNode",
+    "methods": [
+      ".ctor",
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Plug",
+    "methods": [
+      "Pair",
+      "TryPair"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_SecurityDoor",
+    "methods": [
+      "Setup",
+      "SetupBulkheadDCLock",
+      "SetupChainedPuzzleLock",
+      "SetupKeyItemLock",
+      "SetupPowerGeneratorLock",
+      "get_DoorType",
+      "get_LinksToLayerType"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_Zone",
+    "methods": [
+      "Create",
+      "get_DimensionIndex",
+      "get_LocalIndex"
+    ]
+  },
+  {
+    "type": "LevelGeneration.LG_ZoneJob_CreateExpandFromData",
+    "methods": [
+      "AddArea",
+      "AddCustomGeomorphAreas",
+      "Build"
+    ]
+  },
+  {
+    "type": "LevelGeneration.eLG_DoorType",
+    "methods": []
+  },
+  {
+    "type": "LevelGeneration.eSecurityDoorType",
+    "methods": []
+  },
+  {
+    "type": "PLOC_Downed",
+    "methods": [
+      "Enter",
+      "Exit",
+      "OnPlayerRevived",
+      "OnSetup",
+      "SyncEnter",
+      "SyncExit"
+    ]
+  },
+  {
+    "type": "Player.PlayerAgent",
+    "methods": [
+      "OnDespawn",
+      "OnDestroy",
+      "RequestWarpToSync",
+      "SampleWarpPosition",
+      "Setup",
+      "TeleportTo",
+      "TryWarpTo",
+      "WarpTo"
+    ]
+  },
+  {
+    "type": "Player.PlayerAgent/WarpOptions",
+    "methods": []
+  },
+  {
+    "type": "Player.PlayerSync",
+    "methods": [
+      "IncomingSyncWarp",
+      "OnDespawn",
+      "OnSpawn",
+      "SendSyncWarp"
+    ]
+  },
+  {
+    "type": "SurvivalWave",
+    "methods": [
+      "DeSpawn",
+      "OnDespawn",
+      "OnSpawn",
+      "Spawn",
+      "SpawnGroup"
+    ]
+  },
+  {
+    "type": "WardenObjectiveManager",
+    "methods": [
+      "OnLevelCleanup",
+      "CheckAndExecuteEventsOnTrigger",
+      "CheckAndExecuteEventsWithBreaks"
+    ]
+  }
+]

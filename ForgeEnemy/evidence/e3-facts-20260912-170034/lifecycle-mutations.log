@@ -1,0 +1,7 @@
+PASS baseline: []
+PASS death-reentry: ['death.duplicate-and-nested', 'death.alive-readback-is-not-death', 'death.no-consumer-does-not-replay', 'death.no-postfix-does-not-replay', 'integration.queue-rejection-does-not-reopen-fact']
+PASS token-replay: ['death.duplicate-and-nested', 'death.alive-readback-is-not-death', 'death.stale-phase', 'death.stale-client', 'limb.transition-once', 'limb.changed-after-capture-phase', 'limb.changed-after-capture-client', 'limb.unstable-readback', 'limb.readback-exception-consumes-window', 'integration.native-hooks-delegate-exactly-once']
+PASS death-without-readback: ['death.alive-readback-is-not-death']
+PASS noop-is-break: ['limb.noop-then-genuine-transition']
+PASS owner-id-lost: ['limb.changed-after-capture-owner-id-mismatch']
+PASS indexed-pointer-lost: ['limb.changed-after-capture-new-indexed-part']

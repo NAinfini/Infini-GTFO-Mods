@@ -1,0 +1,65 @@
+--- a/ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs
++++ b/ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs
+@@ -33,7 +33,7 @@
+             "Lifecycle observers are read-only; only their subscription may be disposed.");
+     private void AcceptRuntimeWork(bool allowStarting = false)
+     {
+-        NoLifecycleMutation();
++        NoLifecycleMutation(); NoEntityObservationMutation();
+         RuntimeJson.Require(StartupState is not (RuntimeStartupState.Failed or RuntimeStartupState.Stopped)
+             && (allowStarting || StartupState != RuntimeStartupState.Starting),
+             "runtime-not-ready", "Runtime startup failed, stopped or is still initializing.");
+@@ -94,7 +94,7 @@
+     internal bool IsLifecycleObserverActive(long id)
+     { ReadThread(); return lifecycleObservers.ContainsKey(id); }
+     internal void RemoveLifecycleObserver(long id)
+-    { ReadThread(); lifecycleObservers.Remove(id); }
++    { ReadThread(); NoEntityObservationMutation(); lifecycleObservers.Remove(id); }
+     private void RemoveLifecycleObservers(string provider, long moduleGeneration)
+     {
+         foreach (var observer in lifecycleObservers.Values
+--- a/ForgeRuntime/Framework/RuntimeKernel.cs
++++ b/ForgeRuntime/Framework/RuntimeKernel.cs
+@@ -62,7 +62,7 @@
+     }
+     private void Thread() { ReadThread(); AcceptRuntimeWork(); }
+     private void Mutable()
+-    { ReadThread(); NoLifecycleMutation(); RuntimeJson.Require(!advancing, "reentrant-mutation", "Cannot change registration, plans or world during dispatch."); }
++    { ReadThread(); NoLifecycleMutation(); NoEntityObservationMutation(); RuntimeJson.Require(!advancing, "reentrant-mutation", "Cannot change registration, plans or world during dispatch."); }
+     internal bool IsRegistered(string provider, long token) => modules.TryGetValue(provider, out var current) && current == token;
+     public RuntimeModuleHandle RegisterModule(RuntimeModule module)
+     {
+@@ -88,6 +88,7 @@
+         foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Support.Remove(id); }
+         foreach (var id in ownedCaps) { registry.Capabilities.Remove(id); registry.CapabilityRegistrants.Remove(id); }
+         foreach (var key in registry.Resolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.Resolvers.Remove(key);
++        foreach (var key in registry.EntityObservers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.EntityObservers.Remove(key);
+         foreach (var id in plans.Where(x => x.Value.Modules.ContainsKey(provider)).Select(x => x.Key).ToArray()) plans.Remove(id);
+         RebuildSubscriptions();
+     }
+--- a/ForgeRuntime/Framework/RuntimeRegistry.cs
++++ b/ForgeRuntime/Framework/RuntimeRegistry.cs
+@@ -82,6 +82,23 @@
+                 RuntimeJson.Require(next.Resolvers.TryAdd(resolver.Key, (providerId, resolver.Value!)), "entity-namespace-conflict", resolver.Key);
+             }
+         }
++        if (module.EntityObservers != null)
++        {
++            RuntimeJson.Require(module.EntityObservers.Count <= RuntimeKernel.MaximumEntityObservers,
++                "entity-observer-budget", "Entity observer registration exceeds capacity.");
++            foreach (var observer in module.EntityObservers)
++            {
++                RuntimeJson.Require(RuntimeJson.IsId(observer.Key) && observer.Value != null,
++                    "entity-observer-namespace", "An entity observer needs a valid namespace and callback.");
++                RuntimeJson.Require(next.Resolvers.TryGetValue(observer.Key, out var resolver)
++                    && resolver.Owner == providerId, "entity-observer-owner",
++                    "An observer must belong to the owner of its registered entity resolver.");
++                RuntimeJson.Require(next.EntityObservers.TryAdd(observer.Key, (providerId, observer.Value!)),
++                    "entity-observer-conflict", observer.Key);
++            }
++            RuntimeJson.Require(next.EntityObservers.Count <= RuntimeKernel.MaximumEntityObservers,
++                "entity-observer-budget", "Entity observer capacity reached.");
++        }
+         next.Validate();
+         return next;
+     }

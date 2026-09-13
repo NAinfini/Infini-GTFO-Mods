@@ -1,0 +1,144 @@
+[
+  {
+    "name": "host",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 1,
+    "seconds": 1.44
+  },
+  {
+    "name": "development",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/ForgeDevelopment.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 1,
+    "seconds": 1.23
+  },
+  {
+    "name": "Reports",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\Reports\\Reports.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 5.3
+  },
+  {
+    "name": "ProjectChecks",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\ProjectChecks\\ProjectChecks.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 3.64
+  },
+  {
+    "name": "SceneInventory",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\SceneInventory\\SceneInventoryTests.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 2.53
+  },
+  {
+    "name": "Telemetry",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\Telemetry\\Telemetry.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 3.0
+  },
+  {
+    "name": "Samples",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\Samples\\Samples.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 2.67
+  },
+  {
+    "name": "Framework",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\Framework\\Framework.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 1,
+    "seconds": 1.59
+  },
+  {
+    "name": "GameBindings",
+    "command": [
+      "dotnet",
+      "run",
+      "--project",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\GameBindings\\GameBindings.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-d1-xddpveg8\\regression",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 1,
+    "seconds": 1.61
+  }
+]

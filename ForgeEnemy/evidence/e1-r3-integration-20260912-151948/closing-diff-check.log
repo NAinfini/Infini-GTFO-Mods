@@ -1,0 +1,6 @@
+warning: in the working copy of 'ForgeRuntime/Framework/Contracts.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'ForgeRuntime/Framework/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'ForgeRuntime/Framework/RuntimeKernel.State.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'ForgeRuntime/Framework/RuntimeKernel.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'ForgeRuntime/Framework/RuntimeRegistry.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'ForgeRuntime/tests/Framework/Framework.csproj', LF will be replaced by CRLF the next time Git touches it

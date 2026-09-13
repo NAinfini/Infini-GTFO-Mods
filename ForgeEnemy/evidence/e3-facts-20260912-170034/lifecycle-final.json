@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "verification": "production-provider-hooks-and-compiled-sdk-with-game-doubles",
+  "gameExecuted": false,
+  "multiplayerExecuted": false,
+  "utc": "2026-09-12T21:28:33.8005246+00:00",
+  "sdkSha256": "607CAC61B7F40BA12CAE33355D8096420F6654C7A6C7DF2B09D6D147BF24DA55",
+  "passed": 50,
+  "failed": 2,
+  "checks": [
+    {
+      "Id": "death.fact-not-kill",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.duplicate-and-nested",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.already-dead-at-entry",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.alive-readback-is-not-death",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.no-consumer-does-not-replay",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.no-postfix-does-not-replay",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.no-startup-replay",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.foreign-owner-and-wrong-kind",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.stale-phase",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.stale-client",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.stale-despawn",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.stale-world",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.stale-pointer",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.stale-id",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.pooled-new-life",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.two-instances-same-tick",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "death.thread-boundary",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.transition-once",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.two-parts-same-tick",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.noop-then-genuine-transition",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.prebroken-and-restored-not-new-life",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.no-consumer-and-missing-postfix",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-missing-base",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-negative-index",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-index-budget",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-zero-pointer",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-not-indexed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-oversized-array",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-receiver-not-ready",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.reject-wrong-owner",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-phase",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-client",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-despawn",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-world",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-new-receiver",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-new-indexed-part",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-new-base",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-renumbered-part",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.changed-after-capture-owner-id-mismatch",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.foreign-token",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.new-life-reuses-pointer",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.unstable-readback",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "limb.readback-exception-consumes-window",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.manifest-is-implemented-not-game-verified",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.permission-death_started",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.permission-limb_broken",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.causality-remains-runtime-owned",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.queue-rejection-does-not-reopen-fact",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.queued-death-cannot-target-respawn",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "integration.real-heal-death_started",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: permissions\r\n   at ForgeRuntime.Framework.RuntimePlan.Parse(String json, RuntimeIdentity identity, RuntimeLimits ceiling, RuntimeRegistry registry, IEnumerable\u00601 grantedPermissions) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\Framework\\RuntimePlan.cs:line 0\r\n   at ForgeRuntime.Framework.RuntimeKernel.LoadPlan(String json, IEnumerable\u00601 grantedPermissions) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\Framework\\RuntimeKernel.cs:line 106\r\n   at IntegrationCases.\u003C\u003Ec__DisplayClass0_2.\u003CRun\u003Eb__10() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\IntegrationCases.cs:line 53\r\n   at T.Case(String id, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\Program.cs:line 24"
+    },
+    {
+      "Id": "integration.real-heal-limb_broken",
+      "Passed": false,
+      "Detail": "ForgeRuntime.Framework.RuntimeContractException: Binding locks must be ordinal sorted.\r\n   at ForgeRuntime.Framework.RuntimePlan.Parse(String json, RuntimeIdentity identity, RuntimeLimits ceiling, RuntimeRegistry registry, IEnumerable\u00601 grantedPermissions) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\Framework\\RuntimePlan.cs:line 0\r\n   at ForgeRuntime.Framework.RuntimeKernel.LoadPlan(String json, IEnumerable\u00601 grantedPermissions) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\Framework\\RuntimeKernel.cs:line 106\r\n   at IntegrationCases.\u003C\u003Ec__DisplayClass0_2.\u003CRun\u003Eb__10() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\IntegrationCases.cs:line 53\r\n   at T.Case(String id, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\Program.cs:line 24"
+    },
+    {
+      "Id": "integration.native-hooks-delegate-exactly-once",
+      "Passed": true,
+      "Detail": "passed"
+    }
+  ]
+}

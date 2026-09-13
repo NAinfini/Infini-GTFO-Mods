@@ -1,0 +1,9 @@
+{
+  "name": "InfiniTweaks",
+  "version_number": "2.5.5",
+  "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
+  "description": "GTFO gameplay QoL: compact stats, resource HUD, item markers, boosters and placement. Diagnostics are a separate optional Forge Runtime plugin.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.2"
+  ]
+}

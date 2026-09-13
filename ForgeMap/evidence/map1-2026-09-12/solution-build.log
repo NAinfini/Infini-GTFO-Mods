@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj (in 174 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeTrigger\ForgeTrigger.csproj (in 176 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeDevelopment\ForgeDevelopment.csproj (in 176 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\ForgeMap.csproj (in 176 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\ForgeEnemy.csproj (in 176 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\tests\Architecture\Architecture.csproj (in 177 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeWeapon\ForgeWeapon.csproj (in 176 ms).
+  ForgeRuntime.Framework -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  ForgeDevelopment -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\ForgeDevelopment\release\ForgeDevelopment.dll
+  ForgeEnemy -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\ForgeEnemy\release\ForgeEnemy.dll
+  ForgeMap -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\ForgeMap\release\ForgeMap.dll
+  ForgeTrigger -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\ForgeTrigger\release\ForgeTrigger.dll
+  ForgeWeapon -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\ForgeWeapon\release\ForgeWeapon.dll
+  Architecture -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-solution\bin\Architecture\release\Architecture.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.45

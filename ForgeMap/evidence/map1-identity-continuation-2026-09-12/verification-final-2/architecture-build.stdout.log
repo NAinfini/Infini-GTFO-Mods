@@ -1,0 +1,20 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\tests\Architecture\Architecture.csproj (in 155 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\ForgeEnemy.csproj (in 155 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeTrigger\ForgeTrigger.csproj (in 155 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeDevelopment\ForgeDevelopment.csproj (in 155 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeWeapon\ForgeWeapon.csproj (in 155 ms).
+  2 of 7 projects are up-to-date for restore.
+  ForgeRuntime.Framework -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  ForgeMap -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\ForgeMap\release\ForgeMap.dll
+  ForgeDevelopment -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\ForgeDevelopment\release\ForgeDevelopment.dll
+  ForgeTrigger -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\ForgeTrigger\release\ForgeTrigger.dll
+  ForgeEnemy -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\ForgeEnemy\release\ForgeEnemy.dll
+  ForgeWeapon -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\ForgeWeapon\release\ForgeWeapon.dll
+  Architecture -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\identity-checks-6e50f4efb8494b2488f1c1a96af88998\bin\Architecture\release\Architecture.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.87

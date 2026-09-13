@@ -1,0 +1,7 @@
+PASS baseline: exit=0, failures=[]
+PASS spawn-generation: exit=1, failures=['E2-001.duplicate-spawn', 'identity.wrapper-not-life', 'lifecycle.thread']
+PASS observation-replay: exit=1, failures=['E3-003.duplicate-damage-observation', 'damage.two-hits-same-tick', 'damage.zero-window-consumed', 'damage.rejected-window-consumed']
+PASS despawn-loses-life: exit=1, failures=['E2-002.captured-life-late-despawn', 'identity.same-wrapper-respawn']
+PASS changed-receiver-none: exit=1, failures=['E3-001.receiver-changed-commit', 'commit.component-replaced', 'commit.authority-lost', 'commit.owner-changed']
+PASS readback-none: exit=1, failures=['E3-002.invalid-readback-commit', 'commit.maximum-changed']
+PASS exception-none: exit=1, failures=['commit.throw-before-readback', 'commit.throw-after-write', 'commit.kernel-unknown-no-retry']

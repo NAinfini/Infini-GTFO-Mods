@@ -15,6 +15,7 @@ internal sealed class RuntimeRegistry
     internal readonly Dictionary<string, BindingSupport> Support = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, (string Owner, Func<EntityReference, bool> Resolve)> Resolvers = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, string> CapabilityRegistrants = new(StringComparer.Ordinal);
+    internal readonly Dictionary<string, (string Owner, Func<EntityReference, RuntimeEntitySnapshot?> Observe)> EntityObservers = new(StringComparer.Ordinal);
 
     internal RuntimeRegistry() { }
     private RuntimeRegistry(RuntimeRegistry source)
@@ -25,6 +26,7 @@ internal sealed class RuntimeRegistry
         foreach (var x in source.Handlers) Handlers.Add(x.Key, x.Value);
         foreach (var x in source.Support) Support.Add(x.Key, x.Value);
         foreach (var x in source.Resolvers) Resolvers.Add(x.Key, x.Value);
+        foreach (var x in source.EntityObservers) EntityObservers.Add(x.Key, x.Value);
         foreach (var x in source.CapabilityRegistrants) CapabilityRegistrants.Add(x.Key, x.Value);
     }
     internal RuntimeRegistry WithModule(RuntimeModule module, string apiVersion, out string providerId)
@@ -80,6 +82,22 @@ internal sealed class RuntimeRegistry
                 RuntimeJson.Require(next.Resolvers.TryAdd(resolver.Key, (providerId, resolver.Value!)), "entity-namespace-conflict", resolver.Key);
             }
         }
+        if (module.EntityObservers != null)
+        {
+            RuntimeJson.Require(module.EntityObservers.Count <= RuntimeKernel.MaximumEntityObservers,
+                "entity-observer-budget", "Entity observer budget exceeded.");
+            foreach (var item in module.EntityObservers)
+            {
+                RuntimeJson.Require(RuntimeJson.IsId(item.Key) && item.Value != null,
+                    "entity-observer", "Invalid entity observer.");
+                RuntimeJson.Require(next.Resolvers.TryGetValue(item.Key, out var resolver) && resolver.Owner == providerId,
+                    "entity-observer-owner", "An observer requires this provider's resolver.");
+                RuntimeJson.Require(next.EntityObservers.TryAdd(item.Key, (providerId, item.Value!)),
+                    "entity-observer-conflict", item.Key);
+            }
+            RuntimeJson.Require(next.EntityObservers.Count <= RuntimeKernel.MaximumEntityObservers,
+                "entity-observer-budget", "Entity observer budget exceeded.");
+        }
         next.Validate();
         return next;
     }
@@ -110,7 +128,7 @@ internal sealed class RuntimeRegistry
             RuntimeJson.Text(c, "label"); RuntimeJson.Version(c, "version");
             RuntimeJson.Require(c.GetProperty("parameters").ValueKind == JsonValueKind.Object, "parameter-metadata", id);
             if (!c.TryGetProperty("graph", out var graph)) continue;
-            RuntimeJson.Shape(graph, "domains execution inputs outputs parameters", "recipients");
+            RuntimeJson.Shape(graph, "domains execution inputs outputs parameters", "recipients variadic");
             var domains = RuntimeJson.Strings(graph.GetProperty("domains"));
             RuntimeJson.Require(domains.Length > 0 && domains.All(x => new[] { "map", "room", "enemy", "weapon", "tool", "consumable", "player", "session", "logic", "editor" }.Contains(x)), "graph-domain", id);
             RuntimeJson.Require(new[] { "pure", "host", "owner", "presentation" }.Contains(RuntimeJson.Text(graph, "execution")), "graph-authority", id);
@@ -118,18 +136,7 @@ internal sealed class RuntimeRegistry
             {
                 var ports = RuntimeJson.Rows(graph, direction);
                 RuntimeJson.Require(ports.Select(p => RuntimeJson.Text(p, "id")).Distinct(StringComparer.Ordinal).Count() == ports.Length, "duplicate-port", id);
-                foreach (var port in ports)
-                {
-                    RuntimeJson.Shape(port, "id type", "schema unit nullable optional");
-                    RuntimeJson.Require(Regex.IsMatch(RuntimeJson.Text(port, "id"), @"^[a-z][a-z0-9_]*$"), "port-name", id);
-                    foreach (var key in new[] { "schema", "unit" }) if (port.TryGetProperty(key, out var text)) RuntimeJson.Text(text);
-                    if (RuntimeJson.Text(port, "type") is "event" or "result" or "resource") RuntimeJson.Require(port.TryGetProperty("schema", out _), "port-schema", id);
-                    RuntimeJson.Require(new[] { "execution", "boolean", "integer", "number", "string", "vector3", "entity", "entity-list", "resource", "event", "result", "timer", "reservation" }.Contains(RuntimeJson.Text(port, "type")), "port-type", id);
-                    var type = RuntimeJson.Text(port, "type");
-                    if (type == "execution") RuntimeJson.Require(!port.TryGetProperty("unit", out _) && !port.TryGetProperty("schema", out _) && !RuntimeJson.Flag(port, "nullable"), "execution-port", id);
-                    if (port.TryGetProperty("unit", out _)) RuntimeJson.Require(type is "number" or "integer" or "vector3", "port-unit", id);
-                    foreach (var flag in new[] { "nullable", "optional" }) if (port.TryGetProperty(flag, out var v)) RuntimeJson.Require(v.ValueKind is JsonValueKind.True or JsonValueKind.False, "port-flag", id);
-                }
+                foreach (var port in ports) RuntimeGraphContracts.ValidatePort(port, id);
             }
             var parameters = RuntimeJson.Rows(graph, "parameters");
             RuntimeJson.Require(parameters.Select(p => RuntimeJson.Text(p, "id")).Distinct(StringComparer.Ordinal).Count() == parameters.Length, "duplicate-parameter", id);
@@ -148,6 +155,7 @@ internal sealed class RuntimeRegistry
                 if (parameter.TryGetProperty("minimum", out var minimum) && parameter.TryGetProperty("maximum", out var maximum)) RuntimeJson.Require(minimum.GetDouble() <= maximum.GetDouble(), "parameter-bounds", id);
                 RuntimeJson.Require(parameter.GetProperty("required").ValueKind is JsonValueKind.True or JsonValueKind.False, "parameter-required", id);
             }
+            RuntimeGraphContracts.ValidateVariadic(graph, id);
             var kind = RuntimeJson.Text(c, "kind"); var execution = RuntimeJson.Text(graph, "execution");
             var inputPorts = RuntimeJson.Rows(graph, "inputs"); var outputPorts = RuntimeJson.Rows(graph, "outputs");
             if (execution == "pure") RuntimeJson.Require(!inputPorts.Concat(outputPorts).Any(p => RuntimeJson.Text(p, "type") == "execution"), "pure-execution", id);

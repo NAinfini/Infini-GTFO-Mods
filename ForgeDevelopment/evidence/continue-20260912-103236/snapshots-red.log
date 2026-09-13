@@ -1,0 +1,13 @@
+Forge Development report snapshots: 9/21 passed
+FAIL: metadata is frozen at enqueue
+FAIL: late events cannot enter earlier request
+FAIL: aggregate count is frozen
+FAIL: aggregate cost is frozen
+FAIL: late checks cannot enter earlier request
+FAIL: issue count is frozen
+FAIL: late stack does not rewrite old evidence
+FAIL: replacement scan cannot change queued world identity
+FAIL: pending receipt cannot become completed after enqueue
+FAIL: queued declarations cannot be replaced
+FAIL: later request also retains its own scan
+FAIL: next request records completion at capture time

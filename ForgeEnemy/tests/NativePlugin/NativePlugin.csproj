@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <Target Name="RequireSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeFrameworkAssembly)')" Text="An explicitly compiled production SDK is required." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+    <Compile Include="../../Native/Plugin.cs;../../Native/EnemyPluginSession.cs;../../Native/EnemyNativeHooks.cs;../../Native/EnemyLifecycleHooks.cs;../../Native/Observation/*.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+  </ItemGroup>
+</Project>

@@ -3,3 +3,7 @@ obj/
 *.user
 *.suo
 
+# Per-mod local build/release output and Python caches
+dist/
+__pycache__/
+*.py[cod]

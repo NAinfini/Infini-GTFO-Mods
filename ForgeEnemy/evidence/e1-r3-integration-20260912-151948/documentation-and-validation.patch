@@ -1,0 +1,505 @@
+--- a/ForgeEnemy/README.md
++++ b/ForgeEnemy/README.md
+@@ -1,30 +1,51 @@
+ # ForgeEnemy
+ 
+-敌人实例/接收者、攻防、AI/技能、生成要求与表现。遭遇数量/时机/分布由 Map 决定。
++敌人实例、健康接收器、AI/技能与生成要求的领域包；遭遇数量、时机和空间求解仍归 Map。
+ 
+-当前状态：**Native 独立插件入口及原生实体读取已落地并通过编译，但 E1 宿主切换、共享 R3 观察登记和实机验证尚未完成**。`ForgeEnemy.csproj` 仍是托管骨架；实际插件工程为 [Native/ForgeEnemy.Native.csproj](Native/ForgeEnemy.Native.csproj)，消费唯一 Runtime/SDK，不创建第二内核。详见 [E1 切换交接](E1-NATIVE-CUTOVER.md) 与 [E2 原生快照交付](E2-OBSERVATION-HANDOFF.md)。没有安装或发布。
++## 当前代码状态（2026-09-12）
+ 
+-现有敌人绑定仍在 `ForgeRuntime/GameBindings/EnemyModule.cs`，当前骨架沿用其 provider ID，但不与它同时加载。E1 阶段须迁成一条真实注册路径，不能保留双份。
++**E1 源码/程序集切换已完成，R3 实体观察登记已实际接通。尚未进行 GTFO 实机或多人验收。**
++唯一生产接收器在 [Native/EnemyModule.cs](Native/EnemyModule.cs)。Runtime 不再创建 Enemy provider，
++也不再编译三个 Enemy Hook；[独立插件](Native/Plugin.cs) 经公开宿主入口注册同一个 SDK。
++`ModuleDefinition` 仅保留包身份常量，不再提供可与真实 provider 冲突的空注册方法。
+ 
+-完整职责、分阶段任务、输入输出、失败处理、生命周期、测试与机制工作队列见 [详细实施计划](IMPLEMENTATION-PLAN.md)。接手前读 [仓库架构](../ARCHITECTURE.md) 和 [Agent 交接](../AGENT-HANDOFF.md)。上位依据是网站 [唯一总案](../../Infini-GTFO-Model-Site/Docs/rework/FORGE-COMPLETE-PLAN.md)，本目录不另立能力目录。
++| 当前 binding | 已实现范围 |
++| --- | --- |
++| damage_applied | 观察指定原生承伤调用窗口的实际 HP 损失；未知攻击来源不反推 |
++| heal | 存活 Enemy 的显式目标治疗，量化、提交前复核、实际读回及 unknown 结果 |
++| health_changed | 仅本 Forge 治疗实际产生的正生命变化，不宣称覆盖全部原生治疗 |
+ 
+-在模组仓库根目录验证：
++以上仍为 `implementation-only`。Native 实体观察返回精确引用、位置、生命状态和有效的 health.heal
++接收能力；阵营保持未知，位置不代表碰撞净空或合法出生空间。未新增 AI、产怪、伤害命令或恢复支持。
++`ForgeEnemy.Native.dll` 是实际插件；仅引用 Runtime/SDK，不附带第二份 SDK。
++`ForgeEnemy.csproj` 的托管辅助工程不是另一个游戏插件，不应当作玩家发行包。
++
++## 验证与交接
++
++本轮实际工作树：Enemy 观察 66/66、接收器 40/40、插件 12/12、最终切换布局 28/28；
++SDK Framework 253 项、架构 36 项、原生静态证据 107/107，完整宿主和 Native 插件构建通过。
++提交审计现行路径 32/32，辅助组件重复的治疗用例 20/20；这些数量不得相加为独立机制数。
++迁移检查脚本 16 项通过，六种故意回退的接收器错误全部被检出。
++
++详细记录：[本次 E1/R3 集成](E1-R3-INTEGRATION.md)、[完整实施计划](IMPLEMENTATION-PLAN.md)、
++[历史 E3 修复](E3-SAFETY-HANDOFF.md)、[E2 观察来源](E2-OBSERVATION-HANDOFF.md)。
++证据在 [evidence/e1-r3-integration-20260912-151948](evidence/e1-r3-integration-20260912-151948/)。
++早期 pending 布局和隔离 SDK 结果保留为历史，不能覆盖本次实际工作树结果。
++
++## 构建入口
++
++从仓库根运行；先设置 `GTFO_BEPINEX_PATH` 为合法本地编译引用目录。
++输出必须使用自己的隔离路径，不写入已安装的 profile：
+ 
+ ```powershell
+-dotnet build ForgeEnemy/ForgeEnemy.csproj -c Release
+-dotnet run --project ForgeRuntime/tests/Architecture/Architecture.csproj -c Release
++$out = Join-Path $env:TEMP ('forge-enemy-qa-' + [guid]::NewGuid().ToString('N'))
++dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $out
++$hostDll = Join-Path $out 'bin/ForgeRuntime/release/ForgeRuntime.dll'
++$sdkDll = Join-Path $out 'bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll'
++dotnet build ForgeEnemy/Native/ForgeEnemy.Native.csproj -c Release --artifacts-path $out `
++  "-p:ForgeRuntimeAssembly=$hostDll" "-p:ForgeFrameworkAssembly=$sdkDll"
+ ```
+ 
+-上述命令只验证托管骨架，不代替 Native 插件构建。Native 工程需显式提供已成功构建的 ForgeRuntimeAssembly、ForgeFrameworkAssembly 和 GTFOBepInExPath；其构建、加载替身与布局证据见 E1/E2 交接。当前 DLL 均不是已验收的玩家发行物，InfiniTweaks 的 QoL 行为不属于本模块。后文早期计数按各自报告时间保留。
+-
+-## 2026-09-12 E2 首批取证
+-
+-已增加 92 个精确原生签名的冻结证据与可复跑检查；105/105 静态检查和 11/11 工具检错检查通过。首轮接收器探针 8/13 是历史失败基线，保留于 [E2 交付](E2-DELIVERY.md)。最新 [E3 安全修复](E3-SAFETY-HANDOFF.md) 已修改唯一现行 EnemyModule，扩展探针 34/34、6 个错误实现检错及完整宿主构建通过；裸指针对象池探针的证据限制仍明确保留。独立插件和 E1 注册/Hook 切换尚未完成。
+-
+-这不改变当前空 provider 和未独立加载的状态；E1 必须与 Runtime 完成生命周期和三项敌人 Hook 的单写者移交。生产工程完整构建及实机验证不由本批静态测试替代。
+-
+-## 2026-09-12 续作验证
+-
+-新增 `Receivers/**` 迁移准备组件已编译，尚未接入宿主或完成行为测试。并发安全任务修改后的唯一旧接收器，本轮独立复验 **34/34**；Enemy 构建零警告/错误，架构 **35/35**、原生静态审计 **105/105**。这些不等于独立插件、完整 E3 或实机验收通过。
+-
+-进度、并发归属、工具拦截、待移交项目和完整证据见 [E1 边界交接](E1-BOUNDARY-HANDOFF.md)。早期 8/13 记录仅代表旧源码快照；不得用旧失败数或本轮绿色探针代替当前全阶段验收。
++复验命令及退出码见本批 evidence 中的 commands.json；具体测试输出独立记录。
++E2 碰撞/导航/生成要求、E3 其余战斗/部位、E4–E7 机制及实机验收仍未完成。
++本次未安装、打包发布、启动游戏、修改游玩配置、Git 提交或推送。
+--- a/ForgeEnemy/IMPLEMENTATION-PLAN.md
++++ b/ForgeEnemy/IMPLEMENTATION-PLAN.md
+@@ -1,8 +1,8 @@
+ # ForgeEnemy 详细实施计划
+ 
+-2026-09-12；状态：**E2 首批原生 API 取证和现行接收器安全修复已交付；E3 治疗提交结果切片已通过托管验证，E1 物理迁移、完整 E2/E3 及 E4–E7 仍未完成**。没有安装、发布或游戏验收。
++2026-09-12；状态：**E1 源码/程序集迁移与唯一注册路径已完成；R3 实体观察已在共享 SDK 实际接通。E2 身份/观察及 E3 治疗安全切片通过托管验证；完整 E2/E3、E4–E7 和实机验收仍未完成**。没有安装或发布。
+ 
+-首轮 [E2 取证与迁移交接](E2-DELIVERY.md) 的 8/13 是保留的历史失败基线。最新 [E3 安全修复与验证](E3-SAFETY-HANDOFF.md) 记录唯一现行接收器的 34/34 扩展探针、正常基线及 6 个错误实现检错、完整宿主构建与共享 fixture；原裸指针对象池探针的证据歧义单独保留，不伪称原 13 项全部修复。Runtime 已交付 [R2a 生命周期与 R2b 切换要求](../ForgeRuntime/R2B-MIGRATION-HANDOFF.md)，最终注册/Hook 切换仍由 Runtime 单写者完成。上述均不提升游戏支持状态。
++首轮 [E2 取证与迁移交接](E2-DELIVERY.md) 的 8/13 是保留的历史失败基线。最新 [E3 安全修复与验证](E3-SAFETY-HANDOFF.md) 记录唯一现行接收器的 34/34 扩展探针、正常基线及 6 个错误实现检错、完整宿主构建与共享 fixture；原裸指针对象池探针的证据歧义单独保留，不伪称原 13 项全部修复。在 [本次 E1/R3 集成](E1-R3-INTEGRATION.md) 中，旧宿主注册/三个敌人 Hook 已移除，接收器迁入 Native，共享观察登记/注销/只读保护已实际落地。下述早期报告只代表其原始快照，不覆盖本次结果；上述均不提升游戏支持状态。
+ 
+ Enemy 包拥有敌人实例、健康/战斗接收器、AI/感知/移动、弱点/技能以及生成空间要求。敌人资产属于统一资源库；Map 决定遭遇数量、时机和分布，Enemy 不复制地图遭遇调度。
+ 
+@@ -12,25 +12,27 @@
+ 
+ 每个批次的“验收”是未来退出条件，除明确标为本轮已执行的骨架检查外，都不是测试通过记录。所有步骤遵循架构文档中的 M0–M7 和跨仓库交接表。
+ 
+-## 2026-09-12 最新增量：E2 原生实体观察
++## 2026-09-12 最新增量：E1 切换与 R3 实际集成
+ 
+-已在独立 Native 插件中接入同一 Enemy provider 的原生快照读取：精确生命引用、位置、生命状态及合法 health.heal 接收能力；不推断阵营、不创建私有实体表。详情见 [E2 观察交接](E2-OBSERVATION-HANDOFF.md)。
++唯一接收器在 Native/EnemyModule.cs，三个敌人 Hook 由 Native 插件拥有；Runtime 只保留四个世界/会话 Hook，生产依赖不反向引用 Enemy。ModuleDefinition 仅保留包身份，空 Create 注册路径已删除。
+ 
+-本轮完整宿主和 Native 插件构建零警告/错误；原生读取 15/15、接收器回归 40/40、原生签名/静态审计 107/107。完整消费方测试对冻结的当前 SDK 为 32/56，24 项失败来自尚未接完的 R3 观察登记；三个共享接线修正在隔离 SDK 副本中达到 56/56，但未应用到共享源码，不能据此关闭 E2 或 R3。
++共享 SDK 已登记有界且归属明确的 EntityObservers，注销清理和只读回调保护已接通；进一步修复了实体观察回调可注销生命周期订阅的漏洞，同时保留生命周期回调自注销。最终 Enemy 观察 **66/66**，Trigger R3 消费方 **417 项、0 失败**，SDK 合同与注册探针 **76 项、0 失败**。
+ 
+-E1 布局只验收 pending 模式 28/28；最终宿主去除旧 provider/Hook 仍归其单写者。原生 Position 不代替碰撞尺寸、NavMesh 或出生净空，Map 空间合同和 E4–E7 保留待实施/待验证。未安装、发布、启动游戏、提交或推送。
++完整宿主和 Native 插件构建零警告/错误，最终 cutover 布局 **28/28**，架构 **36 项**；接收器 **40/40**、提交审计现行路径 **32/32**、原生静态证据 **107/107**。辅助组件重复治疗用例 20/20 不另算独立机制数。Trigger 消费方工程保留 3 条 NETSDK1138 目标框架生命周期警告，未更改项目目标。
+ 
+-## 当前骨架与既有实现
++早期 32/56 与隔离 56/56、pending 布局和失败日志保留在原证据目录。此次真实工作树命令/源码哈希/完整结果见 [E1/R3 集成](E1-R3-INTEGRATION.md)。原生 Position 不代替碰撞尺寸、NavMesh 或出生净空；Map 空间要求、其余战斗/AI 和 E4–E7 仍按原验收推进。未安装、发布、启动游戏、提交或推送。
+ 
+-本目录已建立 `ForgeEnemy.csproj` 与空 `ModuleDefinition`，provider 沿用 `forge.module.gtfo.enemy / 1.0.0`。它没有加载到实际游戏宿主；不能与宿主内同 ID provider 同时注册。现有三个绑定仍保持原位置和 `implementation-only` 级别，本轮没有把它们迁成独立插件或变成 game-verified。
++## 当前工程与唯一执行路径
+ 
+-| 现有代码 | 已有边界 | 迁移目标 |
++`ForgeEnemy.Native.csproj` 编译实际独立插件，provider 沿用 `forge.module.gtfo.enemy / 1.0.0`，三个 binding 仍为 `implementation-only`。`ForgeEnemy.csproj` 是托管辅助工程，不是第二个游戏插件；ModuleDefinition 只保留身份常量。尚未安装或执行 GTFO，不能标为 game-verified。
++
++| 实际代码位置 | 当前职责 | 归属 |
+ | --- | --- | --- |
+-| `ForgeRuntime/GameBindings/EnemyModule.cs` | `gtfo.enemy:<GlobalID>`、world/life resolver、实际承伤观察、Heal 与 health_changed | Enemy 的实际 provider / 实体表 / receiver |
+-| `GameBindings/NativeHooks.cs` 的 3 个敌人 Hook | spawn / despawn / damage | Enemy 持有；4 个全局世界 Hook 仍归 Runtime |
+-| `GameBindings/GameRuntimeBridge.cs` | 目前直接创建/清理 EnemyModule | R2 改成公开模块/生命周期接入，删除宿主反向依赖 |
+-| `Framework/CombatContracts.cs` | 已迁入 SDK，公共 combat definitions | 留在 SDK，不复制到 Enemy |
+-| `tests/GameBindings` | 绑定替身、原生证据检查与 fixture | Enemy 边界测试迁入本域；宿主/初始化测试仍归 Runtime |
++| `Native/EnemyModule.cs` | 唯一 provider、实体表、resolver、观察函数、Heal 与伤害事实 | Enemy；旧宿主源码已移除 |
++| `Native/EnemyNativeHooks.cs` | spawn / despawn / damage 三个 Hook | Enemy；Runtime 保留四个世界 Hook |
++| `ForgeRuntime/GameBindings/GameRuntimeBridge.cs` | 唯一宿主、阶段/权威、世界与模拟 tick | Runtime；不再引用 EnemyModule |
++| `ForgeRuntime/Framework/CombatContracts.cs` | 唯一公共 combat definitions | SDK；Enemy 不复制 canonical 定义 |
++| `tests/ReceiverProbe`、`tests/EntityObservation`、`tests/NativePlugin` | 引用当前 Native 接收器/插件的独立回归 | Enemy；共享 bridge 初始化测试仍归 Runtime |
+ 
+ 现行 Heal 保留宿主权威、实际 `SendSetHealth`、SFloat16 预量化和读回，零有效量不生成 health_changed。安全修复已将原生提交后的 receiver/owner/上限/权限变化、读回异常和提交异常改为 FailedUnknown；量化准备失败明确 Failed/none，未发包。未知结果不伪造实际量或自动重试；完整 E3 的提交前重入、伤害/部位和实机时序验收仍由相应批次继续。
+ 
+@@ -48,6 +50,8 @@
+ ## 实施批次
+ 
+ ### E1 — 将既有敌人模块完整迁出宿主
++
++当前结果：代码/程序集迁移及唯一注册路径已完成，构建、回归和 cutover 元数据通过。以下是保留的验收要求；真实游戏加载、主客机及原生 Hook 行为仍未验证。
+ 
+ 开始条件：R1 编译基线通过，R2 已交付公开 readiness/world/tick 生命周期接入；与 Runtime 单写者完成 Hook 切分。
+ 
+@@ -179,7 +183,7 @@
+ 
+ 逐机制证据单至少包含：源包精确版本/hash/许可、已核验与未知的语义、canonical ID 与修订、真实 binding/权限、宿主与客户端执行侧、正反 fixture、游戏日志/runId、实际依赖及 M7 清理结论。此表不复制来源代码、不创建第二份能力注册表。
+ 
+-## 2026-09-12 续作：边界组件与独立复验
++## 历史记录：2026-09-12 边界组件与独立复验（已由上方集成进度更新）
+ 
+ 本轮新增 `Receivers/**` 中的身份表、治疗提交、单次伤害观察及线程边界；仅通过编译，未接入游戏宿主，新增组件行为测试未执行。测试工程写入被工具安全检查拦截，未换途径绕过。
+ 
+--- /dev/null
++++ b/ForgeEnemy/E1-R3-INTEGRATION.md
+@@ -0,0 +1,91 @@
++# E1 / R3 bounded integration continuation
++
++2026-09-12. The user's renewed Enemy implementation request continues the existing plan.
++This batch reviews the prepared E1 cutover and the three-part R3 consumer proposal.
++Before changing any shared file, compare current hashes with the captured inputs;
++if another writer changes them, stop that replacement and reconcile, never overwrite.
++
++Selected integration paths: Enemy-owned native source/tests; the E1 bridge/three-hook
++removal and GameBindings/Architecture consumer links; R3 observer registration,
++unregister cleanup and the existing read-only guard. No other shared redesign.
++All builds use isolated outputs. No installed profile, game process, asset or QoL changes.
++
++Acceptance: one native Enemy provider and three Enemy hooks, four Runtime hooks,
++no Runtime-to-Enemy production dependency, current SDK query tests, receiver/commit,
++plugin rollback, native metadata and lifecycle regressions. Preserve initial failures.
++The earlier pending/isolated reports remain historical, not evidence of this cutover.
++No game verification, release, installation, commit or push is implied.
++
++Results and exact changed paths will be recorded after the commands finish.
++
++## 实际落地
++
++- 将唯一 EnemyModule 从 Runtime/GameBindings 移入 Native/EnemyModule.cs，并切换命名空间。
++- Runtime 不再创建/清理 Enemy provider；仅保留四个世界、会话及检查点 Hook。
++- 三个敌人 Hook 由独立 Native 插件拥有；空 ModuleDefinition.Create 已删除。
++- 同步所有实际 receiver/bridge/插件/实体观察测试的源码引用，不保留兼容执行副本。
++- Native 仍单向引用宿主和唯一 SDK；SDK 无 Unity/BepInEx 依赖，Runtime 无 Enemy 生产依赖。
++- R3 在既有 Registry 中登记有所有权和容量校验的观察函数，注销时清理，并接上只读回调约束。
++- 跨模块测试进一步检出生命周期订阅注销缺口；RemoveLifecycleObserver 现在只在实体观察期间拒绝修改，
++  仍允许普通清理、停止后的清理及生命周期回调注销自身。
++
++实际集成修改经过 25 个目标路径的哈希前置检查；没有恢复或覆盖并发的 Trigger 工作。
++初次全快照检查发现四个未拥有的 Trigger 文件变化，已保留其工作树并刷新测试副本。
++旧接收器只在本批 ignored 备份/历史证据中保留，当前生产工程不再编译旧路径。
++所有前置、最终哈希和完整差异保存于本批 evidence，不把 HEAD 当作整个工作树版本。
++
++## 清理
++
++E23 早期留下的七个未使用草稿/空测试工程已移出源码目录，原字节备份保留在本批 obj/retired-drafts。
++清理前核对源码、工程与解决方案引用；同名 EnemyHealthSnapshot 的现有使用明确属于 Receivers 命名空间，
++不是被退休的根目录草稿。保留 CommitAudit 正在使用的 Receivers 辅助组件，没有改写其行为。
++清理后重新构建架构和提交审计并通过；清单及原哈希见 retired-drafts.json。
++
++本批只关闭 E1 的代码/程序集切换和 R3 的这部分接线，不代表完整 R3 或 E2–E7 完成。
++没有游戏启动、安装、打包发行、用户 profile 修改、Git 提交或推送。
++
++## 最终工作树验证
++
++| 检查 | 最终结果 |
++| --- | --- |
++| 完整 Runtime 宿主、Enemy Native 插件 | 均构建通过，0 警告 / 0 错误 |
++| Enemy 实体观察和 Registry 边界 | 66/66，通过实际共享 SDK |
++| Trigger R3 消费方 | 417 项，0 失败；未修改 Trigger 源码 |
++| SDK 实体合同与实际注册探针 | 76 项，0 失败 |
++| Enemy receiver / native plugin | 40/40、12/12 |
++| CommitAudit | 现行路径 32/32；同组治疗对辅助组件复测 20/20 |
++| 最终 NativeLayout | cutover 模式 28/28，不再是 pending |
++| 架构 / Framework | 36 项 / 253 项（253 已包含 timing 116、result 49） |
++| HostIntegration / LifecycleWork | 50 项 / 57 项 |
++| GameBindings | fixture 60、bridge 57、host native metadata 58；三者共享基础断言 |
++| Enemy 原生证据 | 107/107，94 个冻结精确方法签名；没有执行原生游戏方法 |
++| 宿主 PluginStartup / 真实配置夹具 | 42 项 / 70 项；只写测试临时配置 |
++| cutover CLI 防错 / receiver mutation | 16 项；正常基线及六种故意回退共 7/7 |
++
++Trigger 的测试工程构建有 3 条 NETSDK1138 提示（现有 net6.0 生命周期警告），0 错误；
++本批没有切换目标框架或关闭这些提示。生产宿主与 Native 插件的零警告结果单独记录。
++不同测试共享用例，不相加为独立游戏机制数；源码/替身/静态证据不能替代实机多人验证。
++
++## 失败记录与处理
++
++初次 LifecycleWork 调用漏传 --fixtures，命令报告用法错误；纠正参数后 57 项通过。
++首次 Trigger 跨模块回归在 417 项中有两条生命周期订阅只读保护失败；修正共享入口后同套测试通过，
++并新增两条 Enemy 本地回归验证“实体回调禁止注销”和“生命周期回调可自注销”。原失败日志保留。
++
++## 证据入口与下一阶段
++
++- [最终交付摘要与源码/程序集哈希](evidence/e1-r3-integration-20260912-151948/delivery-summary.json)
++- [全部实际命令、工作目录和退出码](evidence/e1-r3-integration-20260912-151948/commands.json)
++- [最终集成前后哈希清单](evidence/e1-r3-integration-20260912-151948/integration-inputs.json)
++- [实际源码差异](evidence/e1-r3-integration-20260912-151948/integrated-source.patch)
++- [Enemy 最终观察测试](evidence/e1-r3-integration-20260912-151948/final-observation.json)
++- [Trigger 最终消费方测试](evidence/e1-r3-integration-20260912-151948/final-trigger-r3.json)
++
++E1 现在的下一门槛是真实游戏加载/原生 Hook 与主客机验证，不是再次创建或迁移同名 provider。
++开发/发布包尚未生成；Native DLL 不能据本次构建直接宣称玩家发行资格。
++E2 继续核验实际 collider、尺寸、移动/导航 profile 和出生空间要求，由 Map 负责合法空间求解；
++不得将当前 Position 快照、模型包围盒或骨骼预览当作碰撞或导航证据。
++E3 保留其余 damage/status/limb 与原生时序；E4–E7 的 AI、跨域产怪、表现、性能、多人/恢复和资产往返未实施完成。
++跨仓库网站导出合同没有在本批修改；绑定 canonical ID/health 单位和 implementation-only 状态保留。
++现有 GameBindings 是测试显式装配 Enemy，不是让 Runtime 生产代码反向加载 Enemy。
++所有 hash 与测试只覆盖已记录输入，不宣称并发整个工作区在任意时刻都是同一快照。
+--- a/ForgeEnemy/E1-NATIVE-CUTOVER.md
++++ b/ForgeEnemy/E1-NATIVE-CUTOVER.md
+@@ -1,4 +1,10 @@
+ # E1 native plugin integration — active continuation
++
++## 当前结论：E1 代码切换已完成（2026-09-12）
++
++唯一生产接收器已迁入 Native/EnemyModule.cs；Runtime 不再创建 Enemy provider，四个世界 Hook 与三个 Enemy Hook 分属各自程序集。最终 cutover 布局 28/28、独立插件 12/12、接收器 40/40 通过。共享 R3 观察接线也已实际落地，不再使用隔离 SDK 提案。详情和源码哈希见 [E1/R3 实际集成](E1-R3-INTEGRATION.md)。下方 preparing/pending 描述保留为原始交接历史，不再是当前代码状态。尚未安装或实机/多人验收。
++
++---
+ 
+ 2026-09-12. Enemy continuation owns `ForgeEnemy/Native/**`, Enemy tests/evidence,
+ and the previously assigned safety/lifecycle edits in the single current
+--- a/ForgeEnemy/E2-OBSERVATION-HANDOFF.md
++++ b/ForgeEnemy/E2-OBSERVATION-HANDOFF.md
+@@ -1,4 +1,10 @@
+ # E2 native entity observation continuation
++
++## 当前结论：共享 SDK 已实际接通（2026-09-12）
++
++本文件下方 32/56 与隔离 56/56 是上一批冻结证据。现在 Registry 登记、注销清理、只读保护及生命周期订阅注销保护已合入真实工作树，Enemy 观察最终 66/66、Trigger 消费方 417 项通过。接收器位于 Native/EnemyModule.cs。实际命令、版本/哈希和未完成边界见 [E1/R3 集成](E1-R3-INTEGRATION.md)。不要再重复应用旧 proposal；E2 的碰撞/导航/出生空间和游戏验证仍未完成。
++
++---
+ 
+ 2026-09-12. Native reader implementation and isolated R3 integration evidence delivered.
+ Shared SDK registration and E1 cutover remain open; no game verification is claimed.
+--- a/ForgeEnemy/E23-CONTINUATION.md
++++ b/ForgeEnemy/E23-CONTINUATION.md
+@@ -1,4 +1,10 @@
+ # Enemy independent continuation / concurrency audit
++
++## 当前结论：七个未引用草稿已退休（2026-09-12）
++
++下方所列七个草稿/占位测试工程已从源码目录移出，原字节和哈希保留于本次 ignored 备份；现行 Receivers 辅助组件及 CommitAudit 使用的同名但不同命名空间类型未删除。清理后的架构和提交审计通过，见 [E1/R3 集成清理记录](E1-R3-INTEGRATION.md)。下方工具拦截仅描述当时状态。
++
++---
+ 
+ 2026-09-12. This continuation uses Remote Desktop Commander only.
+ 
+--- a/ForgeRuntime/R2B-MIGRATION-HANDOFF.md
++++ b/ForgeRuntime/R2B-MIGRATION-HANDOFF.md
+@@ -1,4 +1,10 @@
+ # R2b / D2 / E1 migration inputs
++
++## E1 代码切换实际交付（2026-09-12）
++
++Enemy 的唯一接收器现位于 ForgeEnemy/Native/EnemyModule.cs；Runtime 的 Enemies 字段、创建/清理调用和三个 Enemy Hook 已移除，宿主保留四个世界/会话 Hook。引用、桥接测试及架构检查已同步，最终 cutover 布局 28/28，完整宿主与 Native 构建通过。记录见 [Enemy E1/R3 集成](../ForgeEnemy/E1-R3-INTEGRATION.md)。这是实际源码切换，不是安装/游戏验收；Development D2 与其他公共功能仍按原范围推进。下方 E1 切换要求保留为历史和边界说明，不能据它再启用旧 provider。
++
++---
+ 
+ 2026-09-12. R2a host wiring is implemented; final verification is recorded in R2A-HANDOFF.md.
+ No installation, packaging, publication, commit or push is authorized by this handoff.
+--- a/ForgeRuntime/R3A-ENTITY-OBSERVATION.md
++++ b/ForgeRuntime/R3A-ENTITY-OBSERVATION.md
+@@ -1,4 +1,10 @@
+ # R3a — explicit entity observation and actor contracts
++
++## 观察接线实际交付（2026-09-12）
++
++原未完成的 Registry 观察登记、模块注销清理和公共只读保护已在真实共享 SDK 接通。跨模块测试另检出实体观察可注销生命周期订阅的问题，现已只在实体观察回调内禁止该入口，保留正常清理与生命周期自注销。SDK 合同/注册探针 76 项、Enemy 消费方 66/66、Trigger R3 消费方 417 项、Framework 253 项和生命周期回归通过。详细命令、哈希、初始失败及最终结果见 [Enemy E1/R3 集成](../ForgeEnemy/E1-R3-INTEGRATION.md)。没有另一个 SDK 或 Registry；旧隔离提案不再需要重复应用。完整 R3、世界枚举、网络/恢复和游戏验证仍未因此关闭。
++
++---
+ 
+ 2026-09-12. Implementation in progress through Remote Desktop Commander.
+ This is a bounded part of R3, not completion of R3 or a new master plan.
+--- a/ARCHITECTURE.md
++++ b/ARCHITECTURE.md
+@@ -1,4 +1,10 @@
+ # Forge 模组架构与骨架验收
++
++## 当前增量：Enemy E1 / R3 集成（2026-09-12）
++
++下方骨架快照保留为历史。现已完成 Enemy 独立 Native 源码/程序集切换：唯一接收器迁入 ForgeEnemy/Native，Runtime 无 Enemy 生产依赖，只保留四个世界 Hook；Enemy 持有三个敌人 Hook。共享 EntityObservers 的实际登记/注销/只读保护已接通，空 Enemy provider Create 已移除。当前证据见 [E1/R3 集成](ForgeEnemy/E1-R3-INTEGRATION.md)。没有安装或游戏验证，其他模块的迁移和后续机制不据本增量自动标为完成。
++
++---
+ 
+ 2026-09-12。本文件维护模组仓库的实际工程结构、职责和交接边界。[FORGE-COMPLETE-PLAN.md](../Infini-GTFO-Model-Site/Docs/rework/FORGE-COMPLETE-PLAN.md) 第 20–34 节仍是唯一总案；六份实施计划只细化对应任务，不建立第二份产品总案、能力目录或运行注册表。
+ 
+--- a/AGENT-HANDOFF.md
++++ b/AGENT-HANDOFF.md
+@@ -1,4 +1,10 @@
+ # 后续 Agent 进场交接
++
++## 最新接续位置：Enemy E1 / R3 已集成（2026-09-12）
++
++Enemy 的现行接收器为 ForgeEnemy/Native/EnemyModule.cs；旧 Runtime/GameBindings/EnemyModule.cs 已移除。宿主不再创建 Enemy provider 或编译三个敌人 Hook，EntityObservers 已实际登记和清理。接手者先读 [本次 E1/R3 集成](ForgeEnemy/E1-R3-INTEGRATION.md)，不要恢复下方历史骨架的旧注册、源码链接或隔离 SDK 提案。原生游戏验证、其余领域和 E2–E7 待办仍按实际状态推进；不要将本次代码/元数据通过当成实机通过。
++
++---
+ 
+ 2026-09-12。用户要求本任务建立合理骨架并提供足够细致的计划，随后由其他 Agent 实施。本轮停在架构与计划；本文不表示后续玩法已开始，不自动授权安装、发布或改动 InfiniTweaks。
+ 
+@@ -47,10 +53,10 @@
+ | [唯一总案](../Infini-GTFO-Model-Site/Docs/rework/FORGE-COMPLETE-PLAN.md) | 1–4 产品和仓库职责；20–30 统一架构；31–34 完整能力、机制和边界 |
+ | [现行实现状态](../Infini-GTFO-Model-Site/Docs/rework/FORGE-IMPLEMENTATION-STATUS.md) | 区分设计、已落地和未验证；仍需对照当前工作树 |
+ | [包架构](../Infini-GTFO-Model-Site/Docs/rework/FORGE-PACKAGE-ARCHITECTURE.md) / [资源合同](../Infini-GTFO-Model-Site/Docs/rework/UNIFIED-RESOURCE-CONTRACT.md) | 六包责任、离线内容、资源/运行身份和真实依赖 |
+-| [公开 API 与时间效果要求](../Infini-GTFO-Model-Site/Docs/runtime/forge-runtime-api-contract.md) | SDK 目标与差距、四种时间数值模式、周期/成本/恢复验收 |
+-| [原生绑定证据](../Infini-GTFO-Model-Site/Docs/runtime/forge-native-binding-delivery.md) | 当前敌人 health 绑定、游戏签名/hash、支持与未测边界 |
+-| [地图 API 审核](../Infini-GTFO-Model-Site/Docs/runtime/forge-map-gameplay-api-audit.md) | 地图/玩家/空间能力的实际证据与待核验项 |
+-| [诊断跨仓库合同](../Infini-GTFO-Model-Site/Docs/runtime/infini-forge-runtime.md) | 导出、日志、对象回指和两端共同交付责任 |
++| 公开 API 与时间效果要求（历史路径已缺失：`../Infini-GTFO-Model-Site/Docs/runtime/forge-runtime-api-contract.md`） | SDK 目标与差距、四种时间数值模式、周期/成本/恢复验收 |
++| 原生绑定证据（历史路径已缺失：`../Infini-GTFO-Model-Site/Docs/runtime/forge-native-binding-delivery.md`） | 当前敌人 health 绑定、游戏签名/hash、支持与未测边界 |
++| 地图 API 审核（历史路径已缺失：`../Infini-GTFO-Model-Site/Docs/runtime/forge-map-gameplay-api-audit.md`） | 地图/玩家/空间能力的实际证据与待核验项 |
++| 诊断跨仓库合同（历史路径已缺失：`../Infini-GTFO-Model-Site/Docs/runtime/infini-forge-runtime.md`） | 导出、日志、对象回指和两端共同交付责任 |
+ | [能力词汇](../Infini-GTFO-Model-Site/catalog/capability-catalog.json) / [机制蓝图](../Infini-GTFO-Model-Site/catalog/mechanism-blueprints.json) | 规划词汇、来源和组合；不是运行注册清单 |
+ | [C# 公共 SDK](ForgeRuntime/Framework/README.md) / [既有验证](ForgeRuntime/VALIDATION.md) | 当前真实类型、支持上限、测试命令和历史证据 |
+ | [共享 Runtime fixtures](../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime) | 网站与 C# 使用的跨语言正反例；只覆盖实际存在场景 |
+--- a/ForgeEnemy/Native/scripts/check_cutover.py
++++ b/ForgeEnemy/Native/scripts/check_cutover.py
+@@ -15,12 +15,37 @@
+     if data.get('schemaVersion') != 1 or not data.get('changes'):
+         raise ValueError('Invalid or empty cutover input manifest.')
+     failures = []
++    seen = set()
+     for entry in data['changes']:
+         relative = PurePosixPath(entry['path'])
+         if relative.is_absolute() or '..' in relative.parts or '\\' in str(relative) or ':' in str(relative):
+             raise ValueError('Invalid relative patch path.')
++        if str(relative) in seen or not relative.parts or relative.parts[0] not in {'ForgeEnemy', 'ForgeRuntime'}:
++            raise ValueError('Duplicate or out-of-scope patch path.')
++        seen.add(str(relative))
+         path = ROOT / str(relative)
++        if ROOT not in path.resolve().parents:
++            raise ValueError('Patch path resolves outside the repository.')
+         expected = entry[args.mode + 'Sha256']
++        if expected is not None and (not isinstance(expected, str) or len(expected) != 64
++                or any(c not in '0123456789abcdefABCDEF' for c in expected)):
++            raise ValueError('Invalid expected SHA-256.')
++        if expected is not None:
++            expected = expected.lower()
++        if path.exists() and not path.is_file():
++            raise ValueError('Expected file or missing file, not a directory.')
+         actual = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+         if actual != expected:
+             failures.append(str(relative))
++    print(json.dumps({'mode': args.mode, 'checked': len(seen),
++                      'passed': not failures, 'mismatches': failures}, indent=2))
++    return 1 if failures else 0
++
++
++if __name__ == '__main__':
++    try:
++        raise SystemExit(main())
++    except (OSError, ValueError, KeyError, TypeError) as error:
++        import sys
++        print(f'Cutover check failed: {error}', file=sys.stderr)
++        raise SystemExit(2)
+--- /dev/null
++++ b/ForgeEnemy/tests/CutoverGuard/test_guard.py
+@@ -0,0 +1,87 @@
++"""Exercise the real read-only cutover CLI, including process exit status."""
++import hashlib
++import json
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import unittest
++
++ROOT = Path(__file__).resolve().parents[3]
++SCRIPT = ROOT / 'ForgeEnemy/Native/scripts/check_cutover.py'
++TARGET = 'ForgeEnemy/ModuleDefinition.cs'
++
++
++class GuardTests(unittest.TestCase):
++    def row(self, path=TARGET, before=None, after=None):
++        digest = hashlib.sha256((ROOT / TARGET).read_bytes()).hexdigest()
++        return {'path': path, 'beforeSha256': before or digest,
++                'afterSha256': after or digest}
++
++    def invoke(self, data, expected, mode='before'):
++        original = (ROOT / TARGET).read_bytes()
++        with tempfile.TemporaryDirectory(prefix='forge-cutover-guard-') as temp:
++            manifest = Path(temp) / 'input.json'
++            manifest.write_text(json.dumps(data), encoding='utf-8')
++            result = subprocess.run([sys.executable, str(SCRIPT), str(manifest),
++                '--mode', mode], capture_output=True, text=True, timeout=20)
++            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
++            self.assertEqual((ROOT / TARGET).read_bytes(), original)
++    def check_rows(self, rows, expected, mode='before'):
++        self.invoke({'schemaVersion': 1, 'changes': rows}, expected, mode)
++
++    def test_matching_before(self):
++        self.check_rows([self.row()], 0)
++
++    def test_matching_after(self):
++        self.check_rows([self.row()], 0, 'after')
++
++    def test_stale_before(self):
++        self.check_rows([self.row(before='0' * 64)], 1)
++
++    def test_stale_after(self):
++        self.check_rows([self.row(after='0' * 64)], 1, 'after')
++
++    def test_missing_expected_file(self):
++        self.check_rows([self.row(path='ForgeEnemy/absent-cutover-test.cs')], 1)
++
++    def test_missing_expected_absent(self):
++        row = self.row(path='ForgeEnemy/absent-cutover-test.cs')
++        row['beforeSha256'] = None
++        self.check_rows([row], 0)
++
++    def test_existing_expected_absent(self):
++        row = self.row(); row['beforeSha256'] = None
++        self.check_rows([row], 1)
++
++    def test_traversal(self):
++        self.check_rows([self.row(path='../outside.cs')], 2)
++
++    def test_absolute_path(self):
++        self.check_rows([self.row(path='C:/outside.cs')], 2)
++
++    def test_outside_selected_modules(self):
++        self.check_rows([self.row(path='InfiniTweaks/Plugin.cs')], 2)
++
++    def test_duplicate(self):
++        self.check_rows([self.row(), self.row()], 2)
++
++    def test_invalid_digest(self):
++        self.check_rows([self.row(before='not-a-hash')], 2)
++
++    def test_directory_not_file(self):
++        self.check_rows([self.row(path='ForgeEnemy/Native')], 2)
++
++    def test_empty_manifest(self):
++        self.check_rows([], 2)
++
++    def test_unknown_schema(self):
++        self.invoke({'schemaVersion': 999, 'changes': [self.row()]}, 2)
++
++    def test_missing_required_hash(self):
++        row = self.row(); del row['beforeSha256']
++        self.check_rows([row], 2)
++
++
++if __name__ == '__main__':
++    unittest.main()
+--- a/ForgeEnemy/tests/EntityObservation/ObserverRegistrationCases.cs
++++ b/ForgeEnemy/tests/EntityObservation/ObserverRegistrationCases.cs
+@@ -75,6 +75,27 @@
+             Require(k.InspectEntities(new[] { Ref }).RequireComplete().Single().Kind == "new"
+                 && oldCalls == 0 && newCalls == 1, "Old observer survived unregister or shadowed its replacement.");
+         });
++        Case("registration.entity-callback-cannot-dispose-lifecycle", () =>
++        {
++            var k = Kernel(); RuntimeLifecycleSubscription? subscription = null;
++            var m = Module("test.owner", new[] { "test.entity" }) with
++            { EntityObservers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
++                { ["test.entity"] = _ => { Code(() => subscription!.Dispose(), "entity-observer-mutation"); return Snapshot("test"); } } };
++            using var owner = k.RegisterModule(m);
++            subscription = owner.ObserveLifecycle(_ => { }); k.StartRuntime(() => { });
++            Require(k.InspectEntities(new[] { Ref }).IsComplete && subscription.IsActive,
++                "A read-only entity callback cancelled the lifecycle subscription.");
++            subscription.Dispose(); Require(!subscription.IsActive, "Ordinary cleanup was blocked.");
++        });
++        Case("registration.lifecycle-self-disposal-remains-legal", () =>
++        {
++            var k = Kernel(); using var owner = k.RegisterModule(Module("test.owner", new[] { "test.entity" }));
++            RuntimeLifecycleSubscription? subscription = null;
++            subscription = owner.ObserveLifecycle(e =>
++            { if (e.Kind == RuntimeLifecycleKind.TickAdvanced) subscription!.Dispose(); }, false);
++            k.StartRuntime(() => { }); k.Advance(1, true);
++            Require(!subscription.IsActive && k.LifecycleFaultCount == 0, "Lifecycle self-disposal regressed.");
++        });
+         Case("registration.failure-does-not-reserve-namespace", () =>
+         {
+             var k = Kernel();

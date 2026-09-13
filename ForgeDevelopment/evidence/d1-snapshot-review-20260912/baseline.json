@@ -1,0 +1,52 @@
+﻿[
+    {
+        "Path":  "ForgeRuntime/RuntimeDiagnostics.cs",
+        "Hash":  "1127EA819C415011B8425AE013D22B4ED46422FDCF2AC07FBE9F99FAEFE5FF09",
+        "LastWriteUtc":  "2026-09-12T13:58:49.5981165Z"
+    },
+    {
+        "Path":  "ForgeRuntime/WorldInspection.cs",
+        "Hash":  "63EE32BD3CC34D8CF43E1FC59F883016F8D4E68272A905B7F6861BA23F9A6A3C",
+        "LastWriteUtc":  "2026-09-12T13:58:49.5991161Z"
+    },
+    {
+        "Path":  "ForgeRuntime/ProjectInspectionSession.cs",
+        "Hash":  "3AD9BA01CFD2D6669EDFA1D956599105CA9479E5F98291F0B18F06DFEE707BAC",
+        "LastWriteUtc":  "2026-09-12T14:11:41.5906885Z"
+    },
+    {
+        "Path":  "ForgeRuntime/ProjectObjectReferences.cs",
+        "Hash":  "3D4D8810032718E55FFEFAF385E9A3E4EF363ED2252648243777372B265C66BB",
+        "LastWriteUtc":  "2026-09-12T08:14:37.6142226Z"
+    },
+    {
+        "Path":  "ForgeRuntime/ProjectChecks.cs",
+        "Hash":  "4D4A64AF4417102B41BF275BFE5ECCFECC4755681BB7BE9B8F0BD1135A707A58",
+        "LastWriteUtc":  "2026-09-12T13:40:58.5694065Z"
+    },
+    {
+        "Path":  "ForgeRuntime/DiagnosticsReport.cs",
+        "Hash":  "83F660A4FAACFCA8C651B08845B6B961420F812BB22C8455FA26DE9AE47FAB05",
+        "LastWriteUtc":  "2026-09-12T08:44:32.3409039Z"
+    },
+    {
+        "Path":  "ForgeRuntime/Plugin.cs",
+        "Hash":  "E7F96446740EC23D695CD8CCB54AA679ADB80D86827055138A768E4818395B59",
+        "LastWriteUtc":  "2026-09-12T05:37:30.5757566Z"
+    },
+    {
+        "Path":  "ForgeRuntime/GameBindings/GameRuntimeBridge.cs",
+        "Hash":  "81ED962B6F8773D95536581F55CDD41593D1BC7F1382A259F106132065A98FB3",
+        "LastWriteUtc":  "2026-09-12T06:11:55.8311682Z"
+    },
+    {
+        "Path":  "ForgeRuntime/ForgeRuntime.csproj",
+        "Hash":  "5EFAB5886C8C69DF8D0BA70CE8C3E78F15D88592E33CAB3AB5C3CF79B2190C94",
+        "LastWriteUtc":  "2026-09-12T14:02:04.1570056Z"
+    },
+    {
+        "Path":  "ForgeDevelopment/IMPLEMENTATION-PLAN.md",
+        "Hash":  "FF93E9C87608109412C93F75872FF6D7160EC073839C25F4C67F31E7E8F3B916",
+        "LastWriteUtc":  "2026-09-12T13:15:11.6403362Z"
+    }
+]

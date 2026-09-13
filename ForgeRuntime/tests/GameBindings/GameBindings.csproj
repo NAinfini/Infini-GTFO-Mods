@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Framework/*.cs" Link="Framework/%(Filename)%(Extension)" />
+    <Compile Include="../../GameBindings/GameRuntimeBridge.cs" Link="GameRuntimeBridge.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+    <Compile Include="../../GameBindings/FrameworkFiles.cs" Link="FrameworkFiles.cs" />
+    <Compile Include="../../GameBindings/PluginPatchSelection.cs" Link="PluginPatchSelection.cs" />
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+    <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />
+  </ItemGroup>
+</Project>

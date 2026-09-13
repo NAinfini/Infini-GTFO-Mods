@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Target Name="RequireExplicitSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeFrameworkAssembly)')" Text="Pass ForgeFrameworkAssembly from a successful R3 SDK build." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+    <Compile Include="../../Native/Observation/EnemyEntityObserver.cs" Link="EnemyEntityObserver.cs" />
+    <None Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.source.txt" CopyToOutputDirectory="Always" />
+    <None Include="../../Native/Observation/EnemyEntityObserver.cs" Link="EnemyEntityObserver.source.txt" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+</Project>

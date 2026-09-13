@@ -1,0 +1,164 @@
+{
+  "verification": "compiled-assembly-metadata-only",
+  "mode": "cutover",
+  "gameExecuted": false,
+  "hostSha256": "CCFAF83B2E618EF4F87E6A058C767C20F0C56D1A930BC66BE86F71793E4D4023",
+  "sdkSha256": "EEC0F4116575285EADB4E703B5BBE39BE8D040CCEC00C07E3D47D8AFA362D4D8",
+  "enemySha256": "DA671358373BB453965D573D97888B3155D02D2186A727D2A3EA1D124E8BCB69",
+  "passed": 38,
+  "failed": 0,
+  "checks": [
+    {
+      "Id": "host.no-enemy-assembly-reference",
+      "Passed": true
+    },
+    {
+      "Id": "host.receiver-placement",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.single-receiver",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.no-embedded-kernel",
+      "Passed": true
+    },
+    {
+      "Id": "host.no-embedded-kernel",
+      "Passed": true
+    },
+    {
+      "Id": "sdk.no-game-dependency",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.only-host-and-sdk",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.same-sdk-identity",
+      "Passed": true
+    },
+    {
+      "Id": "enemy.five-hooks",
+      "Passed": true
+    },
+    {
+      "Id": "host.exact-hook-set",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemySpawned",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemySpawned.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemySpawned.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemyDespawned",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDespawned.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDespawned.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemyDamage",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDamage.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDamage.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDamage.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDamage.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemyDeathStarted",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDeathStarted.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDeathStarted.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyDeathStarted.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyDeathStarted.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.target.EnemyLimbBroken",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyLimbBroken.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyLimbBroken.Prefix",
+      "Passed": true
+    },
+    {
+      "Id": "native.static.EnemyLimbBroken.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "native.instance.EnemyLimbBroken.Postfix",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.identity",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.runtime-dependency",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.public-host-entry",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.off-gate",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.tested-session",
+      "Passed": true
+    },
+    {
+      "Id": "plugin.no-second-update-loop",
+      "Passed": true
+    },
+    {
+      "Id": "host.no-implicit-enemy",
+      "Passed": true
+    }
+  ]
+}

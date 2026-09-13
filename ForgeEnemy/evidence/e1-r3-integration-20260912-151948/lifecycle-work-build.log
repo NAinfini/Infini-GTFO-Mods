@@ -1,0 +1,11 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeRuntime\tests\LifecycleWork\LifecycleWork.csproj (in 182 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj (in 176 ms).
+  ForgeRuntime.Framework -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-lifecycle-work\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  LifecycleWork -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-lifecycle-work\bin\LifecycleWork\release\LifecycleWork.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.83

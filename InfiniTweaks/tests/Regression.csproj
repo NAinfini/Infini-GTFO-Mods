@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="**\obj\**\*.cs" />
+    <Compile Remove="NativeContracts\**\*.cs" />
+    <Compile Remove="MarkerIcons\**\*.cs" />
+    <Compile Remove="HudView\**\*.cs" />
+    <Compile Remove="TerminalRuntime\**\*.cs" />
+    <Compile Remove="MarkerRegistration\**\*.cs" />
+    <Compile Remove="MarkerDiscovery\**\*.cs" />
+    <Compile Remove="ResourceSlots\**\*.cs" />
+    <Compile Include="..\Telemetry.cs" Link="Telemetry.cs" />
+    <Compile Include="..\PlayerTweaks.cs" Link="PlayerTweaks.cs" />
+    <Compile Include="..\ResourceHud.cs" Link="ResourceHud.cs" />
+    <Compile Include="..\MarkerRules.cs" Link="MarkerRules.cs" />
+    <Compile Include="..\MarkerIconCatalog.cs" Link="MarkerIconCatalog.cs" />
+    <Compile Include="..\MarkerVisuals.cs" Link="MarkerVisuals.cs" />
+    <Compile Include="..\MarkerPresentation.cs" Link="MarkerPresentation.cs" />
+    <Compile Include="..\MarkerOwnership.cs" Link="MarkerOwnership.cs" />
+    <Compile Include="..\GameDataTweaks.cs" Link="GameDataTweaks.cs" />
+    <Compile Include="..\CasualRules.cs" Link="CasualRules.cs" />
+    <Compile Include="..\BoosterRollRules.cs" Link="BoosterRollRules.cs" />
+    <Compile Include="..\HistoricalBoosterTemplates.cs" Link="HistoricalBoosterTemplates.cs" />
+    <Compile Include="..\CombatStatsModel.cs" Link="CombatStatsModel.cs" />
+    <Compile Include="..\CombatStatsFormat.cs" Link="CombatStatsFormat.cs" />
+    <None Update="historical-stats.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

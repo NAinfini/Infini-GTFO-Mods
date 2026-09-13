@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "verification": "production-source-and-frozen-sdk-with-test-doubles",
+  "gameExecuted": false,
+  "frameworkAssemblySha256": "40F4669A814ABC5CDEF3B23AC39E17195BB9AE6649EC10515E6DB90AE7970505",
+  "utc": "2026-09-12T14:15:02.4992957+00:00",
+  "passed": 8,
+  "failed": 5,
+  "checks": [
+    {
+      "Id": "E2-001.duplicate-spawn",
+      "Passed": false,
+      "Expected": "Repeated observation of the same live spawn preserves its reference.",
+      "Observed": "first=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 1 }; second=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 2 }"
+    },
+    {
+      "Id": "identity.new-life",
+      "Passed": true,
+      "Expected": "A replacement gets a new life and rejects the old reference.",
+      "Observed": "old=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 1 }; new=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 2 }"
+    },
+    {
+      "Id": "identity.old-pointer",
+      "Passed": true,
+      "Expected": "Old distinct-pointer teardown cannot remove the replacement.",
+      "Observed": "Heal attempted on replacement."
+    },
+    {
+      "Id": "E2-002.pooled-late-despawn",
+      "Passed": false,
+      "Expected": "Old-life teardown must not remove a new life reusing its native pointer.",
+      "Observed": "rejected/gtfo.enemy.stale_or_unsupported_recipient"
+    },
+    {
+      "Id": "identity.world-reset",
+      "Passed": true,
+      "Expected": "World reset rejects the old reference.",
+      "Observed": "Old-world Heal attempted."
+    },
+    {
+      "Id": "E3-001.receiver-changed-commit",
+      "Passed": false,
+      "Expected": "An attempted native commit followed by receiver invalidation must not report commitState=none.",
+      "Observed": "status=failed; commit=none; sends=1; health=55"
+    },
+    {
+      "Id": "E3-002.invalid-readback-commit",
+      "Passed": false,
+      "Expected": "An invalid readback after native submission leaves the committed amount unknown.",
+      "Observed": "status=failed; commit=none; sends=1"
+    },
+    {
+      "Id": "E3-003.duplicate-damage-observation",
+      "Passed": false,
+      "Expected": "Re-delivering one captured damage observation must not duplicate the \u002B5 HP action.",
+      "Observed": "commands=2; sends=2; health=50"
+    },
+    {
+      "Id": "health.full",
+      "Passed": true,
+      "Expected": "Full health generates no packet or health-change fact.",
+      "Observed": "facts=0; sends=0"
+    },
+    {
+      "Id": "health.no-revive",
+      "Passed": true,
+      "Expected": "Healing cannot implicitly revive.",
+      "Observed": "gtfo.enemy.not_alive"
+    },
+    {
+      "Id": "health.missing-receiver",
+      "Passed": true,
+      "Expected": "Uninitialized receiver is rejected without a packet.",
+      "Observed": "gtfo.enemy.missing_health_receiver"
+    },
+    {
+      "Id": "health.quantization",
+      "Passed": true,
+      "Expected": "Sub-quantum positive healing cannot reduce health or publish a fact.",
+      "Observed": "health=50; sends=0"
+    },
+    {
+      "Id": "health.host-authority",
+      "Passed": true,
+      "Expected": "A client cannot submit native healing.",
+      "Observed": "gtfo.enemy.authority_or_phase"
+    }
+  ]
+}

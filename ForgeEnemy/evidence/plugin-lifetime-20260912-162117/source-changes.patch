@@ -1,0 +1,338 @@
+--- a/ForgeEnemy/Native/EnemyPluginSession.cs
++++ b/ForgeEnemy/Native/EnemyPluginSession.cs
+@@ -12,6 +12,8 @@
+     private readonly Action<string> _report;
+     private readonly Action _removeHooks;
+     private bool _disposed, _faulted;
++    private readonly int _threadId = Environment.CurrentManagedThreadId;
++    internal static string? LastCleanupDiagnostic { get; private set; }
+     internal EnemyModule Module { get; private set; } = null!;
+     internal bool Faulted => _faulted;
+     internal string? LastFault { get; private set; }
+@@ -38,25 +40,28 @@
+         }
+         catch (Exception original)
+         {
++            // Any residual registration is inert even if rollback itself fails.
++            session._faulted = true;
+             var errors = new List<Exception>();
+             if (hooksAttempted) Cleanup(removeHooks, errors);
+             if (session.Module != null) Cleanup(session.Module.Dispose, errors);
+             session._disposed = true;
+-            if (errors.Count != 0) original.Data["ForgeEnemy.CleanupFailures"] = new AggregateException(errors);
++            if (errors.Count != 0) PreserveCleanupFailure(original, "ForgeEnemy.CleanupFailures", new AggregateException(errors), report);
+             throw;
+         }
+     }
+ 
+     internal void Guard(Action<EnemyModule> callback)
+     {
++        CheckThread();
++        ArgumentNullException.ThrowIfNull(callback);
+         if (_disposed || _faulted || _kernel.StartupState is RuntimeStartupState.Failed or RuntimeStartupState.Stopped) return;
+         try { callback(Module); }
+         catch (Exception error)
+         {
+             _faulted = true;
+             var errors = new List<Exception>(); Cleanup(Module.ClearWorld, errors);
+-            string detail = error.GetType().Name + ": " + error.Message;
+-            if (detail.Length > 2048) detail = detail[..2048];
++            string detail = Describe(error);
+             LastFault = detail;
+             try { _report("Enemy disabled until restart after native callback failure: " + detail + "; cleanupErrors=" + errors.Count); }
+             catch (Exception reporting) { LastReporterFailure = reporting.GetType().Name; }
+@@ -65,12 +70,44 @@
+ 
+     public void Dispose()
+     {
++        CheckThread();
+         if (_disposed) return;
++        // Unregister first: Runtime rejects dispatch/lifecycle re-entry or in-use
++        // providers before native detours or session flags can be changed.
++        Module.Dispose();
+         _faulted = true;
+         var errors = new List<Exception>();
+-        Cleanup(_removeHooks, errors); Cleanup(Module.Dispose, errors);
++        Cleanup(_removeHooks, errors);
+         _disposed = true;
+         if (errors.Count != 0) throw new AggregateException("Enemy shutdown cleanup failed.", errors);
++    }
++
++    private void CheckThread()
++    {
++        if (Environment.CurrentManagedThreadId != _threadId)
++            throw new RuntimeContractException("wrong-thread", "Enemy session requires its owning simulation thread.");
++    }
++
++    private static string Describe(Exception error)
++    {
++        string message;
++        try { message = error.Message ?? ""; }
++        catch (Exception unavailable) { message = "<message unavailable: " + unavailable.GetType().Name + ">"; }
++        if (message.Length > 1900) message = message[..1900];
++        var description = error.GetType().Name + ": " + message;
++        return description.Length <= 2048 ? description : description[..2048];
++    }
++
++    internal static void PreserveCleanupFailure(Exception original, string key, Exception cleanup, Action<string> report)
++    {
++        // One bounded diagnostic, not a gameplay ledger. Even hostile exception
++        // accessors or a broken logger must not replace the primary exception.
++        string diagnostic = key + ": " + Describe(cleanup);
++        try { original.Data[key] = cleanup; }
++        catch (Exception attachment) { diagnostic += "; attachment=" + attachment.GetType().Name; }
++        try { report(diagnostic); }
++        catch (Exception reporter) { diagnostic += "; reporter=" + reporter.GetType().Name; }
++        LastCleanupDiagnostic = diagnostic.Length <= 4096 ? diagnostic : diagnostic[..4096];
+     }
+ 
+     private static void Cleanup(Action action, List<Exception> errors)
+--- a/ForgeEnemy/Native/Plugin.cs
++++ b/ForgeEnemy/Native/Plugin.cs
+@@ -44,12 +44,16 @@
+         }
+         catch (Exception original)
+         {
+-            if (created != null)
++            try
+             {
+-                try { created.Dispose(); }
+-                catch (Exception cleanup) { original.Data["ForgeEnemy.LoadCleanupFailure"] = cleanup; }
++                if (created != null)
++                {
++                    try { created.Dispose(); }
++                    catch (Exception cleanup)
++                    { EnemyPluginSession.PreserveCleanupFailure(original, "ForgeEnemy.LoadCleanupFailure", cleanup, message => Log.LogWarning(message)); }
++                }
+             }
+-            Session = null;
++            finally { Session = null; }
+             throw;
+         }
+     }
+--- a/ForgeEnemy/tests/NativePlugin/Program.cs
++++ b/ForgeEnemy/tests/NativePlugin/Program.cs
+@@ -25,6 +25,15 @@
+ {
+     var actor = new EnemyAgent(); actor.Damage = new() { Owner = actor }; return actor;
+ }
++RuntimeModule Dependency(string id) => new("1.0.0", RuntimeJson.From(new
++{
++    providers = new[] { new { id, kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
++    capabilities = Array.Empty<object>(),
++    bindings = new[] { new { id = id + ".binding.read", capabilityId = "forge.trigger.combat.health_changed",
++        providerId = id, handler = id + ".read", role = "observe", status = "implemented",
++        dependencies = Array.Empty<string>(), requires = new[] { EnemyModule.HealthChangedBinding } } }
++}).GetRawText(), new Dictionary<string, CommandHandler>(), new[]
++{ new BindingSupport(id + ".binding.read", "implementation-only", Array.Empty<string>()) });
+ Case("session.duplicate-before-hooks", () =>
+ {
+     var kernel = Kernel(); using var first = new EnemyModule(kernel, () => true, _ => { });
+@@ -116,6 +125,143 @@
+     Require(Harmony.Patches == 3 && Harmony.Unpatches == 1 && NativePlugin.Session == null
+         && Host.Runtime.ExportManifest() == before, "Post-registration failure leaked the module.");
+ });
++Case("session.readonly-error-data-keeps-primary", () =>
++{
++    var kernel = Kernel(); string before = kernel.ExportManifest(); var primary = new ReadOnlyDataFailure();
++    Exception? caught = null;
++    try { EnemyPluginSession.Start(kernel, () => true, _ => { }, () => throw primary, () => throw new IOException("unpatch")); }
++    catch (Exception error) { caught = error; }
++    Require(ReferenceEquals(primary, caught) && kernel.ExportManifest() == before, "Cleanup evidence replaced primary exception or left a provider.");
++});
++Case("session.message-getter-cannot-escape-guard", () =>
++{
++    var kernel = Kernel(); var logs = new List<string>();
++    using var session = EnemyPluginSession.Start(kernel, () => true, logs.Add, () => { }, () => { });
++    session.Guard(_ => throw new MessageGetterFailure());
++    Require(session.Faulted && session.LastFault != null && logs.Count == 1, "Native fault reporting escaped or lost the failure latch.");
++});
++Case("session.wrong-thread-callback-is-not-invoked", () =>
++{
++    var kernel = Kernel(); int calls = 0;
++    using var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => { });
++    Throws(() => Task.Run(() => session.Guard(_ => calls++)).GetAwaiter().GetResult());
++    Require(calls == 0 && !session.Faulted && session.Module.IsRegistered, "Off-thread guard invoked a callback or mutated the session.");
++});
++Case("session.wrong-thread-dispose-keeps-ownership", () =>
++{
++    var kernel = Kernel(); int removed = 0;
++    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
++    try
++    {
++        Throws(() => Task.Run(session.Dispose).GetAwaiter().GetResult());
++        Require(removed == 0 && session.Module.IsRegistered && !session.Faulted, "Off-thread Dispose removed native hooks or permanently disabled the session.");
++        session.Dispose(); Require(removed == 1 && !session.Module.IsRegistered, "Legal cleanup could not be retried.");
++    }
++    finally { session.Module.Dispose(); session.Dispose(); }
++});
++Case("session.dispatch-dispose-rejects-before-unpatch", () =>
++{
++    var kernel = Kernel(); int removed = 0;
++    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
++    try
++    {
++        var actor = Enemy(); session.Module.TrackSpawn(actor);
++        kernel.StartRuntime(() => kernel.LoadPlan(File.ReadAllText(Path.Combine(args[0], "native-heal.plan.json")),
++            new[] { "gtfo.enemy.health.read", "gtfo.enemy.health.write" }));
++        var hit = session.Module.BeforeDamage(actor.Damage); actor.Damage.Health = 40; session.Module.AfterDamage(actor.Damage, hit);
++        actor.Damage.Commit = value => { actor.Damage.Health = value; session.Dispose(); };
++        var tick = kernel.Advance(1, true);
++        Require(removed == 0 && !session.Faulted && session.Module.IsRegistered && tick.Commands.Count == 1
++            && tick.Commands[0].Result.CommitState == CommitStates.Unknown, "In-dispatch Dispose changed hook ownership or claimed a known commit.");
++        session.Dispose(); Require(removed == 1 && !session.Module.IsRegistered, "Post-dispatch cleanup failed.");
++    }
++    finally { session.Module.Dispose(); session.Dispose(); }
++});
++Case("plugin.cleanup-readonly-data-always-clears-session", () =>
++{
++    Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Play; Host.Runtime = Kernel(); Host.CanExecuteGameplay = true;
++    string before = Host.Runtime.ExportManifest(); var primary = new ReadOnlyDataFailure();
++    var plugin = new NativePlugin(); plugin.Log.InfoFailure = primary; Harmony.UnpatchFailure = new IOException("unpatch");
++    Exception? caught = null;
++    try
++    {
++        try { plugin.Load(); } catch (Exception error) { caught = error; }
++        Require(ReferenceEquals(primary, caught) && NativePlugin.Session == null && Host.Runtime.ExportManifest() == before,
++            "Post-load cleanup failure masked the original or left the static session published.");
++    }
++    finally
++    {
++        // Fixture isolation only, after assertions have recorded the production failure.
++        Harmony.UnpatchFailure = null;
++        NativePlugin.Session?.Module.Dispose(); NativePlugin.Session?.Dispose();
++        typeof(NativePlugin).GetProperty("Session", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.SetValue(null, null);
++    }
++});
++Case("session.in-use-dispose-remains-retryable", () =>
++{
++    var kernel = Kernel(); int removed = 0;
++    using var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
++    using var dependency = kernel.RegisterModule(Dependency("test.enemy_dependency"));
++    Throws(session.Dispose);
++    Require(removed == 0 && !session.Faulted && session.Module.IsRegistered, "Rejected disposal removed hooks or changed a live session.");
++    dependency.Dispose(); session.Dispose();
++    Require(removed == 1 && !session.Module.IsRegistered, "Cleanup failed after dependent module left.");
++});
++Case("session.unpatch-failure-remains-inert", () =>
++{
++    var kernel = Kernel(); int removed = 0, callbacks = 0;
++    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => { removed++; throw new IOException("native cleanup"); });
++    Throws(session.Dispose); session.Guard(_ => callbacks++); session.Dispose();
++    Require(removed == 1 && callbacks == 0 && !session.Module.IsRegistered && session.Faulted,
++        "Failed unpatch left executable ownership or retried a native operation.");
++});
++Case("session.failed-start-residual-registration-is-inert", () =>
++{
++    var kernel = Kernel(); RuntimeModuleHandle? dependency = null; EnemyModule? orphan = null; int gateReads = 0;
++    var primary = new IOException("install failed after dependency registration"); Exception? caught = null;
++    try
++    {
++        try
++        {
++            EnemyPluginSession.Start(kernel, () => { gateReads++; return true; }, _ => { }, () =>
++            {
++                // Test-only access: inspect the otherwise unreachable module left by a failed rollback.
++                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
++                var registry = typeof(RuntimeKernel).GetField("registry", flags)!.GetValue(kernel)!;
++                var handlers = (IDictionary<string, CommandHandler>)registry.GetType().GetField("Handlers", flags)!.GetValue(registry)!;
++                orphan = (EnemyModule)handlers[EnemyModule.HealBinding].Target!;
++                dependency = kernel.RegisterModule(Dependency("test.retained_dependency")); throw primary;
++            }, () => { });
++        }
++        catch (Exception error) { caught = error; }
++        Require(ReferenceEquals(primary, caught) && orphan?.IsRegistered == true, "Fixture did not retain the guarded failed-start module.");
++        var before = gateReads; orphan!.BeforeDamage(Enemy().Damage);
++        Require(gateReads == before, "Failed startup left a residual receiver with a live gameplay gate.");
++    }
++    finally { dependency?.Dispose(); orphan?.Dispose(); }
++});
++Case("session.throwing-error-data-and-reporter-keep-evidence", () =>
++{
++    var kernel = Kernel(); var primary = new DataGetterFailure(); Exception? caught = null;
++    try { EnemyPluginSession.Start(kernel, () => true, _ => throw new IOException("reporter"),
++        () => throw primary, () => throw new IOException("cleanup")); }
++    catch (Exception error) { caught = error; }
++    Require(ReferenceEquals(primary, caught) && EnemyPluginSession.LastCleanupDiagnostic?.Contains("attachment=") == true
++        && EnemyPluginSession.LastCleanupDiagnostic.Contains("reporter="), "Failure evidence replaced the cause or lost bounded diagnostics.");
++});
++Case("session.null-message-is-safe", () =>
++{
++    using var session = EnemyPluginSession.Start(Kernel(), () => true, _ => { }, () => { }, () => { });
++    session.Guard(_ => throw new NullMessageFailure());
++    Require(session.Faulted && session.LastFault?.Contains(nameof(NullMessageFailure)) == true, "Null exception message escaped the guard.");
++});
++Case("session.fault-diagnostic-is-bounded-and-once", () =>
++{
++    var logs = new List<string>(); using var session = EnemyPluginSession.Start(Kernel(), () => true, logs.Add, () => { }, () => { });
++    session.Guard(_ => throw new Exception(new string('x', 20000)));
++    session.Guard(_ => throw new Exception("must not run"));
++    Require(session.LastFault?.Length <= 2048 && logs.Count == 1 && logs[0].Length < 4096, "Unbounded or repeated failure reporting.");
++});
+ Case("plugin.success-single-load-no-hot-reload", () =>
+ {
+     Host.Runtime = Kernel(); var plugin = new NativePlugin(); plugin.Load();
+--- a/ForgeEnemy/tests/NativePlugin/GameDoubles.cs
++++ b/ForgeEnemy/tests/NativePlugin/GameDoubles.cs
+@@ -34,7 +34,8 @@
+     public bool IsSetup = true;
+     public float Health = 50, HealthMax = 100;
+     public int Sends;
+-    public void SendSetHealth(float amount) { Sends++; Health = amount; }
++    public Action<float>? Commit;
++    public void SendSetHealth(float amount) { Sends++; if (Commit == null) Health = amount; else Commit(amount); }
+     public bool ProcessReceivedDamage() => true;
+ }
+ namespace SNetwork
+--- a/ForgeEnemy/tests/NativePlugin/LoaderDoubles.cs
++++ b/ForgeEnemy/tests/NativePlugin/LoaderDoubles.cs
+@@ -16,7 +16,8 @@
+     public sealed class TestLog
+     {
+         public bool ThrowInfo;
+-        public void LogInfo(object message) { if (ThrowInfo) throw new IOException("fixture logger failure"); }
++        public Exception? InfoFailure;
++        public void LogInfo(object message) { if (InfoFailure != null) throw InfoFailure; if (ThrowInfo) throw new IOException("fixture logger failure"); }
+         public void LogWarning(object message) { }
+     }
+ }
+@@ -33,9 +34,10 @@
+     {
+         public static int Patches, Unpatches;
+         public static int FailPatchAt;
++        public static Exception? UnpatchFailure;
+         public Harmony(string id) { }
+         public Processor CreateClassProcessor(Type type) => new();
+-        public void UnpatchSelf() => Unpatches++;
++        public void UnpatchSelf() { Unpatches++; if (UnpatchFailure != null) throw UnpatchFailure; }
+         public sealed class Processor
+         {
+             public void Patch()
+@@ -44,6 +46,26 @@
+                 if (FailPatchAt == Patches) throw new IOException("fixture patch failure");
+             }
+         }
+-        public static void Reset() { Patches = Unpatches = FailPatchAt = 0; }
++        public static void Reset() { Patches = Unpatches = FailPatchAt = 0; UnpatchFailure = null; }
+     }
+ }
++
++internal sealed class ReadOnlyDataFailure : IOException
++{
++    private readonly System.Collections.IDictionary _data =
++        new System.Collections.ObjectModel.ReadOnlyDictionary<object, object>(new Dictionary<object, object>());
++    public override System.Collections.IDictionary Data => _data;
++}
++internal sealed class MessageGetterFailure : Exception
++{
++    public override string Message => throw new InvalidOperationException("fixture message getter");
++}
++
++internal sealed class DataGetterFailure : Exception
++{
++    public override System.Collections.IDictionary Data => throw new InvalidOperationException("fixture Data getter");
++}
++internal sealed class NullMessageFailure : Exception
++{
++    public override string Message => null!;
++}

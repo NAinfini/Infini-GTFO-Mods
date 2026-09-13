@@ -62,6 +62,8 @@ internal static class RuntimePlan
             var binding = registry.Bindings[bindingId]; var capability = registry.Capabilities[RuntimeJson.Text(binding, "capabilityId")];
             RuntimeJson.Require(RuntimeJson.Text(capability, "kind") == kind && capability.TryGetProperty("graph", out _), "node-kind", nodeId);
             var graph = capability.GetProperty("graph");
+            RuntimeJson.Require(!graph.TryGetProperty("variadic", out _), "unsupported-variable-ports",
+                "v1 cannot execute variable ports; an explicit graph lowering revision is required.");
             RuntimeJson.Require(RuntimeJson.Text(graph, "execution") == "host" && RuntimeJson.Strings(graph.GetProperty("domains")).Contains(domain, StringComparer.Ordinal), "node-domain-authority", nodeId);
             RuntimeJson.Parameters(parameters, capability);
             var inputExecution = RuntimeJson.Rows(graph, "inputs").Where(p => RuntimeJson.Text(p, "type") == "execution").ToArray();

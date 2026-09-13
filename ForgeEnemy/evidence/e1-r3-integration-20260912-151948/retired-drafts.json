@@ -1,0 +1,30 @@
+[
+  {
+    "path": "ForgeEnemy/EnemyLifeTable.cs",
+    "sha256": "3662fcfde8e6469fe0acf0eaba7b78111f01a0fddf44b8422f1a7532dcf07277"
+  },
+  {
+    "path": "ForgeEnemy/EnemyReferences.cs",
+    "sha256": "b5b90fa7cd8f207d888cd4487785e41699b9494fff4a1f1ad4188b7fb1ec72c9"
+  },
+  {
+    "path": "ForgeEnemy/EnemyHealthPort.cs",
+    "sha256": "6b6e1185c99694d94aba1d8584e3a94fb623f6a6221caa2cf9434bd58c4b579f"
+  },
+  {
+    "path": "ForgeEnemy/EnemyHealthTransaction.cs",
+    "sha256": "0c71a8363d4693d21d9cb017685c936a2f218551fa6ac023b7c017241b1d872b"
+  },
+  {
+    "path": "ForgeEnemy/EnemyDamageObserver.cs",
+    "sha256": "7153afe08c819cb5711c06ced740d84284895ebb83c79c4192e1840d5f600f35"
+  },
+  {
+    "path": "ForgeEnemy/AssemblyInfo.cs",
+    "sha256": "2b4dfb2143a1dd94a71b0d522a495dcf973354fad70c1fee9547a3c160ab8d25"
+  },
+  {
+    "path": "ForgeEnemy/tests/Boundaries/Boundaries.csproj",
+    "sha256": "d2bef950abb5fcd9a29bad139cb8af8d88f92ef492dd97fe6f913a66d15a9aba"
+  }
+]

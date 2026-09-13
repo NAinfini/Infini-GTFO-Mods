@@ -1,9 +1,0 @@
-{
-  "name": "InfiniTweaks",
-  "version_number": "2.1.1",
-  "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
-  "description": "Casual co-op QoL: flashlights, combat, stamina, maps, resource stacking/drop, remembered pings, contextual HUD, boosters and team stats. No MTFO.",
-  "dependencies": [
-    "BepInEx-BepInExPack_GTFO-3.2.2"
-  ]
-}

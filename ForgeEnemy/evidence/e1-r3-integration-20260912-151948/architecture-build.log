@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj (in 155 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeDevelopment\ForgeDevelopment.csproj (in 161 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeTrigger\ForgeTrigger.csproj (in 161 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeMap\ForgeMap.csproj (in 161 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeEnemy\ForgeEnemy.csproj (in 161 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeRuntime\tests\Architecture\Architecture.csproj (in 162 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\cutover\workspace\ForgeWeapon\ForgeWeapon.csproj (in 161 ms).
+  ForgeRuntime.Framework -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  ForgeEnemy -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\ForgeEnemy\release\ForgeEnemy.dll
+  ForgeWeapon -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\ForgeWeapon\release\ForgeWeapon.dll
+  ForgeDevelopment -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\ForgeDevelopment\release\ForgeDevelopment.dll
+  ForgeMap -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\ForgeMap\release\ForgeMap.dll
+  ForgeTrigger -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\ForgeTrigger\release\ForgeTrigger.dll
+  Architecture -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\candidate-architecture\bin\Architecture\release\Architecture.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.05

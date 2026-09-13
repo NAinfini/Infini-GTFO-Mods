@@ -1,0 +1,231 @@
+{
+  "providers": [
+    {
+      "id": "test.trigger",
+      "kind": "extension",
+      "version": "1.0.0",
+      "dependencies": []
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "test.trigger.event",
+      "owner": "test.trigger",
+      "kind": "trigger",
+      "label": "Synthetic event",
+      "version": "1.0.0",
+      "parameters": {
+        "support": "synthetic-contract-test-only"
+      },
+      "graph": {
+        "domains": [
+          "map",
+          "logic"
+        ],
+        "execution": "host",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "next",
+            "type": "execution"
+          },
+          {
+            "id": "target",
+            "type": "entity"
+          },
+          {
+            "id": "amount",
+            "type": "number"
+          },
+          {
+            "id": "enabled",
+            "type": "boolean"
+          },
+          {
+            "id": "position",
+            "type": "vector3",
+            "unit": "m"
+          },
+          {
+            "id": "distance",
+            "type": "number",
+            "unit": "m"
+          },
+          {
+            "id": "maybe_target",
+            "type": "entity",
+            "nullable": true
+          },
+          {
+            "id": "optional_target",
+            "type": "entity",
+            "optional": true
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "id": "test.trigger.record",
+      "owner": "test.trigger",
+      "kind": "action",
+      "label": "Synthetic record",
+      "version": "1.0.0",
+      "parameters": {
+        "support": "synthetic-contract-test-only"
+      },
+      "graph": {
+        "domains": [
+          "map",
+          "logic"
+        ],
+        "execution": "host",
+        "inputs": [
+          {
+            "id": "in",
+            "type": "execution"
+          },
+          {
+            "id": "target",
+            "type": "entity"
+          },
+          {
+            "id": "value",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "next",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "type": "number"
+          }
+        ],
+        "parameters": [],
+        "recipients": {
+          "input": "target",
+          "requires": [
+            "test.receiver.accept"
+          ]
+        }
+      }
+    },
+    {
+      "id": "test.trigger.branch",
+      "owner": "test.trigger",
+      "kind": "control",
+      "label": "Synthetic branch",
+      "version": "1.0.0",
+      "parameters": {
+        "support": "synthetic-contract-test-only"
+      },
+      "graph": {
+        "domains": [
+          "map",
+          "logic"
+        ],
+        "execution": "host",
+        "inputs": [
+          {
+            "id": "in",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "type": "execution"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "id": "test.trigger.add",
+      "owner": "test.trigger",
+      "kind": "modifier",
+      "label": "Synthetic add",
+      "version": "1.0.0",
+      "parameters": {
+        "support": "synthetic-contract-test-only"
+      },
+      "graph": {
+        "domains": [
+          "map",
+          "logic"
+        ],
+        "execution": "pure",
+        "inputs": [
+          {
+            "id": "a",
+            "type": "number"
+          },
+          {
+            "id": "b",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "type": "number"
+          }
+        ],
+        "parameters": []
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "id": "test.trigger.binding.event",
+      "capabilityId": "test.trigger.event",
+      "providerId": "test.trigger",
+      "handler": "event",
+      "role": "observe",
+      "status": "implemented",
+      "dependencies": [],
+      "requires": []
+    },
+    {
+      "id": "test.trigger.binding.record",
+      "capabilityId": "test.trigger.record",
+      "providerId": "test.trigger",
+      "handler": "record",
+      "role": "execute",
+      "status": "implemented",
+      "dependencies": [],
+      "requires": []
+    },
+    {
+      "id": "test.trigger.binding.branch",
+      "capabilityId": "test.trigger.branch",
+      "providerId": "test.trigger",
+      "handler": "branch",
+      "role": "execute",
+      "status": "implemented",
+      "dependencies": [],
+      "requires": []
+    },
+    {
+      "id": "test.trigger.binding.add",
+      "capabilityId": "test.trigger.add",
+      "providerId": "test.trigger",
+      "handler": "add",
+      "role": "execute",
+      "status": "implemented",
+      "dependencies": [],
+      "requires": []
+    }
+  ]
+}

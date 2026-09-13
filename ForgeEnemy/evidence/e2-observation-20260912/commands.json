@@ -1,0 +1,255 @@
+[
+  {
+    "name": "host-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "native-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/Native/ForgeEnemy.Native.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "-p:ForgeRuntimeAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\native"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "observation-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/EntityObservation/EntityObservation.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\tests"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "observation-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\tests\\bin\\EntityObservation\\release\\EntityObservation.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\observation-result.json"
+    ],
+    "exitCode": 1
+  },
+  {
+    "name": "frozen-worktree-sdk-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-control\\ForgeRuntime.Framework.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\frozen-worktree-sdk-artifacts"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "frozen-worktree-tests-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/EntityObservation/EntityObservation.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\frozen-worktree-sdk-artifacts\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\frozen-worktree-tests"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "frozen-worktree-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\frozen-worktree-tests\\bin\\EntityObservation\\release\\EntityObservation.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\frozen-worktree-result.json",
+      "frozen-worktree"
+    ],
+    "exitCode": 1
+  },
+  {
+    "name": "isolated-proposal-sdk-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\sdk-proposal\\ForgeRuntime.Framework.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\isolated-proposal-sdk-artifacts"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "isolated-proposal-tests-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/EntityObservation/EntityObservation.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\isolated-proposal-sdk-artifacts\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\isolated-proposal-tests"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "isolated-proposal-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\isolated-proposal-tests\\bin\\EntityObservation\\release\\EntityObservation.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\isolated-proposal-result.json",
+      "isolated-proposal"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "native-evidence-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/NativeEvidence/NativeEvidence.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\native-audit"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "native-evidence-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\native-audit\\bin\\NativeEvidence\\release\\NativeEvidence.dll",
+      "C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "E:\\SteamLibrary\\steamapps\\common\\GTFO",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\native-observation-inputs.json",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\native-evidence-result.json"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "receiver-regression-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/ReceiverProbe/ReceiverProbe.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\receiver-regression-artifacts"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "receiver-regression-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\receiver-regression-artifacts\\bin\\ReceiverProbe\\release\\ReceiverProbe.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\receiver-regression-result.json"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "plugin-regression-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/NativePlugin/NativePlugin.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\plugin-regression-artifacts"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "plugin-regression-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\plugin-regression-artifacts\\bin\\NativePlugin\\release\\NativePlugin.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\plugin-regression-result.json"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "commit-regression-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/CommitAudit/CommitAudit.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\commit-regression-artifacts"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "commit-regression-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\commit-regression-artifacts\\bin\\CommitAudit\\release\\CommitAudit.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\commit-regression-result.json"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "layout-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeEnemy/tests/NativeLayout/NativeLayout.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\layout-artifacts"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "layout-pending",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\layout-artifacts\\bin\\NativeLayout\\release\\NativeLayout.dll",
+      "C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\native\\bin\\ForgeEnemy.Native\\release\\ForgeEnemy.Native.dll",
+      "pending",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e2-observation-20260912-142318\\layout-pending-result.json"
+    ],
+    "exitCode": 0
+  }
+]

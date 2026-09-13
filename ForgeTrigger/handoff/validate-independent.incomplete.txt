@@ -1,0 +1,74 @@
+"""Independent T1 metadata audit and T2 computations; never a T1-T7 completion certificate."""
+from __future__ import annotations
+import argparse, datetime, hashlib, json, subprocess, sys
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+MUTATIONS = [
+ ('variadic-tail','Pure/VariadicNodes.cs','foreach (var value in values)\n            result =','foreach (var value in values[..^1])\n            result ='),
+ ('variadic-all-tail','Pure/VariadicNodes.cs','foreach (var value in values) if (!value) return false;','foreach (var value in values[..^1]) if (!value) return false;'),
+ ('variadic-union-pair','Pure/VariadicNodes.cs','i < snapshots.Length; i++) result = ReferenceCollections.Union','i < 2; i++) result = ReferenceCollections.Union'),
+ ('weighted-ignore-mass','Pure/WeightedSampling.cs','var mass = Mass(candidate.Weight);','var mass = BigInteger.One;'),
+ ('weighted-always-replace','Pure/WeightedSampling.cs','if (mode == WeightedSamplingMode.WithoutReplacement)','if (false)'),
+ ('weighted-ignore-budget','Pure/WeightedSampling.cs','if (++used > budget)','if (++used > MaximumEntropyWords)'),
+]
+def sources(site: Path) -> list[Path]:
+    files = [ROOT/'ForgeTrigger.csproj',ROOT/'ModuleDefinition.cs',Path(__file__).resolve(),
+             ROOT/'tests/Contracts/AuthoringContractTests.cs']
+    for directory in ['Pure','Targeting','tests/Acceptance']:
+        files += [p for p in (ROOT/directory).glob('*') if p.suffix in {'.cs','.csproj'}]
+    files += [ROOT/'tools'/name for name in ['acceptance-vectors.mjs','weighted-vectors.mjs','authoring-contract-audit.mjs']]
+    files += list((ROOT.parent/'ForgeRuntime/Framework').glob('*.cs'))
+    files += [ROOT.parent/'ForgeRuntime/Framework/ForgeRuntime.Framework.csproj']
+    files += list((site/'site/forge').glob('*.ts'))
+    files += [site/'Tools/register-typescript.ts',site/'pnpm-lock.yaml',site/'node_modules/typescript/package.json']
+    return sorted(set(files))
+def main() -> int:
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--site',type=Path,default=ROOT.parents[1]/'Infini-GTFO-Model-Site')
+    parser.add_argument('--output',type=Path)
+    parser.add_argument('--mutations',action='store_true')
+    args=parser.parse_args(); site=args.site.resolve()
+    output=(args.output or ROOT/'artifacts'/('independent-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))).resolve()
+    if not output.is_relative_to((ROOT/'artifacts').resolve()): raise ValueError('Output must be inside Trigger artifacts.')
+    output.mkdir(parents=True,exist_ok=False)
+    hashes=lambda:{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sources(site)}
+    report={'status':'failed','requestedScope':'independent-computations','gameVerified':False,'publicationReady':False,'commands':[]}
+    def run(name,argv,allow_failure=False):
+        log=output/(name+'.log'); print('RUN '+name,flush=True)
+        with log.open('w',encoding='utf-8') as stream:
+            result=subprocess.run(argv,cwd=ROOT.parent,stdout=stream,stderr=subprocess.STDOUT,timeout=240)
+        report['commands'].append({'name':name,'argv':argv,'exitCode':result.returncode,'log':log.name})
+        print(log.read_text(encoding='utf-8',errors='replace')[-1600:],flush=True)
+        if result.returncode and not allow_failure: raise RuntimeError(name+' failed: '+str(result.returncode))
+        return result.returncode
+    def build(name,project,destination):
+        run(name,['dotnet','build',str(project),'-c','Release','--artifacts-path',str(destination),'--disable-build-servers'])
+        dlls=[p for p in destination.rglob('ForgeTrigger.AcceptanceTests.dll') if p.with_suffix('.runtimeconfig.json').exists()]
+        if len(dlls)!=1: raise RuntimeError('Expected one compiled acceptance assembly.')
+        return dlls[0]
+    read=lambda p:json.loads(p.read_text(encoding='utf-8'))
+    try:
+        before=hashes(); report['sourcesBefore']=before
+        dll=build('build',ROOT/'tests/Acceptance/Acceptance.csproj',output/'build')
+        run('export',['dotnet',str(dll),'export',str(output)])
+        run('authoring-vectors',['node',str(ROOT/'tools/acceptance-vectors.mjs'),str(site),str(output)])
+        run('weighted-vectors',['node',str(ROOT/'tools/weighted-vectors.mjs'),str(output)])
+        run('behavior',['dotnet',str(dll),'check',str(output)])
+        result=read(output/'acceptance-result.json')
+        if sorted(result['groups'])!=['VariadicTests','WeightedTests']:
+            raise RuntimeError('The expected behavior groups were not all executed.')
+        report['behavior']=result
+        report['authoringCompatibility']=read(output/'authoring-compatibility-result.json')
+        report['variadicCases']=len(read(output/'variadic-reference.json')['cases'])
+        report['weightedCases']=len(read(output/'weighted-reference.json')['cases'])
+        if hashes()!=before: raise RuntimeError('Consumed source changed during the baseline.')
+        if args.mutations:
+            report['mutations']=[]
+            copy_sources=[p for p in sources(site) if p.suffix in {'.cs','.csproj'} and p.is_relative_to(ROOT.parent)]
+            for name,relative,old,new in [('clean-copy',None,None,None)]+MUTATIONS:
+                workspace=output/'mutations'/name; workspace.mkdir(parents=True,exist_ok=False)
+                for source in copy_sources:
+                    data=source.read_bytes()
+                    if hashlib.sha256(data).hexdigest()!=before[str(source)]: raise RuntimeError('Source drift before mutation copy.')
+                    target=workspace/source.relative_to(ROOT.parent)
+                    target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)

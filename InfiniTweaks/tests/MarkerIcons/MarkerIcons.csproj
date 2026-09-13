@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><CheckEolTargetFramework>false</CheckEolTargetFramework></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../MarkerIcon.cs" Link="MarkerIcon.cs" />
+    <Compile Include="../../MarkerIconCatalog.cs" Link="MarkerIconCatalog.cs" />
+    <Compile Include="../../MarkerRules.cs" Link="MarkerRules.cs" />
+    <EmbeddedResource Include="../../assets/marker-icons/*.png" LogicalName="InfiniTweaks.MarkerIcons.%(Filename)%(Extension)" />
+    <None Include="../marker-items.json" Link="marker-items.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

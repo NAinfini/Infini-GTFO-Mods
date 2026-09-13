@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "utc": "2026-09-12T15:19:46.372086+00:00",
+  "enemyBuildExitCode": 0,
+  "auditBuildLog": "obj/e23-continuation-20260912/comparison-build.log",
+  "auditRunExitCode": 1,
+  "gitDiffCheckExitCode": 0,
+  "ownedTextIssues": [],
+  "comparisonSourceStable": true,
+  "sourceHashes": {
+    "ForgeRuntime\\GameBindings\\EnemyModule.cs": "F99FEC2BFE3F338836E280A9753622522A26FD79D3B9F34ED430A2A88B6EBBF5",
+    "ForgeRuntime\\tests\\GameBindings\\GameDoubles.cs": "959B7E25E25C22AEA4F2E70D5E5A61ECAFBDA8786D8835D1C330277471EB8843",
+    "ForgeEnemy\\Receivers\\EnemyHealthCommit.cs": "6D5057CFFDDEBFA476D51FEDDF7ABE2E1E6507C67B866B4D2982B851B8F44634"
+  },
+  "gameExecuted": false,
+  "cleanupBlocked": true,
+  "scope": "Independent verification; concurrent receiver fixes are not authored by this continuation."
+}

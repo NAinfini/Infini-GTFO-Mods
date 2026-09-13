@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Target Name="RequireExplicitSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(ForgeFrameworkAssembly)' == '' or !Exists('$(ForgeFrameworkAssembly)')"
+      Text="Pass -p:ForgeFrameworkAssembly=... with the compiled production SDK. The audit records its hash." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+    <Compile Include="../../Receivers/EnemyHealthCommit.cs" Link="EnemyHealthCommit.cs" />
+    <Compile Include="../../Receivers/EnemyThreadBoundary.cs" Link="EnemyThreadBoundary.cs" />
+    <None Include="../../Receivers/EnemyHealthCommit.cs" Link="EnemyHealthCommit.source.txt" CopyToOutputDirectory="Always" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+    <Compile Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.cs" />
+    <None Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.source.txt" CopyToOutputDirectory="Always" />
+    <None Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.source.txt" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+</Project>

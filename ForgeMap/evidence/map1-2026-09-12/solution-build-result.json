@@ -1,0 +1,15 @@
+{
+  "command": [
+    "dotnet",
+    "build",
+    "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\Forge.Architecture.sln",
+    "-c",
+    "Release",
+    "--artifacts-path",
+    "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeMap\\bin\\map1-solution",
+    "/p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+    "--nologo"
+  ],
+  "exitCode": 0,
+  "verification": "compilation-only; no game execution"
+}

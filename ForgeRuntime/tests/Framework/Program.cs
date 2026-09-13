@@ -220,6 +220,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     }
 }
 checks += TimingTests.Run();
+checks += ExecutionResultTests.Run();
 Console.WriteLine($"Framework checks: {checks} passed.");
 
 if (args.Contains("--benchmark"))

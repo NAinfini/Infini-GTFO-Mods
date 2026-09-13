@@ -1,0 +1,8 @@
+PASS stop clears loaded work
+PASS failed startup clears loaded work
+PASS world change does not revive old handles
+PASS cleanup retains thread ownership
+PASS observers cannot change queued work
+PASS reentrant stop preserves unknown commit
+Lifecycle work: 57 assertions passed; 0 groups failed.
+Compiled production SDK + website fixtures; managed action doubles, no native game execution.

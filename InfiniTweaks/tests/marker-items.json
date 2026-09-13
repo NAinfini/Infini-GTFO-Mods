@@ -1,0 +1,266 @@
+[
+  {
+    "id": 27,
+    "name": "Red keycard"
+  },
+  {
+    "id": 85,
+    "name": "Blue keycard"
+  },
+  {
+    "id": 86,
+    "name": "Green keycard"
+  },
+  {
+    "id": 87,
+    "name": "Yellow keycard"
+  },
+  {
+    "id": 88,
+    "name": "White keycard"
+  },
+  {
+    "id": 89,
+    "name": "Black keycard"
+  },
+  {
+    "id": 90,
+    "name": "Grey keycard"
+  },
+  {
+    "id": 91,
+    "name": "Orange keycard"
+  },
+  {
+    "id": 92,
+    "name": "Purple keycard"
+  },
+  {
+    "id": 93,
+    "name": "Gold keycard"
+  },
+  {
+    "id": 94,
+    "name": "Brown keycard"
+  },
+  {
+    "id": 146,
+    "name": "Bulkhead Key"
+  },
+  {
+    "id": 113,
+    "name": "Flare"
+  },
+  {
+    "id": 30,
+    "name": "Long Range Flashlight"
+  },
+  {
+    "id": 114,
+    "name": "Glow Stick"
+  },
+  {
+    "id": 130,
+    "name": "Red Glow Stick"
+  },
+  {
+    "id": 167,
+    "name": "Glow Stick Orange"
+  },
+  {
+    "id": 174,
+    "name": "Glow Stick Yellow"
+  },
+  {
+    "id": 140,
+    "name": "I2-LP Syringe"
+  },
+  {
+    "id": 142,
+    "name": "IIx Syringe"
+  },
+  {
+    "id": 136,
+    "name": "Glow Stick"
+  },
+  {
+    "id": 115,
+    "name": "C-Foam Grenade"
+  },
+  {
+    "id": 116,
+    "name": "Lock Melter"
+  },
+  {
+    "id": 117,
+    "name": "Fog Repeller"
+  },
+  {
+    "id": 139,
+    "name": "Explosive Trip Mine"
+  },
+  {
+    "id": 159,
+    "name": "Shaped Charge Explosive Mine"
+  },
+  {
+    "id": 144,
+    "name": "C-Foam Tripmine"
+  },
+  {
+    "id": 157,
+    "name": "Portable Barrier"
+  },
+  {
+    "id": 101,
+    "name": "Ammo Pack"
+  },
+  {
+    "id": 102,
+    "name": "MediPack"
+  },
+  {
+    "id": 127,
+    "name": "Tool Refill Pack"
+  },
+  {
+    "id": 132,
+    "name": "Disinfection Pack"
+  },
+  {
+    "id": 128,
+    "name": "Personnel ID"
+  },
+  {
+    "id": 129,
+    "name": "Partial Decoder"
+  },
+  {
+    "id": 147,
+    "name": "Hard drive"
+  },
+  {
+    "id": 183,
+    "name": "Micro Drive"
+  },
+  {
+    "id": 149,
+    "name": "GLP Hormone"
+  },
+  {
+    "id": 150,
+    "name": "OSIP Hormone"
+  },
+  {
+    "id": 169,
+    "name": "GLP Hormone mk 2"
+  },
+  {
+    "id": 168,
+    "name": "TAMPERED_DATA_CUBE"
+  },
+  {
+    "id": 165,
+    "name": "DATA_CUBE"
+  },
+  {
+    "id": 179,
+    "name": "DATA_CUBES"
+  },
+  {
+    "id": 178,
+    "name": "BACKUP_DATA_CUBE"
+  },
+  {
+    "id": 153,
+    "name": "Plant Sample"
+  },
+  {
+    "id": 171,
+    "name": "Memory_Stick"
+  },
+  {
+    "id": 172,
+    "name": "Memory_Stick"
+  },
+  {
+    "id": 180,
+    "name": "Hard_drive"
+  },
+  {
+    "id": 131,
+    "name": "Power Cell"
+  },
+  {
+    "id": 133,
+    "name": "Fog Repeller Turbine"
+  },
+  {
+    "id": 137,
+    "name": "NEONATE HSU"
+  },
+  {
+    "id": 141,
+    "name": "NEONATE HSU"
+  },
+  {
+    "id": 143,
+    "name": "NEONATE HSU"
+  },
+  {
+    "id": 170,
+    "name": "NEONATE HSU"
+  },
+  {
+    "id": 164,
+    "name": "MATTER_WAVE_PROJECTOR"
+  },
+  {
+    "id": 145,
+    "name": "IMPRINTED NEONATE HSU"
+  },
+  {
+    "id": 175,
+    "name": "IMPRINTED NEONATE HSU"
+  },
+  {
+    "id": 177,
+    "name": "IMPRINTED NEONATE HSU"
+  },
+  {
+    "id": 151,
+    "name": "DATA SPHERE"
+  },
+  {
+    "id": 181,
+    "name": "DATA SPHERE"
+  },
+  {
+    "id": 166,
+    "name": "MATTER_WAVE_PROJECTOR"
+  },
+  {
+    "id": 138,
+    "name": "Cargo Crate"
+  },
+  {
+    "id": 176,
+    "name": "Cargo Crate"
+  },
+  {
+    "id": 148,
+    "name": "Cryo Hardcase"
+  },
+  {
+    "id": 154,
+    "name": "Cargo Crate High Security"
+  },
+  {
+    "id": 155,
+    "name": "Cargo Crate High Security Open"
+  },
+  {
+    "id": 173,
+    "name": "Collection Case"
+  }
+]

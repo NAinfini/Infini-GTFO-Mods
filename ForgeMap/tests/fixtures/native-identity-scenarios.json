@@ -1,0 +1,107 @@
+{
+  "purpose": "MAP1 acceptance specifications; not a runtime/export schema",
+  "status": "pending-native-resolver-and-game-verification",
+  "executed": false,
+  "cases": [
+    {
+      "id": "same-zone-index",
+      "given": "Same local zone number in different dimensions/layers/layouts",
+      "expected": "Distinct identities; alias is not an author ID",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "same-resource-placements",
+      "given": "One resource revision instantiated twice",
+      "expected": "Explicit creation token per placement; no name/order/proximity matching",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "generation-reentry",
+      "given": "Old creation callback arrives after a new world begins",
+      "expected": "Invalidate old world and creation token",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "same-native-id-new-life",
+      "given": "Native object identifier reused after destruction",
+      "expected": "Reject old life even if pointer/ID is reused",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "duplicate-observation",
+      "given": "Two hooks report same creation token and exact live object",
+      "expected": "One idempotent receipt",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "ambiguous-token",
+      "given": "Same author token links to different live objects",
+      "expected": "Ambiguous; never choose first or nearest",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "unknown-source",
+      "given": "Name/path/position match without creation source proof",
+      "expected": "Unresolved, never resolved or game-verified",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "revision-mismatch",
+      "given": "Observed source has wrong revision or hash",
+      "expected": "Reject; never silently upgrade",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "incomplete-observations",
+      "given": "Capture budget exceeded or callbacks lost",
+      "expected": "Unknown/incomplete; not proof of absence",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    },
+    {
+      "id": "area-course-node",
+      "given": "Multiple areas per geomorph or node belongs to wrong area",
+      "expected": "Exact area/zone/dimension proof and pCourseNode round trip required",
+      "requiredOwners": [
+        "Map",
+        "Runtime R2/R3",
+        "Development D3"
+      ]
+    }
+  ]
+}

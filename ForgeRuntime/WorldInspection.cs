@@ -1,0 +1,571 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using AIGraph;
+using Gear;
+using LevelGeneration;
+using UnityEngine;
+using UnityEngine.AI;
+
+namespace ForgeRuntime;
+
+internal static class WorldInspection
+{
+    internal static IEnumerable<byte> Capture(ProjectInspectionSession session)
+    {
+        using var iterator = CaptureWorld(session).GetEnumerator();
+        try
+        {
+            while (session.AcceptWorld(RuntimeDiagnostics.WorldEpoch, RuntimeDiagnostics.SimulationTick))
+            {
+                if (!iterator.MoveNext()) yield break;
+                yield return iterator.Current;
+            }
+        }
+        finally
+        {
+            if (!session.IsClosed) session.Cancel(session.WorldEpoch == RuntimeDiagnostics.WorldEpoch
+                ? RuntimeDiagnostics.SimulationTick : null, "iterator_disposed");
+        }
+    }
+
+    private static IEnumerable<byte> CaptureWorld(ProjectInspectionSession session)
+    {
+        var report = session.Report;
+        if (!session.AcceptWorld(RuntimeDiagnostics.WorldEpoch, RuntimeDiagnostics.SimulationTick)) yield break;
+        var floor = Builder.CurrentFloor;
+        var layouts = ActiveLayouts(report, floor, out var layoutContextComplete);
+        session.Start(layouts, RuntimeDiagnostics.SimulationTick);
+        if (!layoutContextComplete) session.MarkPartial();
+        if (floor == null)
+        {
+            report.Check("world", "floor", "missing", "Builder.CurrentFloor was unavailable after FactoryDone.");
+            report.Issue("missing_floor", "Builder.CurrentFloor", "No generated floor was available for inspection.");
+            session.MarkPartial();
+            session.Complete(RuntimeDiagnostics.SimulationTick);
+            yield break;
+        }
+
+        var activeTicks = 0L;
+        var zoneCount = 0;
+        var areaCount = 0;
+        var geomorphCount = 0;
+        var plugCount = 0;
+        var terminalCount = 0;
+        var terminalItemCount = 0;
+        var itemCount = 0;
+        var geomorphs = new HashSet<int>();
+        var inspectedPairs = new HashSet<string>(StringComparer.Ordinal);
+
+        var zones = floor.allZones;
+        if (zones == null || zones.Count == 0)
+        {
+            session.MarkPartial();
+            report.Check("world", "zones", "missing", "The generated floor contains no zones.");
+        }
+
+        if (zones != null)
+        {
+            foreach (var zone in zones)
+            {
+                if (zone == null)
+                {
+                    session.MarkPartial();
+                    activeTicks += Inspect(session, "floor/zones", () =>
+                    {
+                        report.Check("zone", "null", "missing", "The floor zone list contains a null entry.");
+                        report.Issue("missing_zone", "floor/zones", "The floor zone list contains a null entry.");
+                    });
+                    yield return 0;
+                    continue;
+                }
+
+                zoneCount++;
+                var zoneName = SafeZone(session, zone, "zone-path-unavailable");
+                activeTicks += Inspect(session, zoneName, () => InspectZone(session, floor, layouts, zone, zoneName));
+                yield return 0;
+
+                var areas = zone.m_areas;
+                if (areas == null || areas.Count == 0)
+                {
+                    session.MarkPartial();
+                    activeTicks += Inspect(session, zoneName, () =>
+                        report.Check("zone_areas", zoneName, "missing", "The zone contains no generated areas."));
+                    yield return 0;
+                    continue;
+                }
+
+                foreach (var area in areas)
+                {
+                    var areaPath = area == null ? zoneName + "/null-area" : SafePath(session, area, zoneName + "/area-path-unavailable");
+                    if (area == null)
+                    {
+                        session.MarkPartial();
+                        activeTicks += Inspect(session, areaPath, () =>
+                        {
+                            report.Check("area", areaPath, "missing", "The zone area list contains a null entry.");
+                            report.Issue("missing_area", zoneName, "The zone area list contains a null entry.");
+                        });
+                        yield return 0;
+                        continue;
+                    }
+
+                    areaCount++;
+                    activeTicks += Inspect(session, areaPath, () => InspectArea(report, zone, area, areaPath));
+                    yield return 0;
+
+                    var geomorph = area.m_geomorph;
+                    if (geomorph == null)
+                    {
+                        session.MarkPartial();
+                        report.Check("area_geomorph", areaPath, "missing", "Area has no geomorph owner.");
+                        continue;
+                    }
+                    var geomorphPath = SafePath(session, geomorph, areaPath + "/geomorph-path-unavailable");
+                    if (!geomorphs.Add(geomorph.GetInstanceID())) continue;
+
+                    geomorphCount++;
+                    activeTicks += Inspect(session, geomorphPath, () => InspectGeomorph(session, geomorph, geomorphPath));
+                    yield return 0;
+
+                    var plugs = geomorph.m_plugs;
+                    if (plugs == null) { session.MarkPartial(); continue; }
+                    foreach (var plug in plugs)
+                    {
+                        var plugPath = plug == null ? geomorphPath + "/null-plug" : SafePath(session, plug, geomorphPath + "/plug-path-unavailable");
+                        plugCount++;
+                        if (plug == null) session.MarkPartial();
+                        activeTicks += Inspect(session, plugPath, () => InspectPlug(report, plug, plugPath, inspectedPairs));
+                        yield return 0;
+                    }
+                }
+            }
+        }
+
+        // Yield between scene objects instead of allocating the whole floor's component array.
+        var components = FloorComponents(floor.transform);
+        foreach (var component in components)
+        {
+            if (component == null)
+            {
+                yield return 0;
+                continue;
+            }
+            LG_GenericTerminalItem? terminalItem = null;
+            LG_ComputerTerminal? terminal = null;
+            ItemInLevel? item = null;
+            activeTicks += Inspect(session, "floor/component-classification", () =>
+            {
+                terminalItem = component.TryCast<LG_GenericTerminalItem>();
+                if (terminalItem == null) terminal = component.TryCast<LG_ComputerTerminal>();
+                if (terminalItem == null && terminal == null) item = component.TryCast<ItemInLevel>();
+            });
+            if (terminalItem == null && terminal == null && item == null) { yield return 0; continue; }
+            var path = SafePath(session, component, "floor/component-path-unavailable");
+            if (terminalItem != null)
+            {
+                terminalItemCount++;
+                activeTicks += Inspect(session, path, () => InspectTerminalItem(report, terminalItem, path));
+            }
+            else if (terminal != null)
+            {
+                terminalCount++;
+                activeTicks += Inspect(session, path, () => InspectTerminal(report, terminal, path));
+            }
+            else if (item != null)
+            {
+                itemCount++;
+                activeTicks += Inspect(session, path, () => InspectItem(report, item, path));
+            }
+            yield return 0;
+        }
+
+        session.Complete(RuntimeDiagnostics.SimulationTick);
+        report.Event("world_inspection", session.IsPartial ? "partial" : "complete", RuntimeDiagnostics.PathOf(floor.transform), new()
+        {
+            ["zones"] = zoneCount.ToString(),
+            ["areas"] = areaCount.ToString(),
+            ["geomorphs"] = geomorphCount.ToString(),
+            ["plugs"] = plugCount.ToString(),
+            ["terminals"] = terminalCount.ToString(),
+            ["terminalItems"] = terminalItemCount.ToString(),
+            ["items"] = itemCount.ToString()
+        }, activeTicks * 1000.0 / Stopwatch.Frequency);
+        report.Check("world_inspection", "floor", session.IsPartial ? "partial" : "observed",
+            session.IsPartial ? "Inspection ended with missing, unsupported or unreadable observations; coverage is partial."
+                : "Read-only inspection completed. Objective and script behavior remain unverified.");
+    }
+
+    private static IReadOnlyList<ProjectLayoutKey> ActiveLayouts(DiagnosticsReport report, LG_Floor? floor,
+        out bool complete)
+    {
+        complete = false;
+        var expedition = Builder.LevelGenExpedition;
+        if (floor?.MainDimension == null || (int)floor.MainDimension.DimensionIndex != 0 || expedition == null)
+        {
+            report.Check("project_layout_context", "floor", "unverified",
+                "The main dimension or active expedition layout context is unavailable.");
+            return Array.Empty<ProjectLayoutKey>();
+        }
+        // The three explicit expedition layout IDs describe Reality's layers only.
+        // Extra/static dimensions need verified Map creation context, not a guessed ID.
+        var ids = new[] { expedition.LevelLayoutData, expedition.SecondaryLayout, expedition.ThirdLayout };
+        var layouts = new List<ProjectLayoutKey>(3);
+        var nativeLayers = floor.MainDimension.Layers;
+        var seen = new HashSet<int>();
+        complete = nativeLayers != null && nativeLayers.Count is > 0 and <= 3;
+        if (complete)
+            foreach (var nativeLayer in nativeLayers!)
+            {
+                var layer = nativeLayer == null ? -1 : (int)nativeLayer.m_type;
+                if (nativeLayer == null || (nativeLayer.m_dimension == null || nativeLayer.m_dimension.Pointer != floor.MainDimension.Pointer) ||
+                    layer < 0 || layer >= ids.Length || !seen.Add(layer) || ids[layer] == 0)
+                { complete = false; continue; }
+                layouts.Add(new ProjectLayoutKey(ids[layer], 0, layer));
+            }
+        complete &= seen.Contains(0);
+        if (!complete) report.Check("project_layout_context", "floor", "unverified",
+            "Active main-dimension layers or their explicit expedition layout IDs are incomplete.");
+        return layouts;
+    }
+
+    internal static IEnumerable<Component?> FloorComponents(Transform root)
+    {
+        var pending = new Stack<(Transform Transform, int Child)>();
+        pending.Push((root, -1));
+        while (pending.Count > 0)
+        {
+            yield return null;
+            var (node, child) = pending.Pop();
+            if (node == null) continue;
+            if (child == -1)
+            {
+                foreach (var component in node.gameObject.GetComponents<Component>()) yield return component;
+                child = 0;
+            }
+            if (child >= node.childCount) continue;
+            pending.Push((node, child + 1));
+            pending.Push((node.GetChild(child), -1));
+        }
+    }
+
+    private static long Inspect(ProjectInspectionSession session, string source, Action action)
+    {
+        var report = session.Report;
+        var started = Stopwatch.GetTimestamp();
+        try { action(); }
+        catch (Exception e) { session.MarkPartial(); report.Issue("diagnostic_error", source, e.Message, e.ToString()); }
+        return Stopwatch.GetTimestamp() - started;
+    }
+
+    private static string SafePath(ProjectInspectionSession session, Component component, string fallback)
+    {
+        var report = session.Report;
+        try { return RuntimeDiagnostics.PathOf(component.transform); }
+        catch (Exception e)
+        {
+            session.MarkPartial();
+            report.Issue("diagnostic_error", fallback, e.Message, e.ToString());
+            return fallback;
+        }
+    }
+
+    private static string SafeZone(ProjectInspectionSession session, LG_Zone zone, string fallback)
+    {
+        var report = session.Report;
+        try { return RuntimeDiagnostics.Zone(zone); }
+        catch (Exception e)
+        {
+            session.MarkPartial();
+            report.Issue("diagnostic_error", fallback, e.Message, e.ToString());
+            return fallback;
+        }
+    }
+
+    private static void InspectZone(ProjectInspectionSession session, LG_Floor floor, IReadOnlyList<ProjectLayoutKey> layouts, LG_Zone zone, string subject)
+    {
+        var report = session.Report;
+        var nodes = zone.m_courseNodes;
+        var fields = new Dictionary<string, string>
+        {
+            ["path"] = RuntimeDiagnostics.PathOf(zone.transform),
+            ["position"] = RuntimeDiagnostics.Vector(zone.Position),
+            ["buildStatus"] = zone.m_buildStatus.ToString(),
+            ["areas"] = (zone.m_areas?.Count ?? 0).ToString(),
+            ["courseNodes"] = (nodes?.Count ?? 0).ToString(),
+            ["navInfo"] = zone.m_navInfo == null ? "missing" : zone.m_navInfo.ToString() ?? "unavailable"
+        };
+        report.Event("world_inspection", "zone", subject, fields);
+        var layer = zone.Layer;
+        ProjectLayoutKey? layout = null;
+        if (layer != null && (int)zone.DimensionIndex == 0 && layer.m_dimension != null && floor.MainDimension != null && layer.m_dimension.Pointer == floor.MainDimension.Pointer &&
+            layer.m_zones?.Contains(zone) == true && floor.MainDimension?.Layers?.Contains(layer) == true)
+            foreach (var key in layouts)
+                if (key.Dimension == 0 && key.Layer == (int)layer.m_type) { layout = key; break; }
+        if (layout == null)
+        {
+            session.MarkPartial();
+            report.Check("project_zone_context", subject, "unverified",
+                "No verified main-dimension layout/layer ownership was available; no authored zone is inferred.");
+        }
+        else session.Scan?.ObserveZone(new ProjectZoneCandidate(zone.GetInstanceID(), layout.LayoutId,
+            layout.Dimension, layout.Layer, (int)zone.LocalIndex));
+        report.Check("zone_course_nodes", subject, nodes == null || nodes.Count == 0 ? "missing_data" : "observed",
+            nodes == null || nodes.Count == 0 ? "No course nodes are registered to the zone." : $"Observed {nodes.Count} registered course nodes.");
+    }
+
+    private static void InspectArea(DiagnosticsReport report, LG_Zone expectedZone, LG_Area area, string subject)
+    {
+        var node = area.m_courseNode;
+        var actualZone = area.m_zone;
+        var nodeStatus = node == null ? "missing" : node.IsValid ? "observed" : "invalid";
+        var fields = new Dictionary<string, string>
+        {
+            ["zone"] = RuntimeDiagnostics.Zone(actualZone),
+            ["expectedZone"] = RuntimeDiagnostics.Zone(expectedZone),
+            ["position"] = RuntimeDiagnostics.Vector(area.Position),
+            ["uid"] = area.UID.ToString(),
+            ["courseNode"] = NodeSubject(node),
+            ["courseNodeStatus"] = nodeStatus,
+            ["navigationHolder"] = node?.m_navigationInfoHolder == null ? "missing" : "present"
+        };
+        report.Event("world_inspection", "area", subject, fields);
+
+        if (actualZone != expectedZone)
+        {
+            report.Check("area_zone", subject, "mismatch", "Area ownership does not match the zone list that contains it.");
+            report.Issue("area_zone_mismatch", subject, $"Expected {RuntimeDiagnostics.Zone(expectedZone)}, observed {RuntimeDiagnostics.Zone(actualZone)}.");
+        }
+        else report.Check("area_zone", subject, "observed", "Area ownership matches its containing zone list.");
+
+        if (node == null)
+        {
+            report.Check("area_course_node", subject, "missing_data", "The area has no CourseNode; no navigation sample was attempted.");
+            return;
+        }
+
+        var nodeConsistent = node.m_area == area && node.m_zone == actualZone && actualZone?.m_courseNodes?.Contains(node) == true;
+        report.Check("area_course_node", subject, node.IsValid && nodeConsistent ? "observed" : "mismatch",
+            $"valid={node.IsValid}; nodeAreaMatches={node.m_area == area}; nodeZoneMatches={node.m_zone == actualZone}; zoneRegistersNode={actualZone?.m_courseNodes?.Contains(node) == true}.");
+        report.Check("area_navigation_data", subject, node.m_navigationInfoHolder == null ? "missing_data" : "observed",
+            node.m_navigationInfoHolder == null ? "The CourseNode navigation holder is missing." : "The CourseNode navigation holder is present.");
+
+        if (!NavMesh.SamplePosition(node.Position, out var hit, 4f, -1))
+        {
+            report.Check("area_navmesh_sample", subject, "sample_failed",
+                "CourseNode data exists, but NavMesh.SamplePosition failed within 4 m. This alone does not prove that the area is unreachable.");
+            return;
+        }
+        report.Check("area_navmesh_sample", subject, "observed_sample",
+            $"Observed a NavMesh sample at {RuntimeDiagnostics.Vector(hit.position)}. This is not a proof of route reachability.");
+    }
+
+    private static void InspectGeomorph(ProjectInspectionSession session, LG_Geomorph geomorph, string subject)
+    {
+        var report = session.Report;
+        var zone = RuntimeDiagnostics.Zone(geomorph.m_zone);
+        report.Event("world_inspection", "geomorph", subject, new()
+        {
+            ["prefab"] = geomorph.m_geoPrefab == null ? geomorph.name : geomorph.m_geoPrefab.name,
+            ["zone"] = zone,
+            ["position"] = RuntimeDiagnostics.Vector(geomorph.transform.position),
+            ["rotation"] = RuntimeDiagnostics.Rotation(geomorph.transform.rotation),
+            ["placed"] = geomorph.m_placed.ToString(),
+            ["areasSetup"] = geomorph.m_areasSetup.ToString(),
+            ["gatesSetup"] = geomorph.m_gatesSetup.ToString()
+        });
+        var owner = geomorph.m_zone;
+        if (owner == null) { session.MarkPartial(); return; }
+        var nativeAreas = geomorph.m_areas;
+        var areas = new List<ProjectAreaCandidate>();
+        if (nativeAreas == null || nativeAreas.Length == 0) session.MarkPartial();
+        else if (nativeAreas.Length > ProjectObjectReferences.MaximumAreas)
+        {
+            session.MarkPartial();
+            report.Check("project_geomorph_areas", subject, "partial", "Geomorph area budget exceeded; mapping was not enumerated.");
+        }
+        else foreach (var area in nativeAreas)
+        {
+            if (area == null || area.m_geomorph != geomorph || area.m_zone != owner)
+            { session.MarkPartial(); continue; }
+            areas.Add(new ProjectAreaCandidate(area.GetInstanceID(), area.UID));
+        }
+        // m_geoPrefab.name is display evidence only, not the original Assets/ identity.
+        session.Scan?.ObserveGeomorph(new ProjectGeomorphObservation(geomorph.GetInstanceID(),
+            owner.GetInstanceID(), "", false, areas));
+        report.Check("project_geomorph_source", subject, "unverified",
+            "Creation-context source identity is unavailable; prefab names cannot establish an authored room match.",
+            new DiagnosticNativeObject("geomorph", geomorph.GetInstanceID()));
+    }
+
+    private static void InspectPlug(DiagnosticsReport report, LG_Plug? plug, string subject, HashSet<string> inspectedPairs)
+    {
+        if (plug == null)
+        {
+            report.Check("plug", subject, "missing", "A geomorph plug list contains a null entry.");
+            return;
+        }
+
+        var pair = plug.m_pariedWith;
+        var ownerZone = ZoneOf(plug);
+        var pairPath = pair == null ? "none" : RuntimeDiagnostics.PathOf(pair.transform);
+        var directionDot = pair == null || plug.m_forward.sqrMagnitude < 0.0001f || pair.m_forward.sqrMagnitude < 0.0001f
+            ? "unavailable"
+            : RuntimeDiagnostics.Number(Vector3.Dot(plug.m_forward.normalized, pair.m_forward.normalized));
+        report.Event("world_inspection", "plug", subject, new()
+        {
+            ["zone"] = RuntimeDiagnostics.Zone(ownerZone),
+            ["pairedWith"] = pairPath,
+            ["direction"] = plug.m_dir.ToString(),
+            ["forward"] = RuntimeDiagnostics.Vector(plug.m_forward),
+            ["position"] = RuntimeDiagnostics.Vector(plug.m_position),
+            ["linkPosition"] = RuntimeDiagnostics.Vector(plug.m_linkPosition),
+            ["pairDirectionDot"] = directionDot,
+            ["pairHeightDifference"] = pair == null ? "unavailable" : RuntimeDiagnostics.Number(Math.Abs(plug.m_linkPosition.y - pair.m_linkPosition.y)),
+            ["linksFrom"] = AreaSubject(plug.m_linksFrom),
+            ["linksTo"] = AreaSubject(plug.m_linksTo)
+        });
+        report.Check("plug_owner", subject, ownerZone == null ? "missing_data" : "observed",
+            ownerZone == null ? "No owning zone was resolved from the plug's linked areas." : "Owning zone: " + RuntimeDiagnostics.Zone(ownerZone) + ".");
+
+        if (pair == null)
+        {
+            report.Check("plug_pair", subject, "not_checked", "The plug is unpaired. No declared connection expectation was supplied by the generated world.");
+            return;
+        }
+
+        var reverse = pair.m_pariedWith == plug;
+        report.Check("plug_pair", subject, reverse ? "observed" : "mismatch",
+            reverse ? "The paired plug points back to this plug." : "The paired plug does not point back to this plug.");
+        if (!reverse) report.Issue("plug_pair_mismatch", subject, "The native plug pairing is not bidirectional.");
+        report.Check("plug_alignment", subject, directionDot == "unavailable" ? "missing_data" : "observed_measurement",
+            $"opposingForwardDot={directionDot}; linkHeightDifference={RuntimeDiagnostics.Number(Math.Abs(plug.m_linkPosition.y - pair.m_linkPosition.y))}. Values are recorded without assuming a prefab-specific validity threshold.");
+
+        var pairSubject = string.CompareOrdinal(subject, pairPath) <= 0 ? subject + " <-> " + pairPath : pairPath + " <-> " + subject;
+        if (!inspectedPairs.Add(pairSubject)) return;
+        InspectConnectionPath(report, plug, pair, pairSubject);
+    }
+
+    private static void InspectConnectionPath(DiagnosticsReport report, LG_Plug first, LG_Plug second, string subject)
+    {
+        var firstForward = first.m_forward.sqrMagnitude < 0.0001f ? first.transform.forward : first.m_forward.normalized;
+        var secondForward = second.m_forward.sqrMagnitude < 0.0001f ? second.transform.forward : second.m_forward.normalized;
+        var firstQuery = first.m_position - firstForward * 2f;
+        var secondQuery = second.m_position - secondForward * 2f;
+        if (!NavMesh.SamplePosition(firstQuery, out var firstHit, 3f, -1) || !NavMesh.SamplePosition(secondQuery, out var secondHit, 3f, -1))
+        {
+            report.Check("plug_navmesh_path", subject, "sample_failed",
+                "A NavMesh endpoint could not be sampled within 3 m. This does not by itself prove the connection or expedition is unreachable.");
+            return;
+        }
+
+        var path = new NavMeshPath();
+        var calculated = NavMesh.CalculatePath(firstHit.position, secondHit.position, -1, path);
+        var complete = calculated && path.status == NavMeshPathStatus.PathComplete;
+        report.Check("plug_navmesh_path", subject, complete ? "complete_path_observed" : "path_not_observed",
+            $"calculated={calculated}; status={path.status}; start={RuntimeDiagnostics.Vector(firstHit.position)}; end={RuntimeDiagnostics.Vector(secondHit.position)}. " +
+            "This limited connector check does not establish that an objective route or the expedition is completable.");
+    }
+
+    private static void InspectTerminalItem(DiagnosticsReport report, LG_GenericTerminalItem? item, string subject)
+    {
+        if (item == null)
+        {
+            report.Check("terminal_item", subject, "missing", "The terminal-item component enumeration contains a null entry.");
+            return;
+        }
+        var node = item.SpawnNode;
+        var zone = RuntimeDiagnostics.Zone(node?.m_zone);
+        report.Event("world_inspection", "terminal_item", subject, new()
+        {
+            ["key"] = item.TerminalItemKey ?? "",
+            ["spawnNode"] = NodeSubject(node),
+            ["zone"] = zone,
+            ["showInInventory"] = item.ShowInFloorInventory.ToString()
+        });
+        report.Check("terminal_item_node", subject, node == null ? "missing_data" : node.IsValid ? "observed" : "invalid",
+            node == null ? "LG_GenericTerminalItem.SpawnNode is missing." : $"SpawnNode valid={node.IsValid}; zone={zone}.");
+    }
+
+    private static void InspectTerminal(DiagnosticsReport report, LG_ComputerTerminal? terminal, string subject)
+    {
+        if (terminal == null)
+        {
+            report.Check("terminal", subject, "missing", "The terminal enumeration contains a null entry.");
+            return;
+        }
+        var node = terminal.SpawnNode;
+        var manager = LG_ComputerTerminalManager.Current;
+        var managerHas = false;
+        var managerMatches = false;
+        if (manager?.m_terminals != null)
+        {
+            managerHas = manager.m_terminals.ContainsKey(terminal.SyncID);
+            if (managerHas) managerMatches = manager.m_terminals[terminal.SyncID] == terminal;
+        }
+        var zoneHas = node?.m_zone?.TerminalsSpawnedInZone?.Contains(terminal) == true;
+        var zone = RuntimeDiagnostics.Zone(node?.m_zone);
+        report.Event("world_inspection", "terminal", subject, new()
+        {
+            ["syncId"] = terminal.SyncID.ToString(),
+            ["publicName"] = terminal.PublicName ?? "",
+            ["spawnNode"] = NodeSubject(node),
+            ["zone"] = zone,
+            ["isSetup"] = terminal.m_isSetup.ToString(),
+            ["isRegistered"] = terminal.IsRegistered.ToString(),
+            ["managerHasId"] = managerHas.ToString(),
+            ["managerMatches"] = managerMatches.ToString(),
+            ["zoneRegistersTerminal"] = zoneHas.ToString()
+        });
+        var valid = terminal.m_isSetup && terminal.IsRegistered && managerMatches && zoneHas && node != null && node.IsValid;
+        report.Check("terminal_setup", subject, valid ? "observed" : "mismatch",
+            $"setup={terminal.m_isSetup}; registeredFlag={terminal.IsRegistered}; managerMatches={managerMatches}; zoneRegisters={zoneHas}; nodeValid={node?.IsValid == true}.");
+    }
+
+    private static void InspectItem(DiagnosticsReport report, ItemInLevel? item, string subject)
+    {
+        if (item == null)
+        {
+            report.Check("item", subject, "missing", "The ItemInLevel enumeration contains a null entry.");
+            return;
+        }
+        var node = item.CourseNode;
+        var parentArea = item.GetComponentInParent<LG_Area>();
+        var zone = RuntimeDiagnostics.Zone(node?.m_zone);
+        var nodeContains = node?.m_itemsInNode?.Contains(item) == true;
+        var pack = item.TryCast<ResourcePackPickup>();
+        report.Event("world_inspection", "item", subject, new()
+        {
+            ["courseNode"] = NodeSubject(node),
+            ["zone"] = zone,
+            ["parentArea"] = AreaSubject(parentArea),
+            ["nodeContainsItem"] = nodeContains.ToString(),
+            ["itemInstanceId"] = item.GetInstanceID().ToString(),
+            ["itemDataId"] = item.ItemDataBlock?.persistentID.ToString() ?? "unavailable",
+            ["inventorySlot"] = item.ItemDataBlock?.inventorySlot.ToString() ?? "unavailable",
+            ["nativeAmmo"] = RuntimeDiagnostics.Number(item.GetCustomData().ammo),
+            ["resourcePackType"] = pack == null ? "not_resource_pack" : pack.m_packType.ToString(),
+            ["authority"] = SNetwork.SNet.IsMaster ? "host" : "client_observation",
+            ["position"] = RuntimeDiagnostics.Vector(item.transform.position)
+        });
+        if (node == null)
+        {
+            report.Check("item_course_node", subject, "missing_data", "ItemInLevel.CourseNode is missing.");
+            return;
+        }
+        var parentMatches = parentArea == null || node.m_area == parentArea;
+        report.Check("item_course_node", subject, node.IsValid && parentMatches ? "observed" : "mismatch",
+            $"valid={node.IsValid}; parentAreaMatches={parentMatches}; nodeContainsItem={nodeContains}. The node item list is recorded but is not assumed mandatory for every item state.");
+    }
+
+    private static string NodeSubject(AIG_CourseNode? node) => node == null
+        ? "missing"
+        : $"{RuntimeDiagnostics.PathOf(node.gameObject?.transform)}#node-{node.NodeID}";
+
+    private static string AreaSubject(LG_Area? area) => area == null
+        ? "missing"
+        : RuntimeDiagnostics.PathOf(area.transform) + "#area-" + area.UID;
+
+    private static LG_Zone? ZoneOf(LG_Plug plug) =>
+        plug.m_linksFrom?.m_zone ?? plug.OriginalParentArea?.m_zone ?? plug.m_linksTo?.m_zone;
+}

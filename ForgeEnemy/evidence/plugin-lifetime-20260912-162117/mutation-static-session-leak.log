@@ -1,0 +1,3 @@
+FAIL 22/24 Native plugin integration cases; no GTFO execution.
+plugin.log-failure-rollback: Post-registration failure leaked the module.
+plugin.cleanup-readonly-data-always-clears-session: Post-load cleanup failure masked the original or left the static session published.

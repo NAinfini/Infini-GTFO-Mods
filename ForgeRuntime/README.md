@@ -1,0 +1,85 @@
+# Infini Forge Runtime 1.2.0（开发中，未发布）
+
+Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生命周期、模拟调度、状态、事务结果，**以及多人环境下的网络可靠性与社区修复**。它不按领域包名分支，也不强制加载全部领域包或 Development。
+
+仓库整体状态与全部测试数字见 [ARCHITECTURE.md](../ARCHITECTURE.md)。未完成批次见 [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)，当前验证结果见 [VALIDATION.md](VALIDATION.md)。公共 SDK 的 API 细节见 [Framework/README.md](Framework/README.md) 与 [Framework/HOST-LIFECYCLE.md](Framework/HOST-LIFECYCLE.md)。
+
+**1.2.0 尚未发布、安装或完成任何游戏验收。** 下面描述的全部能力都是 implementation-only。
+
+## 当前能力
+
+### 公共 SDK
+
+`Framework/` 是不依赖 Unity 或 GTFO 类型的注册、严格计划验证、世界与实体生命周期、单一有界队列和执行结果合同，编译为独立的 `ForgeRuntime.Framework.dll`。第一方游戏模块与未来扩展都走同一个 `Plugin.Runtime.RegisterModule`。只允许模块用自己的返回句柄发布或取消——这是受信模块之间的所有权约束，不是任意第三方 DLL 的安全沙箱。
+
+`Framework/CombatContracts.cs` 注册 5 个通用 combat canonical 定义（承伤事实、治疗动作、生命变化事实、死亡流程、肢体破坏），0 个 binding。Enemy 模块只注册自己的实际 binding 和 `gtfo.enemy:<GlobalID>` 接收器；来源、目标与阵营独立。
+
+计划执行目前只支持 host 的单 Trigger → 线性 Action，固定参数、直接事件输入、失败停止当前入口。未知控制流、动态结果依赖、recipient-policy 与未实现的数据引用都明确拒绝。完整 Graph IR、查询服务、交易预留与多人大状态恢复属于后续工作。
+
+### 宿主启动与配置
+
+宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`、`Framework.PlanPath`、`Framework.AllowedPermissions`。`AuthoringSettings.cs` 只保留诊断键。原键名、命名与数字模式值和现有默认值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
+
+`Off` 只绑定宿主键，不启动任何组件或 Hook。`Play` 不绑定也不初始化诊断设置。`Authoring` 在 Play 基础上附加现有诊断。模式、计划路径与权限的变更需要重启进程，不支持热卸载。
+
+`Plugin.ConfiguredMode` 是冻结的启动选择，公开在宿主程序集里，**不是权限、不是就绪状态、不是主机权威**。`Plugin.Runtime` 只在 Load 成功后提供；失败或 Off 状态下为 null，同一实例不重试 Load。依赖 Runtime 的插件在自己的 Load 中、Runtime 首个 FixedUpdate 之前注册。
+
+启动失败时先关闭玩法入口再清理。每个已获取的阶段都会被尝试清理，即使宿主停止、unpatch、组件销毁、诊断停止或错误上报中有一步失败也继续执行后面的步骤，最后重新抛出原始启动异常。清理与上报的失败保留在 `Data["ForgeRuntime.StartupCleanupFailures"]` 的 AggregateException 里（字典不可写时不能替换原始异常）。这是对已获取阶段的尽力清理，不是任意原生副作用的回滚保证。
+
+`[Framework] PlanPath` 和 `AllowedPermissions` 默认均为空，因此不会自动启用任何行为。开发者显式选择 BepInEx 内的相对路径离线计划（最大 4 MiB）和权限；首个固定更新在其他插件注册完成后验证加载，版本、模块、路径或权限不符即失败，本次进程不反复读取重试。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
+
+### 尚在本宿主内的诊断
+
+生成、空间、性能、异常聚合与报告的全部源码仍在 `ForgeRuntime/` 根目录，等 D2 迁往 [ForgeDevelopment](../ForgeDevelopment/README.md)。它们记录运行标识与版本、生成 job 的阶段与耗时、全局与 geomorph 局部随机状态、marker 来源与生成对象、区域与 CourseNode 与终端注册与 plug 配对、局部 NavMesh 采样、剔除对象的注册与销毁、聚合后的重复异常，以及性能采样、场景清单、短时 Unity profiler 与离线分析。报告经有界后台写入，超过容量时明确报告丢弃数量。
+
+对象存在不等于任务脚本正确，局部路线通过不等于全关可通关，`FactoryDone` 只表示观察到结构生成完成。现有生成诊断没有宣称修复 R7D2 随机异常或连续切关的 CullingCluster 异常；覆盖范围与对照实验方法见 [AUTHORING-SCOPE.md](AUTHORING-SCOPE.md)。
+
+### 尚未有的能力
+
+没有网络层——去重、权威端判定、迟加入、恢复、主机迁移、带宽预算和能力握手全部未实现，这是 U-NET 的范围。没有持续效果的属性回写；numeric lease 只是 SDK 内部的重算贡献记录，不代表游戏属性已改变。`BeginWorld` 不是检查点或网络恢复，恢复或迁移会暂停绑定，不能通过再次进入 Generating 绕过。没有 Control/Selector 嵌套图的完整 VM。
+
+## 安装与配置
+
+需要 BepInExPack GTFO 3.2.2。历史 1.1.x 发行物是单个 `ForgeRuntime.dll`；当前开发版拆出了 SDK，未来安装产物必须把 `ForgeRuntime.dll` 与 `ForgeRuntime.Framework.dll` 一起放入 Runtime 插件目录。**当前宿主编译通过不代表已完成原生或联机验收，本轮未执行安装。** 与 Infini Tweaks 同装时需要 2.5.0 或更新版本，旧版包含重复采集器。
+
+配置文件是 `BepInEx/config/NAinfini.ForgeRuntime.cfg`：
+
+```ini
+[Runtime]
+Mode = Authoring
+
+[Framework]
+PlanPath =
+AllowedPermissions =
+
+[Authoring]
+ExportReportKey = F10
+InspectionBudgetMilliseconds = 2
+ProjectManifest =
+```
+
+F9 请求性能快照，F10 导出当前生成报告，F11 开关战斗采样。报告写入 `BepInEx/ForgeReports`，性能日志写入 `BepInEx/PerformanceLogs`。关卡结束和进程退出也请求导出。写入失败会报告错误；看 JSON 里的 `dropped` 和检查状态，不能只看 `outcome`。
+
+只关闭 `EnablePerformanceLogging` 只关闭性能采集，不关闭已启用的 Framework。旧配置迁移是一次性安装操作：把 Infini Tweaks 配置里的 `[Performance Diagnostics]` 整节移到 Forge 配置，保留已有值；运行时不维护第二套旧配置读取路径。
+
+`ProjectManifest` 选择本地严格 JSON，相对路径以 BepInEx 为基准。根字段必须是 `format=gtfo-forge-project`、`projectId`、`experiment`、`requiredPlugins`、`sources`、`objectReferences`，不接受 `schemaVersion`、`expectedObjects` 或未知字段，不提供旧格式 fallback。完整字段与路径边界见 [Development 验证记录](../ForgeDevelopment/VALIDATION.md)。
+
+## 制作工具
+
+使用 Python 3.10+ 标准库，不下载依赖也不执行外部代码：
+
+```powershell
+python ForgeRuntime/scripts/compare_runs.py before.json after.json --output comparison.json
+python ForgeRuntime/scripts/import_log.py BepInEx.log imported.json
+python ForgeRuntime/scripts/analyze_performance.py session.log --output performance.md
+```
+
+离线性能分析按远征分段、计算帧加权 FPS、排出慢分钟窗口与长帧，报告扫描开销、被检测的模组路径、内存趋势和缺失的通道。它不会把窗口分位数平均成整场分位数、不会仅凭增长断定内存泄漏、不会仅凭一个异常归咎某个模组。
+
+此版只采集和检查已存在的 LGTuner 配置，不导入或执行布局。重复生成需要固定游戏版本、插件、配置、资源和种子；报告对照会明确缺失的输入，不根据差异自动推断 bug。未经控制实验不发布推测性修复。
+
+## 边界
+
+已提供的是纯 .NET 报告与项目规则测试、Python 工具测试、本地游戏程序集的 hook 签名检查，以及使用替身的绑定测试。它们不代替实际注入、开销测量、主客机测试或同配置生成对照。内部 room 抽取、spawner 选择性控制和完整模组生态适配仍未完成。网站的报告导入界面属于网站仓库。
+
+禁止无限重试、重置指定 prefab 种子、静默替换房间、删除任务对象、任意挂接 CourseNode、吞掉异常或调低游戏日志级别来伪装成功。

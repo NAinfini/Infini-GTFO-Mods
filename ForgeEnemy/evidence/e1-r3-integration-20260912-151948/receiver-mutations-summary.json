@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "gameExecuted": false,
+  "receiverSourceSha256": "c8dab5beda3ad97ed2e56ba1f6389f44211bb43cc904cb581048156f8dac39fb",
+  "sdkSha256": "e30351e5280173969c6b88d9ecddefb72ba41e61e2dc4fd70397964899bd196f",
+  "passed": 7,
+  "failed": 0,
+  "checks": [
+    {
+      "case": "baseline",
+      "passed": true,
+      "exitCode": 0,
+      "expectedFailure": null,
+      "actualFailures": []
+    },
+    {
+      "case": "spawn-generation",
+      "passed": true,
+      "exitCode": 1,
+      "expectedFailure": "E2-001.duplicate-spawn",
+      "actualFailures": [
+        "E2-001.duplicate-spawn",
+        "identity.wrapper-not-life",
+        "lifecycle.thread"
+      ]
+    },
+    {
+      "case": "observation-replay",
+      "passed": true,
+      "exitCode": 1,
+      "expectedFailure": "E3-003.duplicate-damage-observation",
+      "actualFailures": [
+        "E3-003.duplicate-damage-observation",
+        "damage.two-hits-same-tick",
+        "damage.zero-window-consumed",
+        "damage.rejected-window-consumed"
+      ]
+    },
+    {
+      "case": "despawn-loses-life",
+      "passed": true,
+      "exitCode": 1,
+      "expectedFailure": "E2-002.captured-life-late-despawn",
+      "actualFailures": [
+        "E2-002.captured-life-late-despawn",
+        "identity.same-wrapper-respawn"
+      ]
+    },
+    {
+      "case": "changed-receiver-none",
+      "passed": true,
+      "exitCode": 1,
+      "expectedFailure": "E3-001.receiver-changed-commit",
+      "actualFailures": [
+        "E3-001.receiver-changed-commit",
+        "commit.component-replaced",
+        "commit.authority-lost",
+        "commit.owner-changed"
+      ]
+    },
+    {
+      "case": "readback-none",
+      "passed": true,
+      "exitCode": 1,
+      "expectedFailure": "E3-002.invalid-readback-commit",
+      "actualFailures": [
+        "E3-002.invalid-readback-commit",
+        "commit.maximum-changed"
+      ]
+    },
+    {
+      "case": "exception-none",
+      "passed": true,
+      "exitCode": 1,
+      "expectedFailure": "commit.throw-after-write",
+      "actualFailures": [
+        "commit.throw-before-readback",
+        "commit.throw-after-write",
+        "commit.kernel-unknown-no-retry"
+      ]
+    }
+  ]
+}

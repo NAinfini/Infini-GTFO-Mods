@@ -1,0 +1,38 @@
+{
+  "ForgeRuntime/ProjectChecks.cs": "4d4a64af4417102b41bf275bfe5eccfecc4755681bb7be9b8f0bd1135a707a58",
+  "ForgeRuntime/ProjectInspectionSession.cs": "3ad9ba01cfd2d6669edfa1d956599105ca9479e5f98291f0b18f06dfee707bac",
+  "ForgeRuntime/RuntimeDiagnostics.cs": "1127ea819c415011b8425ae013d22b4ed46422fdcf2ac07fbe9f99faefe5ff09",
+  "ForgeRuntime/WorldInspection.cs": "63ee32bd3cc34d8cf43e1fc59f883016f8d4e68272a905b7f6861ba23f9a6a3c",
+  "ForgeRuntime/tests/ProjectChecks/D1InspectionReviewTests.cs": "58e48123fe9bd4851e5b6dd9490b1eebf1c14b33e62fe0e825019ae55acb32f2",
+  "ForgeRuntime/tests/ProjectChecks/Program.cs": "98e7969d0965b961217a05a7907e57423d4856bec6695e12e426a40555730a96",
+  "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj": "3375839f958a5aa2af76a9c4c2f8d86ba496f51706b94cb43632d50152768990",
+  "ForgeRuntime/Framework/RuntimeKernel.cs": "233e0068ca90cf7b69e0a8dea625badc0674666526d7eca0c32842d3707f2748",
+  "retiredCallsRemaining": {
+    "ForgeRuntime/ProjectChecks.cs": [],
+    "ForgeRuntime/ProjectInspectionSession.cs": [],
+    "ForgeRuntime/RuntimeDiagnostics.cs": [],
+    "ForgeRuntime/WorldInspection.cs": []
+  },
+  "pythonExitCode": 0,
+  "pythonCommand": [
+    "python",
+    "-X",
+    "utf8",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "ForgeRuntime/tests",
+    "-p",
+    "test_*.py"
+  ],
+  "finalizationHashes": {
+    "ForgeRuntime/ProjectInspectionSession.cs": "3ad9ba01cfd2d6669edfa1d956599105ca9479e5f98291f0b18f06dfee707bac",
+    "ForgeRuntime/WorldInspection.cs": "8b2613bf696be3c4c7b7fe0f3f9ffc757761e032fe0b8652602587a3221e03da",
+    "ForgeDevelopment/D1-VALIDATION.md": "f39ac1287e5e257facb47afda5b3ec18ab4fb304cb05e46b57427b5eb0506675",
+    "ForgeDevelopment/IMPLEMENTATION-PLAN.md": "ff01ffbb0c3283f537283671b1a017770063a24680bd00322e2a82ab84d74bb9",
+    "ForgeDevelopment/README.md": "112c5f729ac318434cfc65c94d7fcbac69412329acf82d11f488153a038f0df6",
+    "ForgeRuntime/README.md": "6fe9362244376a213bbbd1e6fcdfcaac3bffb2a0744e746b863c2ffac0cf9d24"
+  },
+  "hashScopeNote": "Finalization hashes are working-tree snapshots, not proof of native compilation or game validation."
+}

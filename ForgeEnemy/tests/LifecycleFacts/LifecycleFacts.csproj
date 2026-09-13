@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <Target Name="RequireSdk" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeFrameworkAssembly)')" Text="An explicitly built production SDK is required." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+    <Compile Include="../../Native/*.cs;../../Native/Observation/*.cs" />
+    <Compile Include="../NativePlugin/GameDoubles.cs;../NativePlugin/LoaderDoubles.cs" />
+  </ItemGroup>
+</Project>

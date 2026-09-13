@@ -132,7 +132,8 @@ public sealed partial class RuntimeKernel
     }
     internal bool CancelSchedule(RuntimeScheduleHandle handle)
     {
-        Thread();
+        // Terminal handle disposal is cleanup, not new runtime work.
+        ReadThread(); NoLifecycleMutation();
         if (!schedules.TryGetValue((handle.ProviderId, handle.ScheduleId), out var job) || !ReferenceEquals(job.Handle, handle)) return false;
         EndSchedule(job, "cancelled", "explicit-cancel"); PruneSchedules(); return true;
     }

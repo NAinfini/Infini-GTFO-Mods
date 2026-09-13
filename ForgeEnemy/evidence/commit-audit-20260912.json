@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "verification": "existing-EnemyModule-source-and-compiled-SDK-with-test-doubles",
+  "nativeGameExecuted": false,
+  "multiplayerExecuted": false,
+  "utc": "2026-09-12T15:07:02.0881461+00:00",
+  "enemyModuleSourceSha256": "F99FEC2BFE3F338836E280A9753622522A26FD79D3B9F34ED430A2A88B6EBBF5",
+  "gameDoublesSourceSha256": "959B7E25E25C22AEA4F2E70D5E5A61ECAFBDA8786D8835D1C330277471EB8843",
+  "frameworkAssemblySha256": "5E3FF4AC7D1587E8F66F2E76D20D1205ECAB6E1E8D97888C8D1779E0A9E9FDFD",
+  "fixtureSha256": "B1C1DBA75B2D2C1E2B2222B13BEF9FCB308F59086076A7B6E0F2360AC2EE8FF7",
+  "passed": 21,
+  "failed": 11,
+  "checks": [
+    {
+      "Id": "heal.actual-five",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.full-no-packet",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.clamp",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.dead-no-revive",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.initial-client",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.removed-after-submit",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.invalid-readback",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.submit-throws",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "heal.throw-after-mutation",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "preflight.health-fell",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=succeeded; commit=confirmed; code=committed; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022actualAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022healthAfter\u0022:55,\u0022overflowAmount\u0022:0}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.health-rose",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=succeeded; commit=confirmed; code=committed; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022actualAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022healthAfter\u0022:55,\u0022overflowAmount\u0022:0}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.maximum-changed",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.unexpected_health_readback; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.authority-lost",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.receiver_changed_during_commit; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.client-now",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.receiver_changed_during_commit; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.died",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.unexpected_health_readback; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.world-changed",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.receiver_changed_during_commit; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.life-changed",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.receiver_changed_during_commit; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.receiver-replaced",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: Must reject before native submission when preflight state changes: status=failed; commit=unknown; code=gtfo.enemy.receiver_changed_during_commit; sends=1; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022healthBefore\u0022:50,\u0022nativeSubmissionAttempted\u0022:true}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec__DisplayClass1_0.\u003CPreflight\u003Eb__0() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 49\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.negative-native-quantization",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: status=succeeded; commit=confirmed; code=committed; sends=0; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022actualAmount\u0022:0,\u0022healthBefore\u0022:50,\u0022healthAfter\u0022:50,\u0022overflowAmount\u0022:0}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec.\u003CRun\u003Eb__0_18() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 37\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "preflight.noop-state-changed",
+      "Passed": false,
+      "Detail": "System.InvalidOperationException: status=succeeded; commit=confirmed; code=committed; sends=0; output={\u0022target\u0022:{\u0022id\u0022:\u0022gtfo.enemy:7\u0022,\u0022worldEpoch\u0022:1,\u0022lifeEpoch\u0022:1},\u0022requestedAmount\u0022:5,\u0022actualAmount\u0022:0,\u0022healthBefore\u0022:100,\u0022healthAfter\u0022:100,\u0022overflowAmount\u0022:5}\r\n   at Audit.Require(Boolean condition, String message) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 13\r\n   at CommitCases.\u003C\u003Ec.\u003CRun\u003Eb__0_19() in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitCases.cs:line 40\r\n   at Audit.Case(String name, Action test) in C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\Audit.cs:line 8"
+    },
+    {
+      "Id": "identity.duplicate-spawn",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "identity.wrapper-not-new-life",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "identity.captured-old-token-after-pool-reuse",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "identity.pointer-mutated",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "identity.foreign-despawn-token",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "identity.old-world",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "damage.single-consumption",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "damage.zero-window-not-replayed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "damage.two-real-hits-same-tick",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "damage.rejected-window-not-replayed",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "damage.old-world",
+      "Passed": true,
+      "Detail": "passed"
+    },
+    {
+      "Id": "damage.foreign-owner",
+      "Passed": true,
+      "Detail": "passed"
+    }
+  ]
+}

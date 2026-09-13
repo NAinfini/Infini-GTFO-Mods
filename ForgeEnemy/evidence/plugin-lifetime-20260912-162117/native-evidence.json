@@ -1,0 +1,545 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-only",
+  "gameExecuted": false,
+  "utc": "2026-09-12T20:47:10.6770105+00:00",
+  "passed": 107,
+  "failed": 0,
+  "checks": [
+    {
+      "Id": "steam.app",
+      "Passed": true,
+      "Detail": "Steam app ID must be 493520."
+    },
+    {
+      "Id": "steam.build",
+      "Passed": true,
+      "Detail": "Observed build: 20403457"
+    },
+    {
+      "Id": "native.hash",
+      "Passed": true,
+      "Detail": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55"
+    },
+    {
+      "Id": "hash.Modules-ASM.dll",
+      "Passed": true,
+      "Detail": "A31AF38FAC3F96F1130CF7CDFCD10AE436E0D553EDA7163B9A9FF82392907943"
+    },
+    {
+      "Id": "mvid.Modules-ASM.dll",
+      "Passed": true,
+      "Detail": "2875668a-4ea7-42ad-b126-73590ea1c926"
+    },
+    {
+      "Id": "hash.GameData-ASM.dll",
+      "Passed": true,
+      "Detail": "3A74E6656CDA3A563290BBE71B70578E1E8D0745A5ECDDD05C894934A7A8CC7B"
+    },
+    {
+      "Id": "mvid.GameData-ASM.dll",
+      "Passed": true,
+      "Detail": "7a8e1e7b-7ae1-4846-a83c-a8b6f8635f3d"
+    },
+    {
+      "Id": "hash.SNet_ASM.dll",
+      "Passed": true,
+      "Detail": "99175A1EF40454C1C8DD45D86D9EB9D3DF4D24891FB26ED649835BA25E7360B2"
+    },
+    {
+      "Id": "mvid.SNet_ASM.dll",
+      "Passed": true,
+      "Detail": "63a2b9c8-7187-45a4-9d66-1761e79748c5"
+    },
+    {
+      "Id": "identity.Agents.Agent.get_GlobalID.0",
+      "Passed": true,
+      "Detail": "System.UInt16 Agents.Agent::get_GlobalID()"
+    },
+    {
+      "Id": "identity.Enemies.EnemyAgent.Setup.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAgent::Setup(Enemies.pEnemySpawnData)"
+    },
+    {
+      "Id": "identity.Enemies.EnemyAgent.OnDeSpawn.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAgent::OnDeSpawn()"
+    },
+    {
+      "Id": "identity.Enemies.EnemyAgent.get_Alive.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyAgent::get_Alive()"
+    },
+    {
+      "Id": "identity.Enemies.EnemyAgent.get_Damage.0",
+      "Passed": true,
+      "Detail": "Dam_EnemyDamageBase Enemies.EnemyAgent::get_Damage()"
+    },
+    {
+      "Id": "identity.Enemies.EnemySync.OnSpawn.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemySync::OnSpawn(Enemies.pEnemySpawnData)"
+    },
+    {
+      "Id": "identity.Enemies.EnemySync.OnDespawn.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemySync::OnDespawn()"
+    },
+    {
+      "Id": "identity.Enemies.EnemySync.get_m_agent.0",
+      "Passed": true,
+      "Detail": "Enemies.EnemyAgent Enemies.EnemySync::get_m_agent()"
+    },
+    {
+      "Id": "health.Dam_SyncedDamageBase.get_Health.0",
+      "Passed": true,
+      "Detail": "System.Single Dam_SyncedDamageBase::get_Health()"
+    },
+    {
+      "Id": "health.Dam_SyncedDamageBase.get_HealthMax.0",
+      "Passed": true,
+      "Detail": "System.Single Dam_SyncedDamageBase::get_HealthMax()"
+    },
+    {
+      "Id": "health.Dam_SyncedDamageBase.get_IsSetup.0",
+      "Passed": true,
+      "Detail": "System.Boolean Dam_SyncedDamageBase::get_IsSetup()"
+    },
+    {
+      "Id": "health.Dam_SyncedDamageBase.SendSetHealth.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_SyncedDamageBase::SendSetHealth(System.Single)"
+    },
+    {
+      "Id": "health.Dam_SyncedDamageBase.ReceiveAddHealth.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_SyncedDamageBase::ReceiveAddHealth(pAddHealthData)"
+    },
+    {
+      "Id": "health.Dam_EnemyDamageBase.ReceiveSetHealth.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::ReceiveSetHealth(pSetHealthData)"
+    },
+    {
+      "Id": "health.SNetwork.SFloat16.Set.0",
+      "Passed": true,
+      "Detail": "System.Void SNetwork.SFloat16::Set(System.Single,System.Single)"
+    },
+    {
+      "Id": "health.SNetwork.SFloat16.Get.0",
+      "Passed": true,
+      "Detail": "System.Single SNetwork.SFloat16::Get(System.Single)"
+    },
+    {
+      "Id": "health.SNetwork.SNet.get_IsMaster.0",
+      "Passed": true,
+      "Detail": "System.Boolean SNetwork.SNet::get_IsMaster()"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.ProcessReceivedDamage.0",
+      "Passed": true,
+      "Detail": "System.Boolean Dam_EnemyDamageBase::ProcessReceivedDamage(System.Single,Agents.Agent,UnityEngine.Vector3,UnityEngine.Vector3,ES_HitreactType,System.Boolean,System.Int32,System.Single,DamageNoiseLevel,System.UInt32)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.ReceiveBulletDamage.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::ReceiveBulletDamage(pBulletDamageData)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.ReceiveMeleeDamage.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::ReceiveMeleeDamage(pFullDamageData)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.ReceiveExplosionDamage.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::ReceiveExplosionDamage(pExplosionDamageData)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.SendDestroyLimb.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::SendDestroyLimb(System.Int32,CharacterDestruction.sDestructionEventData)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.ReceiveDestroyLimb.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::ReceiveDestroyLimb(Dam_EnemyDamageBase/pDestroyLimbData)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageBase.InstantDead.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageBase::InstantDead(System.Boolean)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageLimb.DoDamage.0",
+      "Passed": true,
+      "Detail": "System.Boolean Dam_EnemyDamageLimb::DoDamage(System.Single)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageLimb.NotifyLimbDestroyed.0",
+      "Passed": true,
+      "Detail": "System.Void Dam_EnemyDamageLimb::NotifyLimbDestroyed()"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageLimb.TestDamageModifiers.0",
+      "Passed": true,
+      "Detail": "System.Single Dam_EnemyDamageLimb::TestDamageModifiers(System.Single,System.Single)"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageLimb.get_m_weakspotDamageMulti.0",
+      "Passed": true,
+      "Detail": "System.Single Dam_EnemyDamageLimb::get_m_weakspotDamageMulti()"
+    },
+    {
+      "Id": "damage-limbs-death.Dam_EnemyDamageLimb.get_m_armorDamageMulti.0",
+      "Passed": true,
+      "Detail": "System.Single Dam_EnemyDamageLimb::get_m_armorDamageMulti()"
+    },
+    {
+      "Id": "damage-limbs-death.Enemies.EnemyAgent.OnDead.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAgent::OnDead()"
+    },
+    {
+      "Id": "damage-limbs-death.Enemies.EnemyAgent.OnTakeDamage.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAgent::OnTakeDamage(System.Single,Agents.Agent,UnityEngine.Vector3,UnityEngine.Vector3,ES_HitreactType)"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyAI.SetTarget.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAI::SetTarget(Agents.Agent)"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyAI.SetDetectedAgent.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAI::SetDetectedAgent(Agents.Agent,Agents.AgentTargetDetectionType)"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyAI.ForceCombatState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyAI::ForceCombatState()"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyAI.get_Target.0",
+      "Passed": true,
+      "Detail": "Agents.AgentTarget Enemies.EnemyAI::get_Target()"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyDetection.UpdateLineOfSightAndOcclusion.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyDetection::UpdateLineOfSightAndOcclusion(Agents.AgentTarget)"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyDetection.IsTargetValid.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyDetection::IsTargetValid(Agents.AgentTarget)"
+    },
+    {
+      "Id": "ai-perception.Enemies.EnemyDetection.UpdateHibernationDetection.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyDetection::UpdateHibernationDetection(Agents.AgentTarget\u0026)"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyLocomotion.ChangeState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyLocomotion::ChangeState(Enemies.ES_StateEnum)"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyLocomotion.get_CurrentStateEnum.0",
+      "Passed": true,
+      "Detail": "Enemies.ES_StateEnum Enemies.EnemyLocomotion::get_CurrentStateEnum()"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyLocomotion.GetMaxMovementSpeed.0",
+      "Passed": true,
+      "Detail": "System.Single Enemies.EnemyLocomotion::GetMaxMovementSpeed(System.Single)"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyLocomotion.UpdateNetworkState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyLocomotion::UpdateNetworkState()"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyCourseNavigation.SetCourseNode.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyCourseNavigation::SetCourseNode(AIGraph.AIG_CourseNode)"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyCourseNavigation.UpdateTracking.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyCourseNavigation::UpdateTracking(System.Boolean)"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyAgent.get_SizeMultiplier.0",
+      "Passed": true,
+      "Detail": "System.Single Enemies.EnemyAgent::get_SizeMultiplier()"
+    },
+    {
+      "Id": "movement-space.Enemies.EnemyAgent.get_CourseNode.0",
+      "Passed": true,
+      "Detail": "AIGraph.AIG_CourseNode Enemies.EnemyAgent::get_CourseNode()"
+    },
+    {
+      "Id": "movement-space.GameData.EnemyMovementDataBlock.get_AllowClimbDownLadders.0",
+      "Passed": true,
+      "Detail": "System.Boolean GameData.EnemyMovementDataBlock::get_AllowClimbDownLadders()"
+    },
+    {
+      "Id": "movement-space.GameData.EnemyMovementDataBlock.get_LocomotionPathMove.0",
+      "Passed": true,
+      "Detail": "Enemies.ES_StateEnum GameData.EnemyMovementDataBlock::get_LocomotionPathMove()"
+    },
+    {
+      "Id": "movement-space.GameData.EnemyDataBlock.get_MovementDataId.0",
+      "Passed": true,
+      "Detail": "System.UInt32 GameData.EnemyDataBlock::get_MovementDataId()"
+    },
+    {
+      "Id": "abilities.Enemies.EnemyAbilities.HasAbility.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyAbilities::HasAbility(Agents.AgentAbility)"
+    },
+    {
+      "Id": "abilities.Enemies.EnemyAbilities.IsAbilityReady.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyAbilities::IsAbilityReady(Agents.AgentAbility,System.Int32)"
+    },
+    {
+      "Id": "abilities.Enemies.EnemyAbilities.UseAbility.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyAbilities::UseAbility(Agents.AgentAbility)"
+    },
+    {
+      "Id": "abilities.Enemies.EnemyAbilities.UseAbility.1",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyAbilities::UseAbility(Agents.AgentAbility,System.Int32)"
+    },
+    {
+      "Id": "abilities.EnemyAbility.IsReady.0",
+      "Passed": true,
+      "Detail": "System.Boolean EnemyAbility::IsReady()"
+    },
+    {
+      "Id": "abilities.EnemyAbility.Trigger.0",
+      "Passed": true,
+      "Detail": "System.Boolean EnemyAbility::Trigger()"
+    },
+    {
+      "Id": "abilities.EnemyAbility.AbilityIsDone.0",
+      "Passed": true,
+      "Detail": "System.Boolean EnemyAbility::AbilityIsDone()"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_BirtherGiveBirth.ActivateState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_BirtherGiveBirth::ActivateState(EnemyAbility)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_BirtherGiveBirth.RecieveGiveBirthPacket.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_BirtherGiveBirth::RecieveGiveBirthPacket(Enemies.pES_GiveBirthData)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_BirtherGiveBirth.DoStartGiveBirth.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_BirtherGiveBirth::DoStartGiveBirth()"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_BirtherGiveBirth.Enter.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_BirtherGiveBirth::Enter()"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_BirtherGiveBirth.SyncEnter.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_BirtherGiveBirth::SyncEnter()"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_ScoutScream.ActivateState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_ScoutScream::ActivateState(Agents.AgentTarget)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_ScoutScream.RecieveScream.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_ScoutScream::RecieveScream(Enemies.pES_ScoutScreamData)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ES_ScoutScream.DoStartScream.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ES_ScoutScream::DoStartScream(System.Int32)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ScoutAntenna.CheckDetection.0",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.ScoutAntenna::CheckDetection(Agents.AgentTarget)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ScoutAntennaDetection.RegisterTarget.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ScoutAntennaDetection::RegisterTarget(Agents.AgentTarget)"
+    },
+    {
+      "Id": "birthing-scout.Enemies.ScoutAntennaDetection.SetState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.ScoutAntennaDetection::SetState(Enemies.eDetectionState,System.Boolean)"
+    },
+    {
+      "Id": "projectiles.EAB_ProjectileShooter.Trigger.0",
+      "Passed": true,
+      "Detail": "System.Boolean EAB_ProjectileShooter::Trigger()"
+    },
+    {
+      "Id": "projectiles.EAB_ProjectileShooter.FireBurst.0",
+      "Passed": true,
+      "Detail": "System.Single EAB_ProjectileShooter::FireBurst(System.Int32)"
+    },
+    {
+      "Id": "projectiles.EAB_ProjectileShooter.FireAtAgent.0",
+      "Passed": true,
+      "Detail": "System.Void EAB_ProjectileShooter::FireAtAgent(Agents.Agent)"
+    },
+    {
+      "Id": "projectiles.EAB_ProjectileShooter.FireAtTarget.0",
+      "Passed": true,
+      "Detail": "System.Void EAB_ProjectileShooter::FireAtTarget()"
+    },
+    {
+      "Id": "projectiles.EAB_ProjectileShooter.IsReady.0",
+      "Passed": true,
+      "Detail": "System.Boolean EAB_ProjectileShooter::IsReady()"
+    },
+    {
+      "Id": "appearance-animation.EnemyAppearance.Setup.0",
+      "Passed": true,
+      "Detail": "System.Void EnemyAppearance::Setup(Enemies.EnemyAgent)"
+    },
+    {
+      "Id": "appearance-animation.EnemyAppearance.InterpolateGlow.0",
+      "Passed": true,
+      "Detail": "System.Void EnemyAppearance::InterpolateGlow(UnityEngine.Color,System.Single)"
+    },
+    {
+      "Id": "appearance-animation.EnemyAppearance.InterpolateGlow.1",
+      "Passed": true,
+      "Detail": "System.Void EnemyAppearance::InterpolateGlow(UnityEngine.Color,UnityEngine.Vector4,System.Single)"
+    },
+    {
+      "Id": "appearance-animation.EnemyAppearance.OnDead.0",
+      "Passed": true,
+      "Detail": "System.Void EnemyAppearance::OnDead()"
+    },
+    {
+      "Id": "appearance-animation.EnemyAppearance.Reset.0",
+      "Passed": true,
+      "Detail": "System.Void EnemyAppearance::Reset()"
+    },
+    {
+      "Id": "appearance-animation.EnemyModelRefs.get_m_headBone.0",
+      "Passed": true,
+      "Detail": "UnityEngine.Transform EnemyModelRefs::get_m_headBone()"
+    },
+    {
+      "Id": "appearance-animation.EnemyModelRefs.get_m_chestBone.0",
+      "Passed": true,
+      "Detail": "UnityEngine.Transform EnemyModelRefs::get_m_chestBone()"
+    },
+    {
+      "Id": "appearance-animation.EnemyModelRefs.get_m_shooterFireAlign.0",
+      "Passed": true,
+      "Detail": "UnityEngine.Transform EnemyModelRefs::get_m_shooterFireAlign()"
+    },
+    {
+      "Id": "appearance-animation.EnemyModelRefs.SetAimIKEnabled.0",
+      "Passed": true,
+      "Detail": "System.Void EnemyModelRefs::SetAimIKEnabled(System.Boolean)"
+    },
+    {
+      "Id": "appearance-animation.Enemies.EnemyAgent.get_ModelRef.0",
+      "Passed": true,
+      "Detail": "EnemyModelRefs Enemies.EnemyAgent::get_ModelRef()"
+    },
+    {
+      "Id": "appearance-animation.Enemies.EnemyAgent.get_Appearance.0",
+      "Passed": true,
+      "Detail": "EnemyAppearance Enemies.EnemyAgent::get_Appearance()"
+    },
+    {
+      "Id": "appearance-animation.GameData.EnemyDataBlock.get_ModelDatas.0",
+      "Passed": true,
+      "Detail": "Il2CppSystem.Collections.Generic.List\u00601\u003CGameData.ModelData\u003E GameData.EnemyDataBlock::get_ModelDatas()"
+    },
+    {
+      "Id": "appearance-animation.GameData.EnemyDataBlock.get_BasePrefabs.0",
+      "Passed": true,
+      "Detail": "Il2CppSystem.Collections.Generic.List\u00601\u003CSystem.String\u003E GameData.EnemyDataBlock::get_BasePrefabs()"
+    },
+    {
+      "Id": "cleanup-replication.Enemies.EnemySync.ReplicateAIState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemySync::ReplicateAIState()"
+    },
+    {
+      "Id": "cleanup-replication.Enemies.EnemySync.IncomingState.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemySync::IncomingState(Enemies.EnemySync/pEnemyStateData)"
+    },
+    {
+      "Id": "cleanup-replication.Enemies.EnemyPrefabManager.OnLevelCleanup.0",
+      "Passed": true,
+      "Detail": "System.Void Enemies.EnemyPrefabManager::OnLevelCleanup()"
+    },
+    {
+      "Id": "cleanup-replication.Enemies.EnemyPrefabManager.GetEnemyPrefab.0",
+      "Passed": true,
+      "Detail": "UnityEngine.GameObject Enemies.EnemyPrefabManager::GetEnemyPrefab(System.UInt32)"
+    },
+    {
+      "Id": "cleanup-replication.ES_DeadBase.Enter.0",
+      "Passed": true,
+      "Detail": "System.Void ES_DeadBase::Enter()"
+    },
+    {
+      "Id": "cleanup-replication.ES_DeadBase.SyncEnter.0",
+      "Passed": true,
+      "Detail": "System.Void ES_DeadBase::SyncEnter()"
+    },
+    {
+      "Id": "cleanup-replication.ES_DeadBase.CommonUpdate.0",
+      "Passed": true,
+      "Detail": "System.Void ES_DeadBase::CommonUpdate()"
+    },
+    {
+      "Id": "entity-observation.Enemies.EnemyAgent.get_Position",
+      "Passed": true,
+      "Detail": "UnityEngine.Vector3 Enemies.EnemyAgent::get_Position()"
+    },
+    {
+      "Id": "entity-observation.Enemies.EnemyAgent.get_IsSetup",
+      "Passed": true,
+      "Detail": "System.Boolean Enemies.EnemyAgent::get_IsSetup()"
+    },
+    {
+      "Id": "health.no-enemy-ReceiveAddHealth-override",
+      "Passed": true,
+      "Detail": "No declaration on this type; inherited method existence does not prove an implemented receiver."
+    },
+    {
+      "Id": "native.health.host-check",
+      "Passed": true,
+      "Detail": "Build-specific SendSetHealth host-check instruction; not proof of multiplayer behavior."
+    },
+    {
+      "Id": "native.health.send-receive",
+      "Passed": true,
+      "Detail": "Build-specific packet-send and virtual local-receive call shapes at SendSetHealth RVA 0x161F790."
+    },
+    {
+      "Id": "native.health.readback",
+      "Passed": true,
+      "Detail": "ReceiveSetHealth RVA 0x1380D50 decodes SFloat16 then stores the health field; no method was executed."
+    }
+  ]
+}

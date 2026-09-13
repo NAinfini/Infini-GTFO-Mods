@@ -1,0 +1,663 @@
+[
+  {
+    "name": "host-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:12:50.977766+00:00"
+  },
+  {
+    "name": "native-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\Native\\ForgeEnemy.Native.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "-p:ForgeRuntimeAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:12:52.595390+00:00"
+  },
+  {
+    "name": "lifecycle-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\LifecycleFacts.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:26:09.395045+00:00"
+  },
+  {
+    "name": "lifecycle-first",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts\\bin\\LifecycleFacts\\release\\LifecycleFacts.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-first.json"
+    ],
+    "exitCode": 1,
+    "utc": "2026-09-12T21:26:09.766590+00:00"
+  },
+  {
+    "name": "lifecycle-fixed-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\LifecycleFacts.csproj",
+      "-c",
+      "Release",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts-fixed"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:27:28.230536+00:00"
+  },
+  {
+    "name": "lifecycle-fixed",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts-fixed\\bin\\LifecycleFacts\\release\\LifecycleFacts.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-fixed.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:27:28.571770+00:00"
+  },
+  {
+    "name": "lifecycle-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\LifecycleFacts.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-final",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:33.460896+00:00"
+  },
+  {
+    "name": "lifecycle-final-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-final\\bin\\LifecycleFacts\\release\\LifecycleFacts.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-final.json"
+    ],
+    "exitCode": 1,
+    "utc": "2026-09-12T21:28:33.817441+00:00"
+  },
+  {
+    "name": "receiver-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\ReceiverProbe\\ReceiverProbe.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:35.411647+00:00"
+  },
+  {
+    "name": "receiver-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver\\bin\\ReceiverProbe\\release\\ReceiverProbe.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:35.704185+00:00"
+  },
+  {
+    "name": "plugin-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\NativePlugin\\NativePlugin.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\plugin",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:37.431155+00:00"
+  },
+  {
+    "name": "plugin-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\plugin\\bin\\NativePlugin\\release\\NativePlugin.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\plugin.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:37.708184+00:00"
+  },
+  {
+    "name": "observations-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\EntityObservation.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\observations",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:39.300939+00:00"
+  },
+  {
+    "name": "observations-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\observations\\bin\\EntityObservation\\release\\EntityObservation.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\observations.json",
+      "actual-worktree"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:39.530480+00:00"
+  },
+  {
+    "name": "commit-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitAudit.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\commit",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:41.011531+00:00"
+  },
+  {
+    "name": "commit-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\commit\\bin\\CommitAudit\\release\\CommitAudit.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\commit.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:28:41.282081+00:00"
+  },
+  {
+    "name": "lifecycle-validated-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\LifecycleFacts.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-validated",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:18.140122+00:00"
+  },
+  {
+    "name": "lifecycle-validated-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-validated\\bin\\LifecycleFacts\\release\\LifecycleFacts.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-validated.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:18.497181+00:00"
+  },
+  {
+    "name": "native-evidence-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\NativeEvidence\\NativeEvidence.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native-evidence",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:20.214459+00:00"
+  },
+  {
+    "name": "native-evidence-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native-evidence\\bin\\NativeEvidence\\release\\NativeEvidence.dll",
+      "C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "E:\\SteamLibrary\\steamapps\\common\\GTFO",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native-lifecycle-inputs.json",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native-evidence.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:20.789079+00:00"
+  },
+  {
+    "name": "framework-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\Framework\\Framework.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\framework"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:22.498036+00:00"
+  },
+  {
+    "name": "framework-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\framework\\bin\\Framework\\release\\Framework.dll",
+      "--fixtures",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:24.515630+00:00"
+  },
+  {
+    "name": "architecture-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\Architecture\\Architecture.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\architecture"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:31.607174+00:00"
+  },
+  {
+    "name": "architecture-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\architecture\\bin\\Architecture\\release\\Architecture.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:30:31.826212+00:00"
+  },
+  {
+    "name": "lifecycle-mutations",
+    "command": [
+      "python",
+      "-X",
+      "utf8",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\verify_mutations.py",
+      "--sdk",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--fixtures",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "--output",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-mutations"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:35:27.967196+00:00"
+  },
+  {
+    "name": "host-integration-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\HostIntegration\\HostIntegration.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-integration",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:35:30.294600+00:00"
+  },
+  {
+    "name": "host-integration-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-integration\\bin\\HostIntegration\\release\\HostIntegration.dll",
+      "--host",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:35:30.545628+00:00"
+  },
+  {
+    "name": "lifecycle-work-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\LifecycleWork\\LifecycleWork.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-work"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:35:32.527485+00:00"
+  },
+  {
+    "name": "lifecycle-work-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\lifecycle-work\\bin\\LifecycleWork\\release\\LifecycleWork.dll",
+      "--fixtures",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:35:32.809027+00:00"
+  },
+  {
+    "name": "host-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:36:56.870872+00:00"
+  },
+  {
+    "name": "native-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\Native\\ForgeEnemy.Native.csproj",
+      "-c",
+      "Release",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "-p:ForgeRuntimeAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native-final"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:36:58.380160+00:00"
+  },
+  {
+    "name": "facts-final-verified-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\LifecycleFacts\\LifecycleFacts.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts-final-verified",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:36:59.966452+00:00"
+  },
+  {
+    "name": "facts-final-verified-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts-final-verified\\bin\\LifecycleFacts\\release\\LifecycleFacts.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\facts-final-verified.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:00.305340+00:00"
+  },
+  {
+    "name": "layout-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\NativeLayout\\NativeLayout.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\layout-final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:01.714613+00:00"
+  },
+  {
+    "name": "layout-final-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\layout-final\\bin\\NativeLayout\\release\\NativeLayout.dll",
+      "C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\native-final\\bin\\ForgeEnemy.Native\\release\\ForgeEnemy.Native.dll",
+      "cutover",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\layout-final.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:01.895635+00:00"
+  },
+  {
+    "name": "gamebindings-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\tests\\GameBindings\\GameBindings.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\gamebindings",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:03.365226+00:00"
+  },
+  {
+    "name": "gamebindings-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\gamebindings\\bin\\GameBindings\\release\\GameBindings.dll",
+      "--fixtures",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:03.610766+00:00"
+  },
+  {
+    "name": "gamebindings-bridge",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\gamebindings\\bin\\GameBindings\\release\\GameBindings.dll",
+      "--bridge",
+      "E:\\SteamLibrary\\steamapps\\common\\GTFO",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:04.112088+00:00"
+  },
+  {
+    "name": "gamebindings-native",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\gamebindings\\bin\\GameBindings\\release\\GameBindings.dll",
+      "--native",
+      "C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+      "E:\\SteamLibrary\\steamapps\\common\\GTFO"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:04.489604+00:00"
+  },
+  {
+    "name": "receiver-mutations",
+    "command": [
+      "python",
+      "-X",
+      "utf8",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\ReceiverProbe\\verify_mutations.py",
+      "--sdk",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+      "--fixtures",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "--output",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver-mutations"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:37:39.027725+00:00"
+  },
+  {
+    "name": "receiver-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\ReceiverProbe\\ReceiverProbe.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver-final",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:48.399659+00:00"
+  },
+  {
+    "name": "receiver-final-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver-final\\bin\\ReceiverProbe\\release\\ReceiverProbe.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\receiver-final.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:48.639869+00:00"
+  },
+  {
+    "name": "plugin-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\NativePlugin\\NativePlugin.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\plugin-final",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:49.958968+00:00"
+  },
+  {
+    "name": "plugin-final-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\plugin-final\\bin\\NativePlugin\\release\\NativePlugin.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\plugin-final.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:50.191665+00:00"
+  },
+  {
+    "name": "observations-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\EntityObservation\\EntityObservation.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\observations-final",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:51.505153+00:00"
+  },
+  {
+    "name": "observations-final-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\observations-final\\bin\\EntityObservation\\release\\EntityObservation.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\observations-final.json",
+      "final-host-sdk"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:51.727404+00:00"
+  },
+  {
+    "name": "commit-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\tests\\CommitAudit\\CommitAudit.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\commit-final",
+      "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\host-final\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:53.059911+00:00"
+  },
+  {
+    "name": "commit-final-test",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\commit-final\\bin\\CommitAudit\\release\\CommitAudit.dll",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Model-Site\\Tests\\Forge\\fixtures\\runtime",
+      "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeEnemy\\obj\\e3-facts-20260912-170034\\commit-final.json"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:40:53.277682+00:00"
+  },
+  {
+    "name": "final-diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "ForgeEnemy",
+      "ForgeRuntime/Framework/CombatContracts.cs",
+      "ForgeRuntime/tests/GameBindings/GameDoubles.cs",
+      "ForgeRuntime/tests/Architecture/Program.cs",
+      "AGENT-HANDOFF.md",
+      "ARCHITECTURE.md"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-12T21:46:58.875407+00:00"
+  }
+]

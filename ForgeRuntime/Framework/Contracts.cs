@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,7 +26,11 @@ public delegate CommandResult CommandHandler(CommandContext context);
 /// <summary>RegistryJson is the same ForgeRegistry seed consumed by the website; handlers do not define alternative node semantics.</summary>
 public sealed record RuntimeModule(string ApiVersion, string RegistryJson,
     IReadOnlyDictionary<string, CommandHandler> Handlers, IReadOnlyList<BindingSupport> BindingSupport,
-    IReadOnlyDictionary<string, Func<EntityReference, bool>>? EntityResolvers = null);
+    IReadOnlyDictionary<string, Func<EntityReference, bool>>? EntityResolvers = null)
+{
+    /// <summary>Optional read-only targeting snapshots, owned by the same registered entity namespace.</summary>
+    public IReadOnlyDictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>? EntityObservers { get; init; }
+}
 
 public sealed record RuntimeEvent(string EventId, string BindingId, long WorldEpoch, long SimulationTick,
     string ScopeId, JsonElement Outputs, EntityReference? Source = null,
@@ -65,34 +69,173 @@ public sealed class CommandContext
     public EntityReference GetEntityInput(string input) => RuntimeJson.Entity(Inputs.GetProperty(input));
 }
 
+public static class CommandStatuses
+{
+    public const string Succeeded = "succeeded";
+    public const string Partial = "partial";
+    public const string Rejected = "rejected";
+    public const string Failed = "failed";
+    public const string Cancelled = "cancelled";
+    public const string Expired = "expired";
+}
+
+public static class CommitStates
+{
+    public const string None = "none";
+    public const string Confirmed = "confirmed";
+    public const string Unknown = "unknown";
+}
+
 public sealed class CommandResult
 {
-    private CommandResult(string status, string code, string detail, JsonElement outputs, IReadOnlyList<RuntimeFact> facts)
-    { Status = status; Code = code; Detail = detail; Outputs = outputs; Facts = facts; }
+    public const int MaximumFacts = 128;
+    public const int MaximumDetailBytes = 64 * 1024;
+    private const int MaximumResultBytes = 256 * 1024;
+
+    private CommandResult(string status, string commitState, string code, string detail, JsonElement outputs, IReadOnlyList<RuntimeFact> facts)
+    {
+        Status = status;
+        CommitState = commitState;
+        Code = code;
+        Detail = detail;
+        Outputs = outputs;
+        Facts = facts;
+    }
+
     public string Status { get; }
+    public string CommitState { get; }
     public string Code { get; }
     public string Detail { get; }
     public JsonElement Outputs { get; }
     public IReadOnlyList<RuntimeFact> Facts { get; }
+
     public static CommandResult Succeeded(JsonElement outputs, params RuntimeFact[] facts)
-        {
-        RuntimeJson.Require(facts.Length <= 128, "fact-budget", "A command can publish at most 128 committed facts.");
-        var outputText = outputs.GetRawText();
-        var bytes = Encoding.UTF8.GetByteCount(outputText);
-        RuntimeJson.Require(bytes <= RuntimeKernel.MaximumEventPayloadBytes, "result-payload-budget", "Command outputs exceed 64 KiB.");
+        => Create(CommandStatuses.Succeeded, CommitStates.Confirmed, "committed", "", outputs, facts);
+
+    public static CommandResult Partial(JsonElement outputs, string commitState, params RuntimeFact[] facts)
+        => Create(CommandStatuses.Partial, commitState, "partial", "", outputs, facts);
+
+    public static CommandResult Partial(JsonElement outputs, params RuntimeFact[] facts)
+        => Partial(outputs, CommitStates.Confirmed, facts);
+
+    public static CommandResult Rejected(string code, string detail = "")
+        => Create(CommandStatuses.Rejected, CommitStates.None, code, detail, RuntimeJson.EmptyObject);
+
+    public static CommandResult Failed(string code, string detail = "")
+        => Create(CommandStatuses.Failed, CommitStates.None, code, detail, RuntimeJson.EmptyObject);
+
+    public static CommandResult FailedUnknown(string code, string detail = "", params RuntimeFact[] facts)
+        => Create(CommandStatuses.Failed, CommitStates.Unknown, code, detail, RuntimeJson.EmptyObject, facts);
+
+    public static CommandResult FailedUnknown(JsonElement outputs, string code, string detail = "", params RuntimeFact[] facts)
+        => Create(CommandStatuses.Failed, CommitStates.Unknown, code, detail, outputs, facts);
+
+    public static CommandResult Cancelled(string code, string detail = "")
+        => Create(CommandStatuses.Cancelled, CommitStates.None, code, detail, RuntimeJson.EmptyObject);
+
+    public static CommandResult Expired(string code, string detail = "")
+        => Create(CommandStatuses.Expired, CommitStates.None, code, detail, RuntimeJson.EmptyObject);
+
+    public static CommandResult Create(string status, string commitState, string code, string detail,
+        JsonElement outputs, params RuntimeFact[] facts)
+    {
+        var safeStatus = RuntimeJson.Text(status);
+        var safeCommitState = RuntimeJson.Text(commitState);
+        var safeCode = RuntimeJson.Text(code);
+        var safeDetail = ValidatedDetail(detail);
+        var safeOutputs = SnapshotOutputs(outputs);
+        var safeFacts = SnapshotFacts(safeOutputs, facts);
+        return new CommandResult(safeStatus, safeCommitState, safeCode, safeDetail, safeOutputs, safeFacts);
+    }
+
+    private static string ValidatedDetail(string? detail)
+    {
+        detail ??= "";
+        RuntimeJson.Require(Encoding.UTF8.GetByteCount(detail) <= MaximumDetailBytes, "result-detail-budget", "Command detail exceeds 64 KiB.");
+        return detail;
+    }
+
+    private static JsonElement SnapshotOutputs(JsonElement outputs)
+    {
+        RuntimeJson.Require(outputs.ValueKind != JsonValueKind.Undefined, "invalid-result-output", "Command outputs must be a JSON value.");
+        var text = outputs.GetRawText();
+        RuntimeJson.Require(Encoding.UTF8.GetByteCount(text) <= RuntimeKernel.MaximumEventPayloadBytes, "result-payload-budget", "Command outputs exceed 64 KiB.");
+        return RuntimeJson.Parse(text);
+    }
+
+    private static IReadOnlyList<RuntimeFact> SnapshotFacts(JsonElement outputs, RuntimeFact[] facts)
+    {
+        if (facts == null) throw new RuntimeContractException("invalid-result-facts", "Fact collection cannot be null.");
+        RuntimeJson.Require(facts.Length <= MaximumFacts, "fact-budget", "A command can publish at most 128 committed facts.");
         var snapshot = new List<RuntimeFact>(facts.Length);
+        long bytes = Encoding.UTF8.GetByteCount(outputs.GetRawText());
         foreach (var fact in facts)
         {
-            var text = fact.Outputs.GetRawText(); var size = Encoding.UTF8.GetByteCount(text); bytes += size;
-            RuntimeJson.Require(size <= RuntimeKernel.MaximumEventPayloadBytes && bytes <= 256 * 1024, "result-facts-budget", "Committed facts exceed the 256 KiB result budget.");
-            snapshot.Add(new RuntimeFact(fact.BindingId, RuntimeJson.Parse(text)));
+            if (fact == null) throw new RuntimeContractException("invalid-result-fact", "Committed fact cannot be null.");
+            var bindingId = RuntimeJson.Text(fact.BindingId);
+            RuntimeJson.Require(fact.Outputs.ValueKind != JsonValueKind.Undefined, "invalid-fact-output", "Committed fact outputs must be a JSON value.");
+            var text = fact.Outputs.GetRawText();
+            var size = Encoding.UTF8.GetByteCount(text);
+            RuntimeJson.Require(size <= RuntimeKernel.MaximumEventPayloadBytes, "result-fact-payload-budget", "Committed fact exceeds 64 KiB.");
+            bytes += size;
+            RuntimeJson.Require(bytes <= MaximumResultBytes, "result-facts-budget", "Committed facts exceed the 256 KiB result budget.");
+            snapshot.Add(new RuntimeFact(bindingId, RuntimeJson.Parse(text)));
         }
-        return new("succeeded", "committed", "", RuntimeJson.Parse(outputText), snapshot.AsReadOnly());
+        return snapshot.AsReadOnly();
     }
-    public static CommandResult Rejected(string code, string detail = "")
-        => new("rejected", code, detail, RuntimeJson.EmptyObject, Array.Empty<RuntimeFact>());
-    public static CommandResult Failed(string code, string detail = "")
-        => new("failed", code, detail, RuntimeJson.EmptyObject, Array.Empty<RuntimeFact>());
+
+    internal static string TruncateCode(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return "unknown";
+        var text = code!.Trim();
+        if (text.Length > 256) text = text[..256];
+        foreach (var c in text) if (c <= 31 || c == 127) return "invalid-code";
+        return text;
+    }
+
+    internal static string TruncateDetail(string? detail)
+    {
+        if (string.IsNullOrEmpty(detail)) return "";
+        return detail!.Length <= 4096 ? detail : detail[..4096];
+    }
+}
+
+internal static class CommandResultRules
+{
+    internal static bool TryValidate(CommandResult result, out string violation)
+    {
+        violation = "";
+        if (result.Status is not (CommandStatuses.Succeeded or CommandStatuses.Partial or CommandStatuses.Rejected
+            or CommandStatuses.Failed or CommandStatuses.Cancelled or CommandStatuses.Expired))
+        {
+            violation = "unknown-status";
+            return false;
+        }
+
+        switch (result.Status)
+        {
+            case CommandStatuses.Succeeded:
+                if (result.CommitState != CommitStates.Confirmed) { violation = "succeeded-requires-confirmed"; return false; }
+                return true;
+            case CommandStatuses.Partial:
+                if (result.CommitState is not (CommitStates.Confirmed or CommitStates.Unknown)) { violation = "partial-commit-state"; return false; }
+                if (result.Facts.Count == 0) { violation = "partial-requires-known-commit"; return false; }
+                return true;
+            case CommandStatuses.Rejected:
+            case CommandStatuses.Cancelled:
+            case CommandStatuses.Expired:
+                if (result.CommitState != CommitStates.None) { violation = "terminal-status-requires-none"; return false; }
+                if (result.Facts.Count != 0) { violation = "terminal-status-cannot-carry-facts"; return false; }
+                return true;
+            case CommandStatuses.Failed:
+                if (result.CommitState is not (CommitStates.None or CommitStates.Unknown)) { violation = "failed-commit-state"; return false; }
+                if (result.CommitState == CommitStates.None && result.Facts.Count != 0) { violation = "failed-none-cannot-carry-facts"; return false; }
+                return true;
+            default:
+                violation = "unknown-status";
+                return false;
+        }
+    }
 }
 
 public sealed record DispatchResult(string Status, string Code, string EventId);

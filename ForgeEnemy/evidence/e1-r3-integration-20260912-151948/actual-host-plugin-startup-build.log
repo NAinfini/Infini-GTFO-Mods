@@ -1,0 +1,11 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj (in 174 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\tests\PluginStartup\PluginStartup.csproj (in 180 ms).
+  ForgeRuntime.Framework -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\actual-host-plugin-startup\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  PluginStartup -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\obj\integration-20260912-151948\actual-host-plugin-startup\bin\PluginStartup\release\PluginStartup.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.78

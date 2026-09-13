@@ -1,0 +1,17 @@
+{
+  "CombatContracts.cs": "1a239ac29ae883fd6e4414dc21da1ced02348ee6eb69639b14c72949dcdf402f",
+  "Contracts.cs": "fba406499f01ed9bb93c7803a838a6a7fec864e1d30c46bb7d44223e61d31239",
+  "EntityActorContracts.cs": "f5484f848a77e242c27d46e13f75ce3c738bcfb19667d6fc1c49c3e34aa5ccd9",
+  "EntityObservationContracts.cs": "aedec9d1e74886cfd93a336554eb0a5e05fbfd5206c1f3d49e354f6f25cb97d2",
+  "ForgeRuntime.Framework.csproj": "a6e3804e27c7e263fde5553651002dbc0f4b9d54e4922c8e114ac758bcb2455c",
+  "LifecycleContracts.cs": "80446ffe263959fb2c4f385b402076d6d7b375247033684498425929e7e757a0",
+  "RuntimeJson.cs": "9024abdd447140a0d0b971852134891c931dd9569faa71c70883851a193a370e",
+  "RuntimeKernel.cs": "18df60b82890910a052d35e4bf42b692f0b948d3e1e78e0f90bdd759c383ba0b",
+  "RuntimeKernel.Entities.cs": "50eea87e1aeb080efd37dc20b342d59db31550cf25a3aacbfa0bdd69ae6d974e",
+  "RuntimeKernel.Lifecycle.cs": "a679417c9c7937b213f275bb8fb849971eeb3fa5cb0ccb3b6bc846f492c653b0",
+  "RuntimeKernel.State.cs": "e891fd34452925e497a138ca81b3b4adb631df968dba32bce4acb51b9aaa7065",
+  "RuntimeKernel.Timing.cs": "67aabc7ed5b580146a0f4b4eb0f181997d837f18d8961627e7341dfb348ca6f7",
+  "RuntimePlan.cs": "9877e60bf7aed53d762f2bb3456cd2e023144effa08ffee0544fd7d2eabc7497",
+  "RuntimeRegistry.cs": "84ba7429885c6122f00ab7a42a71f1e8777c1457122132961943b95ee7ffe876",
+  "TimingContracts.cs": "286f4c7d76d5438e327530618cd893ffeb3f63fda91465d8b6c037e6243be68a"
+}

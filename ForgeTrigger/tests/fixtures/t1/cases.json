@@ -1,0 +1,2128 @@
+{
+  "schemaVersion": 1,
+  "evidence": "synthetic-contract-tests-not-game-support",
+  "validGraphs": [
+    {
+      "id": "linear",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      }
+    },
+    {
+      "id": "linear-chain",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          },
+          {
+            "id": "Second",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Record",
+              "port": "next"
+            },
+            "to": {
+              "node": "Second",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Second",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Second",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      }
+    }
+  ],
+  "invalidGraphs": [
+    {
+      "id": "unknown-canonical",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.unknown",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Unknown capability"
+    },
+    {
+      "id": "unknown-revision",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "9.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Capability version mismatch"
+    },
+    {
+      "id": "label-is-not-canonical",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "Synthetic record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Unknown capability"
+    },
+    {
+      "id": "binding-mismatch",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Binding/capability mismatch"
+    },
+    {
+      "id": "unknown-node-field",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {},
+            "label": "alias"
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Unknown graph field"
+    },
+    {
+      "id": "unknown-parameter",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {
+              "amount": 5
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Unknown field"
+    },
+    {
+      "id": "missing-recipient",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Required graph input missing"
+    },
+    {
+      "id": "missing-value",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Required graph input missing"
+    },
+    {
+      "id": "unknown-data-node",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Gone",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Unknown edge node"
+    },
+    {
+      "id": "unknown-data-port",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "gone"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Unknown edge port"
+    },
+    {
+      "id": "wrong-data-type",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "enabled"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "wrong-unit-and-shape",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "position"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "duplicate-input-driver",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Duplicate graph edge|Multiple input drivers"
+    },
+    {
+      "id": "wrong-domain",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "editor",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Capability domain mismatch"
+    },
+    {
+      "id": "wrong-authority",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "owner",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Capability authority mismatch"
+    },
+    {
+      "id": "invalid-node-id",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "bad name",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Invalid graph node id"
+    },
+    {
+      "id": "invalid-entrypoint",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Record"
+        ]
+      },
+      "stage": "graph",
+      "error": "Entrypoint is not a trigger"
+    },
+    {
+      "id": "action-output-dependency",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          },
+          {
+            "id": "Second",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Record",
+              "port": "next"
+            },
+            "to": {
+              "node": "Second",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Second",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Record",
+              "port": "value"
+            },
+            "to": {
+              "node": "Second",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "compile",
+      "error": "direct event output"
+    },
+    {
+      "id": "execution-fanout",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          },
+          {
+            "id": "Second",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Second",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Second",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Second",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "compile",
+      "error": "execution branch requires control lowering"
+    },
+    {
+      "id": "control-needs-r4",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          },
+          {
+            "id": "Branch",
+            "capabilityId": "test.trigger.branch",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.branch",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Branch",
+              "port": "true"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Branch",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "enabled"
+            },
+            "to": {
+              "node": "Branch",
+              "port": "condition"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "compile",
+      "error": "Unsupported runtime node kind"
+    },
+    {
+      "id": "pure-evaluator-needs-r4",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          },
+          {
+            "id": "Add",
+            "capabilityId": "test.trigger.add",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.add",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Add",
+              "port": "value"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Add",
+              "port": "a"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Add",
+              "port": "b"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "compile",
+      "error": "Unsupported runtime node kind"
+    },
+    {
+      "id": "same-type-different-unit",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "distance"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "nullable-recipient",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "maybe_target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "graph",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "optional-required-recipient",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "optional_target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      },
+      "stage": "compile",
+      "error": "Optional event output"
+    }
+  ],
+  "invalidPlans": [
+    {
+      "id": "runtime-version",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "runtime",
+            "version"
+          ],
+          "value": "9.0.0"
+        }
+      ],
+      "code": "runtime-lock",
+      "error": "identity/version/game build mismatch"
+    },
+    {
+      "id": "schema-version",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "schemaVersion"
+          ],
+          "value": 2
+        }
+      ],
+      "code": "plan-version",
+      "error": "Unsupported runtime plan schema"
+    },
+    {
+      "id": "capability-version",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "bindings",
+            1,
+            "capabilityVersion"
+          ],
+          "value": "9.0.0"
+        }
+      ],
+      "code": "binding-lock",
+      "error": "binding pin mismatch"
+    },
+    {
+      "id": "provider-version",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "bindings",
+            1,
+            "providerVersion"
+          ],
+          "value": "9.0.0"
+        }
+      ],
+      "code": "binding-lock",
+      "error": "binding pin mismatch"
+    },
+    {
+      "id": "handler-substitution",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "bindings",
+            1,
+            "handler"
+          ],
+          "value": "replacement"
+        }
+      ],
+      "code": "binding-lock",
+      "error": "binding pin mismatch"
+    },
+    {
+      "id": "authority",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "authority"
+          ],
+          "value": "owner"
+        }
+      ],
+      "code": "execution-policy",
+      "error": "execution policy"
+    },
+    {
+      "id": "failure-policy",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "failurePolicy"
+          ],
+          "value": "continue"
+        }
+      ],
+      "code": "execution-policy",
+      "error": "execution policy"
+    },
+    {
+      "id": "missing-recipient",
+      "changes": [
+        {
+          "operation": "delete",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "target"
+          ],
+          "value": null
+        }
+      ],
+      "code": "missing-field",
+      "error": "Required graph input missing"
+    },
+    {
+      "id": "unknown-event-port",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "value",
+            "fromEventPort"
+          ],
+          "value": "missing"
+        }
+      ],
+      "code": "event-port-missing",
+      "error": "Unknown edge port"
+    },
+    {
+      "id": "type-mismatch",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "value",
+            "fromEventPort"
+          ],
+          "value": "enabled"
+        }
+      ],
+      "code": "port-mismatch",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "unit-mismatch",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "value",
+            "fromEventPort"
+          ],
+          "value": "position"
+        }
+      ],
+      "code": "port-mismatch",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "dynamic-node-output",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "value"
+          ],
+          "value": {
+            "fromNodeOutput": {
+              "node": "Record",
+              "port": "value"
+            }
+          }
+        }
+      ],
+      "code": "unknown-field",
+      "error": "Unknown runtime field"
+    },
+    {
+      "id": "unknown-field",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "branches"
+          ],
+          "value": []
+        }
+      ],
+      "code": "unknown-field",
+      "error": "Unknown runtime field"
+    },
+    {
+      "id": "zero-budget",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "limits",
+            "maxCommandsPerTick"
+          ],
+          "value": 0
+        }
+      ],
+      "code": "invalid-integer",
+      "error": "Invalid|outside|budget"
+    },
+    {
+      "id": "duplicate-node",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "nodeId"
+          ],
+          "value": "Event"
+        }
+      ],
+      "code": "duplicate-node",
+      "error": "Duplicate graph node"
+    },
+    {
+      "id": "empty-entrypoint",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps"
+          ],
+          "value": []
+        }
+      ],
+      "code": "empty-entrypoint",
+      "error": "steps per entrypoint"
+    },
+    {
+      "id": "self-granted-permission",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "permissions"
+          ],
+          "value": [
+            "test.permission.admin"
+          ]
+        }
+      ],
+      "code": "permission-lock",
+      "error": "permission|differs"
+    },
+    {
+      "id": "denied-host-permission",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "planId"
+          ],
+          "value": "denied"
+        }
+      ],
+      "code": "permission-denied",
+      "error": "Missing runtime permission",
+      "grants": []
+    },
+    {
+      "id": "unused-dependency",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "dependencies"
+          ],
+          "value": [
+            "Example-Unused-1.0.0"
+          ]
+        }
+      ],
+      "code": "dependency-lock",
+      "error": "differs"
+    },
+    {
+      "id": "same-type-different-unit",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "value",
+            "fromEventPort"
+          ],
+          "value": "distance"
+        }
+      ],
+      "code": "port-mismatch",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "nullable-recipient",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "target",
+            "fromEventPort"
+          ],
+          "value": "maybe_target"
+        }
+      ],
+      "code": "nullable-port",
+      "error": "Incompatible graph ports"
+    },
+    {
+      "id": "optional-required-recipient",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            "target",
+            "fromEventPort"
+          ],
+          "value": "optional_target"
+        }
+      ],
+      "code": "optional-event-port",
+      "error": "Optional event output"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "verification": "audit-tool-tests-only",
+  "passed": 6,
+  "checks": [
+    {
+      "case": "actual-cli-rejects-changed-game-build",
+      "expected": "nonzero exit; reject invalid evidence",
+      "exitCode": 1,
+      "passed": true,
+      "output": "{\n  \"verification\": \"metadata-only\",\n  \"matched\": false,\n  \"differences\": [\n    \"$.game.build: value changed\"\n  ],\n  \"selfTests\": [],\n  \"selfTestCount\": 0\n}\n"
+    },
+    {
+      "case": "actual-cli-rejects-incomplete-capture",
+      "expected": "nonzero exit; reject invalid evidence",
+      "exitCode": 1,
+      "passed": true,
+      "output": "{\n  \"verification\": \"metadata-only\",\n  \"matched\": false,\n  \"differences\": [\n    \"invalid-capture: Wrong capture purpose or missing required API evidence.\"\n  ],\n  \"selfTests\": [],\n  \"selfTestCount\": 0\n}\n"
+    },
+    {
+      "case": "actual-cli-rejects-region-drift",
+      "expected": "nonzero exit; reject invalid evidence",
+      "exitCode": 1,
+      "passed": true,
+      "output": "  \"regions\": [\n    {\n      \"name\": \"LG_BuildGateJob.Build\",\n      \"rva\": 19348832,\n      \"fileOffset\": 19342176,\n      \"length\": 4336,\n      \"sha256\": \"87ac997cafbf74e4d9a46e0f2249f47ed44f1cf5986d4b6ece11bdaff7082b39\",\n      \"matched\": false\n    },\n    {\n      \"name\": \"LG_BuildPowerGeneratorLockJob.Build\",\n      \"rva\": 19373328,\n      \"fileOffset\": 19366672,\n      \"length\": 224,\n      \"sha256\": \"822e953d8042809584f7429f480cf4462f09a261db8b58da93152944467988a5\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"LG_Area.TryGetRandomEnemySpawnPointInside\",\n      \"rva\": 21494320,\n      \"fileOffset\": 21487664,\n      \"length\": 1184,\n      \"sha256\": \"5549802d2a2c3612d08cfebf7764f4e7617ac40721e9d92d575348f21ca12796\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"EnemyAllocator.OnEnemySpawned\",\n      \"rva\": 22439648,\n      \"fileOffset\": 22432992,\n      \"length\": 1024,\n      \"sha256\": \"07d00449bb392855da8d9f1155853101a5d8c76ad969752e2444d99b0c94ccad\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"EnemyAllocator.ResetAllowedToSpawn\",\n      \"rva\": 22440688,\n      \"fileOffset\": 22434032,\n      \"length\": 64,\n      \"sha256\": \"927d6fffc47c9b2788811908b8b98e8eadd33e8c64f3336dce4c65a87e1f2542\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"EnemyAllocator.SpawnEnemy\",\n      \"rva\": 22440896,\n      \"fileOffset\": 22434240,\n      \"length\": 624,\n      \"sha256\": \"3c70a913f11d5de0e455a469e01cf9aef507e003387e99b1814d3bf27e89a528\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"EnemyAllocator.get_AllowedToSpawn\",\n      \"rva\": 22441632,\n      \"fileOffset\": 22434976,\n      \"length\": 64,\n      \"sha256\": \"48fe0ce7c9543bc2befba8d12c75dc32aa88eebf7a88b25d018d7e9613870670\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"EnemyGroupScoreSpawnData.GenerateRandomPlacements\",\n      \"rva\": 22476000,\n      \"fileOffset\": 22469344,\n      \"length\": 176,\n      \"sha256\": \"dd3d60203cc1c2a58f8b0dfbaa0f5de08a838e03f30657612e58fbb22f486184\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"LG_SecurityDoor.Setup\",\n      \"rva\": 22696528,\n      \"fileOffset\": 22689872,\n      \"length\": 5152,\n      \"sha256\": \"3eb494be347f5656f263b4f35a74668e2b2dc56615d0fec2c4d35d4789596d0d\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"pCourseNode.Set\",\n      \"rva\": 26429552,\n      \"fileOffset\": 26422896,\n      \"length\": 32,\n      \"sha256\": \"78992dcfbbbed61a036aab7c0fef3749b19e04f709d2d8dee56409f86bbc1231\",\n      \"matched\": true\n    },\n    {\n      \"name\": \"EnemyReplicationManager.Spawn\",\n      \"rva\": 30978896,\n      \"fileOffset\": 30972240,\n      \"length\": 304,\n      \"sha256\": \"ba3c7fa6f7b248f1a80fb6d64f2f5bde673d6bb51311e2397a3757da3a33696e\",\n      \"matched\": true\n    }\n  ],\n  \"errors\": [\n    \"region-hash-mismatch:LG_BuildGateJob.Build\"\n  ],\n  \"limits\": [\n    \"Reuses prior region boundaries; does not re-disassemble\",\n    \"Does not prove native invocation, callback order or multiplayer behavior\"\n  ],\n  \"baselineManifestSha256\": \"f740c817b86782ba6636add8a1c46aae332f2515bb3c4ee98838e90a26c58080\"\n}\n"
+    },
+    {
+      "case": "actual-cli-rejects-invalid-region-range",
+      "expected": "nonzero exit; reject invalid evidence",
+      "exitCode": 1,
+      "passed": true,
+      "output": "{\"matched\": false, \"error\": \"Invalid region range: LG_BuildGateJob.Build\"}\n"
+    },
+    {
+      "case": "capture-refuses-to-overwrite-reviewed-evidence",
+      "expected": "nonzero exit; reject invalid evidence",
+      "exitCode": 1,
+      "passed": true,
+      "output": "\u001b[31;1mException: \u001b[0mC:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeMap\\tools\\Capture-NativeApi.ps1:11\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1mLine |\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1m\u001b[36;1m  11 | \u001b[0m \ufffd\ufffd  $OutFile) { \u001b[36;1mthrow 'Output already exists; use a new capture path.'\u001b[0m }\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m     | \u001b[31;1m                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[31;1m\u001b[31;1m\u001b[36;1m     | \u001b[31;1mOutput already exists; use a new capture path.\u001b[0m\n"
+    },
+    {
+      "case": "capture-rejects-missing-required-native-type",
+      "expected": "nonzero exit; reject invalid evidence",
+      "exitCode": 1,
+      "passed": true,
+      "output": "{\"output\":\"C:\\\\Users\\\\nainf\\\\Github\\\\Infini-GTFO-Mods\\\\ForgeMap\\\\bin\\\\map1-negative\\\\missing-target-capture.json\",\"types\":0,\"missing\":1,\"methods\":0.0,\"build\":\"20403457\",\"verification\":\"metadata-only\"}\n\u001b[31;1mException: \u001b[0mC:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeMap\\tools\\Capture-NativeApi.ps1:92\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1mLine |\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1m\u001b[36;1m  92 | \u001b[0m \ufffd\ufffd ng.Count) { \u001b[36;1mthrow 'Required native metadata missing; inspect the capt\u001b[0m \ufffd\ufffd\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m     | \u001b[31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\u001b[0m\n\u001b[31;1m\u001b[0m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[31;1m\u001b[31;1m\u001b[36;1m     | \u001b[31;1mRequired native metadata missing; inspect the capture.\u001b[0m\n"
+    }
+  ]
+}

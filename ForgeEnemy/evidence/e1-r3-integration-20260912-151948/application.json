@@ -1,0 +1,32 @@
+{
+  "applied": true,
+  "utc": "2026-09-12T19:39:32.495385+00:00",
+  "paths": [
+    "ForgeEnemy/ModuleDefinition.cs",
+    "ForgeEnemy/Native/EnemyModule.cs",
+    "ForgeEnemy/Native/EnemyNativeHooks.cs",
+    "ForgeEnemy/Native/EnemyPluginSession.cs",
+    "ForgeEnemy/Native/ForgeEnemy.Native.csproj",
+    "ForgeEnemy/tests/CommitAudit/AuditScene.cs",
+    "ForgeEnemy/tests/CommitAudit/CommitAudit.csproj",
+    "ForgeEnemy/tests/EntityObservation/EntityObservation.csproj",
+    "ForgeEnemy/tests/EntityObservation/Program.cs",
+    "ForgeEnemy/tests/EntityObservation/Scene.cs",
+    "ForgeEnemy/tests/NativePlugin/NativePlugin.csproj",
+    "ForgeEnemy/tests/NativePlugin/Program.cs",
+    "ForgeEnemy/tests/ReceiverProbe/Program.cs",
+    "ForgeEnemy/tests/ReceiverProbe/ReceiverProbe.csproj",
+    "ForgeEnemy/tests/ReceiverProbe/verify_mutations.py",
+    "ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs",
+    "ForgeRuntime/Framework/RuntimeKernel.cs",
+    "ForgeRuntime/Framework/RuntimeRegistry.cs",
+    "ForgeRuntime/GameBindings/EnemyModule.cs",
+    "ForgeRuntime/GameBindings/GameRuntimeBridge.cs",
+    "ForgeRuntime/GameBindings/NativeHooks.cs",
+    "ForgeRuntime/tests/Architecture/Program.cs",
+    "ForgeRuntime/tests/GameBindings/GameBindings.csproj",
+    "ForgeRuntime/tests/GameBindings/NativeEvidence.cs",
+    "ForgeRuntime/tests/GameBindings/Program.cs"
+  ],
+  "installed": false
+}

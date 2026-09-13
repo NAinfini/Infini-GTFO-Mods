@@ -1,0 +1,38 @@
+{
+  "utc": "2026-09-12T16:12:21.726851+00:00",
+  "scope": "ForgeMap/**",
+  "moduleDefinitionUnchanged": true,
+  "mapProjectUnchanged": true,
+  "verification": {
+    "identityAssertions": 126,
+    "existingMapAssertions": 33,
+    "architectureAssertions": 35,
+    "releaseBuilds": 3,
+    "warnings": 0,
+    "errors": 0,
+    "sourceFilesUnchanged": 86,
+    "result": "verification-final-2/result.json",
+    "fileQA": "file-qa.json"
+  },
+  "nativeGameExecuted": false,
+  "nativeHooksInstalled": false,
+  "newRuntimeBindings": false,
+  "gitCommitOrPush": false,
+  "ownedFiles": {
+    "AssemblyInfo.cs": "ec60c1f80dbdb39f76ce34d820e18c547dfd9c95635b80efc04df3201853e53c",
+    "MapIdentityContracts.cs": "1e7038b70c7c364cb56fd58b8d5c7fe250deb2ba296174bf9390f31506f9e713",
+    "MapObjectIdentityIndex.cs": "a123bff61a3824dfc037771e0bd0abaee264608f9a735782070f57330b0d5578",
+    "MapIdentitySession.cs": "20f9bc2a6066e23aadc8f42d1e41ea65cbd03c9b707730aa77e728541e988c28",
+    "tests/MapIdentity/MapIdentity.csproj": "ba099223cca8a36983ddb8c39227bf9000005ef0c339a9d9fd3ac32bcf81f1b1",
+    "tests/MapIdentity/IdentityFixture.cs": "81cee03d0b75eb705c631e5890f77b86df57a2f934a69167f9dde015640f529b",
+    "tests/MapIdentity/Program.cs": "4451986cb7b096ed1bf632b97bf21e57afba8ebfda5147d78038cb646756062a",
+    "tests/MapIdentity/README.md": "4f540f62a487787c0c2a6abc840bc3945d90f9a4d21cad370c7996cbb7a989c7",
+    "tools/run_identity_checks.py": "3a7f653001fbd23091847a5163f03e13837853afba5080bf0dec18b062ddc09c",
+    "MAP1-IDENTITY-CONTINUATION.md": "055b571111e61539430c6913b4691aa51e4de370a14f575af12dbd34eec2bb5c",
+    "IMPLEMENTATION-PLAN.md": "3547c41d31763727d2a907542a23205077bb6341707ec7325bef45ea9554665f",
+    "README.md": "399d82689c9b6367613d9e96c1b2616f4dc2f741154f43b1de37609676090eab",
+    "MAP1-DELIVERY.md": "64cc4896d7b83bf4e348b1e72beef959fd5a9c60af32e6620768fe7c662d761c",
+    "VALIDATION.md": "fb2d8a4f2db54ab73dfea90167b69be41c453d47f97621139910f1d1f272e952"
+  },
+  "next": "Audited CustomGeomorph creation ticket to actual LG_Area identity, public R3/source contract and D3 diagnostic evidence; ten native acceptance cases remain unexecuted."
+}

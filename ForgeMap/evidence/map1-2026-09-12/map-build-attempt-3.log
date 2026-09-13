@@ -1,0 +1,11 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\RuntimeKernel.cs(224,6): error CS1513: } expected [C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj]
+
+Build FAILED.
+
+C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\RuntimeKernel.cs(224,6): error CS1513: } expected [C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:01.00

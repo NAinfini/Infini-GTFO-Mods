@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeTrigger\ForgeTrigger.csproj (in 164 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeWeapon\ForgeWeapon.csproj (in 164 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\ForgeEnemy.csproj (in 164 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\ForgeMap.csproj (in 164 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\tests\Architecture\Architecture.csproj (in 164 ms).
+  2 of 7 projects are up-to-date for restore.
+  ForgeRuntime.Framework -> C:\Users\nainf\AppData\Local\Temp\forge-development-continuation-20260912-101801\validation-artifacts\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  ForgeDevelopment -> C:\Users\nainf\AppData\Local\Temp\forge-development-continuation-20260912-101801\validation-artifacts\bin\ForgeDevelopment\release\ForgeDevelopment.dll
+  ForgeWeapon -> C:\Users\nainf\AppData\Local\Temp\forge-development-continuation-20260912-101801\validation-artifacts\bin\ForgeWeapon\release\ForgeWeapon.dll
+C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\EnemyLifeTable.cs(57,81): error CS1513: } expected [C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\ForgeEnemy.csproj]
+  ForgeTrigger -> C:\Users\nainf\AppData\Local\Temp\forge-development-continuation-20260912-101801\validation-artifacts\bin\ForgeTrigger\release\ForgeTrigger.dll
+  ForgeMap -> C:\Users\nainf\AppData\Local\Temp\forge-development-continuation-20260912-101801\validation-artifacts\bin\ForgeMap\release\ForgeMap.dll
+
+Build FAILED.
+
+C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\EnemyLifeTable.cs(57,81): error CS1513: } expected [C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeEnemy\ForgeEnemy.csproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:01.42

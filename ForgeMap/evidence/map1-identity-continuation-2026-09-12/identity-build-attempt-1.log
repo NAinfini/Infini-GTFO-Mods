@@ -1,0 +1,13 @@
+  Determining projects to restore...
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeRuntime\Framework\ForgeRuntime.Framework.csproj (in 132 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\ForgeMap.csproj (in 136 ms).
+  Restored C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\tests\MapIdentity\MapIdentity.csproj (in 137 ms).
+  ForgeRuntime.Framework -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-identity-continuation\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  ForgeMap -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-identity-continuation\bin\ForgeMap\release\ForgeMap.dll
+  MapIdentity -> C:\Users\nainf\Github\Infini-GTFO-Mods\ForgeMap\bin\map1-identity-continuation\bin\MapIdentity\release\ForgeMap.Identity.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:04.48

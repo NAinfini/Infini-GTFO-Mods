@@ -1,0 +1,579 @@
+[
+  {
+    "name": "baseline-host",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\baseline",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 2.28
+  },
+  {
+    "name": "baseline-inspection",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\baseline"
+    ],
+    "exitCode": 1,
+    "seconds": 1.26
+  },
+  {
+    "name": "inspection-repaired-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\inspection"
+    ],
+    "exitCode": 0,
+    "seconds": 1.42
+  },
+  {
+    "name": "inspection-repaired-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\inspection\\bin\\DevelopmentInspection\\release\\DevelopmentInspection.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.17
+  },
+  {
+    "name": "shutdown-before-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\shutdown-before"
+    ],
+    "exitCode": 0,
+    "seconds": 1.34
+  },
+  {
+    "name": "shutdown-before-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\shutdown-before\\bin\\Shutdown\\release\\Shutdown.dll"
+    ],
+    "exitCode": 1,
+    "seconds": 0.08
+  },
+  {
+    "name": "shutdown-fixed-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\shutdown-fixed"
+    ],
+    "exitCode": 0,
+    "seconds": 1.33
+  },
+  {
+    "name": "shutdown-fixed-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\shutdown-fixed\\bin\\Shutdown\\release\\Shutdown.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.08
+  },
+  {
+    "name": "reports-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Reports/Reports.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.45
+  },
+  {
+    "name": "reports-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\Reports\\release\\Reports.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 2.17
+  },
+  {
+    "name": "project-checks-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.38
+  },
+  {
+    "name": "project-checks-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\ProjectChecks\\release\\ProjectChecks.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 1.05
+  },
+  {
+    "name": "snapshot-integration-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.36
+  },
+  {
+    "name": "snapshot-integration-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\ReportSnapshots\\release\\ReportSnapshots.dll"
+    ],
+    "exitCode": 1,
+    "seconds": 0.14
+  },
+  {
+    "name": "inspection-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.42
+  },
+  {
+    "name": "inspection-final-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\DevelopmentInspection\\release\\DevelopmentInspection.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.17
+  },
+  {
+    "name": "shutdown-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.25
+  },
+  {
+    "name": "shutdown-final-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\Shutdown\\release\\Shutdown.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.08
+  },
+  {
+    "name": "scene-inventory-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/SceneInventory/SceneInventoryTests.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.31
+  },
+  {
+    "name": "scene-inventory-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\SceneInventoryTests\\release\\SceneInventoryTests.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.06
+  },
+  {
+    "name": "telemetry-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Telemetry/Telemetry.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.28
+  },
+  {
+    "name": "telemetry-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\Telemetry\\release\\Telemetry.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.06
+  },
+  {
+    "name": "samples-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Samples/Samples.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.28
+  },
+  {
+    "name": "samples-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\Samples\\release\\Samples.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.06
+  },
+  {
+    "name": "host-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 2.14
+  },
+  {
+    "name": "development-final-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/ForgeDevelopment.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.41
+  },
+  {
+    "name": "framework-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Framework/Framework.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.31
+  },
+  {
+    "name": "framework-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\Framework\\release\\Framework.dll",
+      "--fixtures",
+      "../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime"
+    ],
+    "exitCode": 0,
+    "seconds": 1.81
+  },
+  {
+    "name": "game-bindings-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/GameBindings/GameBindings.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.41
+  },
+  {
+    "name": "game-bindings-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\GameBindings\\release\\GameBindings.dll",
+      "--fixtures",
+      "../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime"
+    ],
+    "exitCode": 0,
+    "seconds": 0.22
+  },
+  {
+    "name": "architecture-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Architecture/Architecture.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 1,
+    "seconds": 1.86
+  },
+  {
+    "name": "python-tests",
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "ForgeRuntime/tests",
+      "-p",
+      "test_*.py"
+    ],
+    "exitCode": 1,
+    "seconds": 3.44
+  },
+  {
+    "name": "python-fixed-tests",
+    "command": [
+      "python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "ForgeRuntime/tests",
+      "-p",
+      "test_*.py"
+    ],
+    "exitCode": 0,
+    "seconds": 3.69
+  },
+  {
+    "name": "snapshot-latest-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.25
+  },
+  {
+    "name": "snapshot-latest-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\ReportSnapshots\\release\\ReportSnapshots.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.39
+  },
+  {
+    "name": "architecture-latest-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Architecture/Architecture.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 1,
+    "seconds": 1.38
+  },
+  {
+    "name": "reports-after-snapshot-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/Reports/Reports.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.2
+  },
+  {
+    "name": "reports-after-snapshot-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\Reports\\release\\Reports.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 2.27
+  },
+  {
+    "name": "project-after-snapshot-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.23
+  },
+  {
+    "name": "project-after-snapshot-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\ProjectChecks\\release\\ProjectChecks.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 1.06
+  },
+  {
+    "name": "inspection-after-snapshot-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.25
+  },
+  {
+    "name": "inspection-after-snapshot-tests",
+    "command": [
+      "dotnet",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final\\bin\\DevelopmentInspection\\release\\DevelopmentInspection.dll"
+    ],
+    "exitCode": 0,
+    "seconds": 0.17
+  },
+  {
+    "name": "host-after-snapshot-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeRuntime/ForgeRuntime.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.7
+  },
+  {
+    "name": "development-after-snapshot-build",
+    "command": [
+      "dotnet",
+      "build",
+      "ForgeDevelopment/ForgeDevelopment.csproj",
+      "-c",
+      "Release",
+      "--artifacts-path",
+      "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-development-continue-z6t_mldj\\final",
+      "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Temp\\BepInEx"
+    ],
+    "exitCode": 0,
+    "seconds": 1.44
+  },
+  {
+    "name": "owned-diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "--",
+      "ForgeRuntime/ShutdownSequence.cs",
+      "ForgeRuntime/tests/DevelopmentInspection/WorldDoubles.cs",
+      "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+      "ForgeRuntime/tests/test_import_log.py",
+      "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+      "ForgeDevelopment/tests/Shutdown/Program.cs",
+      "ForgeDevelopment/tests/Shutdown/ReceiptTests.cs",
+      "ForgeDevelopment/D1-INTEGRATION-REVIEW.md"
+    ],
+    "exitCode": 0,
+    "seconds": 0.08
+  }
+]

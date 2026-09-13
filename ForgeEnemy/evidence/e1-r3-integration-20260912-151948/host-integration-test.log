@@ -1,0 +1,9 @@
+PASS startup and registration
+PASS failed startup is terminal
+PASS observer ownership
+PASS observer isolation
+PASS observer capacity
+PASS thread boundary
+PASS production assembly boundary
+Host integration: 50 assertions passed; 0 groups failed.
+Uses the compiled public SDK and metadata, not native GTFO execution or multiplayer.

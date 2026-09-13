@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../DiagnosticsReport.cs" Link="DiagnosticsReport.cs" />
+    <Compile Include="../../AsyncReportWriter.cs" Link="AsyncReportWriter.cs" />
+    <Compile Include="../../ShutdownSequence.cs" Link="ShutdownSequence.cs" />
+    <Compile Include="../../ProjectObjectReferences.cs" Link="ProjectObjectReferences.cs" />
+  </ItemGroup>
+</Project>

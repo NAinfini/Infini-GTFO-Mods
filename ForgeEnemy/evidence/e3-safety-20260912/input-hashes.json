@@ -1,0 +1,18 @@
+{
+  "initialHead": "77c0e0b29473de513787edf08c4085c754a27890",
+  "finalHead": "77c0e0b29473de513787edf08c4085c754a27890",
+  "before": {
+    "ForgeRuntime/GameBindings/EnemyModule.cs": "aabbca62d22cfa32c19edc9b3c8e623ec1c5fd19ed17699dee1379a66be4bece",
+    "ForgeEnemy/tests/ReceiverProbe/Program.cs": "c3190afad430b92df2bc0b6978a912a60f0a975f981d64915a704184bdd26105",
+    "ForgeEnemy/tests/ReceiverProbe/ReceiverProbe.csproj": "d8419b895d2f5c16354d3d48c2edea233b2f5b55f891a8b912c36d3c511286c6"
+  },
+  "after": {
+    "ForgeRuntime/GameBindings/EnemyModule.cs": "f99fec2bfe3f338836e280a9753622522a26fd79d3b9f34ed430a2a88b6ebbf5",
+    "ForgeEnemy/tests/ReceiverProbe/Program.cs": "8a77ac3d220a52ba79b2ec35c0b9c01b2d0d2bfc50145abffade7db90fc8344c",
+    "ForgeEnemy/tests/ReceiverProbe/ReceiverProbe.csproj": "a8eb2673c1d77863fc1410a95cc2a94b9833b58399fa324ce5e3db4d3c460a1e"
+  },
+  "frameworkAssemblySha256": "52f1f808a575fd08185279394ab2e08f2a8f96a2bf8756bacd1e5d9a10137cf7",
+  "nativeHookFileUnchanged": true,
+  "gameExecuted": false,
+  "compiledHostSha256": "921c483e8787ed7a19eab272020a2ac80dd9c3ed81ca6cea93d3ac88a3aa55d7"
+}

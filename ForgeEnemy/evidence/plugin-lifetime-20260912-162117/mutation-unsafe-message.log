@@ -1,0 +1,3 @@
+FAIL 22/24 Native plugin integration cases; no GTFO execution.
+session.message-getter-cannot-escape-guard: fixture message getter
+session.fault-diagnostic-is-bounded-and-once: Unbounded or repeated failure reporting.

@@ -1,0 +1,3 @@
+NATIVE SIGNATURE/PATCH GROUP/HASH CHECKED; not executed in GTFO. GameAssembly SHA256 C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55
+Play patches: FrameworkStateChanged, FrameworkWorldCleanup, FrameworkSessionReset, FrameworkCheckpointRestore
+PASS 58 native-module boundary assertions. Native API execution and multiplayer are not exercised by these doubles.

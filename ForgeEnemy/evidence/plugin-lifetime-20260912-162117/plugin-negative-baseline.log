@@ -1,0 +1,7 @@
+FAIL 12/18 Native plugin integration cases; no GTFO execution.
+session.readonly-error-data-keeps-primary: Cleanup evidence replaced primary exception or left a provider.
+session.message-getter-cannot-escape-guard: fixture message getter
+session.wrong-thread-callback-is-not-invoked: Expected rejection.
+session.wrong-thread-dispose-keeps-ownership: Off-thread Dispose removed native hooks or permanently disabled the session.
+session.dispatch-dispose-rejects-before-unpatch: In-dispatch Dispose changed hook ownership or claimed a known commit.
+plugin.cleanup-readonly-data-always-clears-session: Post-load cleanup failure masked the original or left the static session published.

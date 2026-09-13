@@ -1,0 +1,131 @@
+--- before/ForgeRuntime/DiagnosticsReport.cs
++++ after/ForgeRuntime/DiagnosticsReport.cs
+@@ -223,14 +223,27 @@
+         }
+     }
+ 
+-    public string Export(string path, string outcome)
++    public string Export(string path, string outcome) => Freeze(outcome).Export(path);
++
++    // Captures managed evidence only. Serialization, byte-budget reduction and IO
++    // can run later without retaining the live report or its mutable scan.
++    internal FrozenReport Freeze(string outcome) => new(this, outcome);
++
++    internal sealed class FrozenReport
++    {
++        private readonly ReportDocument document;
++        internal FrozenReport(DiagnosticsReport owner, string outcome)
++            => document = owner.Capture(outcome);
++        internal string Export(string path) => ExportSnapshot(path, ApplyByteBudget(document));
++    }
++
++    private static string ExportSnapshot(string path, ReportDocument snapshot)
+     {
+         if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Export path is required.", nameof(path));
+         var fullPath = Path.GetFullPath(path);
+         var directory = Path.GetDirectoryName(fullPath) ?? throw new ArgumentException("Export path has no directory.", nameof(path));
+         Directory.CreateDirectory(directory);
+         var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+-        var snapshot = Snapshot(outcome);
+         var bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot, JsonOptions);
+         // Second enforcement point: an over-budget file is refused instead of being published, and the
+         // existing target keeps its bytes.
+@@ -267,7 +280,7 @@
+     // exact UTF-8 bytes and reduced in one fixed order until it fits the report byte budget. Entries
+     // are dropped whole and counted; the object reference receipt, the overflow object and the
+     // critical metadata identities are never dropped.
+-    private ReportDocument Snapshot(string outcome)
++    private ReportDocument Capture(string outcome)
+     {
+         string normalizedOutcome;
+         SortedDictionary<string, string> metadata;
+@@ -302,7 +315,40 @@
+             truncatedStrings = _truncatedStrings;
+         }
+ 
+-        var exportedAtUtc = DateTimeOffset.UtcNow;
++        return new ReportDocument
++        {
++            RunId = _runId, StartedAtUtc = _startedAtUtc, ExportedAtUtc = DateTimeOffset.UtcNow,
++            Outcome = normalizedOutcome, Playability = "not_assessed",
++            Metadata = metadata, Events = events, EventAggregates = aggregates,
++            Checks = checks, Issues = issues, ObjectReferences = references,
++            Overflow = new OverflowEntry
++            {
++                DroppedMetadata = droppedMetadata, DroppedEvents = droppedEvents,
++                SampledDetailEvents = sampledDetailEvents, DroppedAggregateEvents = droppedAggregateEvents,
++                DroppedChecks = droppedChecks, DroppedIssues = droppedIssues,
++                DroppedEventFields = droppedEventFields, TruncatedStrings = truncatedStrings
++            }
++        };
++    }
++
++    private static ReportDocument ApplyByteBudget(ReportDocument snapshot)
++    {
++        var normalizedOutcome = snapshot.Outcome;
++        var metadata = snapshot.Metadata;
++        var events = snapshot.Events;
++        var aggregates = snapshot.EventAggregates;
++        var checks = snapshot.Checks;
++        var issues = snapshot.Issues;
++        var references = snapshot.ObjectReferences;
++        var exportedAtUtc = snapshot.ExportedAtUtc;
++        var droppedMetadata = snapshot.Overflow.DroppedMetadata;
++        var droppedEvents = snapshot.Overflow.DroppedEvents;
++        var sampledDetailEvents = snapshot.Overflow.SampledDetailEvents;
++        var droppedAggregateEvents = snapshot.Overflow.DroppedAggregateEvents;
++        var droppedChecks = snapshot.Overflow.DroppedChecks;
++        var droppedIssues = snapshot.Overflow.DroppedIssues;
++        var droppedEventFields = snapshot.Overflow.DroppedEventFields;
++        var truncatedStrings = snapshot.Overflow.TruncatedStrings;
+         var optionalMetadata = metadata.Where(pair => !CriticalMetadata.Contains(pair.Key)).ToArray();
+         var detailed = 0;
+         foreach (var entry in events) if (IsDetailedEvent(entry.Category)) detailed++;
+@@ -379,8 +425,8 @@
+ 
+         ReportDocument Build(int[] kept) => new()
+         {
+-            RunId = _runId,
+-            StartedAtUtc = _startedAtUtc,
++            RunId = snapshot.RunId,
++            StartedAtUtc = snapshot.StartedAtUtc,
+             ExportedAtUtc = exportedAtUtc,
+             Outcome = normalizedOutcome,
+             Playability = "not_assessed",
+--- before/ForgeRuntime/AsyncReportWriter.cs
++++ after/ForgeRuntime/AsyncReportWriter.cs
+@@ -44,14 +44,16 @@
+         lock (_gate)
+         {
+             if (!_accepting) return false;
+-            var request = new Request(report, fullPath, outcome);
++            // Reject before capturing when no pending slot can be used. Holding the
++            // queue gate makes capture/coalescing order match request order.
++            if (!_byPath.ContainsKey(fullPath) && _pending.Count >= MaxPendingPaths) return false;
++            var request = new Request(report.Freeze(outcome), fullPath);
+             if (_byPath.TryGetValue(fullPath, out var existing))
+             {
+                 existing.Value = request;
+             }
+             else
+             {
+-                if (_pending.Count >= MaxPendingPaths) return false;
+                 _byPath.Add(fullPath, _pending.AddLast(request));
+             }
+ 
+@@ -104,7 +106,7 @@
+ 
+             try
+             {
+-                request.Report.Export(request.Path, request.Outcome);
++                request.Snapshot.Export(request.Path);
+             }
+             catch (Exception error)
+             {
+@@ -120,5 +122,5 @@
+         }
+     }
+ 
+-    private sealed record Request(DiagnosticsReport Report, string Path, string Outcome);
++    private sealed record Request(DiagnosticsReport.FrozenReport Snapshot, string Path);
+ }

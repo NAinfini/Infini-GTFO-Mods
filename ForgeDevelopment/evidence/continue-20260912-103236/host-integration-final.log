@@ -1,0 +1,9 @@
+
+step                  exitCode log                                                                                     
+----                  -------- ---                                                                                     
+build-ForgeRuntime           0 C:\Users\nainf\AppData\Local\Temp\forge-development-continue-1bi2lsh2\host-integratio...
+build-HostIntegration        0 C:\Users\nainf\AppData\Local\Temp\forge-development-continue-1bi2lsh2\host-integratio...
+compiled-sdk-and-host        0 C:\Users\nainf\AppData\Local\Temp\forge-development-continue-1bi2lsh2\host-integratio...
+
+
+SOURCE_CHANGES=0 EXIT=0 EVIDENCE=C:\Users\nainf\AppData\Local\Temp\forge-development-continue-1bi2lsh2\host-integration-final

@@ -1,0 +1,253 @@
+{
+  "receiverSourceSha256": "C8DAB5BEDA3AD97ED2E56BA1F6389F44211BB43CC904CB581048156F8DAC39FB",
+  "scenarioRevision": "captured-life-despawn-v2",
+  "schemaVersion": 2,
+  "verification": "production-source-and-explicit-compiled-sdk-with-test-doubles",
+  "gameExecuted": false,
+  "frameworkAssemblySha256": "609344D96DAFDA2300F97E1DAAA735B8CFB69D4BBEB3D8E6847694CBA6C79967",
+  "utc": "2026-09-12T19:26:40.1901382+00:00",
+  "passed": 40,
+  "failed": 0,
+  "checks": [
+    {
+      "Id": "E2-001.duplicate-spawn",
+      "Passed": true,
+      "Expected": "Repeated observation of the same live spawn preserves its reference.",
+      "Observed": "first=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 1 }; second=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 1 }"
+    },
+    {
+      "Id": "identity.new-life",
+      "Passed": true,
+      "Expected": "A replacement gets a new life and rejects the old reference.",
+      "Observed": "old=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 1 }; new=EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 2 }"
+    },
+    {
+      "Id": "identity.old-pointer",
+      "Passed": true,
+      "Expected": "Old distinct-pointer teardown cannot remove the replacement.",
+      "Observed": "Heal attempted on replacement."
+    },
+    {
+      "Id": "E2-002.captured-life-late-despawn",
+      "Passed": true,
+      "Expected": "An old captured-life token cannot remove a respawn reusing ID and pointer.",
+      "Observed": "succeeded/committed"
+    },
+    {
+      "Id": "identity.wrapper-not-life",
+      "Passed": true,
+      "Expected": "A new managed wrapper without a native life boundary is not a respawn.",
+      "Observed": "EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 1 }"
+    },
+    {
+      "Id": "identity.world-reset",
+      "Passed": true,
+      "Expected": "World reset rejects the old reference.",
+      "Observed": "Old-world Heal attempted."
+    },
+    {
+      "Id": "E3-001.receiver-changed-commit",
+      "Passed": true,
+      "Expected": "An attempted native commit followed by receiver invalidation must not report commitState=none.",
+      "Observed": "status=failed; commit=unknown; sends=1; health=55"
+    },
+    {
+      "Id": "E3-002.invalid-readback-commit",
+      "Passed": true,
+      "Expected": "An invalid readback after native submission leaves the committed amount unknown.",
+      "Observed": "status=failed; commit=unknown; sends=1"
+    },
+    {
+      "Id": "E3-003.duplicate-damage-observation",
+      "Passed": true,
+      "Expected": "Re-delivering one captured damage observation must not duplicate the \u002B5 HP action.",
+      "Observed": "commands=1; sends=1; health=45"
+    },
+    {
+      "Id": "health.full",
+      "Passed": true,
+      "Expected": "Full health generates no packet or health-change fact.",
+      "Observed": "facts=0; sends=0"
+    },
+    {
+      "Id": "health.no-revive",
+      "Passed": true,
+      "Expected": "Healing cannot implicitly revive.",
+      "Observed": "gtfo.enemy.not_alive"
+    },
+    {
+      "Id": "health.missing-receiver",
+      "Passed": true,
+      "Expected": "Uninitialized receiver is rejected without a packet.",
+      "Observed": "gtfo.enemy.missing_health_receiver"
+    },
+    {
+      "Id": "health.quantization",
+      "Passed": true,
+      "Expected": "Sub-quantum positive healing cannot reduce health or publish a fact.",
+      "Observed": "health=50; sends=0"
+    },
+    {
+      "Id": "health.host-authority",
+      "Passed": true,
+      "Expected": "A client cannot submit native healing.",
+      "Observed": "gtfo.enemy.authority_or_phase"
+    },
+    {
+      "Id": "commit.throw-before-readback",
+      "Passed": true,
+      "Expected": "Throwing native submissions are unknown, attempted once, with no fabricated actual amount.",
+      "Observed": "gtfo.enemy.native_commit_exception"
+    },
+    {
+      "Id": "commit.throw-after-write",
+      "Passed": true,
+      "Expected": "A write followed by an exception must not retry or claim no commit.",
+      "Observed": "gtfo.enemy.native_commit_exception"
+    },
+    {
+      "Id": "commit.maximum-changed",
+      "Passed": true,
+      "Expected": "A changed native quantization range invalidates the readback contract.",
+      "Observed": "gtfo.enemy.unexpected_health_readback"
+    },
+    {
+      "Id": "commit.component-replaced",
+      "Passed": true,
+      "Expected": "A replacement damage component cannot supply readback for the old commit.",
+      "Observed": "gtfo.enemy.receiver_changed_during_commit"
+    },
+    {
+      "Id": "commit.authority-lost",
+      "Passed": true,
+      "Expected": "Authority loss during a native callback cannot claim a verified commit.",
+      "Observed": "gtfo.enemy.receiver_changed_during_commit"
+    },
+    {
+      "Id": "identity.foreign-despawn-token",
+      "Passed": true,
+      "Expected": "Tokens cannot cross module/kernel ownership even with matching numerical references.",
+      "Observed": "Other receiver remains current."
+    },
+    {
+      "Id": "identity.same-wrapper-respawn",
+      "Passed": true,
+      "Expected": "Observed despawn/respawn changes life even if both native and managed objects are reused.",
+      "Observed": "EntityReference { Id = gtfo.enemy:7, WorldEpoch = 1, LifeEpoch = 2 }"
+    },
+    {
+      "Id": "identity.old-world-token",
+      "Passed": true,
+      "Expected": "Old-world teardown cannot remove a current-world instance.",
+      "Observed": "EntityReference { Id = gtfo.enemy:7, WorldEpoch = 2, LifeEpoch = 3 }"
+    },
+    {
+      "Id": "identity.pointer-mutated",
+      "Passed": true,
+      "Expected": "Stored native pointer changes invalidate old references.",
+      "Observed": "Old reference rejected."
+    },
+    {
+      "Id": "identity.id-mutated",
+      "Passed": true,
+      "Expected": "A mutated GlobalID cannot be resolved through its former reference.",
+      "Observed": "Old ID rejected."
+    },
+    {
+      "Id": "damage.no-subscribers",
+      "Passed": true,
+      "Expected": "No subscription means no damage observation allocation.",
+      "Observed": "No observation returned."
+    },
+    {
+      "Id": "damage.two-hits-same-tick",
+      "Passed": true,
+      "Expected": "Two distinct same-tick damage windows each execute once; a replay adds nothing.",
+      "Observed": "commands=2; health=40"
+    },
+    {
+      "Id": "damage.zero-window-consumed",
+      "Passed": true,
+      "Expected": "A zero-loss window cannot later acquire unrelated damage by replay.",
+      "Observed": "No follow-up action."
+    },
+    {
+      "Id": "damage.rejected-window-consumed",
+      "Passed": true,
+      "Expected": "Rejected callbacks cannot be retried when authority returns.",
+      "Observed": "No replayed damage fact."
+    },
+    {
+      "Id": "commit.kernel-unknown-no-retry",
+      "Passed": true,
+      "Expected": "The real kernel preserves unknown and never retries or publishes an unverified health fact.",
+      "Observed": "commands=1; sends=1"
+    },
+    {
+      "Id": "damage.token-owner",
+      "Passed": true,
+      "Expected": "A foreign module cannot publish or consume another receiver\u0027s observation.",
+      "Observed": "Only issuer dispatched."
+    },
+    {
+      "Id": "damage.replaced-component",
+      "Passed": true,
+      "Expected": "A retired damage component cannot publish facts for its replacement.",
+      "Observed": "No stale-component fact."
+    },
+    {
+      "Id": "commit.preparation-failure",
+      "Passed": true,
+      "Expected": "Failures before submission are known uncommitted.",
+      "Observed": "gtfo.enemy.quantization_failed"
+    },
+    {
+      "Id": "health.owner-mismatch",
+      "Passed": true,
+      "Expected": "A mismatched receiver owner is rejected before native submission.",
+      "Observed": "gtfo.enemy.health_receiver_owner_mismatch"
+    },
+    {
+      "Id": "commit.owner-changed",
+      "Passed": true,
+      "Expected": "A receiver owner changed during native submission cannot verify the old target.",
+      "Observed": "gtfo.enemy.receiver_changed_during_commit"
+    },
+    {
+      "Id": "lifecycle.world-observer",
+      "Passed": true,
+      "Expected": "World changes invalidate domain identities without the host calling ClearWorld.",
+      "Observed": "EntityReference { Id = gtfo.enemy:7, WorldEpoch = 2, LifeEpoch = 2 }"
+    },
+    {
+      "Id": "lifecycle.dispose",
+      "Passed": true,
+      "Expected": "Disposal removes the provider and is idempotent.",
+      "Observed": "Disposed twice, no handler execution."
+    },
+    {
+      "Id": "lifecycle.stop",
+      "Passed": true,
+      "Expected": "Stopped kernels reject gameplay even when a test host delegate returns true; cleanup still works.",
+      "Observed": "gtfo.enemy.authority_or_phase"
+    },
+    {
+      "Id": "lifecycle.failed-startup",
+      "Passed": true,
+      "Expected": "A failed startup cannot retain an executable enemy receiver.",
+      "Observed": "No native submission."
+    },
+    {
+      "Id": "lifecycle.thread",
+      "Passed": true,
+      "Expected": "Foreign threads cannot mutate identity or consume native work.",
+      "Observed": "wrong-thread"
+    },
+    {
+      "Id": "lifecycle.single-provider",
+      "Passed": true,
+      "Expected": "A second Enemy provider is rejected without damaging the registered provider.",
+      "Observed": "Registry unchanged."
+    }
+  ]
+}

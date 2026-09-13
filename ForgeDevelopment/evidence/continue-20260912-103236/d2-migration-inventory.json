@@ -1,0 +1,2117 @@
+{
+  "format": "forge-development-migration-inventory",
+  "status": "prepared-not-migrated",
+  "verification": "textual consumer inventory, not a semantic call graph or game evidence",
+  "diagnosticSources": [
+    {
+      "source": "ForgeRuntime/RuntimeDiagnostics.cs",
+      "target": "ForgeDevelopment/RuntimeDiagnostics.cs",
+      "sha256": "1127ea819c415011b8425ae013d22b4ed46422fdcf2ac07fbe9f99faefe5ff09",
+      "bytes": 24094,
+      "symbols": [
+        "AuthoringMonitor",
+        "JobTrace",
+        "LogListener",
+        "RuntimeDiagnostics"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/CombatSampling.cs",
+          "lines": [
+            14,
+            26,
+            33,
+            36,
+            40,
+            41,
+            42,
+            56,
+            60,
+            62,
+            63
+          ]
+        },
+        {
+          "path": "ForgeRuntime/GenerationHooks.cs",
+          "lines": [
+            15,
+            137,
+            139,
+            140,
+            144,
+            146,
+            154,
+            160,
+            163,
+            172,
+            179,
+            189,
+            192,
+            205
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Plugin.cs",
+          "lines": [
+            38,
+            43,
+            49,
+            59
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectChecks.cs",
+          "lines": [
+            77
+          ]
+        },
+        {
+          "path": "ForgeRuntime/WorldInspection.cs",
+          "lines": [
+            19,
+            27,
+            28,
+            35,
+            38,
+            45,
+            183,
+            184,
+            264,
+            276,
+            291,
+            292,
+            324,
+            325,
+            326,
+            337,
+            360,
+            366,
+            371,
+            372,
+            411,
+            414,
+            417,
+            420,
+            421,
+            422,
+            424,
+            429,
+            442,
+            466,
+            478,
+            507,
+            534,
+            546,
+            549,
+            563,
+            567
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+          "lines": [
+            21,
+            22,
+            124,
+            154
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/WorldDoubles.cs",
+          "lines": [
+            173
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/Stubs.cs",
+          "lines": [
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/DiagnosticsReport.cs",
+      "target": "ForgeDevelopment/DiagnosticsReport.cs",
+      "sha256": "60dc054bcbf8d0940c4c815404b08f169b53959d4c780e47bdb470275ab1643d",
+      "bytes": 28640,
+      "symbols": [
+        "AggregateEntry",
+        "ByteCounter",
+        "CheckEntry",
+        "DiagnosticsReport",
+        "EventEntry",
+        "FrozenReport",
+        "IssueEntry",
+        "OverflowEntry",
+        "ReportDocument"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/AsyncReportWriter.cs",
+          "lines": [
+            35,
+            125
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectChecks.cs",
+          "lines": [
+            59,
+            67,
+            97,
+            155,
+            393,
+            636
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectInspectionSession.cs",
+          "lines": [
+            9,
+            20
+          ]
+        },
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            32,
+            54,
+            66,
+            102,
+            123
+          ]
+        },
+        {
+          "path": "ForgeRuntime/WorldInspection.cs",
+          "lines": [
+            199,
+            317,
+            401,
+            449,
+            470,
+            490,
+            525
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+          "lines": [
+            13
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+          "lines": [
+            23
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/D1InspectionReviewTests.cs",
+          "lines": [
+            17,
+            23,
+            53,
+            68,
+            79,
+            86,
+            97,
+            102,
+            112,
+            118,
+            128,
+            131
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/Program.cs",
+          "lines": [
+            45,
+            158,
+            209,
+            238,
+            255,
+            259,
+            300,
+            307,
+            347,
+            364,
+            381,
+            393,
+            410,
+            419,
+            427,
+            435,
+            448,
+            466,
+            486,
+            502,
+            521,
+            524,
+            550,
+            567,
+            580,
+            595
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+          "lines": [
+            19
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Program.cs",
+          "lines": [
+            21,
+            48,
+            83,
+            86,
+            100,
+            115,
+            136,
+            202,
+            242,
+            258,
+            285,
+            329
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/ProjectObjectReferenceContractTests.cs",
+          "lines": [
+            4,
+            35,
+            69,
+            91,
+            112
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Reports.csproj",
+          "lines": [
+            10
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/PreservedSnapshotTests.cs",
+          "lines": [
+            23
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/Program.cs",
+          "lines": [
+            29
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/QueueBoundaryTests.cs",
+          "lines": [
+            14,
+            46
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj",
+          "lines": [
+            11
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/WorkerBoundaryTests.cs",
+          "lines": [
+            11,
+            22,
+            42,
+            43
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/DiagnosticLogClassifier.cs",
+      "target": "ForgeDevelopment/DiagnosticLogClassifier.cs",
+      "sha256": "cd322b539d03ec47cfde0a273e9a18429d187e90c5e9e41d958b2af3b8395b43",
+      "bytes": 1047,
+      "symbols": [
+        "DiagnosticLogClassifier"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            42,
+            113
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+          "lines": [
+            18
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/AsyncReportWriter.cs",
+      "target": "ForgeDevelopment/AsyncReportWriter.cs",
+      "sha256": "f6b2221d87c221359a186e5e3b1480f277c6d56cdc9ab634a6bd1efbcc4c74c7",
+      "bytes": 3937,
+      "symbols": [
+        "AsyncReportWriter",
+        "Request"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            58,
+            95
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeKernel.State.cs",
+          "lines": [
+            71,
+            99
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/TimingContracts.cs",
+          "lines": [
+            46,
+            47,
+            49,
+            50
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Program.cs",
+          "lines": [
+            137,
+            148,
+            158,
+            166
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Reports.csproj",
+          "lines": [
+            11
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/PreservedSnapshotTests.cs",
+          "lines": [
+            15
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/Program.cs",
+          "lines": [
+            22
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/QueueBoundaryTests.cs",
+          "lines": [
+            16
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj",
+          "lines": [
+            12
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/WorkerBoundaryTests.cs",
+          "lines": [
+            19,
+            36
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/GenerationHooks.cs",
+      "target": "ForgeDevelopment/GenerationHooks.cs",
+      "sha256": "484beae18648822975acff22c70ded6c59e250d03c83fcb783cd3d0a1cd7c85f",
+      "bytes": 9364,
+      "symbols": [
+        "CullingFailure",
+        "CullingLifecycle",
+        "FactoryFinished",
+        "FactoryStart",
+        "GenerationJob",
+        "LevelCleanup",
+        "MarkerPlaced",
+        "PrefabSpawned"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/tests/GameBindings/NativeEvidence.cs",
+          "lines": [
+            49
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/WorldInspection.cs",
+      "target": "ForgeDevelopment/WorldInspection.cs",
+      "sha256": "8b2613bf696be3c4c7b7fe0f3f9ffc757761e032fe0b8652602587a3221e03da",
+      "bytes": 29091,
+      "symbols": [
+        "WorldInspection"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            239
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+          "lines": [
+            14
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+          "lines": [
+            44,
+            119,
+            137
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/ProjectChecks.cs",
+      "target": "ForgeDevelopment/ProjectChecks.cs",
+      "sha256": "4d4a64af4417102b41bf275bfe5eccfecc4755681bb7be9b8f0bd1135a707a58",
+      "bytes": 38062,
+      "symbols": [
+        "DeclaredSource",
+        "Dependency",
+        "Manifest",
+        "ProjectChecks",
+        "SourceCandidate",
+        "SourceRequest"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            119,
+            148,
+            248,
+            270,
+            285,
+            305,
+            398
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/Program.cs",
+          "lines": [
+            22,
+            30,
+            159,
+            210,
+            239,
+            256,
+            260,
+            301,
+            308,
+            348,
+            365,
+            382,
+            394,
+            411,
+            420,
+            428,
+            436,
+            449,
+            467,
+            487,
+            503,
+            504,
+            522,
+            525,
+            551,
+            568,
+            581,
+            596,
+            610
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+          "lines": [
+            16
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/scripts/verify-diagnostics.py",
+          "lines": [
+            18
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/ProjectObjectReferences.cs",
+      "target": "ForgeDevelopment/ProjectObjectReferences.cs",
+      "sha256": "3d4d8810032718e55ffefaf385e9a3e4ef363ed2252648243777372b265c66bb",
+      "bytes": 33523,
+      "symbols": [
+        "DiagnosticNativeObject",
+        "ProjectAreaCandidate",
+        "ProjectGeomorphObservation",
+        "ProjectLayoutKey",
+        "ProjectLocator",
+        "ProjectObjectDeclaration",
+        "ProjectObjectReferenceScan",
+        "ProjectObjectReferences",
+        "ProjectReferenceGroup",
+        "ProjectReferenceOverflow",
+        "ProjectReferenceReason",
+        "ProjectReferenceSnapshot",
+        "ProjectReferenceStatus",
+        "ProjectResourcePin",
+        "ProjectRoomLocator",
+        "ProjectScanStatus",
+        "ProjectSourceVerification",
+        "ProjectZoneCandidate",
+        "ProjectZoneLocator",
+        "Resolution"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/DiagnosticsReport.cs",
+          "lines": [
+            46,
+            47,
+            58,
+            59,
+            71,
+            167,
+            204,
+            250,
+            252,
+            364,
+            368,
+            370,
+            373,
+            378,
+            383,
+            390,
+            392,
+            519,
+            531,
+            532,
+            574,
+            586
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectChecks.cs",
+          "lines": [
+            23,
+            27,
+            44,
+            60,
+            67,
+            73,
+            85,
+            97,
+            101,
+            130,
+            131,
+            155,
+            157,
+            158,
+            159,
+            220,
+            226,
+            234,
+            246,
+            247,
+            267,
+            269,
+            304,
+            305,
+            306,
+            359,
+            393,
+            396,
+            422,
+            425,
+            429,
+            445,
+            523,
+            524,
+            525,
+            526,
+            527,
+            531
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectInspectionSession.cs",
+          "lines": [
+            10,
+            16,
+            20,
+            23,
+            39,
+            60
+          ]
+        },
+        {
+          "path": "ForgeRuntime/WorldInspection.cs",
+          "lines": [
+            199,
+            208,
+            213,
+            224,
+            285,
+            300,
+            311,
+            380,
+            382,
+            391,
+            394,
+            398
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+          "lines": [
+            11
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+          "lines": [
+            14,
+            16,
+            17,
+            19,
+            23,
+            55,
+            57,
+            58,
+            68,
+            71,
+            72,
+            76,
+            86,
+            94,
+            99,
+            104,
+            127,
+            130,
+            138,
+            140,
+            142,
+            144,
+            145,
+            146,
+            147,
+            148,
+            152,
+            153,
+            156,
+            159,
+            161,
+            162,
+            163,
+            165,
+            166,
+            169
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/D1InspectionReviewTests.cs",
+          "lines": [
+            8,
+            10,
+            11,
+            12,
+            14,
+            15,
+            32,
+            33,
+            34,
+            38,
+            39,
+            46,
+            51,
+            58,
+            61,
+            67,
+            71,
+            73,
+            83,
+            89,
+            91,
+            93,
+            100,
+            115,
+            117,
+            120,
+            122,
+            124,
+            125
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/Program.cs",
+          "lines": [
+            196,
+            197,
+            261
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+          "lines": [
+            17
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Program.cs",
+          "lines": [
+            201,
+            331,
+            333,
+            334
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/ProjectObjectReferenceContractTests.cs",
+          "lines": [
+            38,
+            41,
+            68,
+            73,
+            75,
+            114,
+            115,
+            142,
+            143,
+            150,
+            151,
+            152,
+            155,
+            156,
+            161,
+            164,
+            165,
+            172,
+            173,
+            174,
+            175
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Reports.csproj",
+          "lines": [
+            13
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/PreservedSnapshotTests.cs",
+          "lines": [
+            28,
+            29,
+            30,
+            31,
+            41,
+            49
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/Program.cs",
+          "lines": [
+            30,
+            31,
+            32,
+            47,
+            50
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj",
+          "lines": [
+            13
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/WorkerBoundaryTests.cs",
+          "lines": [
+            13,
+            14,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/ProjectInspectionSession.cs",
+      "target": "ForgeDevelopment/ProjectInspectionSession.cs",
+      "sha256": "3ad9ba01cfd2d6669edfa1d956599105ca9479e5f98291f0b18f06dfee707bac",
+      "bytes": 2597,
+      "symbols": [
+        "ProjectInspectionSession"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            56,
+            149
+          ]
+        },
+        {
+          "path": "ForgeRuntime/WorldInspection.cs",
+          "lines": [
+            14,
+            32,
+            252,
+            261,
+            273,
+            285,
+            363
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+          "lines": [
+            12
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+          "lines": [
+            19,
+            41,
+            47
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/D1InspectionReviewTests.cs",
+          "lines": [
+            25,
+            55,
+            69,
+            79,
+            86,
+            97,
+            103,
+            112,
+            118,
+            128,
+            131
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+          "lines": [
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/PerformanceDiagnostics.cs",
+      "target": "ForgeDevelopment/PerformanceDiagnostics.cs",
+      "sha256": "04e66310ff6b8ed63bdfde08eef05c0ebefed53bdc8711a9e0b6ad1ce2f3eb8d",
+      "bytes": 68887,
+      "symbols": [
+        "AsyncLogWriter",
+        "NativeSampler",
+        "PerformanceDiagnostics",
+        "PerformanceMonitor",
+        "PerformanceScope",
+        "SectionSample",
+        "Settings",
+        "a",
+        "struct",
+        "was"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/AuthoringSettings.cs",
+          "lines": [
+            8,
+            19
+          ]
+        },
+        {
+          "path": "ForgeRuntime/CanonicalTriggerRuntime.cs",
+          "lines": [
+            120,
+            210,
+            257
+          ]
+        },
+        {
+          "path": "ForgeRuntime/DiagnosticsReport.cs",
+          "lines": [
+            21,
+            55,
+            57,
+            69,
+            70,
+            252,
+            359,
+            360,
+            531,
+            572
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ForgeRuntimeHost.cs",
+          "lines": [
+            15,
+            16,
+            53
+          ]
+        },
+        {
+          "path": "ForgeRuntime/GenerationHooks.cs",
+          "lines": [
+            22,
+            143
+          ]
+        },
+        {
+          "path": "ForgeRuntime/PerformanceSampleWindow.cs",
+          "lines": [
+            5
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Plugin.cs",
+          "lines": [
+            27,
+            28,
+            29,
+            31,
+            34,
+            35,
+            36,
+            42,
+            43,
+            44,
+            47,
+            50,
+            59,
+            62
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectChecks.cs",
+          "lines": [
+            26,
+            55,
+            100,
+            103,
+            104,
+            105,
+            124,
+            128,
+            129,
+            152,
+            153,
+            154,
+            167,
+            276,
+            323,
+            340,
+            349,
+            355,
+            361,
+            365,
+            378,
+            390,
+            425,
+            481,
+            499,
+            531,
+            600,
+            601
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ProjectObjectReferences.cs",
+          "lines": [
+            119,
+            128,
+            151,
+            152,
+            162,
+            241,
+            245,
+            288,
+            450
+          ]
+        },
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            82,
+            136,
+            262,
+            294,
+            306,
+            312,
+            345,
+            375,
+            376,
+            397
+          ]
+        },
+        {
+          "path": "ForgeRuntime/SceneInventory.cs",
+          "lines": [
+            12
+          ]
+        },
+        {
+          "path": "ForgeRuntime/ShutdownSequence.cs",
+          "lines": [
+            24
+          ]
+        },
+        {
+          "path": "ForgeRuntime/TelemetryBridge.cs",
+          "lines": [
+            11,
+            12
+          ]
+        },
+        {
+          "path": "ForgeRuntime/WorldInspection.cs",
+          "lines": [
+            42,
+            43,
+            76,
+            77,
+            106,
+            107,
+            211,
+            309,
+            343,
+            360,
+            385,
+            405,
+            429,
+            433,
+            442,
+            474,
+            494,
+            529
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/Contracts.cs",
+          "lines": [
+            156,
+            172
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeJson.cs",
+          "lines": [
+            75
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeKernel.cs",
+          "lines": [
+            84
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs",
+          "lines": [
+            42
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeKernel.State.cs",
+          "lines": [
+            42,
+            46
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeKernel.Timing.cs",
+          "lines": [
+            155,
+            182
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/RuntimeRegistry.cs",
+          "lines": [
+            124,
+            139
+          ]
+        },
+        {
+          "path": "ForgeRuntime/Framework/TimingContracts.cs",
+          "lines": [
+            33
+          ]
+        },
+        {
+          "path": "ForgeRuntime/GameBindings/EnemyModule.cs",
+          "lines": [
+            10,
+            61,
+            62,
+            111,
+            162,
+            184
+          ]
+        },
+        {
+          "path": "ForgeRuntime/GameBindings/GameRuntimeBridge.cs",
+          "lines": [
+            77,
+            118,
+            152
+          ]
+        },
+        {
+          "path": "ForgeRuntime/GameBindings/NativeHooks.cs",
+          "lines": [
+            34
+          ]
+        },
+        {
+          "path": "ForgeRuntime/scripts/compare_runs.py",
+          "lines": [
+            5,
+            7,
+            8,
+            75,
+            108,
+            114,
+            142,
+            180,
+            209,
+            280,
+            289,
+            304,
+            512,
+            513
+          ]
+        },
+        {
+          "path": "ForgeRuntime/scripts/import_log.py",
+          "lines": [
+            2,
+            5,
+            6,
+            29,
+            109,
+            185,
+            201
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/SceneInventoryTests.cs",
+          "lines": [
+            79
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/test_compare_runs.py",
+          "lines": [
+            180,
+            274,
+            310
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/test_import_log.py",
+          "lines": [
+            66,
+            117,
+            130,
+            186,
+            188,
+            195
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Architecture/Program.cs",
+          "lines": [
+            35,
+            74
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+          "lines": [
+            16,
+            17,
+            58,
+            104,
+            153
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/WorldDoubles.cs",
+          "lines": [
+            37,
+            38,
+            43,
+            44,
+            45,
+            52,
+            161
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Framework/ExecutionResultTests.cs",
+          "lines": [
+            45,
+            47,
+            68,
+            69,
+            82,
+            102,
+            109,
+            121,
+            123,
+            130,
+            136,
+            138,
+            147,
+            152,
+            163,
+            164,
+            166,
+            177,
+            178,
+            196,
+            198
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Framework/Program.cs",
+          "lines": [
+            16,
+            19,
+            24,
+            26,
+            27,
+            33,
+            34,
+            38,
+            43,
+            45,
+            46,
+            49,
+            51,
+            52,
+            53,
+            59,
+            60,
+            65,
+            69,
+            71,
+            77,
+            78,
+            81,
+            85,
+            86,
+            87,
+            88,
+            89,
+            96,
+            98,
+            108,
+            112,
+            117,
+            118,
+            160,
+            161,
+            162,
+            168,
+            169,
+            174,
+            175,
+            176,
+            178,
+            182,
+            183,
+            184,
+            229,
+            230,
+            240,
+            241,
+            244,
+            245,
+            247,
+            250,
+            254
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Framework/TimingTests.cs",
+          "lines": [
+            19,
+            20,
+            23,
+            28,
+            29,
+            30,
+            31,
+            35,
+            39,
+            40,
+            41,
+            48,
+            49,
+            50,
+            54,
+            55,
+            58,
+            59,
+            63,
+            64,
+            66,
+            67,
+            68,
+            70,
+            71,
+            72,
+            73,
+            76,
+            77,
+            82,
+            87,
+            88,
+            93,
+            94,
+            95,
+            98,
+            99,
+            101,
+            106,
+            107,
+            113,
+            114,
+            115,
+            116,
+            118,
+            121,
+            122,
+            123,
+            124,
+            127,
+            128,
+            130,
+            133,
+            135,
+            136,
+            141,
+            143,
+            145,
+            146,
+            149,
+            152,
+            153,
+            154,
+            155,
+            157,
+            158,
+            161,
+            162,
+            163,
+            167,
+            168,
+            172,
+            175,
+            176,
+            178,
+            182,
+            183,
+            184,
+            196,
+            197,
+            198,
+            199,
+            200,
+            201,
+            202,
+            203,
+            209,
+            210,
+            211,
+            217,
+            218,
+            219,
+            221,
+            224,
+            225,
+            226,
+            228,
+            233,
+            236,
+            237,
+            239,
+            240,
+            241,
+            242,
+            244,
+            248,
+            251,
+            255,
+            256,
+            259,
+            260,
+            261,
+            262,
+            263,
+            265,
+            268,
+            269,
+            270,
+            271,
+            276,
+            277,
+            278,
+            279,
+            281,
+            283,
+            284,
+            285,
+            286,
+            287,
+            289,
+            294,
+            295,
+            303,
+            304,
+            305,
+            315,
+            316,
+            317,
+            318,
+            319,
+            322,
+            323,
+            327,
+            329,
+            332,
+            335,
+            336,
+            341,
+            344,
+            346,
+            392
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/GameBindings/GameDoubles.cs",
+          "lines": [
+            24
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/GameBindings/NativeEvidence.cs",
+          "lines": [
+            42,
+            57,
+            58,
+            60
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/GameBindings/Program.cs",
+          "lines": [
+            36
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/HostIntegration/HostAssemblyProbe.cs",
+          "lines": [
+            13,
+            27
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/HostIntegration/LifecycleProbe.cs",
+          "lines": [
+            64,
+            66,
+            68,
+            70,
+            93,
+            116
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/LifecycleWork/CleanupTests.cs",
+          "lines": [
+            22,
+            23
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/LifecycleWork/ObserverTests.cs",
+          "lines": [
+            44
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/D1InspectionReviewTests.cs",
+          "lines": [
+            12,
+            31,
+            57,
+            62,
+            92,
+            109,
+            116,
+            126,
+            130
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/Program.cs",
+          "lines": [
+            42,
+            52,
+            60,
+            81,
+            96,
+            121,
+            130,
+            135,
+            138,
+            142,
+            167,
+            170,
+            171,
+            177,
+            183,
+            193,
+            213,
+            215,
+            221,
+            222,
+            224,
+            228,
+            229,
+            230,
+            231,
+            232,
+            243,
+            245,
+            247,
+            248,
+            251,
+            270,
+            273,
+            275,
+            278,
+            284,
+            286,
+            288,
+            291,
+            292,
+            295,
+            304,
+            312,
+            324,
+            328,
+            330,
+            334,
+            353,
+            359,
+            376,
+            384,
+            396,
+            400,
+            401,
+            402,
+            403,
+            426,
+            432,
+            454,
+            455,
+            456,
+            479,
+            480,
+            483,
+            494,
+            509,
+            510,
+            511,
+            512,
+            538,
+            556,
+            566,
+            579,
+            587,
+            588,
+            601
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/ProjectChecks/Stubs.cs",
+          "lines": [
+            40
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Program.cs",
+          "lines": [
+            60,
+            199,
+            221,
+            223,
+            224,
+            230,
+            248,
+            251,
+            253,
+            280,
+            288,
+            306,
+            318,
+            321,
+            347,
+            348,
+            349
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/ProjectObjectReferenceContractTests.cs",
+          "lines": [
+            10,
+            36,
+            37,
+            55,
+            63,
+            86,
+            126,
+            128,
+            141,
+            144,
+            167
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Samples/Program.cs",
+          "lines": [
+            3,
+            7,
+            10
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Telemetry/Program.cs",
+          "lines": [
+            11,
+            20,
+            24,
+            26,
+            27,
+            42
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/scripts/verify-diagnostics.py",
+          "lines": [
+            42,
+            103
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/PreservedSnapshotTests.cs",
+          "lines": [
+            79,
+            92,
+            98
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/ReportSnapshots/Program.cs",
+          "lines": [
+            27,
+            30,
+            53
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/PerformanceSampleWindow.cs",
+      "target": "ForgeDevelopment/PerformanceSampleWindow.cs",
+      "sha256": "5e22249f769704310ce786f53eebaa1e32a73c3f5d122ccaca29eb6946af3833",
+      "bytes": 2220,
+      "symbols": [
+        "PerformanceSampleWindow",
+        "struct"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/PerformanceDiagnostics.cs",
+          "lines": [
+            66,
+            127,
+            128,
+            129,
+            130,
+            131,
+            132,
+            135,
+            136,
+            137
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/SceneInventoryTests.cs",
+          "lines": [
+            79
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/DevelopmentInspection/WorldDoubles.cs",
+          "lines": [
+            37,
+            38,
+            52,
+            161
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/GameBindings/GameDoubles.cs",
+          "lines": [
+            24
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Samples/Program.cs",
+          "lines": [
+            5,
+            12
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Samples/Samples.csproj",
+          "lines": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/SceneInventory.cs",
+      "target": "ForgeDevelopment/SceneInventory.cs",
+      "sha256": "0fb1dffffa63eed730facb771df499ebc365a6fb4212ae36b7346efb3be0004f",
+      "bytes": 3902,
+      "symbols": [
+        "Bucket",
+        "SceneInventory"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/PerformanceDiagnostics.cs",
+          "lines": [
+            166,
+            722
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/SceneInventoryTests.cs",
+          "lines": [
+            20,
+            31
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/SceneInventory/SceneInventoryTests.csproj",
+          "lines": [
+            10
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/scripts/verify-diagnostics.py",
+          "lines": [
+            22
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/CombatSampling.cs",
+      "target": "ForgeDevelopment/CombatSampling.cs",
+      "sha256": "66567b097565e323a8a65ce975249704698434494ee753d2603d3cb38bdde582",
+      "bytes": 3214,
+      "symbols": [
+        "CombatSampling",
+        "DamageSample",
+        "WeaponSample"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            295,
+            310
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/GameBindings/NativeEvidence.cs",
+          "lines": [
+            49
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/TelemetryBridge.cs",
+      "target": "ForgeDevelopment/TelemetryBridge.cs",
+      "sha256": "862d32a0a06eb34aa5ba0d10088570a04cb60801cd76a6ffcb56f0466078abed",
+      "bytes": 1627,
+      "symbols": [
+        "TelemetryBridge"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/PerformanceDiagnostics.cs",
+          "lines": [
+            205,
+            328,
+            442
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Telemetry/Program.cs",
+          "lines": [
+            8,
+            10,
+            16,
+            17,
+            19,
+            21,
+            23,
+            28,
+            32,
+            34,
+            36
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Telemetry/Telemetry.csproj",
+          "lines": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "source": "ForgeRuntime/ShutdownSequence.cs",
+      "target": "ForgeDevelopment/ShutdownSequence.cs",
+      "sha256": "eefb1913350bf62aeb5f7014f1db785f73de6b6991ac850ab51b678f0f4d79fe",
+      "bytes": 1129,
+      "symbols": [
+        "ShutdownSequence"
+      ],
+      "consumers": [
+        {
+          "path": "ForgeRuntime/RuntimeDiagnostics.cs",
+          "lines": [
+            385
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Program.cs",
+          "lines": [
+            41
+          ]
+        },
+        {
+          "path": "ForgeRuntime/tests/Reports/Reports.csproj",
+          "lines": [
+            12
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/Shutdown/Program.cs",
+          "lines": [
+            12,
+            21,
+            42,
+            59
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/Shutdown/ReceiptTests.cs",
+          "lines": [
+            11,
+            27,
+            30,
+            33,
+            37
+          ]
+        },
+        {
+          "path": "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+          "lines": [
+            11
+          ]
+        }
+      ]
+    }
+  ],
+  "testsAndScripts": [
+    {
+      "source": "ForgeRuntime/tests/test_compare_runs.py",
+      "target": "ForgeDevelopment/tests/test_compare_runs.py",
+      "sha256": "f47f0ded0ab93a812d92c6b6bb9acc9e440bab753fc56a504b14fa895e92bec0"
+    },
+    {
+      "source": "ForgeRuntime/tests/test_import_log.py",
+      "target": "ForgeDevelopment/tests/test_import_log.py",
+      "sha256": "b20485778652f130fb5c60722ab480a6562d3c7f6dbfc706835f47ae039fdd7c"
+    },
+    {
+      "source": "ForgeRuntime/tests/test_performance_report.py",
+      "target": "ForgeDevelopment/tests/test_performance_report.py",
+      "sha256": "0583c08252f41c676923509cee8d0dfff138ad2e3c9ac07e7755e8f94cf54b6e"
+    },
+    {
+      "source": "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+      "target": "ForgeDevelopment/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+      "sha256": "a5952719de819ebe9d652ca8131d755750d954c715c2698b88eca670f56b1645"
+    },
+    {
+      "source": "ForgeRuntime/tests/DevelopmentInspection/Program.cs",
+      "target": "ForgeDevelopment/tests/DevelopmentInspection/Program.cs",
+      "sha256": "36aa25071e3c5e6d91c927ef244f1ba59adeb380b9b7fbdd97e3760123447e6b"
+    },
+    {
+      "source": "ForgeRuntime/tests/DevelopmentInspection/WorldDoubles.cs",
+      "target": "ForgeDevelopment/tests/DevelopmentInspection/WorldDoubles.cs",
+      "sha256": "4d49107292da669b35552c54c49cd7a5cbb47e8b18db59d5c2606381c51a9c1f"
+    },
+    {
+      "source": "ForgeRuntime/tests/ProjectChecks/D1InspectionReviewTests.cs",
+      "target": "ForgeDevelopment/tests/ProjectChecks/D1InspectionReviewTests.cs",
+      "sha256": "58e48123fe9bd4851e5b6dd9490b1eebf1c14b33e62fe0e825019ae55acb32f2"
+    },
+    {
+      "source": "ForgeRuntime/tests/ProjectChecks/Program.cs",
+      "target": "ForgeDevelopment/tests/ProjectChecks/Program.cs",
+      "sha256": "98e7969d0965b961217a05a7907e57423d4856bec6695e12e426a40555730a96"
+    },
+    {
+      "source": "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj",
+      "target": "ForgeDevelopment/tests/ProjectChecks/ProjectChecks.csproj",
+      "sha256": "3375839f958a5aa2af76a9c4c2f8d86ba496f51706b94cb43632d50152768990"
+    },
+    {
+      "source": "ForgeRuntime/tests/ProjectChecks/Stubs.cs",
+      "target": "ForgeDevelopment/tests/ProjectChecks/Stubs.cs",
+      "sha256": "47baf099a557aaeabeacd57ebcd325a744fb1e9b8b60b3e9fecaf399d8e7a20f"
+    },
+    {
+      "source": "ForgeRuntime/tests/Reports/Program.cs",
+      "target": "ForgeDevelopment/tests/Reports/Program.cs",
+      "sha256": "ef1ef5571400241f409b90b4b4fe84026fa5141a2342e5e61b71cbd49d4867e1"
+    },
+    {
+      "source": "ForgeRuntime/tests/Reports/ProjectObjectReferenceContractTests.cs",
+      "target": "ForgeDevelopment/tests/Reports/ProjectObjectReferenceContractTests.cs",
+      "sha256": "9bbb6227243132ae808fe6dfbfb0b7fe31d125fd7a4a3e20151cca0cd508403d"
+    },
+    {
+      "source": "ForgeRuntime/tests/Reports/Reports.csproj",
+      "target": "ForgeDevelopment/tests/Reports/Reports.csproj",
+      "sha256": "3384915b9870c37ca91e257a653c806088795d63ecc6c5b1dbf470196c9ac5f1"
+    },
+    {
+      "source": "ForgeRuntime/tests/Samples/Program.cs",
+      "target": "ForgeDevelopment/tests/Samples/Program.cs",
+      "sha256": "40a64baa2c6060cb5d070cb625fc5c98449c5a52a97a767ed8440a0003ef8386"
+    },
+    {
+      "source": "ForgeRuntime/tests/Samples/Samples.csproj",
+      "target": "ForgeDevelopment/tests/Samples/Samples.csproj",
+      "sha256": "bee740e8f8a34418f9d0b2995d616663676f19ed195149ef48250919e7edd408"
+    },
+    {
+      "source": "ForgeRuntime/tests/SceneInventory/SceneInventoryTests.csproj",
+      "target": "ForgeDevelopment/tests/SceneInventory/SceneInventoryTests.csproj",
+      "sha256": "8a66764288e850b54cf3d5f9b562b84fcb33bac1d34e1b2f01958571a1503474"
+    },
+    {
+      "source": "ForgeRuntime/tests/Telemetry/Program.cs",
+      "target": "ForgeDevelopment/tests/Telemetry/Program.cs",
+      "sha256": "ac8f17067dca41c8a2584199190ff4921c2f982ad8ba904a9dd97034ebadfcc5"
+    },
+    {
+      "source": "ForgeRuntime/tests/Telemetry/Telemetry.csproj",
+      "target": "ForgeDevelopment/tests/Telemetry/Telemetry.csproj",
+      "sha256": "d114cabb7a3486ea349903b3a46ae65036c16b36a34566cdf639eee920a8b9ee"
+    },
+    {
+      "source": "ForgeRuntime/scripts/analyze_performance.py",
+      "target": "ForgeDevelopment/scripts/analyze_performance.py",
+      "sha256": "ec20ef64f9d945f242bcc85661bb2a3c42561dca94ca113b9b6813d86bde1946"
+    },
+    {
+      "source": "ForgeRuntime/scripts/compare_runs.py",
+      "target": "ForgeDevelopment/scripts/compare_runs.py",
+      "sha256": "4dba15b81646c03aee8134ed2962f0246391b50b3092b24e0aa34d5da39cd3de"
+    },
+    {
+      "source": "ForgeRuntime/scripts/import_log.py",
+      "target": "ForgeDevelopment/scripts/import_log.py",
+      "sha256": "93feb56854ee7529ee2f4f406814c242dc09f3e56db35ab12e823fecc22b4ba6"
+    }
+  ],
+  "sharedCutoverFiles": [
+    {
+      "path": "ForgeRuntime/Plugin.cs",
+      "sha256": "2fbdbd0497a5fdf26259023c4a9594b4f278e45d0f962570aedbf09fe6070835"
+    },
+    {
+      "path": "ForgeRuntime/AuthoringSettings.cs",
+      "sha256": "52bffc7273d798d3dafed2e5a977b367dded4e61bb906b592ddea2bc68d98658"
+    },
+    {
+      "path": "ForgeRuntime/GameBindings/PluginPatchSelection.cs",
+      "sha256": "be237fc68dd984c56693b920c17fdfc0f1844125fd0f774a84eeec1f1cbf0638"
+    },
+    {
+      "path": "ForgeRuntime/ForgeRuntime.csproj",
+      "sha256": "5efab5886c8c69df8d0ba70ce8c3e78f15d88592e33cab3ab5c3cf79b2190c94"
+    },
+    {
+      "path": "ForgeDevelopment/ForgeDevelopment.csproj",
+      "sha256": "9e262db550e1539d081b1ec6df2266f967f69bcf95776da2562da9bea5bc365e"
+    }
+  ],
+  "runtimeEntry": "ForgeRuntime.Plugin.Runtime",
+  "lifecycleEntry": "RuntimeModuleHandle.ObserveLifecycle",
+  "newPluginIdentity": "not activated; coordinate with Runtime R2b",
+  "profileModified": false,
+  "filesMoved": false
+}

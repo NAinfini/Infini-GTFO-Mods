@@ -1,0 +1,58 @@
+{
+  "capturedUtc": "2026-09-12T14:33:50.456595+00:00",
+  "verification": "local-compiled-tests; no native game execution",
+  "before": {
+    "ForgeMap/ForgeMap.csproj": "038041a33dfb095ac25d06e99de17e8a799c29068f3499626f4ca0fa0564679b",
+    "ForgeMap/ModuleDefinition.cs": "0318728553181083d8642406639774f7ef1ad0b16af87e47a6dd7e76bd5d1304",
+    "ForgeMap/tests/MapContracts/MapContracts.csproj": "595fc10fc4a45b541c5fd6219b2ac4f003b04bf0c217e1e10e3db7ea6c505f85",
+    "ForgeMap/tests/MapContracts/Program.cs": "8e912142df1ff179e6bffa63da28812dcbe72053a1bc64331eb4e78898a3069b",
+    "ForgeMap/tests/MapContracts/TestWorld.cs": "42a9092b3080f90423aa1df0462a0482f7148dd1f1c4121bb5a359ef97437515",
+    "ForgeRuntime/Framework/CombatContracts.cs": "1a239ac29ae883fd6e4414dc21da1ced02348ee6eb69639b14c72949dcdf402f",
+    "ForgeRuntime/Framework/Contracts.cs": "a6c69c5405920b9c01702a640053d4dbc110f21cac728ba8754de35f4eb46ede",
+    "ForgeRuntime/Framework/ForgeRuntime.Framework.csproj": "a6e3804e27c7e263fde5553651002dbc0f4b9d54e4922c8e114ac758bcb2455c",
+    "ForgeRuntime/Framework/LifecycleContracts.cs": "80446ffe263959fb2c4f385b402076d6d7b375247033684498425929e7e757a0",
+    "ForgeRuntime/Framework/RuntimeJson.cs": "9024abdd447140a0d0b971852134891c931dd9569faa71c70883851a193a370e",
+    "ForgeRuntime/Framework/RuntimeKernel.cs": "18df60b82890910a052d35e4bf42b692f0b948d3e1e78e0f90bdd759c383ba0b",
+    "ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs": "a679417c9c7937b213f275bb8fb849971eeb3fa5cb0ccb3b6bc846f492c653b0",
+    "ForgeRuntime/Framework/RuntimeKernel.State.cs": "214e9fc5e644ce42735ae93bc181bf7b1a3a661d46bb247ea4215eb471ef37c2",
+    "ForgeRuntime/Framework/RuntimeKernel.Timing.cs": "30dfdb98b96f4f4480d739251b4ba07b4c282c796fc31ffe18e78e880b73105d",
+    "ForgeRuntime/Framework/RuntimePlan.cs": "9877e60bf7aed53d762f2bb3456cd2e023144effa08ffee0544fd7d2eabc7497",
+    "ForgeRuntime/Framework/RuntimeRegistry.cs": "51712e2e66a72ac14c4223c1f1ea7367b45641048f68edba01fa7f42dbd5be1f",
+    "ForgeRuntime/Framework/TimingContracts.cs": "286f4c7d76d5438e327530618cd893ffeb3f63fda91465d8b6c037e6243be68a"
+  },
+  "after": {
+    "ForgeMap/ForgeMap.csproj": "038041a33dfb095ac25d06e99de17e8a799c29068f3499626f4ca0fa0564679b",
+    "ForgeMap/ModuleDefinition.cs": "0318728553181083d8642406639774f7ef1ad0b16af87e47a6dd7e76bd5d1304",
+    "ForgeMap/tests/MapContracts/MapContracts.csproj": "595fc10fc4a45b541c5fd6219b2ac4f003b04bf0c217e1e10e3db7ea6c505f85",
+    "ForgeMap/tests/MapContracts/Program.cs": "8e912142df1ff179e6bffa63da28812dcbe72053a1bc64331eb4e78898a3069b",
+    "ForgeMap/tests/MapContracts/TestWorld.cs": "42a9092b3080f90423aa1df0462a0482f7148dd1f1c4121bb5a359ef97437515",
+    "ForgeRuntime/Framework/CombatContracts.cs": "1a239ac29ae883fd6e4414dc21da1ced02348ee6eb69639b14c72949dcdf402f",
+    "ForgeRuntime/Framework/Contracts.cs": "a6c69c5405920b9c01702a640053d4dbc110f21cac728ba8754de35f4eb46ede",
+    "ForgeRuntime/Framework/ForgeRuntime.Framework.csproj": "a6e3804e27c7e263fde5553651002dbc0f4b9d54e4922c8e114ac758bcb2455c",
+    "ForgeRuntime/Framework/LifecycleContracts.cs": "80446ffe263959fb2c4f385b402076d6d7b375247033684498425929e7e757a0",
+    "ForgeRuntime/Framework/RuntimeJson.cs": "9024abdd447140a0d0b971852134891c931dd9569faa71c70883851a193a370e",
+    "ForgeRuntime/Framework/RuntimeKernel.cs": "18df60b82890910a052d35e4bf42b692f0b948d3e1e78e0f90bdd759c383ba0b",
+    "ForgeRuntime/Framework/RuntimeKernel.Lifecycle.cs": "a679417c9c7937b213f275bb8fb849971eeb3fa5cb0ccb3b6bc846f492c653b0",
+    "ForgeRuntime/Framework/RuntimeKernel.State.cs": "214e9fc5e644ce42735ae93bc181bf7b1a3a661d46bb247ea4215eb471ef37c2",
+    "ForgeRuntime/Framework/RuntimeKernel.Timing.cs": "30dfdb98b96f4f4480d739251b4ba07b4c282c796fc31ffe18e78e880b73105d",
+    "ForgeRuntime/Framework/RuntimePlan.cs": "9877e60bf7aed53d762f2bb3456cd2e023144effa08ffee0544fd7d2eabc7497",
+    "ForgeRuntime/Framework/RuntimeRegistry.cs": "51712e2e66a72ac14c4223c1f1ea7367b45641048f68edba01fa7f42dbd5be1f",
+    "ForgeRuntime/Framework/TimingContracts.cs": "286f4c7d76d5438e327530618cd893ffeb3f63fda91465d8b6c037e6243be68a"
+  },
+  "sourceStableDuringBuildAndTests": true,
+  "assemblies": [
+    {
+      "file": "bin/map1-artifacts/bin/ForgeMap/release/ForgeMap.dll",
+      "sha256": "b2ad090a7a4d1580dc40fbaabec1c26518dc9fb1e04bee8411e44d79dae2aa86"
+    },
+    {
+      "file": "bin/map1-artifacts/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll",
+      "sha256": "b147102e05bfbcda70a01f1191f1a4529e520798e0650209ddae95abdc0c1ec1"
+    },
+    {
+      "file": "bin/map1-artifacts/bin/MapContracts/release/MapContracts.dll",
+      "sha256": "52456a95218e327f4320f0ade67282049172982f16d0d0a7f4d5482da55fee86"
+    }
+  ],
+  "mapModuleDefinitionUnchanged": true
+}
