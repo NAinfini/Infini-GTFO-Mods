@@ -10,7 +10,7 @@ Map 与 Room 的空间、设备、任务、遭遇、玩家生命流程与进程�
 
 因此本包同时是**模型 Adapter 的运行期调用方**。链路分两段，不要混为一谈：编辑期由网站从模组包里提取模型、拆成可组合小件、在地图编辑器里渲染；**运行期由 Forge Map 直接读取对方模组已在游戏内加载的模型资源，按玩家的拼装结果生成**。玩家的依赖列表和现在一致——他仍然装那个 Geo 包，我们调用它；我们不持有拆解后的资源副本去分发。
 
-这两条在 v1.5 时期的模组侧文档里完全没有落点，MAP2 与 MAP9 需要按它重新定范围。
+归属与接口形状见 [GENERATION-SPEC.md](GENERATION-SPEC.md)：现在谁在生成地图、生成步骤 G0–G10 各自的输入输出与归属和证据等级、资源侧 Adapter 描述符与正反 fixture、运行期调用链、游戏内验证步骤，以及需要网站与其他单元提供的最小接口。**这些目前是计划、fixture 形状和原生签名证据，没有生成器或 Adapter 的 C# 实现。**
 
 ## 当前代码状态
 
@@ -22,11 +22,11 @@ Map 与 Room 的空间、设备、任务、遭遇、玩家生命流程与进程�
 
 地址逐项区分 layout 与 revision、dimension、layer、local zone、placement、对象 ID 和对象类别。同一 geomorph 的多个 area 使用各自明确的对象 ID；同资源的两个 placement 不合并。**地址不能通过名字、位置、遍历顺序或预览 GLB 猜测**；提供地址的原生适配器仍待核验。来源锁保留 resource ID 与 revision、来源证据 SHA-256，以及已有 `SourceObjectIdentity` 的 file 与 pathId。
 
-MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本机 build 的 32 个类型、110 个方法的元数据锁，以及旧审计的 11 个原生区域字节复核。**这些是 metadata-only 证据，不证明原生调用语义、合法阶段或复制完成。**
+MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本机 build 的 32 个类型、110 个方法的元数据锁，以及旧审计的 11 个原生区域字节复核。MAP2 定范围时另锁定了生成相关的 27 个类型、59 个方法（`tools/generation-api-targets.json`）。**这些是 metadata-only 证据，不证明原生调用语义、合法阶段或复制完成。**
 
 ## 边界
 
-没有真实创建适配器、对外 EntityResolver、地图 Action、游戏 Hook 或玩家可用插件。`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格仍然 `executed: false`，报告里的 `nativeGameExecuted`、`nativeHooksInstalled` 和 `gameplayBindingsRegistered` 都是 false。没有原生创建、主客机、恢复或导航执行。
+没有真实创建适配器、对外 EntityResolver、地图 Action、游戏 Hook、生成器、资源 Adapter 或玩家可用插件。`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分（MapIdentity 按用例 id 标记），原生部分仍然 `nativeExecuted: false`；报告里的 `nativeGameExecuted`、`nativeHooksInstalled` 和 `gameplayBindingsRegistered` 都是 false。没有原生创建、主客机、恢复或导航执行。
 
 所有写世界的动作必须由明确的权威提交。查询与生成批次使用稳定排序、实际 seed、显式预算和完整性结果；缺少合法落点、导航证据或目标 receiver 时返回原因，**不静默换目标**。
 
@@ -50,6 +50,12 @@ dotnet build ForgeMap/tests/MapContracts/MapContracts.csproj -c Release --artifa
 dotnet "$artifacts/bin/MapContracts/release/MapContracts.dll"
 ```
 
-原生证据的复采命令见 [VALIDATION.md](VALIDATION.md)。测试目录的边界说明见 [MapContracts](tests/MapContracts/README.md) 与 [MapIdentity](tests/MapIdentity/README.md)。
+资源侧 Adapter 描述符 fixture（只读 JSON，不加载资源或游戏程序集）：
+
+```powershell
+python ForgeMap/tools/verify_resource_adapter_fixtures.py
+```
+
+原生证据的复采命令见 [VALIDATION.md](VALIDATION.md) 与 [GENERATION-SPEC.md](GENERATION-SPEC.md#5-fixture-与本地检查)。测试目录的边界说明见 [MapContracts](tests/MapContracts/README.md) 与 [MapIdentity](tests/MapIdentity/README.md)。
 
 当前 DLL 不是玩家发行物；发布身份、真正加载、主客机和恢复都待实施验证。InfiniTweaks 的 QoL 行为不属于本模块。

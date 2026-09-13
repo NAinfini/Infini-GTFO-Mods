@@ -4,10 +4,19 @@ using ForgeRuntime.Framework;
 using static IdentityFixture;
 
 var checks = new List<string>();
+// Checks inside a Scenario scope count as that native identity spec's managed substitute, never as native execution.
+var scenarioChecks = new SortedDictionary<string, int>(StringComparer.Ordinal);
+var activeScenarios = Array.Empty<string>();
 void Check(bool condition, string name)
 {
     if (!condition) throw new InvalidOperationException("FAIL: " + name);
     checks.Add(name); Console.Error.WriteLine("PASS: " + name);
+    foreach (var id in activeScenarios) scenarioChecks[id] = scenarioChecks.GetValueOrDefault(id) + 1;
+}
+IDisposable Scenario(params string[] ids)
+{
+    activeScenarios = ids;
+    return new ScenarioScope(() => activeScenarios = Array.Empty<string>());
 }
 void Reject(Action action, string suffix, string name)
 {
@@ -33,6 +42,7 @@ Check(module.Handlers.Count == 0 && module.BindingSupport.Count == 0 && (module.
     "Default provider still exports no unsupported gameplay or native resolver");
 Check(!assembly.GetReferencedAssemblies().Any(a => a.Name!.StartsWith("Unity") || a.Name.StartsWith("BepInEx")),
     "Managed identity implementation introduces no native loader dependency");
+using (Scenario("same-zone-index", "same-resource-placements"))
 using (var f = new IdentityFixture())
 {
     var basic = Address();
@@ -55,6 +65,7 @@ using (var f = new IdentityFixture())
     Check(f.Session.ObservedCount == addresses.Length && f.Session.HistoryCount == addresses.Length,
         "Bound identities and history counts match exact instances");
 }
+using (Scenario("duplicate-observation"))
 using (var f = new IdentityFixture())
 {
     var ticket = f.Begin();
@@ -68,6 +79,7 @@ using (var f = new IdentityFixture())
     Check(JsonSerializer.Serialize(ticket.Value).Contains("9223372036854775807"), "Source int64 path ID is preserved as a string without float rounding");
     Check(!JsonSerializer.Serialize(ticket.Value).Contains("Pointer"), "Diagnostic identity snapshot excludes native pointer fields");
 }
+using (Scenario("same-native-id-new-life"))
 using (var f = new IdentityFixture())
 {
     var old = f.Begin(); var before = f.Bind(old);
@@ -85,6 +97,7 @@ using (var f = new IdentityFixture())
     Reject(() => f.Begin(source: Source() with { ResourceRevision = "changed" }), "source-lock-changed",
         "Retired address cannot silently switch its locked resource revision");
 }
+using (Scenario("generation-reentry"))
 using (var f = new IdentityFixture())
 {
     var ticket = f.Begin(); var old = f.Bind(ticket);
@@ -107,6 +120,7 @@ using (var b = new IdentityFixture())
     var refA = a.Bind(foreign).Entity; var refB = b.Bind(b.Begin()).Entity;
     Check(refA != refB && !b.Current(refA), "Independent sessions do not accidentally alias opaque entity IDs");
 }
+using (Scenario("ambiguous-token"))
 using (var f = new IdentityFixture())
 {
     var ticket = f.Begin(); var old = f.Bind(ticket);
@@ -117,6 +131,7 @@ using (var f = new IdentityFixture())
     Reject(() => f.Bind(second, Key(2)), "native-claimed", "Ambiguous alternate native key remains quarantined against reassignment");
     Check(!f.Current(second.Value.Entity), "Contender does not resolve after a native claim conflict");
 }
+using (Scenario("same-resource-placements"))
 using (var f = new IdentityFixture())
 {
     var first = f.Begin(); var bound = f.Bind(first); var second = f.Begin(Address("placement-b"));
@@ -127,13 +142,15 @@ using (var f = new IdentityFixture())
 var sourceChanges = new[] { Source() with { ResourceId = "other" }, Source() with { ResourceRevision = "other" },
     Source() with { SourceIdentityHash = new string('b', 64) }, Source() with { SourceFile = "other.assets" },
     Source() with { SourcePathId = "9223372036854775806" } };
-for (var i = 0; i < sourceChanges.Length; i++)
-{
-    using var f = new IdentityFixture(); var ticket = f.Begin(); var prior = f.Bind(ticket);
-    var source = sourceChanges[i];
-    Reject(() => f.Session.ObserveCreated(ticket, new(ticket.Value.Address, source, Key())), "source-mismatch", "Exact source lock mismatch rejected: " + i);
-    Check(!f.Current(prior.Entity), "Conflicting source evidence invalidates prior mapping: " + i);
-}
+using (Scenario("revision-mismatch"))
+    for (var i = 0; i < sourceChanges.Length; i++)
+    {
+        using var f = new IdentityFixture(); var ticket = f.Begin(); var prior = f.Bind(ticket);
+        var source = sourceChanges[i];
+        Reject(() => f.Session.ObserveCreated(ticket, new(ticket.Value.Address, source, Key())), "source-mismatch", "Exact source lock mismatch rejected: " + i);
+        Check(!f.Current(prior.Entity), "Conflicting source evidence invalidates prior mapping: " + i);
+    }
+using (Scenario("unknown-source"))
 using (var f = new IdentityFixture())
 {
     var ticket = f.Begin(); f.Native.Add(Key()); f.Incarnations[Key()] = ticket;
@@ -143,6 +160,29 @@ using (var f = new IdentityFixture())
         "Unknown provenance records a gap without probing or inventing source evidence");
     Check(!f.Current(ticket.Value.Entity), "Unknown source does not expose a reference as current");
 }
+using (Scenario("same-resource-placements"))
+using (var f = new IdentityFixture())
+{
+    var a = f.Begin(); var boundA = f.Bind(a); var b = f.Begin(Address("placement-b"));
+    Check(a.Value.Entity != b.Value.Entity && a.Value.Source == b.Value.Source,
+        "One source lock placed twice issues one distinct creation ticket per placement");
+    f.Native.Add(Key(2)); f.Incarnations[Key(2)] = b;
+    Reject(() => f.Session.ObserveCreated(b, new(a.Value.Address, b.Value.Source, Key(2))), "address-mismatch",
+        "Callback for placement B carrying placement A's address is rejected, not matched by resource");
+    Check(f.Current(boundA.Entity) && !f.Current(b.Value.Entity), "Rejected sibling callback leaves placement A intact and B unresolved");
+}
+using (Scenario("area-course-node"))
+using (var f = new IdentityFixture())
+{
+    var areaA = f.Begin(); var boundA = f.Bind(areaA);
+    var areaB = f.Begin(Address() with { ObjectId = "source-area-b" });
+    Check(areaA.Value.Entity != areaB.Value.Entity, "Two areas of one geomorph placement get distinct identities");
+    f.Native.Add(Key(2)); f.Incarnations[Key(2)] = areaB;
+    Reject(() => f.Session.ObserveCreated(areaB, new(areaA.Value.Address, areaB.Value.Source, Key(2))), "address-mismatch",
+        "Observation naming the sibling area cannot bind the requested area");
+    Check(f.Current(boundA.Entity) && !f.Current(areaB.Value.Entity), "Wrong-area observation leaves the sibling area intact");
+}
+using (Scenario("area-course-node"))
 using (var f = new IdentityFixture())
 {
     var ticket = f.Begin(); var prior = f.Bind(ticket);
@@ -226,6 +266,7 @@ using (var f = new IdentityFixture())
     f.Kernel.BeginWorld(2);
     Check(f.Session.HistoryCount == 0, "Detached session receives no repopulating world callback");
 }
+using (Scenario("incomplete-observations"))
 using (var f = new IdentityFixture(limit: 2))
 {
     var a = f.Begin(); var first = f.Bind(a); f.Session.Retire(a, Key());
@@ -240,6 +281,7 @@ using (var f = new IdentityFixture(limit: 2))
     Check(f.Session.GapCount == 0 && f.Bind(f.Begin(Address("c"))).Entity != first.Entity,
         "Explicit new generation resets bounded capture without reusing old instance identity");
 }
+using (Scenario("incomplete-observations"))
 using (var f = new IdentityFixture())
 {
     var ticket = f.Begin(); var bound = f.Bind(ticket);
@@ -282,6 +324,7 @@ using (var f = new IdentityFixture())
     Reject(() => index.BeginWorld(0), "stale-world", "World epoch cannot move backwards");
     RuntimeReject(() => new MapObjectIdentityIndex(0), "Zero identity budget is rejected");
 }
+using (Scenario("same-native-id-new-life"))
 using (var f = new IdentityFixture())
 {
     var old = f.Begin(); var before = f.Bind(old);
@@ -303,10 +346,28 @@ using (var f = new IdentityFixture())
     Reject(() => f.Session.CancelCreation(retry), "creation-already-observed", "Cancellation cannot impersonate destruction of an observed object");
     Check(f.Current(bound.Entity), "Rejected cancellation leaves the actual observed object intact");
 }
+var scenarioSpec = JsonDocument.Parse(File.ReadAllText(
+    Path.Combine(AppContext.BaseDirectory, "fixtures", "native-identity-scenarios.json"))).RootElement;
+var specCases = scenarioSpec.GetProperty("cases").EnumerateArray().ToArray();
+var specIds = specCases.Select(c => c.GetProperty("id").GetString()!).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+Check(!scenarioSpec.GetProperty("nativeExecuted").GetBoolean() && specCases.All(c =>
+        !string.IsNullOrWhiteSpace(c.GetProperty("managedSubstitute").GetString())
+        && !string.IsNullOrWhiteSpace(c.GetProperty("nativeOnly").GetString())),
+    "Native identity specs keep native execution false and separate managed substitute from native-only proof");
+Check(specIds.Distinct().Count() == specIds.Length && specIds.SequenceEqual(scenarioChecks.Keys),
+    "Every native identity spec id has tagged managed checks and no tag lacks a spec");
 Console.WriteLine(JsonSerializer.Serialize(new {
     verification = "production-managed-map-identity-with-synthetic-native-probes",
     nativeGameExecuted = false, nativeHooksInstalled = false, gameplayBindingsRegistered = false,
     productionAssembly = assembly.GetName().FullName,
     sdkAssembly = typeof(RuntimeKernel).Assembly.GetName().FullName,
+    nativeScenariosExecuted = false, managedScenarioChecks = scenarioChecks,
     passed = checks.Count, checks
 }, new JsonSerializerOptions { WriteIndented = true }));
+
+sealed class ScenarioScope : IDisposable
+{
+    private readonly Action end;
+    internal ScenarioScope(Action end) => this.end = end;
+    public void Dispose() => end();
+}

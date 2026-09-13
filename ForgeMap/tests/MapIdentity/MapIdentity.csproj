@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../ForgeMap.csproj" />
+    <None Include="../fixtures/native-identity-scenarios.json" Link="fixtures/native-identity-scenarios.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

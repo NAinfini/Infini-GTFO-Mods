@@ -6,7 +6,24 @@
 
 MAP1 的原生 API 取证、字节复核、SDK 消费方测试，以及生产程序集内的身份表、创建生命票据与 R2 生命周期接入都已交付并通过。
 
-**没有真实创建适配器、对外原生 resolver、地图 Action、游戏 Hook 或玩家可用插件；MAP1 整体未关闭，MAP2–MAP9 与新增的 MAP-GEN、MAP-ADAPTER 全部未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false，`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格仍然 `executed: false`。
+**没有真实创建适配器、对外原生 resolver、地图 Action、游戏 Hook、生成器、资源 Adapter 或玩家可用插件；MAP1 整体未关闭。MAP2 只完成了定范围（规格、fixture、签名锁），没有 C# 实现；MAP3–MAP9、MAP-GEN、MAP-ADAPTER 未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false；`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分，原生部分 `nativeExecuted: false`。
+
+## MAP2 定范围（2026-09-13）
+
+输出保存在 `evidence/map2-scope-2026-09-13/`。构建使用会话临时目录的隔离 artifacts，没有写 `ForgeMap/bin` 以外的模块输出。
+
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| 生成相关原生签名锁 | `Capture-NativeApi.ps1 -TargetsFile tools/generation-api-targets.json` | 27 个类型、59 个方法，缺失 0，build 20403457，`metadata-only` |
+| 独立复采比对 + 检查器自测 | `verify_native_api.py generation-api.json <复采> --self-test` | 退出码 0，`matched: true`，差异 0，自测 17 项 |
+| 资源侧描述符 fixture | `python ForgeMap/tools/verify_resource_adapter_fixtures.py` | 退出码 0，合法 3/3（阻塞项与期望一致），非法 21/21 以期望错误码拒绝，`fixture-schema-only` |
+| MapIdentity（含十个规格的托管替身标记） | Release 构建后运行 `ForgeMap.Identity.Tests.dll` | 构建 0 警告 0 错误；退出码 0，134 项断言通过；每个规格 3–17 项标记断言，`nativeScenariosExecuted: false` |
+| MapContracts 回归 | Release 构建后运行 `MapContracts.dll` | 构建 0 警告 0 错误；退出码 0，33 项通过 |
+| 架构回归 | `Forge.Architecture.sln` Release 构建后运行 `Architecture.dll` | 构建 0 警告 0 错误；退出码 0，36 项通过 |
+
+MapIdentity 从 126 项增加到 134 项：新增同资源两个 placement 的兄弟回调拒绝（3 项）、同一 geomorph 两个 area 的错 area 观察拒绝（3 项），以及规格文件与标记集合一一对应的两项核对。原有断言未修改，只加了规格 id 标记。
+
+**边界**：签名锁只证明方法存在；fixture 检查只证明描述符形状与拒绝规则，数据是合成的，不代表任何真实 Geo 包；134 项仍是托管实现加原生探针替身。没有运行游戏、加载 bundle、安装或发布。MapContracts 的 `TestWorld.cs` 在本批期间由主会话为 Framework 的 `promoted` 字段修改过，本批未改它，回归结果基于修改后的文件。
 
 ## MAP1b — 内部身份实现
 

@@ -1,0 +1,25 @@
+{
+  "verification": "metadata-only",
+  "matched": true,
+  "differences": [],
+  "selfTests": [
+    "equivalent-capture",
+    "game-build",
+    "native-hash",
+    "assembly-hash",
+    "assembly-mvid",
+    "method-signature",
+    "method-authority-visibility",
+    "parameter-out",
+    "parameter-optional",
+    "parameter-type",
+    "enum-value",
+    "missing-target",
+    "empty-types",
+    "duplicate-type",
+    "target-contract",
+    "verification-escalation",
+    "schema-version"
+  ],
+  "selfTestCount": 17
+}

@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Resource-side Adapter descriptor shape (GENERATION-SPEC.md section 3); synthetic fixture data, not package evidence",
+  "checker": "ForgeMap/tools/verify_resource_adapter_fixtures.py",
+  "valid": [
+    {
+      "id": "package-geomorph",
+      "file": "valid/package-geomorph.json",
+      "expectedBlockers": []
+    },
+    {
+      "id": "shared-mesh-distinct-identities",
+      "file": "valid/shared-mesh-distinct-identities.json",
+      "expectedBlockers": []
+    },
+    {
+      "id": "native-geomorph-unknown-spatial",
+      "file": "valid/native-geomorph-unknown-spatial.json",
+      "expectedBlockers": [
+        "colliders",
+        "navigation",
+        "occlusion"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "id": "unknown-field",
+      "file": "invalid/unknown-field.json",
+      "expectedError": "descriptor.unknown-field"
+    },
+    {
+      "id": "revision-mismatch",
+      "file": "invalid/revision-mismatch.json",
+      "expectedError": "descriptor.revision-mismatch"
+    },
+    {
+      "id": "reference-from-name",
+      "file": "invalid/reference-from-name.json",
+      "expectedError": "descriptor.reference-derivation"
+    },
+    {
+      "id": "profile-by-package-name",
+      "file": "invalid/profile-by-package-name.json",
+      "expectedError": "descriptor.unsupported-profile"
+    },
+    {
+      "id": "path-id-json-number",
+      "file": "invalid/path-id-json-number.json",
+      "expectedError": "descriptor.path-id"
+    },
+    {
+      "id": "redistribute-bytes",
+      "file": "invalid/redistribute-bytes.json",
+      "expectedError": "descriptor.authorization"
+    },
+    {
+      "id": "dependency-not-source-package",
+      "file": "invalid/dependency-not-source-package.json",
+      "expectedError": "descriptor.authorization"
+    },
+    {
+      "id": "unknown-parent",
+      "file": "invalid/unknown-parent.json",
+      "expectedError": "descriptor.hierarchy"
+    },
+    {
+      "id": "duplicate-node",
+      "file": "invalid/duplicate-node.json",
+      "expectedError": "descriptor.duplicate-node"
+    },
+    {
+      "id": "non-normalized-rotation",
+      "file": "invalid/non-normalized-rotation.json",
+      "expectedError": "descriptor.transform"
+    },
+    {
+      "id": "connector-outward-not-unit",
+      "file": "invalid/connector-outward-not-unit.json",
+      "expectedError": "descriptor.connector-orientation"
+    },
+    {
+      "id": "connector-unknown-area",
+      "file": "invalid/connector-unknown-area.json",
+      "expectedError": "descriptor.connector-area"
+    },
+    {
+      "id": "collider-from-renderer-bounds",
+      "file": "invalid/collider-from-renderer-bounds.json",
+      "expectedError": "descriptor.collider-evidence"
+    },
+    {
+      "id": "unknown-without-reason",
+      "file": "invalid/unknown-without-reason.json",
+      "expectedError": "descriptor.unknown-reason"
+    },
+    {
+      "id": "navigation-ready-in-descriptor",
+      "file": "invalid/navigation-ready-in-descriptor.json",
+      "expectedError": "descriptor.navigation-state"
+    },
+    {
+      "id": "mesh-bytes-missing",
+      "file": "invalid/mesh-bytes-missing.json",
+      "expectedError": "descriptor.shared-bytes-missing"
+    },
+    {
+      "id": "runtime-locator-loads-bundle",
+      "file": "invalid/runtime-locator-loads-bundle.json",
+      "expectedError": "descriptor.runtime-locator"
+    },
+    {
+      "id": "root-not-locked-source",
+      "file": "invalid/root-not-locked-source.json",
+      "expectedError": "descriptor.root-mismatch"
+    },
+    {
+      "id": "duplicate-resource-identity",
+      "file": "invalid/duplicate-resource-identity.json",
+      "expectedError": "descriptor.duplicate-resource"
+    },
+    {
+      "id": "position-fourth-component-divided",
+      "file": "invalid/position-fourth-component-divided.json",
+      "expectedError": "descriptor.vector-channel"
+    },
+    {
+      "id": "static-descriptor-claims-game-verified",
+      "file": "invalid/static-descriptor-claims-game-verified.json",
+      "expectedError": "descriptor.evidence-escalation"
+    }
+  ]
+}

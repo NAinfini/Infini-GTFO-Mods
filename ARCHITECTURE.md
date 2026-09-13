@@ -37,7 +37,7 @@
 | Development：PluginStartup / NativeLayout | 54 / 23 | 插件入口编排替身测试；编译后宿主与插件元数据及 10 个 Hook 的 interop 解析 |
 | Enemy：receiver / 实体观察 / 插件 / LifecycleFacts | 40 / 66 / 24 / 52 | LifecycleFacts 的 52 覆盖死亡流程与肢体破坏 |
 | Enemy：CommitAudit 现行路径 / NativeLayout / 原生静态审计 | 32 / 38 / 112 | 静态审计对应 99 个精确签名 |
-| Map：MapIdentity / MapContracts | 126 / 33 | 托管身份实现与 SDK 消费方 |
+| Map：MapIdentity / MapContracts | 134 / 33 | 托管身份实现与 SDK 消费方 |
 | Weapon：Identity / IdentityAcceptance / IdentityDispatchReview | 42 场景 99 断言 / 37 / 20 | 三套分别由不同任务编写，复跑于同一份生产实现 |
 | Weapon：元数据 / 核验工具 | 312 / 24 | metadata-only 证据等级 |
 | Trigger：纯计算与集合 / R3 与空间与筛选 / Acceptance | 1613 / 1529 / 2082 | 三者存在重叠；Acceptance 含可变端口与权重 |

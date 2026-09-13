@@ -1,12 +1,15 @@
 {
-  "purpose": "MAP1 acceptance specifications; not a runtime/export schema",
+  "purpose": "MAP1 native identity acceptance specifications; not a runtime/export schema",
   "status": "pending-native-resolver-and-game-verification",
-  "executed": false,
+  "nativeExecuted": false,
+  "managedSubstitute": "tests/MapIdentity tags its checks with these case ids and runs the managedSubstitute part against the compiled Map assembly with a synthetic native probe; managed results never mark a case natively executed",
   "cases": [
     {
       "id": "same-zone-index",
       "given": "Same local zone number in different dimensions/layers/layouts",
       "expected": "Distinct identities; alias is not an author ID",
+      "managedSubstitute": "Addresses differing only in dimension, layer, layout, revision or local zone index stay distinct entity references",
+      "nativeOnly": "The creation hook reads the generated zone's real dimension/layer/local index instead of reconstructing it from alias or object name",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -17,6 +20,8 @@
       "id": "same-resource-placements",
       "given": "One resource revision instantiated twice",
       "expected": "Explicit creation token per placement; no name/order/proximity matching",
+      "managedSubstitute": "Two placements of one source lock get distinct tickets; a callback carrying the sibling placement address, or one native object claimed by both, is rejected",
+      "nativeOnly": "The creation ticket travels with the real instantiate call of each placement",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -27,6 +32,8 @@
       "id": "generation-reentry",
       "given": "Old creation callback arrives after a new world begins",
       "expected": "Invalidate old world and creation token",
+      "managedSubstitute": "Generation or world change clears associations; late callbacks fail as stale-generation/stale-world before probing",
+      "nativeOnly": "Real LG_Factory rebuild and drop-in timing relative to the Runtime world epoch",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -37,6 +44,8 @@
       "id": "same-native-id-new-life",
       "given": "Native object identifier reused after destruction",
       "expected": "Reject old life even if pointer/ID is reused",
+      "managedSubstitute": "A reused pointer and Unity instance ID resolve only the ticket owning the current incarnation, including after a missed destroy",
+      "nativeOnly": "IL2CPP pointer / Unity instance ID reuse and the real liveness probe",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -47,6 +56,8 @@
       "id": "duplicate-observation",
       "given": "Two hooks report same creation token and exact live object",
       "expected": "One idempotent receipt",
+      "managedSubstitute": "Repeated exact observation returns map.identity.duplicate without a second allocation",
+      "nativeOnly": "Which real generation hooks report the same object more than once",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -57,6 +68,8 @@
       "id": "ambiguous-token",
       "given": "Same author token links to different live objects",
       "expected": "Ambiguous; never choose first or nearest",
+      "managedSubstitute": "A second native object for one ticket quarantines the token and its native claims",
+      "nativeOnly": "Real generation steps that yield several candidate objects for one creation",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -67,6 +80,8 @@
       "id": "unknown-source",
       "given": "Name/path/position match without creation source proof",
       "expected": "Unresolved, never resolved or game-verified",
+      "managedSubstitute": "An observation without a source lock records UnknownSource and never resolves, even when the object is alive",
+      "nativeOnly": "Objects created by vanilla or third-party generation that bypass the Forge creation ticket",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -77,6 +92,8 @@
       "id": "revision-mismatch",
       "given": "Observed source has wrong revision or hash",
       "expected": "Reject; never silently upgrade",
+      "managedSubstitute": "A change of resource id, revision, source hash, file or pathId is rejected and invalidates the prior mapping",
+      "nativeOnly": "Reading the loaded asset's actual source identity from the installed package",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -87,6 +104,8 @@
       "id": "incomplete-observations",
       "given": "Capture budget exceeded or callbacks lost",
       "expected": "Unknown/incomplete; not proof of absence",
+      "managedSubstitute": "Capacity and CallbackLost gaps are explicit; missing capture is never an absence claim",
+      "nativeOnly": "Real callback loss and capture budget during a full level build",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",
@@ -97,6 +116,8 @@
       "id": "area-course-node",
       "given": "Multiple areas per geomorph or node belongs to wrong area",
       "expected": "Exact area/zone/dimension proof and pCourseNode round trip required",
+      "managedSubstitute": "Sibling areas of one placement stay distinct; an observation naming the wrong area or dimension is rejected",
+      "nativeOnly": "LG_Area.m_courseNode ownership and the pCourseNode round trip in a generated level",
       "requiredOwners": [
         "Map",
         "Runtime R2/R3",

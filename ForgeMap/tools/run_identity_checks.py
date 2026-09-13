@@ -30,7 +30,7 @@ def main() -> int:
     excluded = {"bin", "obj", "artifacts", ".artifacts", "evidence"}
     def snapshot() -> dict[str, str]:
         return {p.relative_to(root).as_posix(): sha(p) for base in roots
-            for p in base.rglob("*") if p.is_file() and p.suffix in (".cs", ".csproj", ".sln")
+            for p in base.rglob("*") if p.is_file() and (p.suffix in (".cs", ".csproj", ".sln") or p.name == "native-identity-scenarios.json")
             and not excluded.intersection(p.relative_to(base).parts)}
     def write(name: str, value: object) -> None:
         (out / name).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")

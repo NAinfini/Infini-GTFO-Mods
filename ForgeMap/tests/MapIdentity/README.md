@@ -9,7 +9,8 @@ Callback 只投递观察，不改变物理生命；Bind 才建立测试中的新
 覆盖地址/来源锁、int64 pathId、重复观察、冲突隔离、取消/销毁、world/generation/life、
 指针与 Unity ID 同时复用、probe 异常/重入、跨线程、停机/注销、历史上限和不完整采集。
 这些是托管实现测试，不能替代原生创建 API、权限/阶段、主客机、导航或恢复测试。
-`../fixtures/native-identity-scenarios.json` 仍明确未执行原生场景。
+`../fixtures/native-identity-scenarios.json` 的十个用例由本测试按 id 标记托管替身断言（`managedScenarioChecks`），
+并核对标记集合与规格文件一一对应；规格文件与输出都保持原生场景未执行（`nativeExecuted` / `nativeScenariosExecuted` 为 false）。
 
 从仓库根运行，输出目录必须位于 ForgeMap 内且尚不存在：
 
