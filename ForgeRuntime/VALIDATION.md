@@ -48,7 +48,7 @@ SDK 合同与注册探针 76 项、Enemy 消费方 66 项、Trigger 的 R3 消�
 
 网站 `graph-schema.ts` 会校验 `graph.variadic` 并按可选整数计数展开选定一侧，下界等于原有的 2 个端口，上界不超过 32；已有基础端口名与顺序不变，新增端口是 `templateId_3`、`templateId_4` 依此类推。此前 `RuntimeRegistry` 把 `variadic` 当未知字段拒绝，Trigger 的 R4 交接记录了这个阻塞。
 
-现在能在不剥字段、不改所有者与版本的前提下校验该元数据，并从唯一注册定义中按精确能力 revision 和有界计数解析端口。**解析出的端口布局只是元数据**：没有 handler、权限、调度器或可执行 binding。v1 计划加载器像当前网站编译器一样明确拒绝可变端口的执行；完整 R4 lowering 另算。
+现在能在不剥字段、不改所有者与版本的前提下校验该元数据，并从唯一注册定义中按精确能力 revision 和有界计数解析端口。**解析出的端口布局只是元数据**，没有 handler、权限或调度器。Plan v2 加载器按常量展开 variadic 与 portGroups，再与文件 layout 逐项比对（`PlanBoundaryTests` 覆盖固定与展开两种计划，以及未展开、虚假展开、计数不符三类拒绝）；步骤输入仍只接触发事件槽位。完整 R4 lowering 另算。
 
 ## D2 — 宿主移除诊断
 

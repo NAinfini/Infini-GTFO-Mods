@@ -56,7 +56,7 @@
 
 **B 批（真实包边界）基本收口但未关闭。** Runtime 的 R1 编译基线、R2a 公开生命周期、R2b-1 宿主配置与启动隔离已交付；Development 的 D1 诊断接线与入队快照修复已交付；Enemy 的 E1 源码/程序集切换已完成——唯一接收器在 `ForgeEnemy/Native/EnemyModule.cs`，Runtime 不再创建 Enemy provider，`ForgeEnemy/Native/Plugin.cs` 是带 `[BepInPlugin("NAinfini.ForgeEnemy")]` 和 `[BepInDependency("NAinfini.ForgeRuntime","1.2.0")]` 的真实插件。Development 的 D2 切换也已完成到实现与本地验证等级：16 个诊断源、全部诊断测试与 Python 工具迁到 `ForgeDevelopment/`，`ForgeDevelopment/Native/Plugin.cs` 是只在 Runtime `Authoring` 模式下启动的独立插件，宿主不再含诊断。**B 批尚未关闭的是游戏内证据**：Enemy 与 Development 插件都没有在 GTFO 中实际加载过，Development 的三种加载模式未核验。
 
-**C 批（共享合同）进行中。** R3a 的实体观察登记、注销清理与只读保护已在共享 SDK 实际接通；R4a 的可变端口元数据校验与精确 revision 解析已落地，v1 计划加载器明确拒绝可变端口执行。R3、R4 整体未关闭，T1 门槛未过，T2–T7 未完成。
+**C 批（共享合同）进行中。** R3a 的实体观察登记、注销清理与只读保护已在共享 SDK 实际接通；R4a 的可变端口元数据校验与精确 revision 解析已落地；Plan v2 加载器按常量展开 variadic 与 portGroups 后逐项比对 layout，控制节点与 action→action 数据边仍未 lowering。R3、R4 整体未关闭，T1 门槛未过，T2–T7 未完成。
 
 **D 批（首批真实绑定）起步。** Enemy 已有 5 个 binding 与 5 个 Hook 的 implementation-only 接线；Map 的 MAP1b 身份类与 Weapon 的 W1 身份类已在各自生产程序集内，但**两者的 `ModuleDefinition` 仍是空 provider**，没有对外 EntityResolver、游戏 Hook 或可执行 binding，只有显式构造 Session 才登记 resolver。
 
