@@ -78,4 +78,4 @@ python -m unittest discover -s ForgeDevelopment/tests -p 'test_*.py'
 
 以上是托管逻辑、合成输入与编译后元数据的证据。采集本身在游戏主线程的成本、两次进出图、GC 之后的原生 callback、GTFO 主客机与恢复、独立插件的真实加载组合、安装与发布，全部未执行。
 
-没有安装到游戏 profile、运行 GTFO、发布、push 或修改网站。Temp profile 只作为本地构建的程序集引用，构建输出在独立的临时目录。
+没有安装到游戏 profile、运行 GTFO、发布或修改网站；D2 已按用户要求提交并推送到 `origin/main`。Temp profile 只作为本地构建的程序集引用，构建输出在独立的临时目录。
