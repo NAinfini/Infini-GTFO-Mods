@@ -80,6 +80,19 @@
 
 `TickResult` 另带 `Schedules` 和 `StateLeases` 收据，但**只包含该次 `Advance` 期间**产生的条目。主动调用 `Cancel()`、`Release()` 或 `CancelScope` 不保证出现在之后的 `TickResult` 里；这些调用应读方法自身的返回值和句柄的 `Status`/`Code`。
 
+## 执行日志 sink 与级别（D-007 阶段 B）
+
+合同在 `RuntimeLogContracts.cs`，内核侧在 `RuntimeKernel.Logging.cs`。宿主用 `RuntimeKernel(identity, limits, IRuntimeLogSink sink, RuntimeLogLevel runtimeLogLevel)` 构造内核，sink 在内核生命周期内固定，没有注册或替换接口。`RuntimeLogLevel` 为 `Off < Error < Info < Trace`，构造参数只接受 off、error、info（否则 `log-level`），trace 只能经提级得到。
+
+- `RuntimeLogRecord` 是 `readonly struct`，以 `in` 传给 `IRuntimeLogSink.Write(in record, RuntimeLogLevels levels)`。字段：Level、Code、Provider、SubjectProvider?、Tick、WorldEpoch、Frame?、CommandId?、EventId?、CauseId?、RootEventId?、Plan?（planId 与 resource id/revision）、Entry?、Step?、Binding?、Result?（status、commit?、reason）。**没有 message 与 inputs**：消息由 sink 在后台线程拼，调用点不构造字符串；inputs 属于 Development 的 trace recorder，未实现。status 与 commit 本阶段是不做词表校验的字符串。
+- 级别表按 provider 保存。本阶段只有 Runtime 自身（`Identity.Id`）有条目，级别来自宿主 cfg。**领域 provider 不进表、没有默认级别**，`LogGate` 或 `WriteLog` 查不到时抛 `log-provider-unregistered`，不会静默当作 off 或 error。领域包的级别条目在阶段 A 随必填参数 `RegisterModule(RuntimeModule, RuntimeLogLevel)` 进入。
+- `ElevateLogging()` 把所有条目升为 Trace 并切换到提级限流档。只在注册窗口内接受一次；窗口关闭（Ready、Failed、Stopped）或第二次调用都抛 `log-elevation-rejected`，不可撤销。级别门是同一个可变对象，提级前取得的门也会看到 Trace。
+- `WriteLog(in record)` 是记录点到 sink 的唯一通道：所属线程（`wrong-thread`）；无 sink 的内核抛 `log-unconfigured`；缺 code、provider 或不完整的 plan/result 抛 `log-record`；Off 或门未开抛 `log-level-disabled`。调用点应先比对门，再构造记录。
+- 每次级别表变化都会发布新的 `RuntimeLogLevels` 快照（按 provider 排序、带 tier），sink 据引用变化重写 `log.level`。
+- `RuntimeLogCodes` 只有 `log.dropped` 与 `log.level`；其余码表等网站拍板。
+
+原有构造函数 `RuntimeKernel(identity, limits)` 不带 sink，测试与领域消费方仍用它；它的日志接口一律拒绝，不写任何东西。**内核与领域都还没有记录点**，所以玩家层目前只有 Runtime 自身的日志能力，实际不会写出任何业务记录。
+
 ## 预算
 
 运行预算由已锁定的 manifest 约束：入口 32、每入口 128 步、总 512 步；每 tick 128 事件 / 512 命令、队列 1024、因果深度 16，作者计划可以要求更低的上界。单事件 64 KiB，命令最多 128 事实、总结果 256 KiB；每世界去重账本 65536 项且不驱逐，耗尽时明确拒绝新事件（包括新的 schedule 与 lease）。定时与状态另有 256 活跃 schedule、65536 计划 pulse、每 tick 64 scheduled pulse、16 捕获引用、512 活跃 lease 的上限。所有 epoch 与 tick 限制在 JavaScript 安全整数范围内。

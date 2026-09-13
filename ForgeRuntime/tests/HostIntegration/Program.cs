@@ -7,7 +7,10 @@ Verify.Run("observer isolation", LifecycleProbe.Isolation);
 Verify.Run("observer capacity", LifecycleProbe.Capacity);
 Verify.Run("thread boundary", LifecycleProbe.Threading);
 if (args.Length == 2 && args[0] == "--host")
+{
     Verify.Run("production assembly boundary", () => HostAssemblyProbe.Run(args[1]));
+    Verify.Run("log call-site boundary", () => LogBoundaryProbe.Run(args[1]));
+}
 else if (args.Length != 0)
     throw new ArgumentException("Usage: HostIntegration [--host <ForgeRuntime.dll>]");
 Console.WriteLine($"Host integration: {Verify.Checks} assertions passed; {Verify.Failures} groups failed.");

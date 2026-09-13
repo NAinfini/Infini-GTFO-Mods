@@ -28,12 +28,13 @@
 | --- | --- | --- |
 | Architecture | 36 | 编译后真实 DLL 的边界检查 |
 | Framework | 253 | **已包含** timing/state 116 与 execution-result 49，不再另加 |
-| HostIntegration / LifecycleWork | 53 / 57 | 编译后 SDK + 实际宿主元数据；53 是 D2 后 `--host` 的数字，新增宿主不含诊断的检查 |
+| HostIntegration / LifecycleWork | 61 / 57 | 编译后 SDK + 实际宿主元数据；61 是 D-007 阶段 B 后 `--host` 的数字，新增日志调用点不拼字符串、日志路径不调用 `SNet_Player.Lookup` 的检查及其对照 |
+| RuntimeLog | 127 | D-007 阶段 B：宿主 JSONL writer、级别门与提级，真实 `ManualLogSource` 与临时目录文件 |
 | GameBindings：fixtures / bridge / native metadata | 60 / 57 / 51 | 三种模式共享基础断言。51 是 D2 后的 native 数字（模式分派检查换成宿主只有 4 个 Framework Hook）；60 与 57 是 D2 之前的记录。**fixtures 模式当前失败**于 `Unsupported plan version`：网站未提交的 F0 fixture 已把 schemaVersion 改为 2，SDK 仍只接受 1，随 F0 定稿处理 |
 | Reports / ProjectChecks / DevelopmentInspection | 99 / 202 / 47 | 诊断侧回归，D2 后位于 `ForgeDevelopment/tests/` |
 | SceneInventory / Telemetry / Samples | 8 / 56 / 7 | 诊断侧回归 |
 | Shutdown / ReportSnapshots | 31 / 100 | ReportSnapshots 的 100 含保留的原 37 项 |
-| 宿主 PluginStartup / HostConfiguration | 35 / 66 | 宿主启动编排与真实 BepInEx 配置文件；D2 移除诊断用例后的数字 |
+| 宿主 PluginStartup / HostConfiguration | 39 / 90 | 宿主启动编排与真实 BepInEx 配置文件；D-007 阶段 B 加入 `Logging.Level` 用例后的数字 |
 | Development：PluginStartup / NativeLayout | 54 / 23 | 插件入口编排替身测试；编译后宿主与插件元数据及 10 个 Hook 的 interop 解析 |
 | Enemy：receiver / 实体观察 / 插件 / LifecycleFacts | 40 / 66 / 24 / 52 | LifecycleFacts 的 52 覆盖死亡流程与肢体破坏 |
 | Enemy：CommitAudit 现行路径 / NativeLayout / 原生静态审计 | 32 / 38 / 112 | 静态审计对应 99 个精确签名 |

@@ -10,6 +10,13 @@ per-module/global observer budgets; simulation-thread guards; stopped-instance r
 With `--host <ForgeRuntime.dll>`, Mono.Cecil checks production assembly boundaries,
 `Plugin.Runtime`'s shared type identity, absence of the imported prototype and retired
 private startup latch, and a real call from the host to the public `StartRuntime` API.
+It also checks the log call-site rules on IL (the Architecture project has neither the
+host DLL nor Cecil): no string field of `RuntimeLogRecord`/`RuntimeLogPlan`/`RuntimeLogResult`
+receives a value from `string.Concat/Format/Join/Create`, `ToString` or an interpolated-string
+handler, directly or through one local, in the SDK or host; and neither the SDK nor
+`ForgeRuntime.Logging` calls `SNet_Player.Lookup`. Fixtures in `LogBoundaryFixtures.cs`
+must be flagged (and a clean one must not), so a probe that detects nothing fails.
+Branches that merge a built string into a setter are not followed.
 A standalone SDK pass must not be reported as a host integration pass.
 
 From the repository root, with existing local BepInEx compile references:

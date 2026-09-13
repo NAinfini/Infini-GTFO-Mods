@@ -29,7 +29,7 @@ internal static class RuntimeSettings
         AllowedPermissions = config.Bind("Framework", "AllowedPermissions", "", "Explicit comma-separated grants. Example: gtfo.enemy.health.read,gtfo.enemy.health.write. The plan cannot authorize itself; empty grants nothing.");
         // Raw text for the same reason as Mode; trace is deliberately not accepted here, only ForgeDevelopment elevation reaches it.
         var level = config.Bind("Logging", "Level", "error",
-            "Forge Runtime records written to BepInEx/forge-logs/*.jsonl: off, error or info. error writes only when something goes wrong; info also mirrors normal records to the console. Independent of Runtime.Mode. Restart required.");
+            "Forge Runtime records written to BepInEx/forge-logs/*.jsonl: off, error or info. error writes only when something goes wrong; info also writes normal records. Error and info records are mirrored to the console. Runtime.Mode Off starts no writer. Restart required.");
         LogLevel = level.Value.Trim().ToLowerInvariant() switch
         {
             "off" => RuntimeLogLevel.Off,

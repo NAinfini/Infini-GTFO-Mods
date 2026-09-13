@@ -18,7 +18,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 ### 宿主启动与配置
 
-宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`、`Framework.PlanPath`、`Framework.AllowedPermissions`。原键名、命名与数字模式值和现有默认值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
+宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`、`Framework.PlanPath`、`Framework.AllowedPermissions`、`Logging.Level`。原键名、命名与数字模式值和现有默认值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
 
 `Off` 只绑定宿主键，不启动任何组件或 Hook。`Play` 与 `Authoring` 启动同一个宿主：4 个世界/会话/检查点 Hook（`harmony.PatchAll` 只扫描宿主程序集）与 `FrameworkMonitor`。**宿主不含任何诊断、报告或性能采集**；两种模式唯一的区别是可选的 [ForgeDevelopment](../ForgeDevelopment/README.md) 插件只在 `Authoring` 下启动。模式、计划路径与权限的变更需要重启进程，不支持热卸载。
 
@@ -27,6 +27,25 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 启动失败时先关闭玩法入口再清理：宿主停止 → unpatch → 销毁 FrameworkMonitor。每个已获取的阶段都会被尝试清理，即使其中一步或错误上报失败也继续执行后面的步骤，最后重新抛出原始启动异常。清理与上报的失败保留在 `Data["ForgeRuntime.StartupCleanupFailures"]` 的 AggregateException 里（字典不可写时不能替换原始异常）。这是对已获取阶段的尽力清理，不是任意原生副作用的回滚保证。
 
 `[Framework] PlanPath` 和 `AllowedPermissions` 默认均为空，因此不会自动启用任何行为。开发者显式选择 BepInEx 内的相对路径离线计划（最大 4 MiB）和权限；首个固定更新在其他插件注册完成后验证加载，版本、模块、路径或权限不符即失败，本次进程不反复读取重试。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
+
+### 执行日志（D-007 阶段 B）
+
+**记录点尚未接入。** 内核与 Enemy、Map、Weapon、Trigger 都还没有调用日志接口，所以玩家层现在不会写出任何业务记录；目前可用的只有 Runtime 自身的级别、sink 和提级接口，SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-b)。领域包的级别条目在阶段 A 随必填参数 `RegisterModule(RuntimeModule, RuntimeLogLevel)` 加入；在那之前查领域 provider 的级别会以 `log-provider-unregistered` 拒绝，不给默认值。
+
+`[Logging] Level` 接受 `off`、`error`、`info`（大小写与首尾空白不敏感），默认 `error`，按原始文本解析，其他值（包括 `trace`）在原生初始化之前失败。改动需要重启。`Runtime.Mode = Off` 时宿主不初始化，也就没有 writer。
+
+宿主的 `Logging/RuntimeLogWriter.cs` 实现 sink，写 `forge.log.v1` JSONL：
+
+- 惰性启动：第一条被接受的记录才创建后台线程、目录和文件。没有记录就没有线程、目录、文件和控制台输出。
+- 文件是 `BepInEx/forge-logs/<yyyyMMddTHHmmssZ>-<4 位十六进制随机>.jsonl`，UTF-8 无 BOM，`\n` 换行，`CreateNew` 不覆盖。新文件建好后按修改时间只保留最新 10 个，只删该目录顶层的 `*.jsonl`。
+- 第一行是 `log.level`（level 为 info，带 `levels[{provider, level}]` 与 `elevated`），与第一条真实记录一起写出。提级后级别表变化，下一条记录前再写一行 `log.level`。
+- 限流：普通档每 tick 256 行、队列 8192；提级档每 tick 4096 行、队列 65536。超限的记录丢弃并计数，下一条被接受的记录前或停止时写 `log.dropped`（带 `count`，level 为 error）。`log.level` 与 `log.dropped` 不受限流，因此队列最多可超出上限 2 项。
+- 单文件 64 MiB（预留一行给最后的 `log.dropped`）。到达上限后停止写文件，控制台报告一次，停止时在文件末尾写带未写条数的 `log.dropped`。
+- error 与 info 通过 `ManualLogSource` 镜像到控制台，trace 不镜像。序列化和消息文本都在后台线程完成，内核线程只做计数、复制和入队。
+- `GameRuntimeBridge.Stop` 在 `StopRuntime` 之后结束写入，最多等 5 秒；超时时报告未写出的条数。进程被强杀时，队列中未写出的记录和文件上限的最后一行 `log.dropped` 会丢失。
+- 限值只是内部构造参数，供测试注入，不对玩家开放配置。
+
+以下尚未验证：游戏内 `ManualLogSource` 从后台线程调用是否安全、真实磁盘和退出时序，以及任何记录点的开销。
 
 ### 诊断不在宿主内
 
@@ -49,6 +68,9 @@ Mode = Authoring
 [Framework]
 PlanPath =
 AllowedPermissions =
+
+[Logging]
+Level = error
 ```
 
 1.1.x 与 D2 之前写在本文件里的 `[Authoring]`、`[Performance Diagnostics]` 键不再被读取，也不自动迁移；诊断配置在 `NAinfini.ForgeDevelopment.cfg`，见 Development 的说明。

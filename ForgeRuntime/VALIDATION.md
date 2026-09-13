@@ -133,6 +133,35 @@ public bool IsEntityCurrent(EntityReference reference);                         
 
 本批没有重跑 GameBindings 的 `--fixtures` / `--bridge` / `--native`、HostIntegration、PluginStartup、HostConfiguration、GraphContracts、Enemy 与 Trigger 套件。全部是托管替身证据，没有加载 GTFO。
 
+## D-007 阶段 B — 执行日志 sink、宿主 JSONL writer 与提级（2026-09-13）
+
+分支 `feat/runtime-log-writer`，基于 `d09d6bb`（已含 Weapon/Map 的实例解析）。行为说明见 [README](README.md#执行日志d-007-阶段-b) 与 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-b)。`Contracts.cs` 与 `RuntimeKernel.cs` 未改：内核构造重载、级别表和提级都放在新的 partial 文件 `RuntimeKernel.Logging.cs` 里。
+
+**记录点尚未接入，玩家层现在不会写出任何业务记录。** 当前只有 Runtime 自身 provider 的级别（来自 `[Logging] Level`）。领域包的级别条目在阶段 A 随必填参数 `RegisterModule(RuntimeModule, RuntimeLogLevel)` 加入，在那之前查领域 provider 抛 `log-provider-unregistered`。
+
+新增 `tests/RuntimeLog`，编译 SDK 源码和生产 writer，使用真实的 BepInEx `ManualLogSource`，日志只写到 `--root` 指定的新目录。14 个场景：惰性启动；首行 `log.level`；seq 连续；每 tick 限流与 `log.dropped` 计数；队列满时计数确定（让消费线程停在第一次控制台镜像）；注入 4096 字节文件上限；保留 10 个文件且不动非 jsonl 和子目录；控制台只镜像 error 与 info；按 provider 的级别矩阵与固定拒绝码；提级只接受一次、只在注册窗口内接受、不可撤销且切换限流档；停止时写完 60000 条提级记录；JSON 合法、字段顺序、无 BOM 与 CR、非 ASCII 原样写出；无 17 位 Steam64 形数字，记录也没有玩家身份字段；错误线程拒绝。
+
+HostIntegration `--host` 新增日志调用点检查，在 IL 层检查 SDK 与宿主（Architecture 工程没有宿主 DLL 和 Cecil）。检查两件事：记录的字符串字段不接受当场拼接、格式化或 `ToString` 产生的值（直接或经一个局部变量）；SDK 与 `ForgeRuntime.Logging` 不调用 `SNet_Player.Lookup`。四个拼接 fixture 与一个 Lookup fixture 必须被检出，干净 fixture 的 8 个 setter 必须全部放行。宿主当前至少有 writer 自己的站点，因此检查不是空转。
+
+PluginStartup 新增默认与配置级别传入宿主、trace 与未知级别在 Harmony 和宿主初始化前失败、运行中改级别不生效。HostConfiguration 新增 4 个合法值、6 个非法值、带级别的保存往返，以及默认值写出为 `Level = error`。GameBindings 的替身日志改为 `BepInEx.Logging.ManualLogSource` 形状，并链接生产 writer。
+
+rebase 到 `d09d6bb` 之后的验证记录如下。构建使用 `dotnet build <工程> -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx 目录>`，套件使用 `dotnet <隔离目录>/bin/<套件>/release/<套件>.dll <参数>`。宿主 `ForgeRuntime.csproj`、`Forge.Architecture.sln`，以及 Framework、GameBindings、LifecycleWork、EntityObservation、HostIntegration、PluginStartup、HostConfiguration、RuntimeLog 八个测试工程，退出码均为 0，输出结尾均为 `0 Warning(s)` / `0 Error(s)`。
+
+| 套件与参数 | 退出码 | 输出结尾 |
+| --- | --- | --- |
+| RuntimeLog `--root <新目录>` | 0 | `Runtime log: 127 assertions passed; 0 scenarios failed.`（停止写完：`60000 elevated records: enqueue 12 ms, stop and flush 68 ms`） |
+| Framework | 0 | `Framework checks: 255 passed.` |
+| GameBindings（默认） | 0 | `PASS 31 native-module boundary assertions. Native API execution and multiplayer are not exercised by these doubles.` |
+| GameBindings `--native <BepInEx> <ForgeRuntime.dll> <GTFO>` | 0 | `Host patches: FrameworkStateChanged, FrameworkWorldCleanup, FrameworkSessionReset, FrameworkCheckpointRestore` / `PASS 51 native-module boundary assertions. …`，宿主 Hook 精确为 4 个，GameAssembly SHA-256 `C6A5C3CD…` |
+| LifecycleWork `--fixtures <网站 fixtures/runtime>` | 0 | `Lifecycle work: 57 assertions passed; 0 groups failed.` |
+| EntityObservation | 0 | `Entity contracts: 118 passed; 0 failed. No native APIs exercised.` |
+| Architecture | 0 | `PASS 36 architecture boundary assertions. No GTFO hooks, gameplay, networking or installation exercised.` |
+| HostIntegration `--host <ForgeRuntime.dll>` | 0 | `Host integration: 61 assertions passed; 0 groups failed.` |
+| PluginStartup | 0 | `Plugin bootstrap: 39 assertions passed; 0 scenarios failed.` |
+| HostConfiguration | 0 | `Real BepInEx configuration: 90 assertions passed; 0 scenarios failed.` |
+
+本批没有跑 GameBindings `--fixtures` / `--bridge`、EntityObservation `--probe-registration`、GraphContracts、Enemy、Map、Weapon 与 Trigger 套件，也没有检查内核或领域记录点的开销（记录点不存在）。以下仍未验证：游戏内 `ManualLogSource` 从后台线程调用、真实退出时序、进程强杀时丢失的队列与最后一行 `log.dropped`。以上都是托管替身、编译后元数据与本地原生签名证据，没有加载 GTFO，也没有安装。
+
 ## 复跑
 
 从仓库根目录执行。宿主与 GameBindings 需要 `GTFO_BEPINEX_PATH` 或 `-p:GTFOBepInExPath=<BepInEx 目录>`。构建输出用 `--artifacts-path` 指向隔离目录，绝不写入已安装的插件目录。
@@ -148,6 +177,8 @@ dotnet run --project ForgeRuntime/tests/HostIntegration -c Release
 dotnet run --project ForgeRuntime/tests/LifecycleWork/LifecycleWork.csproj -c Release -- --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime
 dotnet run --project ForgeRuntime/tests/PluginStartup -c Release
 dotnet run --project ForgeRuntime/tests/HostConfiguration -c Release
+dotnet run --project ForgeRuntime/tests/HostIntegration -c Release -- --host <隔离目录>/bin/ForgeRuntime/release/ForgeRuntime.dll
+dotnet run --project ForgeRuntime/tests/RuntimeLog -c Release -- --root <仓库外的新目录>
 ```
 
 诊断侧套件的复跑见 [Development 验证记录](../ForgeDevelopment/VALIDATION.md#复跑)。聚焦回归各有自己的 README：[宿主启动](tests/PluginStartup/README.md)、[真实配置](tests/HostConfiguration/README.md)、[已加载工作清理](tests/LifecycleWork/README.md)。
