@@ -27,13 +27,25 @@
 
 ## W1 — 装备身份与原生 API 核验（部分交付）
 
-已交付的是元数据核验工具、精确输入锁和装备身份的托管实现，见 [README](README.md#当前代码状态)。**W1 未关闭。**
+已交付元数据核验工具、精确输入锁、装备身份的托管实现，以及 **implementation-only** 等级的首批原生观察接线，见 [README](README.md#当前代码状态)。**W1 未关闭，没有任何一项游戏验证。**
 
-仍未做的：原生装备观察的实际接线；方法体的调用阶段、权限与读回核验；生成阶段的初始采集；实例产生与探测的真实实现；模型挂载与 rig 与动画与部件来源和实际原生组件限制的核验（previewBinding 与 runtimeBinding 分开，源包与资产 hash 和权利证据不丢）；通过公开 SDK 注册首批已实现的观察与动作并附精确权限。
+已实现（均未在游戏中执行）：
+- `Native/ForgeWeapon.Native.csproj` 里 7 个 postfix-only 读回 Hook（背包存入、清槽、销毁全部实例、本地与同步 inventory 的持有与收起），每个目标的签名、程序集、dump RVA 唯一且不共享、位于可执行段，均由 `tests/NativeEvidence` 对本机 build 20403457 静态核验；14 条直接调用边说明哪些上层路径能到达这些 Hook。
+- 背包存入后的读回就是初始采集，不补造历史。
+- 实例身份由原生接线按世界递增生成，读回探测严格比对指针、槽位、资源与 owner。
+- 通过公开 SDK 注册两个观察型 trigger：`forge.trigger.input.equipped` 与 `forge.trigger.input.unequipped`，所需权限 `gtfo.equipment.wield.read`。只注册 runtimeBinding。
+
+仍未做的：
+- 游戏内加载入口。阻塞原因是没有领域提供 `gtfo.player` 引用与 SNet_Player→EntityReference 查询，Weapon 不自造玩家身份。
+- 关卡拾取物、世界掉落与部署物等非背包生成路径的采集。
+- 方法体内的虚调用与字段写入语义核验。
+- 模型挂载、rig 与动画的运行时核验：目前只有 3 条离线静态调用边（DoWieldItem→FirstPersonItemHolder.SetWieldedItem 与 PlayAnimationsForWieldedItem，UnWield→FirstPersonItemHolder.UnWield）。
+- 部件来源、实际原生组件限制、previewBinding（与 runtimeBinding 分开，源包与资产 hash 和权利证据不丢）。
+- 任何动作 binding：没有执行证据，不注册。
 
 **未观察到的转交历史不能由最终快照补造。**
 
-退出验收：同槽位新武器、同资源多实例、转交后的旧 owner、世界切换、陈旧指针，都不混淆；无隐式的包级兼容宣称。
+退出验收：同槽位新武器、同资源多实例、转交后的旧 owner、世界切换、陈旧指针，都不混淆；无隐式的包级兼容宣称。托管替身里这五类都已覆盖（`tests/NativeAdapter` 26/26），**都没有游戏验证**，退出验收因此仍未满足。
 
 ## W2 — 攻击、命中和接收者链
 

@@ -206,9 +206,11 @@ Case("no-gameplay-claims-or-embedded-kernel", w =>
 {
     using var manifest = JsonDocument.Parse(w.Kernel.ExportManifest());
     var root = manifest.RootElement;
-    Check(root.GetProperty("registry").GetProperty("capabilities").GetArrayLength() == 0, "no capabilities");
-    Check(root.GetProperty("registry").GetProperty("bindings").GetArrayLength() == 0, "no bindings");
-    Check(root.GetProperty("bindingSupport").GetArrayLength() == 0, "no game verification");
+    Check(root.GetProperty("registry").GetProperty("capabilities").EnumerateArray().Select(c => c.GetProperty("id").GetString())
+        .SequenceEqual(new[] { ModuleDefinition.EquippedCapability, ModuleDefinition.UnequippedCapability }), "only the two observed wield triggers");
+    Check(root.GetProperty("registry").GetProperty("bindings").EnumerateArray().All(b => b.GetProperty("role").GetString() == "observe"), "no executable bindings");
+    Check(root.GetProperty("bindingSupport").EnumerateArray().All(s => s.GetProperty("verification").GetString() == "implementation-only"
+        && s.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()).SequenceEqual(new[] { ModuleDefinition.WieldReadPermission })), "no game verification; exact read permission");
     Check(typeof(EquipmentIdentitySession).Assembly.GetType(typeof(RuntimeKernel).FullName!) == null, "single SDK");
 });
 Case("unknown-authority-denied-before-first-tick", w =>

@@ -70,11 +70,25 @@ public sealed class EquipmentIdentitySession : IDisposable
         { throw new RuntimeContractException("equipment.probe-failed", error.GetType().Name); }
         finally { probing = false; }
     }
-    public void Record(EquipmentObservation value)
+    /// <summary>Records one verified observation. Returns the wield fact dispatch only when this observation
+    /// is a directly observed wield flip of the same life, owner and inventory slot; otherwise null.
+    /// First sightings, owner or slot changes and location changes never synthesize wield history.</summary>
+    public DispatchResult? Record(EquipmentObservation value)
     {
         var before = Ready(); index.Validate(value); Probe(value);
         Check(Ready().WorldEpoch == before.WorldEpoch, "equipment.stale-world");
-        index.Record(value);
+        var previous = index.Get(value.Entity)?.Value;
+        var entry = index.Record(value);
+        if (previous == null || previous.IsWielded == value.IsWielded || previous.Owner != value.Owner
+            || previous.Slot != value.Slot || previous.Location != EquipmentLocation.Inventory
+            || value.Location != EquipmentLocation.Inventory) return null;
+        var world = before.WorldEpoch;
+        var kind = value.IsWielded ? "equipped" : "unequipped";
+        return registration.Publish(new RuntimeEvent(
+            "gtfo.equipment." + kind + ":" + world + ":" + value.Entity.Id + ":" + entry.Revision,
+            value.IsWielded ? ModuleDefinition.EquippedBinding : ModuleDefinition.UnequippedBinding,
+            world, Math.Max(0, kernel.CurrentTick), "gtfo.world:" + world,
+            RuntimeJson.From(new { actor = value.Owner, equipment = value.Entity })));
     }
     public bool Remove(EntityReference reference)
     {

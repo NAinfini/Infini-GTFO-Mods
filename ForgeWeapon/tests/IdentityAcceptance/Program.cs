@@ -28,7 +28,7 @@ Test("public-module-no-executable-claims", () =>
     using var f = new Fixture(); using var doc = JsonDocument.Parse(f.Kernel.ExportManifest());
     var r = doc.RootElement.GetProperty("registry");
     Check(r.GetProperty("providers").GetArrayLength() == 1, "provider duplicated");
-    Check(r.GetProperty("capabilities").GetArrayLength() == 0 && r.GetProperty("bindings").GetArrayLength() == 0, "unimplemented bindings advertised");
+    Check(r.GetProperty("capabilities").GetArrayLength() == 2 && r.GetProperty("bindings").EnumerateArray().All(b => b.GetProperty("role").GetString() == "observe"), "executable bindings advertised");
     Check(f.Kernel.QueuedEvents == 0 && f.Kernel.LoadedPlans == 0, "identity inspection started gameplay");
 });
 Test("live-use-revalidates-native-and-owner", () =>

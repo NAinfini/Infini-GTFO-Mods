@@ -4,11 +4,48 @@
 
 ## 当前结论
 
-W1 的元数据核验与装备身份托管实现已交付，统一入口 `tools/verify-w1.py --architecture` 退出码 0，所检查的源码前后哈希一致。
+已交付 W1 的元数据核验、装备身份托管实现和首批原生观察接线。原生接线的证据等级是 **implementation-only**，外加本机静态原生证据。
 
-**W1 未关闭，W2–W8 未开始。** 原生 Hook、生成与 owner 生命周期映射、共享 R3/R5 合同的消费、资源与动画、游戏验证都待完成。生产 `ModuleDefinition` 保持原字节，0 新游戏 binding。没有启动 GTFO、没有主客机、没有安装或发布。
+**W1 未关闭，W2–W8 未开始。** 仍待完成的有：
+- 游戏内加载入口，被 `gtfo.player` 引用阻塞。
+- 非背包生成路径。
+- 共享 R3/R5 合同的消费。
+- 模型、rig 与动画的运行时核验。
+- 全部游戏验证。
 
-## 最后一次统一复验
+`ModuleDefinition` 现在注册 2 个观察型 binding，全部是 `implementation-only`。没有启动 GTFO、没有主客机、没有安装或发布。
+
+## W1 原生观察接线复验（2026-09-13）
+
+全部用隔离的 `--artifacts-path` 构建，`-p:GTFOBepInExPath` 指向只读的 BepInEx interop，没有写入任何 profile 的 plugins 目录。
+
+| 套件 | 退出码 | 输出结尾 | 说明 |
+| --- | --- | --- | --- |
+| `Native/ForgeWeapon.Native.csproj` 构建 | 0 | 0 警告 0 错误 | 引用真实 interop 程序集编译；不含 BepInEx 入口 |
+| `tests/NativeAdapter` | 0 | `PASS 26/26 Weapon native adapter cases; managed doubles, no GTFO execution.` | 编译同一批原生源码，替换为托管游戏替身 |
+| `tests/NativeLayout` | 0 | `PASS 51/51 Weapon native layout checks; no GTFO execution.` | Cecil 检查构建产物：依赖方向、只读访问、Hook 集合与 postfix 形状 |
+| `tests/NativeEvidence` | 0 | `PASS 52/52 Weapon static native evidence checks; game execution NOT tested.` | 文件 hash、MVID、签名、dump RVA 唯一、不共享、可执行段，17 条直接调用边 |
+| `tests/Identity` | 0 | `"cases":42,"assertions":99` | 改为 2 个观察 binding 后重跑 |
+| `tests/IdentityAcceptance` | 0 | `INDEPENDENT IDENTITY: 37/37 passed; gameExecuted=false; synthetic inputs` | |
+| `tests/IdentityDispatchReview` | 0 | `DISPATCH REVIEW: 20/20 passed; fixture-only; gameExecuted=false` | |
+| `ForgeRuntime/tests/Architecture` | 0 | `PASS 36 architecture boundary assertions. No GTFO hooks, gameplay, networking or installation exercised.` | 3 条"不声明能力"断言改为精确匹配 Weapon 的两个观察 binding |
+
+本批最初两次运行失败，都已修复，没有放宽检查。第一次是 NativeAdapter 夹具的 plan 顺序错误（binding lock 与 permissions 未按 ordinal 排序），修正的是夹具。第二次是 `exit.world-switch-clears-and-reobserves` 失败（25/26）：实例序号跨世界不归零，修正的是适配器，世界切换时序号归零。同一世界内序号不回退，因为索引保留该世界的退役生命。
+
+NativeAdapter 覆盖的场景：
+- 会话：注册先于 Hook、重复 provider、安装失败回滚、清理失败保留原因、迟到注册、注销后卸 Hook。
+- 初始快照不产生事件；无 GearIDRange 时用 ItemID 作资源。
+- 直接观察到的持有翻转依次发布 equipped、unequipped；同步 inventory 路径同样生效。
+- 未观察到的变化只让探测失效，不补造历史；已销毁 agent 的 inventory 被忽略。
+- 退出场景：同槽新武器（有无清槽 Hook 两种）、同资源多实例、转交后旧 owner 退役且不补造转交历史、世界切换、指针复用成为新生命（有无清槽 Hook 两种）、销毁全部实例。
+- owner 未解析时不记录；客户端或 gate 关闭时不记录。
+- 合同拒绝不锁死会话；未加载却持有被拒绝；意外原生异常锁存故障。
+
+**这些都是托管替身结果，不是游戏验证。**
+
+NativeEvidence 的证据范围：直接 near call 边与方法边界来自 dump 的下一个 RVA。它**不**解析虚调用、字段写入、运行时实际调用顺序或多人流量。3 条表现调用边只说明离线调用关系，不证明模型挂载、rig 或动画结果。
+
+## 此前的统一入口复验（verify-w1.py，原生接线之前）
 
 | 套件 | 结果 | 说明 |
 | --- | --- | --- |
@@ -47,7 +84,7 @@ Steam app `493520` / build `20403457` / revision `34873`。GameAssembly SHA-256 
 
 一次较早的跨模块复验曾在 `ForgeEnemy/EnemyLifeTable.cs(97,85)` 报 `CS1503`（CultureInfo 与 NumberStyles 参数不匹配）。没有修改 Enemy；最终实际重跑通过，不用旧结果覆盖失败，也不把其修复归到 Weapon。
 
-一份并行的"仅物理会话"草稿已从生产移除，保留在被忽略的 `.artifacts` 下；生产方向只有 `EquipmentIdentitySession` 与索引这一条。一次原生静态代码检查在检查前被工具安全检查拦截，其未验证的草稿被排除在 NativeAudit 工程之外，先前的元数据审计器已恢复——**本包没有做出任何原生代码层面的断言**。
+一份并行的"仅物理会话"草稿已从生产移除，保留在被忽略的 `.artifacts` 下；生产方向只有 `EquipmentIdentitySession` 与索引这一条。一次原生静态代码检查在检查前被工具安全检查拦截，其未验证的草稿被排除在 NativeAudit 工程之外，先前的元数据审计器已恢复。该记录时本包没有原生代码层面的断言。现行的静态原生断言只来自 `tests/NativeEvidence`，见上文。
 
 ## 复跑
 

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Production native sources compiled against game/Harmony doubles; no GTFO assembly is loaded. -->
+    <Compile Include="../../Native/WeaponNativeSession.cs;../../Native/WeaponNativeHooks.cs;../../Native/EquipmentNativeAdapter.cs" />
+    <Compile Include="Program.cs;GameDoubles.cs" />
+    <ProjectReference Include="../../ForgeWeapon.csproj" />
+  </ItemGroup>
+</Project>

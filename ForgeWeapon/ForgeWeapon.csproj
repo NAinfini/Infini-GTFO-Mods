@@ -10,7 +10,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="tests/**/*.cs;tools/**/*.cs;.artifacts/**/*.cs" />
+    <Compile Remove="tests/**/*.cs;tools/**/*.cs;.artifacts/**/*.cs;Native/**/*.cs" />
     <ProjectReference Include="../ForgeRuntime/Framework/ForgeRuntime.Framework.csproj" />
   </ItemGroup>
 </Project>

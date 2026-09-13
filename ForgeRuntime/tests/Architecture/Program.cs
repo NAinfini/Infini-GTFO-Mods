@@ -50,9 +50,10 @@ using (var manifest = JsonDocument.Parse(manifestBeforeDuplicate))
 {
     var registry = manifest.RootElement.GetProperty("registry");
     Check(registry.GetProperty("providers").GetArrayLength() == definitions.Length, "one registry contains all providers");
-    Check(registry.GetProperty("capabilities").GetArrayLength() == 0, "scaffolds do not claim capabilities");
-    Check(registry.GetProperty("bindings").GetArrayLength() == 0, "scaffolds do not claim executable bindings");
-    Check(manifest.RootElement.GetProperty("bindingSupport").GetArrayLength() == 0, "scaffolds do not claim game verification");
+    var weapon = ForgeWeapon.ModuleDefinition.ProviderId;
+    Check(registry.GetProperty("capabilities").EnumerateArray().Select(c => c.GetProperty("owner").GetString()).SequenceEqual(new[] { weapon, weapon }), "only Weapon claims capabilities: its two observed wield triggers");
+    Check(registry.GetProperty("bindings").EnumerateArray().Select(b => (b.GetProperty("providerId").GetString(), b.GetProperty("role").GetString())).SequenceEqual(new (string?, string?)[] { (weapon, "observe"), (weapon, "observe") }), "only Weapon claims bindings and none is executable");
+    Check(manifest.RootElement.GetProperty("bindingSupport").EnumerateArray().Select(s => s.GetProperty("verification").GetString()).SequenceEqual(new[] { "implementation-only", "implementation-only" }), "no provider claims game verification");
 }
 try
 {
