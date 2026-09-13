@@ -46,7 +46,7 @@
 
 退出验收：跨域数据依赖、循环与重入与错误类型拒绝、重复 tick、预算耗尽、公平排序与取消传播；编译往返无静默丢字段。另需给出冷/热加载、每 tick 预算、分配次数、GC 压力的实测前后对比，同设备同场景——没有实测数据不得声称性能达标。
 
-同时要退休导入的 `Infini.ForgeRuntime` 原型源码。它当前被生产工程明确排除，只有 `ForgeRuntime.Tests` 引用它；它不是生产 API 也不是 fallback，退休是本批的显式收尾项。
+导入的 `Infini.ForgeRuntime` 原型（三份源码、`ForgeRuntime.Core.csproj`、`ForgeRuntime.Tests` 与只服务它的 CI 工作流）已于 2026-09-13 删除，不再是本批收尾项。
 
 ### R5 — 结果、成本与事务基础
 
@@ -131,10 +131,6 @@ source / owner / instigator / recipient 四个角色在网络语义下各自的�
 安装到测试 profile 与发布需要当时的明确任务授权。
 
 退出验收：从网站离线导出到独立测试 profile 的完整闭环；源码、二进制、包依赖和报告版本一致，不能只凭构建关闭任务。
-
-## 尚未收口的具体项
-
-已排除编译的原型 `CanonicalTriggerRuntime.cs` 与 `ForgeRuntimeHost.cs` 仍文本引用 D2 后已不在宿主内的 `PerformanceDiagnostics`；它们不参与任何构建，随 R1 记录的原型退休在 R4 收尾时删除。
 
 ## 聚焦验收矩阵
 

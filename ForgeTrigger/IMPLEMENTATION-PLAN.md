@@ -60,7 +60,7 @@
 
 按总案定义 Branch/Switch/Sequence/Parallel/Join、ForEach 与有限循环、Gate/Once/Counter、Cooldown/Throttle/Debounce、Delay/Pulse/Interval 各批；每类先写可检出错误的用例再接唯一内核。固定控制状态的 scope、拥有者、执行顺序与 join 的完成/失败/取消规则；不允许无界循环、同步递归、自发重复调度或域线程池执行。周期控制输出普通动作输入；立即或延后首跳、有限 pulseCount 与终点、到期边界明确，历史成员不可补算，跳过数与迟到策略进入结果。
 
-**不能把 T3 的控制折叠成专用 Action 绕过现有 ABI**，也不能调用被宿主 csproj 明确排除的旧 `ForgeLogicRuntime` / `CanonicalTriggerRuntime`。
+**不能把 T3 的控制折叠成专用 Action 绕过现有 ABI。**
 
 退出验收：相同 tick 幂等、join 不重复完成、零成员 foreach、循环预算、重入、取消父与子 scope、过期点无额外一跳。
 

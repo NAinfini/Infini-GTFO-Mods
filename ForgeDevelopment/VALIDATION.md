@@ -41,7 +41,7 @@ Python 的跨端 reader 用例此前硬编码网站旧文件 `site/map-balance-r
 
 **设计决定。** 启动门槛取 Runtime 的 `Authoring` 模式，不另设开关；配置文件独立为 `NAinfini.ForgeDevelopment.cfg`，**不迁移旧键**，旧 `Off` 不会变成启用；本插件不登记 provider；报告写 `forgeVersion`（宿主）与 `developmentVersion`。
 
-**未关闭。** 网站离线包仍把 `ProjectManifest` 写进 Runtime 配置且不含本插件（网站仓库负责）。已排除编译的原型 `CanonicalTriggerRuntime.cs` 与 `ForgeRuntimeHost.cs` 仍文本引用 `PerformanceDiagnostics`，它们不参与任何构建，退休归 Runtime R4 收尾。
+**未关闭。** 网站离线包仍把 `ProjectManifest` 写进 Runtime 配置且不含本插件（网站仓库负责）。
 
 ## D1 — 入队快照缺陷的复现与修复
 

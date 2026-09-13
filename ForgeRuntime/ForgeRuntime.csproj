@@ -20,8 +20,6 @@
   <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
     <Compile Remove="Framework\**\*.cs" />
-    <!-- Imported prototype belongs only to its own test project, never the GTFO host. -->
-    <Compile Remove="CanonicalTriggerRuntime.cs;ForgeLogicRuntime.cs;ForgeRuntimeHost.cs" />
     <ProjectReference Include="Framework\ForgeRuntime.Framework.csproj" />
     <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.ImageConversionModule.dll" Private="false" />
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)\core\0Harmony.dll" Private="false" />

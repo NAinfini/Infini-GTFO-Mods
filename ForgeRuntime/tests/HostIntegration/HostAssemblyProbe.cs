@@ -8,8 +8,6 @@ internal static class HostAssemblyProbe
         using var host = AssemblyDefinition.ReadAssembly(Path.GetFullPath(path));
         var references = host.MainModule.AssemblyReferences;
         Verify.That(references.Count(r => r.Name == "ForgeRuntime.Framework") == 1, "host must reference exactly one shared SDK");
-        Verify.That(!references.Any(r => r.Name == "Infini.ForgeRuntime.Core"), "prototype leaked into production references");
-        Verify.That(!host.MainModule.Types.Any(t => t.Namespace == "Infini.ForgeRuntime"), "prototype source leaked into production DLL");
         Verify.That(!host.MainModule.Types.Any(t => t.FullName == typeof(RuntimeKernel).FullName), "host contains a duplicate kernel type");
         var plugin = host.MainModule.Types.Single(t => t.FullName == "ForgeRuntime.Plugin");
         var runtime = plugin.Properties.Single(p => p.Name == "Runtime");
