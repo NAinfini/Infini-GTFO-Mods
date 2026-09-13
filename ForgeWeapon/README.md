@@ -50,7 +50,13 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 - 14 条到达或清理路径的直接调用边。
 - 3 条离线表现调用边：DoWieldItem 调 `FirstPersonItemHolder.SetWieldedItem` 与 `PlayAnimationsForWieldedItem`，本地 UnWield 调 `FirstPersonItemHolder.UnWield`。**这 3 条不证明模型挂载、rig 或动画的实际结果。**
 
-阻塞游戏加载的原因：没有领域注册 `gtfo.player` resolver，也没有公开的 SNet_Player→EntityReference 查询。Weapon 不能自造玩家身份，所以不提供插件入口。
+阻塞游戏加载的原因：ForgeMap 的 MAP5a 已注册 `gtfo.player` resolver（implementation-only，见 [ForgeMap README](../ForgeMap/README.md#map5a-玩家实体身份implementation-only)），但**公开 SDK 没有从 SNet_Player 取得当前玩家引用的入口**。玩家引用 `gtfo.player:<n>` 的编号与 lifeEpoch 都由 Map 私有分配；SDK 只有 owner 内部的精确核验和对完整引用的 `InspectEntities`，没有发现或查询入口，也没有公开的精确核验入口。唯一稳定的原生玩家键是 `SNet_Player.Lookup`，即 Steam64 账号 ID，按隐私规则不能成为公开字符串键；猜编号或 lifeEpoch 不可靠，Weapon 也不能引用 ForgeMap 程序集。所以仍不提供插件入口，`WeaponPlayerReferences` 没有生产实现。
+
+解除阻塞所需的最小 SDK 变更（Framework 所有者决定，本包不改）：
+- `RuntimeModule` 增加 `EntityInstanceResolvers : IReadOnlyDictionary<string, Func<object, EntityReference?>>`：owner 在进程内把活的原生对象（这里是 `SNet_Player`）映射为当前引用；命名空间所有权与 `EntityResolvers` 相同，冲突同样原子拒绝。
+- `RuntimeKernel` 增加 `EntityReference? ResolveEntityInstance(string kind, object instance)`：只在所属线程、非 Failed/Stopped 时可用；路由到该 kind 的唯一 owner；返回值前缀必须等于 kind、WorldEpoch 必须等于当前世界，并再经 owner 的 resolver 核验；不枚举、不回退；实例及由它导出的任何键都不进入错误、诊断、清单或序列化。
+- `RuntimeKernel` 增加 `bool IsEntityCurrent(EntityReference reference)`：公开现有的路由加世界加 owner 核验，同样的线程与状态限制。
+- Weapon 插件随后以 `ResolveEntityInstance("gtfo.player", player)` 实现 `Resolve`、以 `IsEntityCurrent` 实现 `IsCurrent`，并声明对 `NAinfini.ForgeMap` 的 `BepInDependency`。
 
 已知未核验的点：
 - `Slots` 下标是否等于 `InventorySlot` 值。
@@ -76,7 +82,7 @@ W1 已交付只读的元数据核验工具与精确的输入锁：Steam app `493
 `tests/fixtures/w1-runtime-acceptance.json` 里的 20 个完整接线规格已经写好但 **0 个执行**，`verification=not-executed`；它们不是新的 Runtime IR 也不是已实现的库存服务，不计为通过的玩法测试。
 
 W1 仍待完成：
-- 游戏加载入口，受 `gtfo.player` 引用阻塞。
+- 游戏加载入口，受公开 SDK 缺少 SNet_Player→`gtfo.player` 原生实例查询阻塞（Map 的 resolver 已有）。
 - 非背包生成路径的采集。
 - 共享 R3/R5 合同的消费。
 - 模型、rig 与动画的运行时核验。

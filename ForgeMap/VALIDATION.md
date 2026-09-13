@@ -6,7 +6,32 @@
 
 MAP1 的原生 API 取证、字节复核、SDK 消费方测试，以及生产程序集内的身份表、创建生命票据与 R2 生命周期接入都已交付并通过。
 
-**没有真实创建适配器、对外原生 resolver、地图 Action、游戏 Hook、生成器、资源 Adapter 或玩家可用插件；MAP1 整体未关闭。MAP2 只完成了定范围（规格、fixture、签名锁），没有 C# 实现；MAP3–MAP9、MAP-GEN、MAP-ADAPTER 未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false；`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分，原生部分 `nativeExecuted: false`。
+**没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；MAP1 整体未关闭。MAP2 只完成了定范围（规格、fixture、签名锁），没有 C# 实现；MAP5a 玩家实体身份为 implementation-only（唯一的游戏 Hook 与对外 resolver，见下节），MAP5 其余与 MAP3–MAP9、MAP-GEN、MAP-ADAPTER 未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false；`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分，原生部分 `nativeExecuted: false`。
+
+## MAP5a — 玩家实体身份（2026-09-13）
+
+证据等级：**implementation-only + 本机静态原生证据**。没有启动 GTFO、没有安装到任何 profile、没有主客机。全部构建使用会话临时目录的隔离 `--artifacts-path`，`GTFOBepInExPath` 指向只读的 Temp profile BepInEx；复跑命令见 [README](README.md#复跑)。
+
+| 套件 | 退出码 | 输出结尾 | 说明 |
+| --- | --- | --- | --- |
+| `Native/ForgeMap.Native.csproj` 构建 | 0 | 0 警告 0 错误 | 真实 interop 编译，`ForgeRuntimeAssembly` 取同一 artifacts 的宿主构建 |
+| `tests/MapNativeAdapter` | 0 | `PASS 35/35 Map native player identity cases; no GTFO execution.` | 生产源码加 loader 与游戏替身：注册顺序与回滚、身份规则、世界与停止清表、bot、迟加入、冲突、伪造引用、线程、隐私 |
+| `tests/MapNativeLayout` | 0 | `PASS 38/38 Map native layout checks; no GTFO execution.` | Cecil：依赖方向、单一 provider 来源、只读且精确的玩家读取、Lookup 从不格式化或装箱、Hook 形状、插件身份与依赖、Off 门、不热卸载 |
+| `tests/MapNativeEvidence` | 0 | `PASS 29/29 Map static native evidence checks; game execution NOT tested.` | build、hash、MVID、2 个 Hook 签名与 dump RVA 唯一不共享可执行、5 个读回签名、7 条直接调用边 |
+| MapIdentity 回归 | 0 | 134 项断言通过，`nativeScenariosExecuted: false` | 未改 |
+| MapContracts 回归 | 0 | 33 项通过 | 未改 |
+| 架构回归 | 0 | `PASS 36 architecture boundary assertions. No GTFO hooks, gameplay, networking or installation exercised.` | `Program.cs` 未改 |
+
+同批复跑 ForgeWeapon（源码未改，只改文档）：NativeAdapter `PASS 26/26`，NativeLayout `PASS 51/51`，NativeEvidence `PASS 52/52`，Identity `"cases":42,"assertions":99`，IdentityAcceptance `INDEPENDENT IDENTITY: 37/37 passed`，IdentityDispatchReview `DISPATCH REVIEW: 20/20 passed`，退出码均为 0。
+
+中间失败与修正：
+- MapNativeLayout 首跑 36/37：`GameAssembly` 判定只识别 `-ASM` 后缀，漏掉 `SNet_ASM`，精确读取集合因此缺少 SNet_Player 成员。补上 `_ASM` 后通过。
+- 协调方追加隐私规则后，实体 ID 从 `gtfo.player:<Lookup>` 改为本世界编号，测试随之重写并新增 2 个隐私用例与 1 项静态检查。
+- IdentityAcceptance / DispatchReview 第二次运行时报告文件已存在而拒绝覆盖（测试行已全部通过），换新报告路径重跑后退出码 0。
+
+会话临时目录里的变异检查（只改副本，不改仓库）：去掉 agent 指针替换、去掉 `SNet.IsMaster`、去掉互链复核、去掉世界清表、冲突保留首个、实体 ID 用 Lookup、每个 life 换编号，7 个变体各自被对应的具名用例检出。报告 JSON 中搜不到任何 fixture Lookup 值。
+
+未核验（需要游戏内确认）：bot `Lookup` 跨重生稳定性；postfix 时刻 `PlayerAgentsInLevel` 的成员是否已更新；`UnregisterPlayerAgent` 与 `OnPlayerDespawned` 的运行时顺序；倒地与救起不重建 PlayerAgent；`Object.Destroy` 延迟期间旧 agent 的状态；迟加入与主机迁移。
 
 ## MAP2 定范围（2026-09-13）
 

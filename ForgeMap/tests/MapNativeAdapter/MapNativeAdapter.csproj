@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Production Map native sources compiled against loader/game doubles; no GTFO assembly is loaded. -->
+    <Compile Include="../../Native/Plugin.cs;../../Native/MapPluginSession.cs;../../Native/MapNativeHooks.cs;../../Native/PlayerIdentityModule.cs" />
+    <Compile Include="Program.cs;GameDoubles.cs;LoaderDoubles.cs" />
+    <ProjectReference Include="../../ForgeMap.csproj" />
+  </ItemGroup>
+</Project>

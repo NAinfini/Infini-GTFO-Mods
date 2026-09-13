@@ -36,7 +36,7 @@
 - 通过公开 SDK 注册两个观察型 trigger：`forge.trigger.input.equipped` 与 `forge.trigger.input.unequipped`，所需权限 `gtfo.equipment.wield.read`。只注册 runtimeBinding。
 
 仍未做的：
-- 游戏内加载入口。阻塞原因是没有领域提供 `gtfo.player` 引用与 SNet_Player→EntityReference 查询，Weapon 不自造玩家身份。
+- 游戏内加载入口。`gtfo.player` resolver 已由 ForgeMap MAP5a 注册（implementation-only），剩余阻塞是公开 SDK 没有 SNet_Player→EntityReference 的原生实例查询：编号与 lifeEpoch 归 Map 私有，唯一稳定键 Lookup 是 Steam64 账号 ID、不能作公开键，Weapon 不猜、不自造、不引用 ForgeMap。所需最小 SDK API 见 [README](README.md#原生观察接线implementation-only)；该 API 落地后再写 Weapon 插件并声明依赖 `NAinfini.ForgeMap`。
 - 关卡拾取物、世界掉落与部署物等非背包生成路径的采集。
 - 方法体内的虚调用与字段写入语义核验。
 - 模型挂载、rig 与动画的运行时核验：目前只有 3 条离线静态调用边（DoWieldItem→FirstPersonItemHolder.SetWieldedItem 与 PlayAnimationsForWieldedItem，UnWield→FirstPersonItemHolder.UnWield）。

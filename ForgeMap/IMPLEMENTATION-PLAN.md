@@ -96,6 +96,23 @@ Unity 的 64 位 path ID 以十进制字符串穿过 JSON 边界。三分量与�
 
 退出验收：倒地自救扣费一次、死亡不能被 Heal 意外复活、传送不新建 life、重生不继承旧 lease、恢复不重复授予或生成。
 
+### MAP5a — 玩家实体身份（先行切片，implementation-only）
+
+为解除 Weapon W1 的加载阻塞，从 MAP5 切出身份这一项先做，其余 MAP5 内容（alive / downed / dead 映射、救起与重生语义、落点、检查点）**仍未开始**。已交付内容见 [README](README.md#map5a-玩家实体身份implementation-only)，结果见 [VALIDATION](VALIDATION.md#map5a--玩家实体身份2026-09-13)。
+
+规则：
+- 引用为 `gtfo.player:<n>`，`n` 是本世界内按首次登记顺序递增的编号，WorldEpoch 取内核当前世界；同一 SNet_Player 上观察到新的 PlayerAgent 实例（指针变化）或 SNet_Player 对象变化即分配新 lifeEpoch，lifeEpoch 单调、不复用。
+- 隐私硬规则：`SNet_Player.Lookup` 是 Steam64 账号 ID，只作 Map 私有字典键，不进入实体 ID、observer 输出、错误码或 detail、日志与测试证据，也不序列化。
+- 倒地、救起、Heal、传送不改 life：只有 agent 实例替换或 despawn 才结束 life。检查点重载由宿主暂停并换世界，Map 只在 WorldChanged / Failed / Stopped 清表，不另做一套。
+- 只在 host（`SNet.IsMaster`）且 Runtime Ready 时分配；**不使用 InLevel 玩法门**，因为电梯阶段的生成与进关同属一个世界。
+- owner 解析不到、agent 与 SNet_Player 互链不成立、同键两个 agent，一律不登记；不按名字、槽位顺序或指针推断身份。Bot 同样规则，Lookup 稳定性未核验。
+- 只注册 resolver，不注册 observer、capability 或 binding。
+
+剩余：
+- 游戏内核验（清单见 VALIDATION）。
+- 与 MAP1 身份 Session 合并为同一 provider 生命周期：两者都登记 `forge.module.gtfo.map`，不能同进程并存；MAP1 原生适配器接线时必须合并，不做双注册。
+- SDK 的原生实例查询（Framework 所有者，形状见 [ForgeWeapon README](../ForgeWeapon/README.md#原生观察接线implementation-only)）落地后，Weapon 才能消费；不以 Lookup 作公开键凑合。
+
 ## MAP6 — 共享资源、奖励与局内进程
 
 开始条件：Runtime R5 事务、R6 状态与 Weapon 的库存与装备动作可用。

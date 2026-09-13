@@ -11,6 +11,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <!-- Game-bound player identity lives in Native/ForgeMap.Native.csproj; this assembly stays game-independent. -->
+    <Compile Remove="Native/**/*.cs" />
     <ProjectReference Include="../ForgeRuntime/Framework/ForgeRuntime.Framework.csproj" />
   </ItemGroup>
 </Project>
