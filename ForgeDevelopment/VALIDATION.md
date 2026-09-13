@@ -41,7 +41,7 @@ Python 的跨端 reader 用例此前硬编码网站旧文件 `site/map-balance-r
 
 **设计决定。** 启动门槛取 Runtime 的 `Authoring` 模式，不另设开关；配置文件独立为 `NAinfini.ForgeDevelopment.cfg`，**不迁移旧键**，旧 `Off` 不会变成启用；本插件不登记 provider；报告写 `forgeVersion`（宿主）与 `developmentVersion`。
 
-**未关闭。** 网站离线包仍把 `ProjectManifest` 写进 Runtime 配置且不含本插件（网站仓库负责）。
+**已关闭（2026-09-13）。** 网站 `62041354` 起离线包不再把 `ProjectManifest` 写进 Runtime 配置，`NAinfini.ForgeRuntime.cfg` 只剩 `[Runtime] Mode`；玩家包不含本插件是 D-007 的设计。模组侧无代码改动（本插件从未读 Runtime 配置里的这个键）；证据为网站提交，模组未复跑离线包导出。
 
 ## D1 — 入队快照缺陷的复现与修复
 

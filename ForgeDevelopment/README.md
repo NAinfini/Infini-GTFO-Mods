@@ -42,7 +42,7 @@ ManualSnapshotKey = F9
 
 F9 请求性能快照，F10 导出当前生成报告，F11 开关战斗采样。报告写入 `BepInEx/ForgeReports`，性能日志写入 `BepInEx/PerformanceLogs`（`ForgeDevelopment_*.log` 与短时 `ForgeDevelopment_UnityProfile_*.raw`）。关卡结束和进程退出也请求导出。写入失败会报告错误；看 JSON 里的 `dropped` 和检查状态，不能只看 `outcome`。只关闭 `EnablePerformanceLogging` 只关闭性能采集。
 
-**网站合同待同步：** 网站的离线包导出（`site/map-package.ts` 与其测试）仍把 `[Authoring] ProjectManifest` 写进 `NAinfini.ForgeRuntime.cfg`，也不包含本插件。按当前源码这个键不会被读取；修改归网站仓库。
+网站离线包导出（`site/map-package.ts`，网站 `62041354` 起）只给 `NAinfini.ForgeRuntime.cfg` 写 `[Runtime] Mode`，不再写 `[Authoring] ProjectManifest`。玩家包不包含本插件（D-007：开发层不进玩家包）。
 
 ## 现行输入与报告合同
 
