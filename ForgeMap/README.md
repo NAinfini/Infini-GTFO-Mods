@@ -14,7 +14,7 @@ Map 与 Room 的空间、设备、任务、遭遇、玩家生命流程与进程�
 
 ## 当前代码状态
 
-**运行清单仍没有 capability 或 binding。** `ModuleDefinition.Create()` 的 capabilities 与 bindings 都是空数组，没有地图 Action。唯一对外的运行期能力是 MAP5a 的 `gtfo.player` 实体 resolver，它在独立的 `Native/ForgeMap.Native.csproj` 插件里，见下一节。
+**运行清单仍没有 capability 或 binding。** `ModuleDefinition.Create()` 的 capabilities 与 bindings 都是空数组，没有地图 Action。唯一对外的运行期能力是 MAP5a 的 `gtfo.player` 实体 resolver 与原生实例解析器，它们在独立的 `Native/ForgeMap.Native.csproj` 插件里，见下一节。
 
 已经在生产程序集内的是内部身份层，只有显式构造 Session 才登记这一空 provider 并订阅生命周期，不会自动加载：
 
@@ -31,7 +31,7 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 `Native/ForgeMap.Native.csproj` 是独立项目，引用真实 interop 编译，不进入 `ForgeMap.dll`：
 - `Plugin`：BepInEx 插件 `NAinfini.ForgeMap` / `Infini Forge Map` / `0.1.0`，依赖 `NAinfini.ForgeRuntime` 1.2.0。宿主 Off 时不注册、不装 Hook；Load 只允许一次，`Unload()` 返回 false。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
 - `MapPluginSession`：与 Enemy 相同的顺序。注册窗口内先注册模块（重复 provider 或 `gtfo.player` 命名空间冲突在装 Hook 前原子失败），再装 Hook；失败回滚先卸 Hook 再注销并保留原始异常；回调异常锁存故障并清表；释放时先注销再卸 Hook；所属线程检查。
-- `PlayerIdentityModule`：在 `ModuleDefinition.Create()` 上只追加 `EntityResolvers["gtfo.player"]`，不注册 observer、capability 或 binding，也不另造 provider。
+- `PlayerIdentityModule`：在 `ModuleDefinition.Create()` 上只追加 `EntityResolvers["gtfo.player"]` 与 `EntityInstanceResolvers["gtfo.player"]`，不注册 observer、capability 或 binding，也不另造 provider。
 - `MapNativeHooks`：2 个 `Priority.Last` postfix，只决定何时读回、不读参数：`PlayerManager.OnPlayerSpawned` 与 `PlayerManager.OnPlayerDespawned`。两者都是非虚方法，由 `PlayerReplicationManager.OnSpawn` / `OnDeSpawn` 调用，本地、远端与 bot 玩家都经过这里（静态调用边见证据文件）。选这两个是因为它们是所有玩家生成与销毁的共同汇合点：`RegisterPlayerAgent` 与 `PlayerSync.OnSpawn` 没有直接调用者（接口派发），`PlayerAgent.Setup` / `OnDespawn` 是被 `LocalPlayerAgent` 覆盖的虚方法。
 
 身份规则：
@@ -42,6 +42,7 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 - 只在 Runtime Ready、会话未故障且 `SNet.IsMaster` 时分配。**不用 InLevel 玩法门**：电梯阶段的生成与进关同属一个世界。
 - owner 解析不到或互链不成立时不登记，并对每个 agent 警告一次 `map.player-owner-unresolved`；同一玩家键出现两个 agent 时两者都不登记（`map.player-key-conflict`，警告不带键）。不按名字、槽位顺序或指针推断身份。
 - `IsCurrent` 每次重读：world、前缀、无符号十进制编号、精确引用、agent 未销毁且指针相同、SNet_Player 指针与内部键不变、owner 与互链仍成立。
+- 原生实例解析（其他模块经 SDK 的 `ResolveEntityInstance("gtfo.player", player)` 调用）只接受 `SNet_Player`，门槛与读回相同（已注册、Runtime Ready、会话未故障、`SNet.IsMaster`）。它按 SNet_Player 指针在已登记表里查找，再经上面的 `IsCurrent` 复核后返回该条目的引用；**只查不写**：不遍历 `PlayerAgentsInLevel`、不读 `Lookup`、不分配编号或 life。未登记、互链失效或门槛关闭都返回 null，由调用方决定不记录。
 
 证据文件 `evidence/map5a-player-hooks.json` 锁定：两个 Hook 的签名、非 virtual、dump RVA（唯一且不共享、位于可执行段），5 个读回成员的签名，7 条直接调用边。
 
@@ -52,11 +53,11 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 - `Object.Destroy` 延迟销毁期间旧 agent 的可见状态。
 - 迟加入玩家与主机迁移路径。
 
-与 MAP1 的关系：`MapIdentitySession` 也登记 `forge.module.gtfo.map`，两者不能同进程并存；MAP1 原生适配器接线时必须合并为同一个 provider 生命周期。Weapon 仍不能消费这个 resolver：公开 SDK 没有从 SNet_Player 查到当前引用的入口，而唯一稳定的原生键是账号 ID，不能做成公开字符串键；缺口与最小 API 见 [ForgeWeapon README](../ForgeWeapon/README.md#原生观察接线implementation-only)。
+与 MAP1 的关系：`MapIdentitySession` 也登记 `forge.module.gtfo.map`，两者不能同进程并存；MAP1 原生适配器接线时必须合并为同一个 provider 生命周期。Weapon 的装备 owner 经上面的原生实例解析取得，Weapon 插件因此依赖 `NAinfini.ForgeMap`，但不引用 ForgeMap 程序集，见 [ForgeWeapon README](../ForgeWeapon/README.md#原生观察接线implementation-only)。
 
 ## 边界
 
-没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；唯一的游戏 Hook 与对外 resolver 是上面 MAP5a 的 implementation-only 玩家身份。`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分（MapIdentity 按用例 id 标记），原生部分仍然 `nativeExecuted: false`；报告里的 `nativeGameExecuted`、`nativeHooksInstalled` 和 `gameplayBindingsRegistered` 都是 false。没有原生创建、主客机、恢复或导航执行。
+没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；唯一的游戏 Hook、对外 resolver 与原生实例解析器是上面 MAP5a 的 implementation-only 玩家身份。`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分（MapIdentity 按用例 id 标记），原生部分仍然 `nativeExecuted: false`；报告里的 `nativeGameExecuted`、`nativeHooksInstalled` 和 `gameplayBindingsRegistered` 都是 false。没有原生创建、主客机、恢复或导航执行。
 
 所有写世界的动作必须由明确的权威提交。查询与生成批次使用稳定排序、实际 seed、显式预算和完整性结果；缺少合法落点、导航证据或目标 receiver 时返回原因，**不静默换目标**。
 

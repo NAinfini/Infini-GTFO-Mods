@@ -6,7 +6,30 @@
 
 MAP1 的原生 API 取证、字节复核、SDK 消费方测试，以及生产程序集内的身份表、创建生命票据与 R2 生命周期接入都已交付并通过。
 
-**没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；MAP1 整体未关闭。MAP2 只完成了定范围（规格、fixture、签名锁），没有 C# 实现；MAP5a 玩家实体身份为 implementation-only（唯一的游戏 Hook 与对外 resolver，见下节），MAP5 其余与 MAP3–MAP9、MAP-GEN、MAP-ADAPTER 未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false；`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分，原生部分 `nativeExecuted: false`。
+**没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；MAP1 整体未关闭。MAP2 只完成了定范围（规格、fixture、签名锁），没有 C# 实现；MAP5a 玩家实体身份为 implementation-only（唯一的游戏 Hook、对外 resolver 与原生实例解析器，见下两节），MAP5 其余与 MAP3–MAP9、MAP-GEN、MAP-ADAPTER 未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false；`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分，原生部分 `nativeExecuted: false`。
+
+## MAP5a — gtfo.player 原生实例解析（2026-09-13）
+
+`PlayerIdentityModule` 同时登记 `EntityInstanceResolvers["gtfo.player"]`，Weapon 由此经 SDK 的 `ResolveEntityInstance` 取得装备 owner，接口见 [Runtime 验证记录](../ForgeRuntime/VALIDATION.md#原生实例解析2026-09-13)。证据等级不变：**implementation-only + 本机静态原生证据**；没有新的原生读取签名，证据文件未改。
+
+| 套件 | 退出码 | 输出结尾 |
+| --- | --- | --- |
+| `Native/ForgeMap.Native.csproj` 构建 | 0 | 0 警告 0 错误 |
+| `tests/MapNativeAdapter` | 0 | `PASS 41/41 Map native player identity cases; no GTFO execution.` |
+| `tests/MapNativeLayout` | 0 | `PASS 39/39 Map native layout checks; no GTFO execution.` |
+| `tests/MapNativeEvidence` | 0 | `PASS 29/29 Map static native evidence checks; game execution NOT tested.` |
+
+MapNativeAdapter 从 35 增加到 41：
+- `instance.sdk-lookup-returns-recorded-life`：经 SDK 查到的就是已登记的引用。
+- `instance.lookup-never-allocates-a-life`：未登记的玩家返回 null，不分配编号或 life。
+- `instance.observe-gate-and-native-type`：注册期、非主机、已销毁的玩家，以及 agent、`SNet_IPlayerAgent`、字符串、数字和同 Lookup 的另一个 `SNet_Player` 都返回 null。
+- `instance.lookup-rereads-native-links`：agent 互链、Lookup 或 owner 变化后返回 null，且不改表。
+- `instance.stop-and-wrong-thread`：模块与内核两条路径在错线程都抛 `wrong-thread` 且不改状态；停止后模块返回 null，内核抛 `runtime-not-ready`。
+- `privacy.instance-lookup-results-and-errors-exclude-account-lookup`：结果与错误文本并入输出后做 Lookup 泄漏检查，结果为没搜到。
+
+另外两个已有用例各追加一项：外部模块给 `gtfo.player` 挂实例解析器被拒（`entity-instance-resolver-owner`）；插件成功路径能经内核解析出玩家。MapNativeLayout 从 38 增加到 39：原检查改名为 `native.player-resolver-and-instance-lookup-without-observer` 并要求登记实例解析器，新增 `native.instance-lookup-never-allocates`（单个 `object` 参数、不写字段、不调用对账或增删、不读 `Lookup` 与 `PlayerAgentsInLevel`）。
+
+本批没有重跑 MapIdentity 与 MapContracts（身份层与 SDK 消费方源码未改）。下节表中的 35/38 是加入实例解析之前的计数。
 
 ## MAP5a — 玩家实体身份（2026-09-13）
 

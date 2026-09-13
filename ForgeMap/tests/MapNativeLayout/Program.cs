@@ -46,8 +46,16 @@ Check("native.no-update-loop", !nativeTypes.SelectMany(t => t.Methods).Any(m => 
 Check("native.single-provider-source", calls.Any(m => Member(m) == "ForgeMap.ModuleDefinition::Create")
     && !instructions.Any(i => i.OpCode == OpCodes.Newobj && i.Operand is MethodReference c && c.DeclaringType.FullName == "ForgeRuntime.Framework.RuntimeModule")
     && !instructions.Any(i => i.Operand is string s && s.Contains("forge.module.", StringComparison.Ordinal)));
-Check("native.player-resolver-without-observer", calls.Any(m => Member(m) == "ForgeRuntime.Framework.RuntimeModule::set_EntityResolvers")
+Check("native.player-resolver-and-instance-lookup-without-observer", calls.Any(m => Member(m) == "ForgeRuntime.Framework.RuntimeModule::set_EntityResolvers")
+    && calls.Any(m => Member(m) == "ForgeRuntime.Framework.RuntimeModule::set_EntityInstanceResolvers")
     && !calls.Any(m => m.Name == "set_EntityObservers") && instructions.Any(i => i.Operand is string s && s == "gtfo.player"));
+// Only the spawn/despawn readback allocates lives; the SDK instance lookup reads the recorded table and nothing else.
+var lookup = nativeTypes.Where(t => t.Name == "PlayerIdentityModule").SelectMany(t => t.Methods).SingleOrDefault(m => m.Name == "ResolveInstance");
+var lookupCalls = lookup?.Body.Instructions.Select(i => i.Operand).OfType<MethodReference>().ToArray() ?? Array.Empty<MethodReference>();
+Check("native.instance-lookup-never-allocates", lookup != null && lookup.Parameters.Count == 1 && lookup.Parameters[0].ParameterType.FullName == "System.Object"
+    && !lookup.Body.Instructions.Any(i => i.OpCode.Code is Code.Stfld or Code.Stsfld)
+    && !lookupCalls.Any(m => m.Name is "Reconcile" or "Add" or "Remove" or "Clear" or "get_Lookup" or "get_PlayerAgentsInLevel"),
+    string.Join(", ", lookupCalls.Select(Member).Distinct(StringComparer.Ordinal)));
 Check("native.no-gameplay-gate", !calls.Any(m => m.Name == "get_CanExecuteGameplay"));
 // SNet_Player.Lookup is a Steam64 account ID: compared and used as a private dictionary key, never formatted or boxed.
 Check("native.account-lookup-never-formatted", !calls.Any(m => m.DeclaringType.FullName == "System.UInt64" && m.Name == "ToString")

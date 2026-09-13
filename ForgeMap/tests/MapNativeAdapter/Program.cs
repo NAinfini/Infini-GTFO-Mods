@@ -96,6 +96,8 @@ Case("module.provider-and-player-namespace-only", () =>
             "Player identity claimed capabilities or bindings.");
     }
     Throws("entity-namespace-conflict", () => kernel.RegisterModule(Other("test.player_namespace", true)));
+    Throws("entity-instance-resolver-owner", () => kernel.RegisterModule(Other("test.player_lookup", false) with
+        { EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>> { ["gtfo.player"] = _ => null } }));
 });
 Case("session.duplicate-map-provider-before-hooks", () =>
 {
@@ -278,6 +280,91 @@ Case("identity.wrong-thread-rejected", () =>
     Throws("wrong-thread", () => Task.Run(session.Module.Reconcile).GetAwaiter().GetResult());
     Require(session.Module.IsCurrent(Ref(1, 1, 1)), "Off-thread access changed identity state.");
 });
+Case("instance.sdk-lookup-returns-recorded-life", () =>
+{
+    var kernel = Kernel(); List<string> info = new(), warn = new(); using var session = Start(kernel, info, warn);
+    kernel.StartRuntime(() => { }); var a = Spawn(A); var bot = Spawn(Bot, bot: true); Read(session);
+    int logs = info.Count + warn.Count;
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 1)
+        && kernel.ResolveEntityInstance("gtfo.player", bot.Player) == Ref(2, 1, 2), "SDK lookup did not return the recorded lives.");
+    Require(kernel.IsEntityCurrent(Ref(1, 1, 1)) && info.Count + warn.Count == logs && session.Module.Count == 2,
+        "Lookup logged or changed identity state.");
+});
+Case("instance.lookup-never-allocates-a-life", () =>
+{
+    var kernel = Kernel(); List<string> info = new(); using var session = Start(kernel, info, new());
+    kernel.StartRuntime(() => { }); var a = Spawn(A);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null && session.Module.Count == 0 && info.Count == 0,
+        "Lookup recorded a player before the spawn readback.");
+    Read(session);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 1), "Lookup consumed an entity number or life epoch.");
+    Replace(a.Player, a.Agent);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null && session.Module.Count == 1,
+        "Lookup returned the replaced life or allocated the replacement.");
+    Read(session);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 2), "Replacement readback did not own the new life.");
+    kernel.BeginWorld(2);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null && session.Module.Count == 0, "Lookup survived or refilled a world change.");
+});
+Case("instance.observe-gate-and-native-type", () =>
+{
+    var kernel = Kernel(); using var session = Start(kernel, new(), new()); var a = Spawn(A);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null, "Registering Runtime resolved a player.");
+    kernel.StartRuntime(() => { }); Read(session);
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 1), "Fixture life missing.");
+    SNet.IsMaster = false;
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null && session.Module.ResolveInstance(a.Player) == null,
+        "A client resolved a host-allocated life.");
+    SNet.IsMaster = true;
+    var stranger = new SNet_Player { Lookup = A, PlayerAgent = new SNet_IPlayerAgent { Target = a.Agent } };
+    foreach (var wrong in new object[] { a.Agent, a.Player.PlayerAgent!, "gtfo.player:1", 1L, stranger })
+        Require(kernel.ResolveEntityInstance("gtfo.player", wrong) == null, "Lookup accepted " + wrong.GetType().Name + ".");
+    a.Player.Destroyed = true;
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null, "Destroyed player resolved.");
+    a.Player.Destroyed = false;
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 1), "Gated lookups changed the recorded life.");
+    session.Guard(_ => throw new InvalidOperationException("fault"));
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == null, "Faulted session resolved a player.");
+});
+Case("instance.lookup-rereads-native-links", () =>
+{
+    var kernel = Kernel(); using var session = Start(kernel, new(), new()); kernel.StartRuntime(() => { });
+    var relinked = Spawn(76561198000000010); var relookup = Spawn(76561198000000011); var reowned = Spawn(76561198000000012); Read(session);
+    var fixtures = new[] { relinked, relookup, reowned };
+    Require(fixtures.Select((p, i) => kernel.ResolveEntityInstance("gtfo.player", p.Player) == Ref(i + 1, 1, i + 1)).All(x => x), "Fixture lives missing.");
+    relinked.Player.PlayerAgent = new SNet_IPlayerAgent { Target = new PlayerAgent { Owner = relinked.Player } };
+    relookup.Player.Lookup = 76561198000000099;
+    reowned.Agent.Owner = new SNet_Player { Lookup = 76561198000000012, PlayerAgent = new SNet_IPlayerAgent { Target = reowned.Agent } };
+    Require(fixtures.All(p => kernel.ResolveEntityInstance("gtfo.player", p.Player) == null) && session.Module.Count == 3,
+        "A relinked, re-keyed or re-owned player resolved, or the lookup changed the table.");
+});
+Case("instance.stop-and-wrong-thread", () =>
+{
+    var kernel = Kernel(); using var session = Start(kernel, new(), new()); kernel.StartRuntime(() => { });
+    var a = Spawn(A); Read(session);
+    Throws("wrong-thread", () => Task.Run(() => session.Module.ResolveInstance(a.Player)).GetAwaiter().GetResult());
+    Throws("wrong-thread", () => Task.Run(() => kernel.ResolveEntityInstance("gtfo.player", a.Player)).GetAwaiter().GetResult());
+    Require(kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 1), "Off-thread lookup changed identity state.");
+    kernel.StopRuntime();
+    Require(session.Module.ResolveInstance(a.Player) == null, "Stopped Map resolved a player.");
+    Throws("runtime-not-ready", () => kernel.ResolveEntityInstance("gtfo.player", a.Player));
+});
+Case("privacy.instance-lookup-results-and-errors-exclude-account-lookup", () =>
+{
+    var kernel = Kernel(); List<string> info = new(), warn = new(); using var session = Start(kernel, info, warn); kernel.StartRuntime(() => { });
+    var a = Spawn(A); var bot = Spawn(Bot, bot: true); Read(session);
+    var texts = new List<string>();
+    foreach (var player in new[] { a.Player, bot.Player, new SNet_Player { Lookup = B } })
+        texts.Add(kernel.ResolveEntityInstance("gtfo.player", player)?.ToString() ?? "null");
+    void Capture(Action action) { try { action(); texts.Add("no-error"); } catch (Exception error) { texts.Add(error.ToString()); } }
+    Capture(() => Task.Run(() => session.Module.ResolveInstance(a.Player)).GetAwaiter().GetResult());
+    Capture(() => Task.Run(() => kernel.ResolveEntityInstance("gtfo.player", a.Player)).GetAwaiter().GetResult());
+    kernel.StopRuntime(); Capture(() => kernel.ResolveEntityInstance("gtfo.player", a.Player));
+    Require(texts.Count == 6 && texts[0].Contains("gtfo.player:1", StringComparison.Ordinal) && texts[2] == "null"
+        && texts.Skip(3).All(t => t.Contains("RuntimeContractException", StringComparison.Ordinal)), "Scenario differs: " + texts.Count);
+    outputs.AddRange(texts);
+    Require(!texts.Concat(info).Concat(warn).Any(Leaks), "An account lookup reached an instance lookup result, error or log.");
+});
 Case("privacy.entity-ids-logs-and-manifest-exclude-account-lookup", () =>
 {
     var kernel = Kernel(); List<string> info = new(), warn = new(); using var session = Start(kernel, info, warn);
@@ -389,7 +476,7 @@ Case("plugin.success-hooks-drive-identity-no-hot-reload", () =>
         Require(Harmony.Patches == 2 && !plugin.Unload(), "Repeated Load or hot unload changed native lifetime.");
         kernel.StartRuntime(() => { });
         var a = Spawn(A); Hook(typeof(PlayerSpawnedReadback));
-        Require(session!.Module.IsCurrent(Ref(1, 1, 1))
+        Require(session!.Module.IsCurrent(Ref(1, 1, 1)) && kernel.ResolveEntityInstance("gtfo.player", a.Player) == Ref(1, 1, 1)
             && plugin.Log.Infos.Contains("map.player-life-started id=gtfo.player:1 world=1 life=1 bot=false"), "Spawn postfix did not record the player.");
         Despawn(a.Player, a.Agent); Hook(typeof(PlayerDespawnedReadback));
         Require(!session.Module.IsCurrent(Ref(1, 1, 1))

@@ -40,11 +40,13 @@ internal sealed class PlayerIdentityModule : IDisposable
         _canObserve = canObserve ?? throw new ArgumentNullException(nameof(canObserve));
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _warn = warn ?? throw new ArgumentNullException(nameof(warn));
-        // The one Map provider identity. The resolver is its only runtime surface: no capability, binding or
-        // observer, because a snapshot would need the alive/downed/dead mapping that MAP5 has not verified.
+        // The one Map provider identity. The resolver and the instance lookup are its only runtime surface: no
+        // capability, binding or observer, because a snapshot would need the alive/downed/dead mapping that MAP5
+        // has not verified. The instance lookup lets other domains name a player without ever seeing the account key.
         _registration = kernel.RegisterModule(ModuleDefinition.Create() with
         {
-            EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [EntityKind] = IsCurrent }
+            EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [EntityKind] = IsCurrent },
+            EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>> { [EntityKind] = ResolveInstance }
         });
         try
         {
@@ -158,6 +160,18 @@ internal sealed class PlayerIdentityModule : IDisposable
     }
 
     internal bool IsCurrent(EntityReference reference) => Resolve(reference) != null;
+
+    /// <summary>SDK instance lookup: an <see cref="SNet_Player"/> maps to its recorded current life, anything else to null.
+    /// It never allocates, so a player seen before the spawn readback has no reference yet rather than a guessed one.</summary>
+    internal EntityReference? ResolveInstance(object instance)
+    {
+        CheckThread();
+        if (instance is not SNet_Player player || player == null || !CanObserve) return null;
+        var pointer = player.Pointer;
+        foreach (var entry in _players.Values)
+            if (entry.PlayerPointer == pointer) return Resolve(entry.Reference)?.Reference;
+        return null;
+    }
 
     private static bool Linked(SNet_Player player, PlayerAgent agent)
     {
