@@ -57,7 +57,7 @@ internal sealed partial class EnemyModule : IDisposable
         _canExecute = canExecute ?? throw new ArgumentNullException(nameof(canExecute));
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _observe = observe;
-        _registration = kernel.RegisterModule(new RuntimeModule("1.0.0", RegistryJson,
+        _registration = kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RegistryJson,
             new Dictionary<string, CommandHandler> { ["gtfo.enemy.heal"] = Heal },
             new[] {
                 new BindingSupport(DamageBinding, "implementation-only", new[] { "gtfo.enemy.health.read" }),

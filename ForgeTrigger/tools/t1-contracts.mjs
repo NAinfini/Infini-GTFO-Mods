@@ -63,9 +63,14 @@ for (const row of suite.invalidPlans) {
 for (const name of ['branch', 'add']) {
     const plan = structuredClone(wires[0].plan);
     const binding = manifest.registry.bindings.find(b => b.id === 'test.trigger.binding.' + name);
-    plan.bindings[1] = {bindingId: binding.id, capabilityId: binding.capabilityId, capabilityVersion: '1.0.0', providerId: 'test.trigger', providerVersion: '1.0.0', handler: name};
-    plan.bindings.sort((a,b) => a.bindingId < b.bindingId ? -1 : 1);
-    plan.entrypoints[0].steps[0].bindingId = binding.id;
+    const capability = manifest.registry.capabilities.find(c => c.id === binding.capabilityId);
+    const provider = manifest.registry.providers.find(p => p.id === binding.providerId);
+    plan.bindings[1] = {bindingId: binding.id, capabilityId: capability.id, capabilityVersion: capability.version, providerId: provider.id, providerVersion: provider.version, handler: binding.handler};
+    plan.bindings.sort((a,b) => a.bindingId < b.bindingId ? -1 : a.bindingId > b.bindingId ? 1 : 0);
+    // Nodes name pins by position, so re-sorting the pin table moves both indices.
+    const pin = id => plan.bindings.findIndex(row => row.bindingId === id);
+    plan.entrypoints[0].binding = pin('test.trigger.binding.event');
+    plan.entrypoints[0].steps[0].binding = pin(binding.id);
     rejects(() => validateForgeRuntimePlan(plan, manifest, grant), 'Unsupported runtime node kind', 'wire cannot disguise ' + name + ' as action');
     wires.push({id: 'disguised-' + name, accepted: false, plan, grants: grant, code: 'node-kind'});
 }
@@ -130,7 +135,7 @@ const report = {kind:'generated-non-executable-source-audit', schemaVersion:1, s
 write('node-audit.json', report);
 const provenanceOnly = structuredClone(wires[0].plan);
 provenanceOnly.resource.revision = 'unresolved-resource-revision';
-check(validateForgeRuntimePlan(provenanceOnly, manifest, grant).kind === 'compiled-runtime-plan', 'v1 resource revision is provenance, not resource-catalog validation');
+check(validateForgeRuntimePlan(provenanceOnly, manifest, grant).kind === 'compiled-runtime-plan', 'plan resource revision is provenance, not resource-catalog validation');
 wires.push({id:'resource-revision-provenance-only', accepted:true, plan:provenanceOnly, grants:grant});
 write('wire-cases.json', {schemaVersion:1,evidence:'synthetic-no-game', cases:wires});
 write('typescript-result.json', {assertions,status:'passed',gameVerified:false,graphNegativeCases:suite.invalidGraphs.length,sharedWireCases:wires.length});

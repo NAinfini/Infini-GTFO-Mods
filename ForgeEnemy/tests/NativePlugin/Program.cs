@@ -18,14 +18,14 @@ void Require(bool condition, string detail) { if (!condition) throw new Exceptio
 void Throws(Action action) { try { action(); } catch { return; } throw new Exception("Expected rejection."); }
 RuntimeKernel Kernel()
 {
-    var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", "1.0.0", "20403457"));
+    var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module()); return kernel;
 }
 EnemyAgent Enemy()
 {
     var actor = new EnemyAgent(); actor.Damage = new() { Owner = actor }; return actor;
 }
-RuntimeModule Dependency(string id) => new("1.0.0", RuntimeJson.From(new
+RuntimeModule Dependency(string id) => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
 {
     providers = new[] { new { id, kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
     capabilities = Array.Empty<object>(),

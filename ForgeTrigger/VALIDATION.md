@@ -2,15 +2,15 @@
 
 **上次更新：2026-09-13**（由原 `VALIDATION.md` 与 `VALIDATION-CURRENT.md` 合并而成，另并入 T1-CONTRACT-MAP、T1-T7-STATUS 与四份 T2 交接记录的实际结果）。
 
-## 当前结论：默认完整入口失败
+## 当前结论：完整入口受阻于缺失的新 mutation 覆盖
 
 ```powershell
 python ForgeTrigger/tools/validate-trigger.py --mutations
 ```
 
-**最后一次执行退出码 1。** 三个子项里 pure 通过、r3 通过、**t1 失败**。失败原因是旧的作者元数据入口要求共享 heal 定义也带 `authoring-contract-only` 标记；该合同的实际 owner 是 `forge.contract.combat`，version 1.0.0，parameters 含 description 与 amountUnit。这不是新增的权重或可变端口测试失败。
+**2026-09-13 U-RUNTIME 迁移后执行**（`artifacts/trigger-20260913-094711`），进程退出 0，summary `status=blocked`、`checksStatus=passed`：pure、r3（1561 项；14 种错误实现，检出 14 种）、t1 均通过；independent 的基线 2625 项通过，但可变端口与权重抽样的新错误实现覆盖不可用，所以记为 blocked。此前"t1 因共享 heal 作者元数据标记失败"在本次不再复现（作者元数据 `metadataReady=true`）。
 
-`--r3-only --mutations` 的专项入口退出 0，summary.json 用 `requestedScope=r3-only` 标注。**专项通过不改变完整入口的失败结果**，也不能作为发布或整体完成的判定。
+**blocked 不是通过**，不能作为发布或整体完成的判定；缺口见下面"错误实现检出"。
 
 ## 各套件的最后记录
 
@@ -45,7 +45,7 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 **生命周期订阅注销保护也已合入。** 曾经 417 项中剩余 2 项失败（`entity observer disposed lifecycle subscription`、`subscription remains intact`），根因是 `RemoveLifecycleObserver` 允许实体观察回调注销生命周期订阅。现在只在实体观察期间禁止该入口，普通清理、停止后清理与生命周期回调自注销都保留。`handoff/` 下的隔离补丁提案（`r3-observer-candidate.*`、`r3-observer-followup.*`）已经无效，不要再应用。
 
-**SDK 不支持 variadic 也已解除。** `RuntimeRegistry` 曾把 `graph.variadic` 当未知字段拒绝，导致 T1 的 C# 注册在 `RuntimeJson.Shape → RuntimeRegistry.Validate` 处失败。Runtime 的 R4a 现在能校验该元数据并按精确 revision 解析端口，但**v1 计划加载器仍然明确拒绝可变端口的执行**——元数据可登记不等于图已可执行。
+**SDK 不支持 variadic 也已解除。** `RuntimeRegistry` 曾把 `graph.variadic` 当未知字段拒绝，导致 T1 的 C# 注册在 `RuntimeJson.Shape → RuntimeRegistry.Validate` 处失败。Runtime 的 R4a 能校验该元数据并按精确 revision 解析端口；U-RUNTIME 的 plan v2 加载器会按注册合同展开 variadic/portGroups，但 T1 的作者定义没有运行绑定，**元数据可登记不等于图已可执行**。
 
 历史失败日志全部保留在各自的 `artifacts/` 目录里，不用后来的绿色结果覆盖它们。
 

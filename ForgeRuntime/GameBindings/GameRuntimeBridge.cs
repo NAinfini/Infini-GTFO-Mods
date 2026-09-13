@@ -46,7 +46,7 @@ internal static class GameRuntimeBridge
         _permissions = permissions.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
         _pendingStop = false; _reportedLifecycleFaults = 0;
         _inLevel = _suspended = _blockedUntilLobby = _dispatching = _pendingInvalidation = false; _epoch = 1; _tick = 0;
-        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", "1.0.0", GameBuild), new RuntimeLimits());
+        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, GameBuild), new RuntimeLimits());
         Kernel.BeginWorld(_epoch);
         Kernel.RegisterModule(CombatContracts.Module());
     }

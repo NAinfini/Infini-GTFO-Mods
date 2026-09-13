@@ -10,7 +10,7 @@ process.chdir(site);
 await import(pathToFileURL(path.join(site, 'Tools/register-typescript.ts')).href);
 const load = name => import(pathToFileURL(path.join(site, 'site/forge', name + '.ts')).href);
 const {logicPrimitiveSeed} = await load('logic-primitives');
-const {validateGraphMetadata, resolveGraphContract, validateGraphParameters} = await load('graph-schema');
+const {validateGraphMetadata, resolveGraphContract} = await load('graph-schema');
 const {ForgeRegistry} = await load('registry');
 const logic = logicPrimitiveSeed();
 const registrations = [], resolutions = [];
@@ -48,6 +48,7 @@ const mutations = {
     'unknown-field': g => {g.variadic.default = 3;},
     'unknown-parameter': g => {g.variadic.parameter = 'missing';},
     'required-count': g => {g.parameters[0].required = true;},
+    'value-role-count': g => {g.parameters[0].role = 'value';},
     'number-count': g => {g.parameters[0].type = 'number';},
     'missing-min': g => {delete g.parameters[0].minimum;},
     'missing-max': g => {delete g.parameters[0].maximum;},
@@ -84,43 +85,59 @@ for (const count of [3, 7, 31]) {
         expected:resolveGraphContract(g, {input_count:32})});
 }
 const {compileForgeRuntimePlan, validateForgeRuntimePlan} = await load('runtime-compiler');
+const {forgeRuntimeApiVersion} = await load('runtime-contracts');
 const provider = {id:'test.graphports', kind:'extension', version:'1.0.0', dependencies:[]};
 const make = (name, kind, graph) => ({id:provider.id+'.'+name, owner:provider.id,
     kind, label:name, version:'1.0.0', parameters:{}, graph});
 const start = make('start', 'trigger', {domains:['logic'], execution:'host', inputs:[],
-    outputs:[{id:'out',type:'execution'}], parameters:[]});
+    outputs:[{id:'out',type:'execution'},{id:'target',type:'entity'}], parameters:[]});
+// Every v0.2 action declares its recipient and result, so the repeated number block
+// shares its side with a result output: a port group, not a whole-side variadic.
 const action = make('action', 'action', {domains:['logic'], execution:'host',
-    inputs:[{id:'in',type:'execution'}], outputs:[{id:'a',type:'number'},{id:'b',type:'number'}],
-    parameters:[{id:'output_count',type:'integer',required:false,minimum:2,maximum:32}]});
+    inputs:[{id:'in',type:'execution'},{id:'target',type:'entity'}],
+    outputs:[{id:'value_1',type:'number'},{id:'value_2',type:'number'},{id:'result',type:'result',schema:'test.graphports.result'}],
+    parameters:[{id:'output_count',type:'integer',role:'structural',required:false,minimum:2,maximum:32}],
+    recipients:{input:'target',target:'entity',cardinality:'one',requires:[],result:'result'}});
 const binding = (name, capability, role) => ({id:provider.id+'.binding.'+name,
     capabilityId:capability.id, providerId:provider.id, handler:name, role,
     status:'implemented', dependencies:[], requires:[]});
-const v1seed = {providers:[provider], capabilities:[start,action],
+const fixedSeed = {providers:[provider], capabilities:[start,action],
     bindings:[binding('start',start,'observe'),binding('record',action,'execute')]};
+const variableSeed = structuredClone(fixedSeed);
+variableSeed.capabilities[1].graph.portGroups = [{id:'values',side:'outputs',parameter:'output_count',
+    minimum:2,maximum:32,slots:[{id:'value',type:'number'}]}];
 const limits = {maxEntrypoints:32,maxStepsPerEntrypoint:128,maxTotalSteps:512,
     maxEventsPerTick:128,maxCommandsPerTick:512,maxQueuedEvents:1024,maxCausalDepth:16};
-const manifest = {schemaVersion:1,runtime:{id:'forge.runtime',version:'1.2.0',
-    apiVersion:'1.0.0',gameBuild:'synthetic-no-game'},registry:v1seed,limits,
-    bindingSupport:v1seed.bindings.map(b=>({bindingId:b.id,verification:'implementation-only',requiredPermissions:[]}))};
+const manifestFor = registry => ({schemaVersion:1,runtime:{id:'forge.runtime',version:'1.2.0',
+    apiVersion:forgeRuntimeApiVersion,gameBuild:'synthetic-no-game'},registry,limits,
+    bindingSupport:registry.bindings.map(b=>({bindingId:b.id,verification:'implementation-only',requiredPermissions:[]}))});
+const fixedManifest = manifestFor(fixedSeed), variableManifest = manifestFor(variableSeed);
 const graph = {schemaVersion:1,domain:'logic',authority:'host',entrypoints:['Start'],
-    nodes:[{id:'Start',capabilityId:start.id,capabilityVersion:'1.0.0',bindingId:v1seed.bindings[0].id,parameters:{}},
-        {id:'Action',capabilityId:action.id,capabilityVersion:'1.0.0',bindingId:v1seed.bindings[1].id,parameters:{output_count:3}}],
-    edges:[{from:{node:'Start',port:'out'},to:{node:'Action',port:'in'}}]};
-const options = {planId:'v1-variable-guard',resource:{id:'test.resource',revision:'1'},
+    nodes:[{id:'Start',capabilityId:start.id,capabilityVersion:'1.0.0',bindingId:fixedSeed.bindings[0].id,parameters:{}},
+        {id:'Action',capabilityId:action.id,capabilityVersion:'1.0.0',bindingId:fixedSeed.bindings[1].id,parameters:{output_count:3}}],
+    edges:[{from:{node:'Start',port:'out'},to:{node:'Action',port:'in'}},
+        {from:{node:'Start',port:'target'},to:{node:'Action',port:'target'}}]};
+const options = {planId:'graph-port-expansion',resource:{id:'test.resource',revision:'1'},
     limits:{maxEventsPerTick:16,maxCommandsPerTick:16,maxQueuedEvents:32,maxCausalDepth:8},grantedPermissions:[]};
-const v1plan = compileForgeRuntimePlan(graph,manifest,options).plan;
-validateForgeRuntimePlan(v1plan,manifest,[]);
-const variableSeed = structuredClone(v1seed);
-variableSeed.capabilities[1].graph.variadic = {side:'outputs',parameter:'output_count',port:{id:'value',type:'number'}};
-const variableManifest = {...manifest,registry:variableSeed};
-assert.throws(()=>compileForgeRuntimePlan(graph,variableManifest,options),/Variable ports/);
-assert.throws(()=>validateForgeRuntimePlan(v1plan,variableManifest,[]),/Variable ports/);
+const fixedPlan = compileForgeRuntimePlan(graph,fixedManifest,options).plan;
+validateForgeRuntimePlan(fixedPlan,fixedManifest,[]);
+const variablePlan = compileForgeRuntimePlan(graph,variableManifest,options).plan;
+validateForgeRuntimePlan(variablePlan,variableManifest,[]);
+// output_count 3 inserts value_3 after the declared base block, before the result output.
+const outputTypes = plan => plan.entrypoints[0].steps[0].layout.outputs.map(slot => slot.type);
+assert.deepEqual(outputTypes(fixedPlan), [3, 3, 11]);
+assert.deepEqual(outputTypes(variablePlan), [3, 3, 3, 11]);
+assert.deepEqual(resolveGraphContract(variableSeed.capabilities[1].graph, {output_count:3}).outputs.map(p => p.id),
+    ['value_1', 'value_2', 'value_3', 'result']);
+// A layout written for the other contract never passes: the loader re-derives it.
+assert.throws(()=>validateForgeRuntimePlan(fixedPlan,variableManifest,[]),/differs from its locked graph compilation/);
+assert.throws(()=>validateForgeRuntimePlan(variablePlan,fixedManifest,[]),/differs from its locked graph compilation/);
 const sourceFiles = fs.readdirSync(path.join(site,'site/forge')).filter(f=>f.endsWith('.ts'))
     .map(f=>path.join('site/forge',f)).concat(['Tools/register-typescript.ts']);
 const hashes = Object.fromEntries(sourceFiles.map(f=>[f,
     createHash('sha256').update(fs.readFileSync(path.join(site,f))).digest('hex')]));
-fs.writeFileSync(destination,JSON.stringify({schemaVersion:1,kind:'test-only-graph-contract-vectors',
+fs.writeFileSync(destination,JSON.stringify({schemaVersion:2,kind:'test-only-graph-contract-vectors',
     gameVerified:false,sourceHashes:hashes,registrations,resolutions,
-    v1:{fixedSeed:v1seed,variableSeed,plan:v1plan}},null,2)+'\n');
+    plans:{fixedSeed,variableSeed,fixedPlan,variablePlan}},null,2)+'\n');
 console.log(JSON.stringify({registrations:registrations.length,resolutions:resolutions.length,
-    websiteV1Refusals:2,sourceFiles:sourceFiles.length,gameVerified:false}));
+    websiteLayoutRefusals:2,sourceFiles:sourceFiles.length,gameVerified:false}));

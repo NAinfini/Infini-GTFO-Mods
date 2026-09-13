@@ -30,11 +30,11 @@
 
 ## T1 — 目录与执行合同（门槛未过）
 
-已交付的是完整目录审计、原 v1 正反例、逐 owner 的元数据审计与精确版本检查。审计报告从当前源码生成，逐行记录 canonical ID、目录 JSON 指针、typed 合同来源与版本与端口与单位与 domain、差异和前置条件；它的显式 kind 是 `generated-non-executable-source-audit`，**永远不作为 Registry 加载，也不得用来制造 handler**。
+已交付的是完整目录审计、Runtime API 2.0.0（计划 schemaVersion 2：位置 binding 索引、预解析 layout、槽位输入）正反例、逐 owner 的元数据审计与精确版本检查。审计报告从当前源码生成，逐行记录 canonical ID、目录 JSON 指针、typed 合同来源与版本与端口与单位与 domain、差异和前置条件；它的显式 kind 是 `generated-non-executable-source-audit`，**永远不作为 Registry 加载，也不得用来制造 handler**。
 
 未过的门槛有三处，按优先级：
 
-**共享 heal 的作者元数据分歧。** 默认完整入口失败在旧作者元数据测试要求共享 heal 定义也带 `authoring-contract-only` 标记；该合同的实际 owner 是 `forge.contract.combat`，version 1.0.0，parameters 含 description 与 amountUnit。需要与 Runtime 和网站责任任务定论：这个标记该由谁加、加在哪一侧。不能只删一条断言称整体修复。
+**共享 heal 的作者元数据分歧（已不复现）。** 2026-09-13 U-RUNTIME 迁移后 t1 子项退出 0、`metadataReady=true`；完整入口现受阻于 independent 缺失的新 mutation 覆盖，见 [验证记录](VALIDATION.md)。
 
 **目录与 typed 定义的 domain 差异。** 审计报告识别出 58 行差异：56 个当前作者定义相对目录多了 session，2 个记录在案的原生 Trigger fixture 定义与其目录 domain 不同。记录在案的原生 fixture 不是当前游戏支持的证据。所有者必须逐条定论，不能静默放宽或收窄某个 canonical 定义。
 
@@ -46,7 +46,7 @@
 
 底层方法与筛选已实现（见 [README](README.md)），剩余部分：
 
-**权重抽样的正式作者合同。** `forge.selector.target.weighted` 仍是规划目录项。需要网站给出正式的参数与端口合同，本包再接图绑定。`WithReplacement` 的结果是明确的 occurrence 列表，**不能直接伪装成禁止重复的 Runtime entity-list 端口**。
+**权重抽样的正式作者合同。** `forge.selector.target.weighted` 仍是规划目录项。需要网站给出正式的参数与端口合同，本包再接图绑定。`WithReplacement` 的结果是明确的 occurrence 列表，**不能直接伪装成禁止重复的 Runtime `entity`（`cardinality: many`）端口**。
 
 **可变端口的图接入。** 网站已把 all/any、add/multiply/minimum/maximum、union/intersection、sequence 升级为 1.1.0 并加上 variadic 元数据（重复输入用 `input_count`，sequence 用 `step_count`，作者参数范围 2…32），Runtime 的 R4a 已能校验和解析这些元数据但明确拒绝执行。本包等 R4 的完整 lowering 落地后再实现对应版本的计算、集合与控制接入。**不能删掉 variadic 字段、忽略版本断言、把新定义降级成旧定义，或把 Selector/Condition 包装成 Action 来制造通过结果。** 历史回归确需 1.0.0 时必须显式锁定并消费该版本的真实定义，与 1.1.0 的支持状态分开记录；生产导出不能自动降级。
 

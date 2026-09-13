@@ -6,7 +6,7 @@ using ForgeRuntime.Framework;
 internal sealed class Scene : IDisposable
 {
     internal static string Fixtures = "";
-    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", "1.0.0", "20403457"));
+    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     internal readonly RuntimeModuleHandle Sink;
     internal readonly EnemyAgent Enemy;
@@ -20,7 +20,7 @@ internal sealed class Scene : IDisposable
     {
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
         Module = new(Kernel, () => Allowed, Messages.Add);
-        Sink = Kernel.RegisterModule(new("1.0.0", Fixture.SinkRegistry,
+        Sink = Kernel.RegisterModule(new(RuntimeKernel.ApiVersion, Fixture.SinkRegistry,
             new Dictionary<string, CommandHandler> { ["test.record"] = c =>
             { Records.Add(c); OnRecord?.Invoke(c); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
             new[] { new BindingSupport("test.lifecycle.binding.record", "implementation-only", new[] { "test.record" }) }));
@@ -38,7 +38,7 @@ internal sealed class Scene : IDisposable
     }
     internal void Load(string suffix, IEnumerable<string>? grants = null)
     {
-        var json = Fixture.Plan(Fixtures, suffix);
+        var json = Fixture.Plan(Kernel, Fixtures, suffix);
         Kernel.LoadPlan(json, grants ?? new[] { "gtfo.enemy.lifecycle.read", "gtfo.enemy.limbs.read", "test.record" });
     }
     internal void Die(EnemyAgent? actor = null)

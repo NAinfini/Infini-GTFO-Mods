@@ -26,8 +26,8 @@ internal static class Suite
         throw new InvalidOperationException("Expected contract rejection.");
     }
     internal static RuntimeKernel Kernel() => new(new RuntimeIdentity(
-        "forge.runtime", "1.2.0", "1.0.0", "synthetic-no-game"));
-    internal static RuntimeModule Module(JsonElement seed) => new("1.0.0", seed.GetRawText(),
+        "forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
+    internal static RuntimeModule Module(JsonElement seed) => new(RuntimeKernel.ApiVersion, seed.GetRawText(),
         new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
     internal static bool Equal(JsonElement a, JsonElement b)
     {

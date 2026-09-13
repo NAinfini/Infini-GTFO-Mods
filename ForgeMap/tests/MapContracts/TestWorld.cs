@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ForgeRuntime.Framework;
 
 // Synthetic SDK consumer, not a production Map resolver or native creation hook.
@@ -37,8 +38,9 @@ sealed class TestWorld
                         outputs = new[] { Port("next", "execution"), Port("target", "entity") }, parameters = Array.Empty<object>() } },
                 new { id = "map1.test.action", owner = Provider, kind = "action", label = "Synthetic identity receipt", version = "1.0.0", parameters = new {},
                     graph = new { domains = new[] { "map" }, execution = "host", inputs = new[] { Port("in", "execution"), Port("target", "entity") },
-                        outputs = new[] { Port("next", "execution") }, parameters = Array.Empty<object>(),
-                        recipients = new { input = "target", requires = new[] { "test.identity" } } } }
+                        outputs = new[] { Port("next", "execution"), new { id = "result", type = "result", schema = "map1.test.result.identity" } },
+                        parameters = Array.Empty<object>(),
+                        recipients = new { input = "target", target = "entity", cardinality = "one", requires = new[] { "test.identity" }, result = "result" } } }
             },
             bindings = new[] {
                 new { id = Trigger, capabilityId = "map1.test.trigger", providerId = Provider, handler = "map1.test.observe", role = "observe", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() },
@@ -57,19 +59,35 @@ sealed class TestWorld
     }
     public string Plan()
     {
-        var manifest = RuntimeJson.Parse(Kernel.ExportManifest());
-        var pins = manifest.GetProperty("registry").GetProperty("bindings").EnumerateArray()
-            .Where(b => b.GetProperty("providerId").GetString() == Provider).Select(b => new {
-                bindingId = b.GetProperty("id").GetString(), capabilityId = b.GetProperty("capabilityId").GetString(),
-                capabilityVersion = "1.0.0", providerId = Provider, providerVersion = "1.0.0", handler = b.GetProperty("handler").GetString()
-            }).ToArray();
+        var registry = RuntimeJson.Parse(Kernel.ExportManifest()).GetProperty("registry");
+        var bindings = registry.GetProperty("bindings").EnumerateArray()
+            .Where(b => b.GetProperty("providerId").GetString() == Provider)
+            .OrderBy(b => b.GetProperty("id").GetString(), StringComparer.Ordinal).ToArray();
+        var pins = bindings.Select(b => new {
+            bindingId = b.GetProperty("id").GetString(), capabilityId = b.GetProperty("capabilityId").GetString(),
+            capabilityVersion = "1.0.0", providerId = Provider, providerVersion = "1.0.0", handler = b.GetProperty("handler").GetString()
+        }).ToArray();
+        int Binding(string id) => Array.FindIndex(pins, p => p.bindingId == id);
+        JsonElement Graph(string id) => registry.GetProperty("capabilities").EnumerateArray()
+            .Single(c => c.GetProperty("id").GetString() == bindings[Binding(id)].GetProperty("capabilityId").GetString()).GetProperty("graph");
+        // schemaVersion 2 slot frame written independently of the SDK; these ports carry no value set or lifetime.
+        string[] types = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
+        object[] Slots(JsonElement ports) => ports.EnumerateArray().Select((p, index) => (object)new {
+            index, type = Array.IndexOf(types, p.GetProperty("type").GetString()),
+            cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0, valueSet = -1, lifetime = -1,
+            optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(), nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean()
+        }).ToArray();
+        object Layout(JsonElement graph) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants = Array.Empty<object>() };
+        int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
+        var trigger = Graph(Trigger); var action = Graph(Action);
         return RuntimeJson.From(new {
-            schemaVersion = 1, kind = "forge-runtime-plan", planId = "map1.test.plan",
+            schemaVersion = 2, kind = "forge-runtime-plan", planId = "map1.test.plan",
             resource = new { id = "map1.test.shared-room", revision = "fixture-revision" }, runtime = Kernel.Identity,
             domain = "map", authority = "host", failurePolicy = "stop-entrypoint", permissions = new[] { Permission }, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth }, bindings = pins,
-            entrypoints = new[] { new { nodeId = "Observed", bindingId = Trigger, parameters = new {},
-                steps = new[] { new { nodeId = "RecordIdentity", bindingId = Action, parameters = new {}, inputs = new { target = new { fromEventPort = "target" } } } } } }
+            entrypoints = new[] { new { nodeId = "Observed", binding = Binding(Trigger), layout = Layout(trigger),
+                steps = new[] { new { nodeId = "RecordIdentity", binding = Binding(Action), layout = Layout(action),
+                    inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } } } } } }
         }).GetRawText();
     }
 }

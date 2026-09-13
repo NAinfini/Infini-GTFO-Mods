@@ -1,8 +1,8 @@
-# ForgeRuntime 公共 SDK 1.0.0
+# ForgeRuntime 公共 SDK 2.0.0
 
 本目录由 `ForgeRuntime.Framework.csproj` 单独编译成 `ForgeRuntime.Framework.dll`，生产宿主和全部模块共享这一个程序集。它提供与 GTFO/Unity 类型无关的注册、计划验证和唯一模拟队列；实际游戏绑定在相邻的 `GameBindings/` 与各领域包里。网站侧的 TS 合同与共同正反例在模型网站仓库的 `site/forge/runtime-contracts.ts` 与 `Tests/Forge/fixtures/runtime/`。
 
-当前开发 Runtime 身份是 `forge.runtime / 1.2.0`，SDK API 1.0.0，游戏 build `20403457`。未经游戏验收的绑定一律保持 `implementation-only`。仓库整体状态见 [ARCHITECTURE.md](../../ARCHITECTURE.md)，未完成批次见 [Runtime 实施计划](../IMPLEMENTATION-PLAN.md)，公开生命周期的完整时序与限制见 [HOST-LIFECYCLE.md](HOST-LIFECYCLE.md)。
+当前开发 Runtime 身份是 `forge.runtime / 1.2.0`，SDK API 2.0.0（Forge Standard v0.2，与网站同批升级），游戏 build `20403457`。未经游戏验收的绑定一律保持 `implementation-only`。仓库整体状态见 [ARCHITECTURE.md](../../ARCHITECTURE.md)，未完成批次见 [Runtime 实施计划](../IMPLEMENTATION-PLAN.md)，公开生命周期的完整时序与限制见 [HOST-LIFECYCLE.md](HOST-LIFECYCLE.md)。
 
 共享 `CombatContracts.cs` 当前注册 **5 个** canonical 定义（承伤事实、治疗动作、生命变化事实、死亡流程、肢体破坏），**0 个** binding。Enemy 因此持有 5 个 binding 与 5 个原生 Hook，Runtime 保留 4 个世界与会话 Hook。
 
@@ -60,7 +60,7 @@
 
 ## 宿主边界
 
-`ExportManifest()` 导出实际注册快照。`LoadPlan(json, grantedPermissions)` 从网站的离线计划重新验证精确版本、领域、绑定闭包、显式权限和端口；权限由宿主提供，**不能从文件自身反读自授**。当前只支持 host 的单 Trigger → 线性 Action，固定参数、直接事件输入、失败停止当前入口。未知控制流、动态结果依赖、recipient-policy、未实现的数据引用与可变端口执行都明确拒绝。
+`ExportManifest()` 导出实际注册快照。`LoadPlan(json, grantedPermissions)` 从网站的离线计划重新验证精确版本、领域、绑定闭包、显式权限和端口；权限由宿主提供，**不能从文件自身反读自授**。计划格式是 schemaVersion 2：binding 以 pin 表下标引用，每个节点的 `layout` 由 Runtime 按已注册合同（含可变端口与端口组展开）重新推导并逐项比对，`layout.constants` 按参数声明顺序排列（null 表示未填写），数据输入是 `{slot, fromEventSlot}` 帧下标。加载时把下标解析回端口名，处理器仍拿到按名称组织的 `Parameters` 与 `Inputs`；位置化的执行帧 SDK 尚未提供。注册按 v0.2 校验端口的 cardinality、resourceKind、handleKind 与 lifetime，参数必须声明 role，每个 action 必须声明完整的 recipients（target、cardinality、result）。当前只支持 host 的单 Trigger → 线性 Action，固定参数、直接事件输入、失败停止当前入口。未知控制流、动态结果依赖、recipient-policy、参数提升与未实现的数据引用都明确拒绝；运行期数据端口只接受 boolean、integer、number、string、vector3、entity，`many` 只允许 entity。
 
 `BeginWorld(epoch)` 需要递增的安全整数 epoch，取消所有旧世界的排队事件并清理去重与取消记录；**这不是检查点或网络恢复**。`Advance(simulationTick, isHost)` 使用游戏提供的模拟时间，按 due tick 与入队序号调度。重复 tick 不会重置预算，积压以有界延后保留；非主机不调用 handler，世界内主机迁移明确不支持。无订阅的绑定可以用 `HasSubscribers(bindingId)` 在游戏 hook 中提前返回。
 

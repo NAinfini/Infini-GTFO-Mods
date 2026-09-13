@@ -17,7 +17,7 @@ void Reject(Action action, string message)
 }
 RuntimeKernel Kernel()
 {
-    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", "1.0.0", "20403457"), new RuntimeLimits());
+    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module()); return kernel;
 }
 EnemyAgent Enemy(ushort id = 7, long pointer = 10)

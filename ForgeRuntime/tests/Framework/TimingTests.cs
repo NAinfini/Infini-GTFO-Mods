@@ -367,7 +367,11 @@ sealed class TimingScenario
         var module = Fixture.Module(provider, apply); var json = JsonNode.Parse(module.RegistryJson)!;
         foreach (var cap in json["capabilities"]!.AsArray()) if (replay) cap!["parameters"]!["scheduleReplay"] = "fixed-inputs";
         if (targetList)
-        { json["capabilities"]![0]!["graph"]!["outputs"]![1]!["type"] = "entity-list"; json["capabilities"]![1]!["graph"]!["inputs"]![1]!["type"] = "entity-list"; }
+        {
+            json["capabilities"]![0]!["graph"]!["outputs"]![1]!["cardinality"] = "many";
+            json["capabilities"]![1]!["graph"]!["inputs"]![1]!["cardinality"] = "many";
+            json["capabilities"]![1]!["graph"]!["recipients"]!["cardinality"] = "many";
+        }
         if (unsafeSecondAction)
         {
             var capability = JsonNode.Parse(json["capabilities"]![1]!.ToJsonString())!;
@@ -384,7 +388,7 @@ sealed class TimingScenario
     public void Plan(string id, string provider, bool secondAction = false, int steps = 1, Action<JsonNode>? tweak = null)
     {
         var plan = JsonNode.Parse(Fixture.Plan(Kernel, id, provider, secondAction ? 2 : steps))!;
-        if (secondAction) plan["entrypoints"]![0]!["steps"]![1]!["bindingId"] = provider + ".binding.unsafe";
+        if (secondAction) plan["entrypoints"]![0]!["steps"]![1]!["binding"] = plan["bindings"]!.AsArray().Select(b => b!["bindingId"]!.GetValue<string>()).ToList().IndexOf(provider + ".binding.unsafe");
         tweak?.Invoke(plan);
         Kernel.LoadPlan(plan.ToJsonString(), Fixture.Permissions);
     }

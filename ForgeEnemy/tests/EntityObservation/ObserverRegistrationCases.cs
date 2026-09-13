@@ -6,13 +6,13 @@ internal static class ObserverRegistrationCases
     private static readonly EntityReference Ref = new("test.entity:1", 1, 1);
     private static RuntimeKernel Kernel()
     {
-        var k = new RuntimeKernel(new("forge.test", "1.0.0", "1.0.0", "synthetic"));
+        var k = new RuntimeKernel(new("forge.test", "1.0.0", RuntimeKernel.ApiVersion, "synthetic"));
         k.BeginWorld(1); return k;
     }
     private static RuntimeEntitySnapshot Snapshot(string kind)
         => new(Ref, kind, null, "alive", Array.Empty<string>(), Array.Empty<string>(), new double[] { 0, 0, 0 });
     private static RuntimeModule Module(string id, string[] names, bool resolvers = true)
-        => new("1.0.0", RuntimeJson.From(new
+        => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
         {
             providers = new[] { new { id, kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()

@@ -199,7 +199,8 @@ sealed class Fixture : IDisposable
         {
             domains = new[] { "weapon" }, execution = "host",
             inputs = new[] { new { id = "enter", type = "execution" }, new { id = "target", type = "entity" } },
-            outputs = Array.Empty<object>(), parameters = Array.Empty<object>(), recipients = new { input = "target", requires = Array.Empty<string>() }
+            outputs = new[] { new { id = "result", type = "result", schema = "fixture.dispatch.result" } }, parameters = Array.Empty<object>(),
+            recipients = new { input = "target", target = "entity", cardinality = "one", requires = Array.Empty<string>(), result = "result" }
         };
         return new { id = Provider + "." + kind, owner = Provider, kind, label = "Synthetic dispatch review", version = "1.0.0", parameters = new { }, graph };
     }
@@ -216,19 +217,36 @@ sealed class Fixture : IDisposable
     }).GetRawText(), new Dictionary<string, CommandHandler> { [Provider + ".action"] = Apply },
         new[] { new BindingSupport(Trigger, "implementation-only", Array.Empty<string>()),
             new BindingSupport(Action, "implementation-only", new[] { "fixture.dispatch.use" }) });
-    internal string Plan() => RuntimeJson.From(new
+    private static readonly string[] PortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
+    private JsonElement Graph(string kind) => RuntimeJson.Parse(Kernel.ExportManifest()).GetProperty("registry").GetProperty("capabilities")
+        .EnumerateArray().Single(c => c.GetProperty("id").GetString() == Provider + "." + kind).GetProperty("graph");
+    // schemaVersion 2 slot frame written independently of the SDK; these ports carry no value set or lifetime.
+    private static object[] Slots(JsonElement ports) => ports.EnumerateArray().Select((p, index) => (object)new
     {
-        schemaVersion = 1, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
-        runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
-        permissions = new[] { "fixture.dispatch.use" }, dependencies = Array.Empty<string>(),
-        limits = new { maxEventsPerTick = 8, maxCommandsPerTick = 8, maxQueuedEvents = 8, maxCausalDepth = 4 },
-        bindings = new[] { "action", "trigger" }.Select(kind => new
+        index, type = Array.IndexOf(PortTypes, p.GetProperty("type").GetString()!),
+        cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0, valueSet = -1, lifetime = -1,
+        optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(), nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean()
+    }).ToArray();
+    private static object Layout(JsonElement graph) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants = Array.Empty<object>() };
+    private static int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
+    internal string Plan()
+    {
+        var kinds = new[] { "action", "trigger" }; var trigger = Graph("trigger"); var action = Graph("action");
+        return RuntimeJson.From(new
         {
-            bindingId = Provider + ".binding." + kind, capabilityId = Provider + "." + kind,
-            capabilityVersion = "1.0.0", providerId = Provider, providerVersion = "1.0.0", handler = Provider + "." + kind
-        }).ToArray(),
-        entrypoints = new[] { new { nodeId = "entry", bindingId = Trigger, parameters = new { },
-            steps = new[] { new { nodeId = "apply", bindingId = Action, parameters = new { }, inputs = new { target = new { fromEventPort = "target" } } } } } }
-    }).GetRawText();
+            schemaVersion = 2, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
+            runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
+            permissions = new[] { "fixture.dispatch.use" }, dependencies = Array.Empty<string>(),
+            limits = new { maxEventsPerTick = 8, maxCommandsPerTick = 8, maxQueuedEvents = 8, maxCausalDepth = 4 },
+            bindings = kinds.Select(kind => new
+            {
+                bindingId = Provider + ".binding." + kind, capabilityId = Provider + "." + kind,
+                capabilityVersion = "1.0.0", providerId = Provider, providerVersion = "1.0.0", handler = Provider + "." + kind
+            }).ToArray(),
+            entrypoints = new[] { new { nodeId = "entry", binding = Array.IndexOf(kinds, "trigger"), layout = Layout(trigger),
+                steps = new[] { new { nodeId = "apply", binding = Array.IndexOf(kinds, "action"), layout = Layout(action),
+                    inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } } } } } }
+        }).GetRawText();
+    }
     public void Dispose() { Dispatch.Dispose(); Session.Dispose(); Kernel.StopRuntime(); }
 }

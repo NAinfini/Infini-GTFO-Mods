@@ -10,6 +10,16 @@ void Reject(Action action, string name)
     try { action(); } catch (RuntimeContractException) { checks++; return; }
     throw new Exception("FAIL: " + name + " did not reject");
 }
+void RejectCode(Action action, string code, string name)
+{
+    try { action(); }
+    catch (RuntimeContractException error)
+    {
+        if (error.Code != code) throw new Exception($"FAIL: {name} rejected with {error.Code}, expected {code}");
+        checks++; return;
+    }
+    throw new Exception("FAIL: " + name + " did not reject");
+}
 
 {
     var s = new Scenario();
@@ -26,7 +36,7 @@ void Reject(Action action, string name)
     Check(a.Publish(s.Event("a1", "example.alpha", tick: 2)).Code == "event-id-conflict", "reusing identity with changed event rejects");
     Check(a.Publish(s.Event("cross", "example.beta")).Code == "binding-owner", "module cannot publish another module binding");
     Reject(() => s.Register("example.alpha"), "provider conflict rejects atomically");
-    Reject(() => s.Kernel.RegisterModule(Fixture.Module("example.third") with { ApiVersion = "2.0.0" }), "API version mismatch");
+    Reject(() => s.Kernel.RegisterModule(Fixture.Module("example.third") with { ApiVersion = "1.0.0" }), "API version mismatch");
     Check(b.IsRegistered, "rejected registration does not damage other module");
 }
 {
@@ -122,16 +132,51 @@ void Reject(Action action, string name)
     Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "game build is exactly pinned");
     bad = JsonNode.Parse(plan)!; bad["bindings"]![0]!["providerVersion"] = "9.0.0";
     Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "provider version is exactly pinned");
-    bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["steps"]![0]!["inputs"] = new JsonObject();
-    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "missing explicit recipient rejects");
-    bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["steps"]![0]!["parameters"]!["amount"] = -5;
+    bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["steps"]![0]!["inputs"] = new JsonArray();
+    RejectCode(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "missing-input", "missing explicit recipient rejects");
+    bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["steps"]![0]!["layout"]!["constants"]![0] = -5;
     Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "negative effect amount rejects at plan boundary");
     bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["extra"] = true;
     Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "unknown plan field rejects");
     Reject(() => RuntimeJson.Parse("{\"schemaVersion\":1,\"schemaVersion\":2}"), "duplicate JSON keys reject");
+    JsonNode Step(JsonNode node) => node["entrypoints"]![0]!["steps"]![0]!;
+    void Load(JsonNode node, string code, string name) => RejectCode(() => s.Kernel.LoadPlan(node.ToJsonString(), Fixture.Permissions), code, name);
+    bad = JsonNode.Parse(plan)!; bad["schemaVersion"] = 1;
+    Load(bad, "plan-version", "schemaVersion 1 plans are not read");
+    bad = JsonNode.Parse(plan)!; Step(bad)["layout"]!["inputs"]![1]!["cardinality"] = 1;
+    Load(bad, "layout-mismatch", "file layout must equal the registered contract");
+    bad = JsonNode.Parse(plan)!; Step(bad)["layout"]!["constants"]![0] = null;
+    Load(bad, "missing-constant", "required constant cannot be null");
+    bad = JsonNode.Parse(plan)!; Step(bad)["layout"]!["constants"]!.AsArray().Add(1);
+    Load(bad, "constant-frame", "constant frame length is exact");
+    bad = JsonNode.Parse(plan)!; Step(bad)["inputs"]!.AsArray().Add(JsonNode.Parse("{\"slot\":1,\"fromEventSlot\":1}"));
+    Load(bad, "input-order", "one driver per input slot");
+    bad = JsonNode.Parse(plan)!; Step(bad)["inputs"] = JsonNode.Parse("[{\"slot\":0,\"fromEventSlot\":0}]");
+    Load(bad, "execution-slot", "execution ports are not data inputs");
+    bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["binding"] = Step(bad)["binding"]!.GetValue<int>();
+    Load(bad, "node-kind", "entrypoint binding index must name a trigger");
     var planned = Fixture.Module("example.planned"); var registry = JsonNode.Parse(planned.RegistryJson)!;
     registry["bindings"]![0]!["status"] = "planned";
     Reject(() => s.Kernel.RegisterModule(planned with { RegistryJson = registry.ToJsonString() }), "planned catalog entry cannot register execution");
+}
+{
+    // Forge Standard v0.2 registration rules mirrored from the website's validateCapabilityGraph.
+    void Bad(Action<JsonNode> mutate, string? code, string name)
+    {
+        var module = Fixture.Module("example.contract"); var json = JsonNode.Parse(module.RegistryJson)!;
+        mutate(json["capabilities"]![1]!["graph"]!);
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        void Register() => kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() });
+        if (code == null) Reject(Register, name); else RejectCode(Register, code, name);
+    }
+    Bad(g => g.AsObject().Remove("recipients"), "recipient-contract", "every action declares recipients");
+    Bad(g => g["recipients"]!["result"] = "next", "recipient-result", "recipient result names a result output");
+    Bad(g => g["parameters"]![0]!.AsObject().Remove("role"), null, "parameters declare a role");
+    Bad(g => g["inputs"]![1]!["type"] = "entity-list", null, "entity-list is retired");
+    Bad(g => g["inputs"]![1]!["cardinality"] = "many", "recipient-cardinality", "recipient cardinality matches its port");
+    Bad(g => g["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"source\",\"type\":\"entity\",\"optional\":true}")), "context-role-port", "context role inputs are explicit");
+    Bad(g => g["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"values\":[\"a\"]}")), "parameter-set", "promotable enums name a shared set");
+    Bad(g => g["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"target\",\"type\":\"number\",\"role\":\"value\",\"required\":false}")), "parameter-collision", "value parameters cannot shadow an input");
 }
 {
     var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
@@ -206,7 +251,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
             var capabilities = registry.GetProperty("capabilities").EnumerateArray().Where(c => c.GetProperty("owner").GetString() == id).ToArray();
             var handlers = bindings.Where(b => b.GetProperty("role").GetString() == "execute").ToDictionary(b => b.GetProperty("handler").GetString()!, b => (CommandHandler)(_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)));
             var support = manifest.GetProperty("bindingSupport").EnumerateArray().Where(b => bindings.Any(row => row.GetProperty("id").GetString() == b.GetProperty("bindingId").GetString())).Select(b => new BindingSupport(b.GetProperty("bindingId").GetString()!, b.GetProperty("verification").GetString()!, b.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!).ToArray())).ToArray();
-            kernel.RegisterModule(new RuntimeModule("1.0.0", RuntimeJson.From(new { providers = new[] { provider }, capabilities, bindings }).GetRawText(), handlers, support));
+            kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new { providers = new[] { provider }, capabilities, bindings }).GetRawText(), handlers, support));
         }
         return kernel;
     }
@@ -270,8 +315,9 @@ sealed class Scenario
 }
 static class Fixture
 {
-    public static readonly RuntimeIdentity Identity = new("forge.runtime", "1.2.0", "1.0.0", "20403457");
+    public static readonly RuntimeIdentity Identity = new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457");
     public static readonly string[] Permissions = { "example.health.write" };
+    static readonly string[] PortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
     public static string Trigger(string id) => id + ".binding.trigger";
     public static string TriggerCapability(string id) => id + ".trigger";
     public static string ActionCapability(string id) => id + ".apply";
@@ -287,14 +333,14 @@ static class Fixture
             providers = new[] { new { id, kind = id.StartsWith("forge.") ? "native" : "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = new object[] {
                 new { id = TriggerCapability(id), owner = id, kind = "trigger", label = "Observed event", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = Array.Empty<object>(), outputs = new[] { Port("next", "execution"), Port("target", "entity") }, parameters = Array.Empty<object>() } },
-                new { id = ActionCapability(id), owner = id, kind = "action", label = "Effect", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = new[] { Port("in", "execution"), Port("target", "entity") }, outputs = new[] { Port("next", "execution") }, parameters = new[] { new { id = "amount", type = "number", required = true, minimum = 1, maximum = 100 } }, recipients = new { input = "target", requires = new[] { "health.current" } } } }
+                new { id = ActionCapability(id), owner = id, kind = "action", label = "Effect", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = new[] { Port("in", "execution"), Port("target", "entity") }, outputs = new[] { Port("next", "execution"), new { id = "result", type = "result", schema = "example.result.apply" } }, parameters = new[] { new { id = "amount", type = "number", role = "value", required = true, minimum = 1, maximum = 100 } }, recipients = new { input = "target", target = "entity", cardinality = "one", requires = new[] { "health.current" }, result = "result" } } }
             },
             bindings = new[] {
                 new { id = Trigger(id), capabilityId = TriggerCapability(id), providerId = id, handler = id + ".handler.trigger", role = "observe", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() },
                 new { id = id + ".binding.apply", capabilityId = ActionCapability(id), providerId = id, handler = Handler(id), role = "execute", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() }
             }
         });
-        return new RuntimeModule("1.0.0", json.GetRawText(), new Dictionary<string, CommandHandler> { [Handler(id)] = handler ?? (_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)) }, Support(id));
+        return new RuntimeModule(RuntimeKernel.ApiVersion, json.GetRawText(), new Dictionary<string, CommandHandler> { [Handler(id)] = handler ?? (_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)) }, Support(id));
     }
     public static string Plan(RuntimeKernel kernel, string planId, string provider, int stepCount = 1)
     {
@@ -305,11 +351,26 @@ static class Fixture
             capabilityVersion = registry.GetProperty("capabilities").EnumerateArray().Single(c => c.GetProperty("id").GetString() == b.GetProperty("capabilityId").GetString()).GetProperty("version").GetString(),
             providerId = provider, providerVersion = "1.0.0", handler = b.GetProperty("handler").GetString()
         }).ToArray();
+        var ids = pins.Select(p => p.bindingId!).ToList();
+        JsonElement Graph(string bindingId)
+        {
+            var capabilityId = registry.GetProperty("bindings").EnumerateArray().Single(b => b.GetProperty("id").GetString() == bindingId).GetProperty("capabilityId").GetString();
+            return registry.GetProperty("capabilities").EnumerateArray().Single(c => c.GetProperty("id").GetString() == capabilityId).GetProperty("graph");
+        }
+        // Wire frame written independently of the SDK: dense port-type and cardinality indexes; these fixture ports carry no value set or lifetime.
+        object[] Slots(JsonElement ports) => ports.EnumerateArray().Select((p, index) => (object)new {
+            index, type = Array.IndexOf(PortTypes, p.GetProperty("type").GetString()),
+            cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0, valueSet = -1, lifetime = -1,
+            optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(), nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean()
+        }).ToArray();
+        object Layout(JsonElement graph, object[] constants) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants };
+        int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
+        var trigger = Graph(Trigger(provider)); var action = Graph(provider + ".binding.apply");
         return RuntimeJson.From(new {
-            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
+            schemaVersion = 2, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth }, bindings = pins,
-            entrypoints = new[] { new { nodeId = "Entry", bindingId = Trigger(provider), parameters = new {}, steps = Enumerable.Range(0, stepCount).Select(i => new { nodeId = "Action" + i, bindingId = provider + ".binding.apply", parameters = new { amount = 5 }, inputs = new { target = new { fromEventPort = "target" } } }).ToArray() } }
+            entrypoints = new[] { new { nodeId = "Entry", binding = ids.IndexOf(Trigger(provider)), layout = Layout(trigger, Array.Empty<object>()), steps = Enumerable.Range(0, stepCount).Select(i => new { nodeId = "Action" + i, binding = ids.IndexOf(provider + ".binding.apply"), layout = Layout(action, new object[] { 5 }), inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } } }).ToArray() } }
         }).GetRawText();
     }
 }

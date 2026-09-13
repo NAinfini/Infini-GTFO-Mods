@@ -23,7 +23,8 @@ internal sealed class WorkFixture
         Kernel.BeginWorld(1);
         Plan = File.ReadAllText(Path.Combine(FixtureRoot, cases.GetProperty("validPlan").GetString()!));
         var plan = RuntimeJson.Parse(Plan);
-        Trigger = plan.GetProperty("entrypoints")[0].GetProperty("bindingId").GetString()!;
+        Trigger = plan.GetProperty("bindings")[plan.GetProperty("entrypoints")[0].GetProperty("binding").GetInt32()]
+            .GetProperty("bindingId").GetString()!;
         Grants = Read(cases.GetProperty("compileOptions").GetString()!).GetProperty("grantedPermissions")
             .EnumerateArray().Select(p => p.GetString()!).ToArray();
         var registry = manifest.GetProperty("registry");

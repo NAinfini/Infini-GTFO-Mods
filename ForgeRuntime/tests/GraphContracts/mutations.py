@@ -15,14 +15,13 @@ if not vectors.is_file():
 out = Path(tempfile.mkdtemp(prefix='forge-runtime-r4a-mutations-'))
 changes = [
     ('control', None, None, None),
-    ('dropped-last-port', 'RuntimeGraphContracts.cs', 'i <= count;', 'i < count;'),
-    ('sorted-port-order', 'RuntimeGraphContracts.cs', 'RuntimeJson.From(ports);',
-     'RuntimeJson.From(ports.OrderBy(p => RuntimeJson.Text(p, "id"), StringComparer.Ordinal));'),
+    ('dropped-last-port', 'RuntimeGraphContracts.cs', 'i <= count; i++) ports.Add(', 'i < count; i++) ports.Add('),
+    ('sorted-port-order', 'RuntimeGraphContracts.cs', 'ports.Add(Port(spec.GetProperty("port"), i));',
+     'ports.Add(Port(spec.GetProperty("port"), i)); ports = ports.OrderBy(p => RuntimeJson.Text(p, "id"), StringComparer.Ordinal).ToList();'),
     ('raised-count-ceiling', 'RuntimeGraphContracts.cs', 'MaximumVariadicPorts = 32;', 'MaximumVariadicPorts = 33;'),
     ('missing-collision-check', 'RuntimeGraphContracts.cs', '!ids.Contains(added)', 'true'),
-    ('missing-v1-guard', 'RuntimePlan.cs',
-     'RuntimeJson.Require(!graph.TryGetProperty("variadic", out _), "unsupported-variable-ports",',
-     'RuntimeJson.Require(true, "unsupported-variable-ports",')]
+    ('plan-skips-expansion', 'RuntimePlan.cs', 'var contract = RuntimeGraphContracts.Resolve(graph, parameters);',
+     'var contract = graph;')]
 results = []
 print('EVIDENCE=' + str(out), flush=True)
 base = out / 'base'

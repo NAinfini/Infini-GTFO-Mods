@@ -1,41 +1,74 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ForgeRuntime.Framework;
 
 internal static class PlanBoundaryTests
 {
+    const string Provider = "test.graphports", Trigger = "test.graphports.binding.start";
+
     internal static void Run(JsonElement vectors)
     {
-        var fixture = vectors.GetProperty("v1"); var calls = 0;
-        RuntimeModule Module(JsonElement seed) => new("1.0.0", seed.GetRawText(),
+        var fixture = vectors.GetProperty("plans"); var calls = 0;
+        RuntimeModule Module(JsonElement seed) => new(RuntimeKernel.ApiVersion, seed.GetRawText(),
             new Dictionary<string, CommandHandler>
             {
-                ["record"] = _ => { calls++; return CommandResult.Succeeded(RuntimeJson.From(new { a = 1, b = 2 })); }
+                ["record"] = _ => { calls++; return CommandResult.Succeeded(RuntimeJson.From(new { value_1 = 1, value_2 = 2 })); }
             }, seed.GetProperty("bindings").EnumerateArray().Select(b => new BindingSupport(
-                b.GetProperty("id").GetString()!, "implementation-only", Array.Empty<string>())).ToArray());
-        Suite.Test("v1-explicit-variable-refusal", () =>
+                b.GetProperty("id").GetString()!, "implementation-only", Array.Empty<string>())).ToArray(),
+            new Dictionary<string, Func<EntityReference, bool>> { [Provider] = r => r.Id == Provider + ":1" && r.LifeEpoch == 1 });
+        void Refused(string seed, string plan, string name)
         {
             var kernel = Suite.Kernel();
-            kernel.RegisterModule(Module(fixture.GetProperty("variableSeed")));
-            Suite.Reject(() => kernel.LoadPlan(fixture.GetProperty("plan").GetRawText(), Array.Empty<string>()),
-                "unsupported-variable-ports");
+            kernel.RegisterModule(Module(fixture.GetProperty(seed)));
+            Suite.Reject(() => kernel.LoadPlan(plan, Array.Empty<string>()), "layout-mismatch");
             Suite.Check(kernel.LoadedPlans == 0 && kernel.QueuedEvents == 0 && calls == 0,
-                "Rejected plan created execution or side effects.");
-            Suite.Check(!kernel.HasSubscribers("test.graphports.binding.start"), "Rejected plan left a subscription.");
-        });
-        Suite.Test("unchanged-v1-executes-once", () =>
+                name + ": rejected plan created execution or side effects.");
+            Suite.Check(!kernel.HasSubscribers(Trigger), name + ": rejected plan left a subscription.");
+        }
+        // The website compiles both plans; C# re-derives every layout and must agree exactly.
+        foreach (var (seed, plan) in new[] { ("fixedSeed", "fixedPlan"), ("variableSeed", "variablePlan") })
+            Suite.Test(plan + "-executes-once", () =>
+            {
+                calls = 0;
+                var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Module(fixture.GetProperty(seed)));
+                kernel.BeginWorld(1);
+                kernel.StartRuntime(() => kernel.LoadPlan(fixture.GetProperty(plan).GetRawText(), Array.Empty<string>()));
+                var evt = new RuntimeEvent(plan + "-event", Trigger, 1, 0, "test-scope",
+                    RuntimeJson.From(new { target = new EntityReference(Provider + ":1", 1, 1) }));
+                Suite.Check(handle.Publish(evt).Status == "queued", plan + " could not queue.");
+                var tick = kernel.Advance(0, true);
+                Suite.Check(tick.CommandsExecuted == 1 && calls == 1, plan + " did not execute exactly once.");
+                Suite.Check(tick.Commands[0].Result.Status == "succeeded", plan + " command failed.");
+                Suite.Check(handle.Publish(evt).Status == "duplicate", "Duplicate event was admitted.");
+                kernel.Advance(0, true);
+                Suite.Check(calls == 1, "Same-tick repeat duplicated execution.");
+            });
+        Suite.Test("expanded-port-group-layout", () =>
         {
-            var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Module(fixture.GetProperty("fixedSeed")));
-            kernel.BeginWorld(1);
-            kernel.StartRuntime(() => kernel.LoadPlan(fixture.GetProperty("plan").GetRawText(), Array.Empty<string>()));
-            var evt = new RuntimeEvent("v1-guard-event", "test.graphports.binding.start", 1, 0,
-                "test-scope", RuntimeJson.EmptyObject);
-            Suite.Check(handle.Publish(evt).Status == "queued", "Unchanged v1 could not queue.");
-            var tick = kernel.Advance(0, true);
-            Suite.Check(tick.CommandsExecuted == 1 && calls == 1, "Unchanged v1 did not execute exactly once.");
-            Suite.Check(tick.Commands[0].Result.Status == "succeeded", "Unchanged v1 command failed.");
-            Suite.Check(handle.Publish(evt).Status == "duplicate", "Duplicate event was admitted.");
-            kernel.Advance(0, true);
-            Suite.Check(calls == 1, "Same-tick repeat duplicated execution.");
+            var kernel = Suite.Kernel(); kernel.RegisterModule(Module(fixture.GetProperty("variableSeed")));
+            var outputs = kernel.ResolveGraphContract(Provider + ".action", "1.0.0", RuntimeJson.From(new { output_count = 3 }))
+                .GetProperty("outputs").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToArray();
+            Suite.Check(outputs.SequenceEqual(new[] { "value_1", "value_2", "value_3", "result" }),
+                "Port group did not expand inside its declared block.");
+            var layout = fixture.GetProperty("variablePlan").GetProperty("entrypoints")[0].GetProperty("steps")[0]
+                .GetProperty("layout").GetProperty("outputs");
+            Suite.Check(layout.GetArrayLength() == outputs.Length, "Compiled layout does not carry the expanded ports.");
+        });
+        Suite.Test("unexpanded-layout-refused", () =>
+        {
+            calls = 0;
+            Refused("variableSeed", fixture.GetProperty("fixedPlan").GetRawText(), "unexpanded");
+            Refused("fixedSeed", fixture.GetProperty("variablePlan").GetRawText(), "phantom-expansion");
+        });
+        Suite.Test("expansion-follows-constant", () =>
+        {
+            calls = 0;
+            foreach (var count in new JsonNode?[] { JsonValue.Create(4), null })
+            {
+                var plan = JsonNode.Parse(fixture.GetProperty("variablePlan").GetRawText())!;
+                plan["entrypoints"]![0]!["steps"]![0]!["layout"]!["constants"]![0] = count;
+                Refused("variableSeed", plan.ToJsonString(), "count " + (count?.ToJsonString() ?? "default"));
+            }
         });
     }
 }

@@ -54,8 +54,7 @@ public sealed partial class RuntimeKernel
         foreach (var port in RuntimeJson.Rows(capability.GetProperty("graph"), "outputs"))
         {
             if (!snapshot.Outputs.TryGetProperty(RuntimeJson.Text(port, "id"), out var data) || data.ValueKind == JsonValueKind.Null) continue;
-            if (RuntimeJson.Text(port, "type") == "entity") references++;
-            if (RuntimeJson.Text(port, "type") == "entity-list") references += data.GetArrayLength();
+            if (RuntimeJson.Text(port, "type") == "entity") references += RuntimeGraphContracts.Many(port) ? data.GetArrayLength() : 1;
         }
         RuntimeJson.Require(references <= MaximumScheduleEntityReferences, "schedule-target-budget", "Fixed schedule targets exceed the explicit limit; no truncation is performed.");
         return snapshot;

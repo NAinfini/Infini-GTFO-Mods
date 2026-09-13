@@ -15,7 +15,7 @@ internal sealed class AuditScene
     internal readonly List<string> Messages = new();
     internal AuditScene(bool subscribe = false)
     {
-        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", "1.0.0", "20403457"), new RuntimeLimits());
+        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
         Module = new EnemyModule(Kernel, () => Allowed, Messages.Add);
         Actor = CreateEnemy(); Reference = Module.TrackSpawn(Actor);

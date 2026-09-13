@@ -1769,7 +1769,7 @@
           "path": [
             "schemaVersion"
           ],
-          "value": 2
+          "value": 1
         }
       ],
       "code": "plan-version",
@@ -1855,19 +1855,23 @@
       "id": "missing-recipient",
       "changes": [
         {
-          "operation": "delete",
+          "operation": "set",
           "path": [
             "entrypoints",
             0,
             "steps",
             0,
-            "inputs",
-            "target"
+            "inputs"
           ],
-          "value": null
+          "value": [
+            {
+              "slot": 2,
+              "fromEventSlot": 2
+            }
+          ]
         }
       ],
-      "code": "missing-field",
+      "code": "missing-input",
       "error": "Required graph input missing"
     },
     {
@@ -1881,14 +1885,14 @@
             "steps",
             0,
             "inputs",
-            "value",
-            "fromEventPort"
+            1,
+            "fromEventSlot"
           ],
-          "value": "missing"
+          "value": 99
         }
       ],
       "code": "event-port-missing",
-      "error": "Unknown edge port"
+      "error": "Unknown runtime port slot"
     },
     {
       "id": "type-mismatch",
@@ -1901,10 +1905,10 @@
             "steps",
             0,
             "inputs",
-            "value",
-            "fromEventPort"
+            1,
+            "fromEventSlot"
           ],
-          "value": "enabled"
+          "value": 3
         }
       ],
       "code": "port-mismatch",
@@ -1921,10 +1925,10 @@
             "steps",
             0,
             "inputs",
-            "value",
-            "fromEventPort"
+            1,
+            "fromEventSlot"
           ],
-          "value": "position"
+          "value": 4
         }
       ],
       "code": "port-mismatch",
@@ -1941,7 +1945,7 @@
             "steps",
             0,
             "inputs",
-            "value"
+            1
           ],
           "value": {
             "fromNodeOutput": {
@@ -2075,10 +2079,10 @@
             "steps",
             0,
             "inputs",
-            "value",
-            "fromEventPort"
+            1,
+            "fromEventSlot"
           ],
-          "value": "distance"
+          "value": 5
         }
       ],
       "code": "port-mismatch",
@@ -2095,10 +2099,10 @@
             "steps",
             0,
             "inputs",
-            "target",
-            "fromEventPort"
+            0,
+            "fromEventSlot"
           ],
-          "value": "maybe_target"
+          "value": 6
         }
       ],
       "code": "nullable-port",
@@ -2115,14 +2119,168 @@
             "steps",
             0,
             "inputs",
-            "target",
-            "fromEventPort"
+            0,
+            "fromEventSlot"
           ],
-          "value": "optional_target"
+          "value": 7
         }
       ],
       "code": "optional-event-port",
       "error": "Optional event output"
+    },
+    {
+      "id": "unknown-binding-index",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "binding"
+          ],
+          "value": 99
+        }
+      ],
+      "code": "binding-index",
+      "error": "Unknown runtime binding index"
+    },
+    {
+      "id": "entrypoint-binding-kind",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "binding"
+          ],
+          "value": 1
+        }
+      ],
+      "code": "node-kind",
+      "error": "entrypoint must be a trigger"
+    },
+    {
+      "id": "constant-frame",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "layout",
+            "constants"
+          ],
+          "value": [
+            5
+          ]
+        }
+      ],
+      "code": "constant-frame",
+      "error": "constant frame mismatch"
+    },
+    {
+      "id": "layout-mismatch",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "layout",
+            "inputs",
+            1,
+            "cardinality"
+          ],
+          "value": 1
+        }
+      ],
+      "code": "layout-mismatch",
+      "error": "differs from its locked graph compilation"
+    },
+    {
+      "id": "unknown-input-slot",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs",
+            1,
+            "slot"
+          ],
+          "value": 99
+        }
+      ],
+      "code": "input-slot",
+      "error": "Unknown runtime port slot"
+    },
+    {
+      "id": "input-order",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs"
+          ],
+          "value": [
+            {
+              "slot": 2,
+              "fromEventSlot": 2
+            },
+            {
+              "slot": 1,
+              "fromEventSlot": 1
+            }
+          ]
+        }
+      ],
+      "code": "input-order",
+      "error": "differs from its locked graph compilation"
+    },
+    {
+      "id": "execution-slot",
+      "changes": [
+        {
+          "operation": "set",
+          "path": [
+            "entrypoints",
+            0,
+            "steps",
+            0,
+            "inputs"
+          ],
+          "value": [
+            {
+              "slot": 0,
+              "fromEventSlot": 0
+            },
+            {
+              "slot": 1,
+              "fromEventSlot": 1
+            },
+            {
+              "slot": 2,
+              "fromEventSlot": 2
+            }
+          ]
+        }
+      ],
+      "code": "execution-slot",
+      "error": "Duplicate graph edge"
     }
   ]
 }

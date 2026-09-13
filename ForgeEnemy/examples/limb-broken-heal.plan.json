@@ -22,21 +22,96 @@
   "domain": "enemy",
   "entrypoints": [
     {
-      "bindingId": "forge.module.gtfo.enemy.binding.limb_broken",
+      "binding": 1,
+      "layout": {
+        "constants": [],
+        "inputs": [],
+        "outputs": [
+          {
+            "cardinality": 0,
+            "index": 0,
+            "lifetime": -1,
+            "nullable": false,
+            "optional": false,
+            "type": 0,
+            "valueSet": -1
+          },
+          {
+            "cardinality": 0,
+            "index": 1,
+            "lifetime": -1,
+            "nullable": false,
+            "optional": false,
+            "type": 7,
+            "valueSet": -1
+          },
+          {
+            "cardinality": 0,
+            "index": 2,
+            "lifetime": -1,
+            "nullable": false,
+            "optional": false,
+            "type": 2,
+            "valueSet": -1
+          }
+        ]
+      },
       "nodeId": "DamageObserved",
-      "parameters": {},
       "steps": [
         {
-          "bindingId": "forge.module.gtfo.enemy.binding.heal",
-          "inputs": {
-            "target": {
-              "fromEventPort": "target"
+          "binding": 0,
+          "inputs": [
+            {
+              "fromEventSlot": 1,
+              "slot": 1
             }
+          ],
+          "layout": {
+            "constants": [
+              5
+            ],
+            "inputs": [
+              {
+                "cardinality": 0,
+                "index": 0,
+                "lifetime": -1,
+                "nullable": false,
+                "optional": false,
+                "type": 0,
+                "valueSet": -1
+              },
+              {
+                "cardinality": 0,
+                "index": 1,
+                "lifetime": -1,
+                "nullable": false,
+                "optional": false,
+                "type": 7,
+                "valueSet": -1
+              }
+            ],
+            "outputs": [
+              {
+                "cardinality": 0,
+                "index": 0,
+                "lifetime": -1,
+                "nullable": false,
+                "optional": false,
+                "type": 0,
+                "valueSet": -1
+              },
+              {
+                "cardinality": 0,
+                "index": 1,
+                "lifetime": -1,
+                "nullable": false,
+                "optional": false,
+                "type": 11,
+                "valueSet": -1
+              }
+            ]
           },
-          "nodeId": "HealExplicitRecipient",
-          "parameters": {
-            "amount": 5
-          }
+          "nodeId": "HealExplicitRecipient"
         }
       ]
     }
@@ -59,10 +134,10 @@
     "revision": "example-2026-09-12-v1"
   },
   "runtime": {
-    "apiVersion": "1.0.0",
+    "apiVersion": "2.0.0",
     "gameBuild": "20403457",
     "id": "forge.runtime",
     "version": "1.2.0"
   },
-  "schemaVersion": 1
+  "schemaVersion": 2
 }

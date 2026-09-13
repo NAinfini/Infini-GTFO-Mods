@@ -58,7 +58,7 @@ for (const name of ids) {
     }
     const parameters={input_count:3};
     const resolved=resolveGraphContract(definition.graph,parameters);
-    const sample=resolved.inputs[0].type==='boolean'?true:resolved.inputs[0].type==='entity-list'?[]:1;
+    const sample=resolved.inputs[0].type==='boolean'?true:resolved.inputs[0].cardinality==='many'?[]:1;
     const inputs=Object.fromEntries(resolved.inputs.map(p=>[p.id,sample]));
     delete inputs[resolved.inputs[2].id];
     assert.throws(()=>preview(id,parameters,inputs),/Missing runtime field/); assertions++; graphRejections++;

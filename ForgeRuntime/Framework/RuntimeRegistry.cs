@@ -127,52 +127,7 @@ internal sealed class RuntimeRegistry
             RuntimeJson.Require(new[] { "trigger", "selector", "condition", "modifier", "control", "action", "variable", "state", "event", "component" }.Contains(RuntimeJson.Text(c, "kind")), "capability-kind", id);
             RuntimeJson.Text(c, "label"); RuntimeJson.Version(c, "version");
             RuntimeJson.Require(c.GetProperty("parameters").ValueKind == JsonValueKind.Object, "parameter-metadata", id);
-            if (!c.TryGetProperty("graph", out var graph)) continue;
-            RuntimeJson.Shape(graph, "domains execution inputs outputs parameters", "recipients variadic");
-            var domains = RuntimeJson.Strings(graph.GetProperty("domains"));
-            RuntimeJson.Require(domains.Length > 0 && domains.All(x => new[] { "map", "room", "enemy", "weapon", "tool", "consumable", "player", "session", "logic", "editor" }.Contains(x)), "graph-domain", id);
-            RuntimeJson.Require(new[] { "pure", "host", "owner", "presentation" }.Contains(RuntimeJson.Text(graph, "execution")), "graph-authority", id);
-            foreach (var direction in new[] { "inputs", "outputs" })
-            {
-                var ports = RuntimeJson.Rows(graph, direction);
-                RuntimeJson.Require(ports.Select(p => RuntimeJson.Text(p, "id")).Distinct(StringComparer.Ordinal).Count() == ports.Length, "duplicate-port", id);
-                foreach (var port in ports) RuntimeGraphContracts.ValidatePort(port, id);
-            }
-            var parameters = RuntimeJson.Rows(graph, "parameters");
-            RuntimeJson.Require(parameters.Select(p => RuntimeJson.Text(p, "id")).Distinct(StringComparer.Ordinal).Count() == parameters.Length, "duplicate-parameter", id);
-            foreach (var parameter in parameters)
-            {
-                RuntimeJson.Shape(parameter, "id type required", "minimum maximum values");
-                RuntimeJson.Require(Regex.IsMatch(RuntimeJson.Text(parameter, "id"), @"^[a-z][a-z0-9_]*$"), "parameter-name", id);
-                RuntimeJson.Require(new[] { "boolean", "integer", "number", "string", "enum", "vector3", "recipient-policy" }.Contains(RuntimeJson.Text(parameter, "type")), "parameter-type", id);
-                if (RuntimeJson.Text(parameter, "type") == "enum") RuntimeJson.Require(RuntimeJson.Strings(parameter.GetProperty("values")).Length > 0, "enum-values", id);
-                if (RuntimeJson.Text(parameter, "type") != "enum") RuntimeJson.Require(!parameter.TryGetProperty("values", out _), "parameter-values", id);
-                foreach (var bound in new[] { "minimum", "maximum" }) if (parameter.TryGetProperty(bound, out var value)) {
-                    RuntimeJson.Require(RuntimeJson.Text(parameter, "type") is "number" or "integer", "parameter-bound-type", id);
-                    RuntimeJson.Require(value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number) && double.IsFinite(number), "parameter-bound", id);
-                    if (RuntimeJson.Text(parameter, "type") == "integer") RuntimeJson.Integer(value, -RuntimeJson.MaxSafeInteger);
-                }
-                if (parameter.TryGetProperty("minimum", out var minimum) && parameter.TryGetProperty("maximum", out var maximum)) RuntimeJson.Require(minimum.GetDouble() <= maximum.GetDouble(), "parameter-bounds", id);
-                RuntimeJson.Require(parameter.GetProperty("required").ValueKind is JsonValueKind.True or JsonValueKind.False, "parameter-required", id);
-            }
-            RuntimeGraphContracts.ValidateVariadic(graph, id);
-            var kind = RuntimeJson.Text(c, "kind"); var execution = RuntimeJson.Text(graph, "execution");
-            var inputPorts = RuntimeJson.Rows(graph, "inputs"); var outputPorts = RuntimeJson.Rows(graph, "outputs");
-            if (execution == "pure") RuntimeJson.Require(!inputPorts.Concat(outputPorts).Any(p => RuntimeJson.Text(p, "type") == "execution"), "pure-execution", id);
-            if (kind is "selector" or "condition" or "modifier") RuntimeJson.Require(execution == "pure", "query-authority", id);
-            if (kind is "trigger" or "action" or "control") RuntimeJson.Require(execution != "pure", "executable-authority", id);
-            if (kind == "trigger") RuntimeJson.Require(!inputPorts.Any(p => RuntimeJson.Text(p, "type") == "execution"), "trigger-input", id);
-            if (kind == "action" && inputPorts.Any(p => RuntimeJson.Text(p, "type") is "entity" or "entity-list"))
-                RuntimeJson.Require(graph.TryGetProperty("recipients", out _), "recipient-contract", id);
-            if (graph.TryGetProperty("recipients", out var recipients))
-            {
-                RuntimeJson.Require(kind == "action", "recipient-owner", id);
-                RuntimeJson.Shape(recipients, "input requires");
-                var recipient = RuntimeJson.Text(recipients, "input");
-                RuntimeJson.Require(inputPorts.Any(p => RuntimeJson.Text(p, "id") == recipient && RuntimeJson.Text(p, "type") is "entity" or "entity-list" && !RuntimeJson.Flag(p, "optional") && !RuntimeJson.Flag(p, "nullable")), "recipient-port", id);
-                var requirements = RuntimeJson.Strings(recipients.GetProperty("requires"));
-                RuntimeJson.Require(requirements.Length <= 128 && requirements.All(RuntimeJson.IsId), "recipient-requirements", id);
-            }
+            if (c.TryGetProperty("graph", out var graph)) RuntimeGraphContracts.ValidateCapability(RuntimeJson.Text(c, "kind"), graph, id);
         }
         foreach (var b in Bindings.Values)
         {

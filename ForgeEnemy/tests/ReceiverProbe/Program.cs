@@ -16,7 +16,7 @@ EnemyAgent Enemy(long pointer = 10)
 }
 (RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) Scene()
 {
-    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", "1.0.0", "20403457"), new RuntimeLimits());
+    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module());
     var module = new EnemyModule(kernel, () => true, _ => { });
     var actor = Enemy(); return (kernel, module, actor, module.TrackSpawn(actor));

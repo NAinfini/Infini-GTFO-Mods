@@ -6,7 +6,7 @@ using ForgeRuntime.Framework;
 
 internal sealed class Scene : IDisposable
 {
-    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", "1.0.0", "20403457"));
+    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     internal readonly EnemyAgent Enemy;
     internal readonly EntityReference Ref;

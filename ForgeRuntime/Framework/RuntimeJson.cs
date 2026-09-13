@@ -124,13 +124,15 @@ public static class RuntimeJson
         if (value.ValueKind == JsonValueKind.Null)
         { Require(Flag(port, "nullable"), "null-input", Text(port, "id")); return; }
         var type = Text(port, "type");
+        // Only entity has an implemented set validator; any other "many" port is unsupported, never read as one value.
+        if (RuntimeGraphContracts.Many(port) && type != "entity") throw new RuntimeContractException("unsupported-port", type + " many");
         switch (type)
         {
-            case "entity": Entity(value); break;
-            case "entity-list":
-                Require(value.ValueKind == JsonValueKind.Array && value.GetArrayLength() <= 256, "invalid-entities", "Entity-list exceeds 256.");
+            case "entity" when RuntimeGraphContracts.Many(port):
+                Require(value.ValueKind == JsonValueKind.Array && value.GetArrayLength() <= 256, "invalid-entities", "Entity set exceeds 256.");
                 var refs = value.EnumerateArray().Select(Entity).ToArray();
                 Require(refs.Distinct().Count() == refs.Length, "duplicate-entity", "Repeated recipients require explicit semantics."); break;
+            case "entity": Entity(value); break;
             case "boolean": Require(value.ValueKind is JsonValueKind.True or JsonValueKind.False, "invalid-boolean", "Expected bool."); break;
             case "integer": Integer(value, -MaxSafeInteger); break;
             case "number": Require(value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var n) && double.IsFinite(n), "invalid-number", "Expected finite number."); break;
@@ -149,8 +151,12 @@ public static class RuntimeJson
         {
             if (!parameters.TryGetProperty(Text(definition, "id"), out var value)) continue;
             var type = Text(definition, "type");
-            if (type == "enum") Require(Strings(definition.GetProperty("values")).Contains(Text(value), StringComparer.Ordinal), "invalid-enum", Text(definition, "id"));
-            else { Require(type != "recipient-policy", "unsupported-parameter", "v1 cannot evaluate recipient-policy."); ValidateValue(value, definition); }
+            if (type == "enum")
+            {
+                var members = definition.TryGetProperty("set", out var set) ? RuntimeGraphContracts.EnumSets[Text(set)] : Strings(definition.GetProperty("values"));
+                Require(value.ValueKind == JsonValueKind.String && members.Contains(value.GetString(), StringComparer.Ordinal), "invalid-enum", Text(definition, "id"));
+            }
+            else { Require(type != "recipient-policy", "unsupported-parameter", "The runtime cannot evaluate recipient-policy."); ValidateValue(value, definition); }
             if (value.ValueKind != JsonValueKind.Number) continue;
             var number = value.GetDouble();
             if (definition.TryGetProperty("minimum", out var min)) Require(number >= min.GetDouble(), "parameter-minimum", Text(definition, "id"));

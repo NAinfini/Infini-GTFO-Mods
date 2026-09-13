@@ -6,7 +6,7 @@ namespace ForgeRuntime.Framework;
 /// <summary>Shared combat semantics. Receiver implementations register separate explicit bindings.</summary>
 public static class CombatContracts
 {
-    public static RuntimeModule Module() => new("1.0.0", RegistryJson,
+    public static RuntimeModule Module() => new(RuntimeKernel.ApiVersion, RegistryJson,
         new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
     private const string RegistryJson = """
     {
@@ -94,22 +94,31 @@ public static class CombatContracts
               {
                 "id": "next",
                 "type": "execution"
+              },
+              {
+                "id": "result",
+                "type": "result",
+                "schema": "forge.result.heal"
               }
             ],
             "parameters": [
               {
                 "id": "amount",
                 "type": "number",
+                "role": "value",
                 "required": true,
-                "minimum": 1e-06,
+                "minimum": 0.000001,
                 "maximum": 1000000
               }
             ],
             "recipients": {
               "input": "target",
+              "target": "entity",
+              "cardinality": "one",
               "requires": [
                 "health.heal"
-              ]
+              ],
+              "result": "result"
             }
           }
         },

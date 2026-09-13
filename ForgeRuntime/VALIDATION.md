@@ -56,9 +56,31 @@ SDK 合同与注册探针 76 项、Enemy 消费方 66 项、Trigger 的 R3 消�
 
 宿主侧重跑：宿主与 `Forge.Architecture.sln` 构建 0 警告 0 错误；Architecture 36；PluginStartup 35；HostConfiguration 66；HostIntegration `--host` 53，新增宿主无诊断类型、全部 HarmonyPatch 位于 `ForgeRuntime.GameBindings`、宿主插件无 BepInDependency 且不引用 ForgeDevelopment；GameBindings `--native` 51，宿主 Hook 精确为 4 个 Framework Hook 且 Load 调用 `PatchAll`，对照的本地 GameAssembly SHA-256 以 `C6A5C3CD` 开头。Enemy 原生插件随宿主重新构建，NativeLayout 38/38；重建时修了 `ForgeEnemy/Native/EnemyModule.BehaviorObservation.cs` 缺少 `using System;` 的既有编译错误。
 
-使用网站 fixture 的 GameBindings `--fixtures` 入口当前失败于 `Unsupported plan version`：网站工作树里未提交的 F0 fixture 已把 schemaVersion 改为 2，SDK 仍只接受 1。D2 没有改 SDK，这不是 D2 回归，等 F0 合同定稿后随 R3/R4 处理。
+使用网站 fixture 的 GameBindings `--fixtures` 入口当时失败于 `Unsupported plan version`：网站 F0 fixture 已把 schemaVersion 改为 2，SDK 仍只接受 1。D2 没有改 SDK，这不是 D2 回归；已由下面的 U-RUNTIME 处理。
 
 以上都是托管替身与编译后元数据证据，没有加载 GTFO。
+
+## U-RUNTIME — API 2.0.0 与 plan schemaVersion 2
+
+与网站 `ebc37a11`（Forge Standard v0.2）同批。`RuntimeKernel.ApiVersion` 为 2.0.0，是模块、宿主身份与测试唯一的版本来源；`GameRuntimeBridge` 原先写死的 1.0.0 身份一并改掉。manifest 自身 schemaVersion 仍为 1。
+
+注册校验按网站 `validateCapabilityGraph` 重写：cardinality、resourceKind/handleKind/lifetime、参数 role 与 set/values、参数与输入重名、上下文角色端口、完整 recipients 与 result 输出、variadic 与 portGroups 约束；`entity-list` 退役为 entity + many。计划加载器只读 v2：位置 pin 表、按注册合同展开 variadic/portGroups 后重推 layout 并逐项比对、位置常量、`{slot, fromEventSlot}` 输入。加载时把槽位解析回名字，handler 仍拿键值形式的 Parameters/Inputs；**没有提供位置帧 handler SDK**。v1 计划与 v1 注册形状直接拒绝，没有兼容路径。
+
+构建：SDK、宿主 `ForgeRuntime.csproj` 与 `Forge.Architecture.sln` 0 警告 0 错误。结果：
+
+| 套件 | 结果 |
+| --- | --- |
+| Framework | 242；`--fixtures` 270，网站 27 个非法计划逐条核对拒绝码均为预期原因 |
+| GraphContracts | 1911，0 失败；verify.py 通过；5 个错误实现全部检出（新增 `plan-skips-expansion`） |
+| GameBindings | 默认 31；`--fixtures` 62；`--bridge` 57；`--native` 51（GameAssembly SHA-256 `C6A5C3CD…`）；`--export-manifest` 实际导出 apiVersion 2.0.0 |
+| 宿主 | Architecture 36；HostIntegration 默认 42、`--host` 53；PluginStartup 35；HostConfiguration 66；LifecycleWork `--fixtures` 57；EntityObservation 75、`--probe-registration` 76 |
+| Enemy | LifecycleFacts 52/52；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
+| Map / Weapon | MapContracts 报告 33 通过、0 失败；IdentityDispatchReview 20/20 |
+| Trigger T1 | C# 928、TypeScript 392；Acceptance 2625 |
+
+网站 `generate.ts` 的 `permission-escalation` 曾在追加权限后未排序，C# 报的是 `plan-order`；网站已改为排序后生成，C# 现报 `permission-lock`。网站工作树里未提交的枚举集改动（`compare_operator` 收窄、新增三个集合、structural enum 的 set 子集）尚未同步，提交后需要跟进。
+
+以上都是托管替身、编译后元数据与本地原生签名证据，没有加载 GTFO，也没有安装。
 
 ## 复跑
 

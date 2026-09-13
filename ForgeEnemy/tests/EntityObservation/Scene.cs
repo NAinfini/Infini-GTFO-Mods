@@ -13,7 +13,7 @@ internal sealed class Scene : IDisposable
     internal Func<EnemyAgent, EntityReference, RuntimeEntitySnapshot?> Reader = EnemyEntityObserver.Read;
     internal Scene(bool observe = true, bool start = true)
     {
-        Kernel = new(new("forge.runtime", "1.2.0", "1.0.0", "20403457"));
+        Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
         Module = new(Kernel, () => Allowed, _ => { }, observe ? (actor, reference) => Reader(actor, reference) : null);
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);

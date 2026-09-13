@@ -24,7 +24,8 @@ public sealed partial class RuntimeModuleHandle : IDisposable
 /// <summary>Single-thread simulation dispatcher. Registration and plans are resolved once; no Unity/game types are owned here.</summary>
 public sealed partial class RuntimeKernel
 {
-    public const string ApiVersion = "1.0.0";
+    /// <summary>2.0.0 is the Forge Standard v0.2 wire (schemaVersion 2 plans); it moves together with the website.</summary>
+    public const string ApiVersion = "2.0.0";
     public const int MaximumEventHistory = 65536;
     public const int MaximumEventPayloadBytes = 65536;
     private readonly int threadId = Environment.CurrentManagedThreadId;
@@ -211,9 +212,9 @@ public sealed partial class RuntimeKernel
     private void ValidateEntities(JsonElement value, JsonElement port)
     {
         if (value.ValueKind == JsonValueKind.Null) return;
-        var type = RuntimeJson.Text(port, "type");
-        if (type == "entity") CheckEntity(RuntimeJson.Entity(value));
-        else if (type == "entity-list") foreach (var item in value.EnumerateArray()) CheckEntity(RuntimeJson.Entity(item));
+        if (RuntimeJson.Text(port, "type") != "entity") return;
+        if (!RuntimeGraphContracts.Many(port)) CheckEntity(RuntimeJson.Entity(value));
+        else foreach (var item in value.EnumerateArray()) CheckEntity(RuntimeJson.Entity(item));
     }
     private static CommandResult PreInvocationFailure(RuntimeContractException error)
     {
@@ -309,10 +310,10 @@ public sealed partial class RuntimeKernel
                             if (pending.Event.Source != null) CheckEntity(pending.Event.Source);
                             RuntimeJson.Require(!cancelled.Contains((pending.Provider, pending.Event.ScopeId)), "scope-cancelled", pending.Event.ScopeId);
                             var inputs = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-                            foreach (var port in step.Ports)
+                            foreach (var input in step.Inputs)
                             {
-                                var name = RuntimeJson.Text(port, "id"); if (!step.Inputs.TryGetValue(name, out var from) || !pending.Event.Outputs.TryGetProperty(from, out var value)) continue;
-                                RuntimeJson.ValidateValue(value, port); ValidateEntities(value, port); inputs.Add(name, value);
+                                if (!pending.Event.Outputs.TryGetProperty(input.EventPort, out var value)) continue;
+                                RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port); inputs.Add(input.Name, value);
                             }
                             var handler = registry.Handlers[step.BindingId];
                             currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, step.Parameters, RuntimeJson.From(inputs));

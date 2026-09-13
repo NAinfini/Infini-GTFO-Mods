@@ -45,16 +45,23 @@ internal static class IntegrationCases
             var plan = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(Scene.Fixtures, "native-heal.plan.json")))!;
             string id = suffix == "death_started" ? EnemyModule.DeathStartedBinding : EnemyModule.LimbBrokenBinding;
             string cap = suffix == "death_started" ? "forge.trigger.enemy.death_started" : "forge.trigger.combat.limb_broken";
-            plan["bindings"]![0]!["bindingId"] = id; plan["bindings"]![0]!["capabilityId"] = cap;
-            plan["bindings"]![0]!["handler"] = "gtfo.enemy." + suffix;
-            plan["entrypoints"]![0]!["bindingId"] = id;
+            var entry = plan["entrypoints"]![0]!; var step = entry["steps"]![0]!;
+            var trigger = plan["bindings"]![entry["binding"]!.GetValue<int>()]!;
+            string heal = plan["bindings"]![step["binding"]!.GetValue<int>()]!["bindingId"]!.GetValue<string>();
+            trigger["bindingId"] = id; trigger["capabilityId"] = cap; trigger["handler"] = "gtfo.enemy." + suffix;
             plan["planId"] = "forge.example.enemy_" + suffix + "_heal";
             plan["resource"]!["id"] = "forge.example.enemy_" + suffix + "_heal";
             string read = suffix == "death_started" ? "gtfo.enemy.lifecycle.read" : "gtfo.enemy.limbs.read";
             plan["permissions"] = JsonSerializer.SerializeToNode(new[] { read, "gtfo.enemy.health.write" }.OrderBy(x => x, StringComparer.Ordinal).ToArray());
-            plan["bindings"] = new System.Text.Json.Nodes.JsonArray(plan["bindings"]!.AsArray()
-                .Select(x => System.Text.Json.Nodes.JsonNode.Parse(x!.ToJsonString()))
-                .OrderBy(x => x!["bindingId"]!.GetValue<string>(), StringComparer.Ordinal).ToArray());
+            var pins = plan["bindings"]!.AsArray()
+                .Select(x => System.Text.Json.Nodes.JsonNode.Parse(x!.ToJsonString())!)
+                .OrderBy(x => x["bindingId"]!.GetValue<string>(), StringComparer.Ordinal).ToList();
+            plan["bindings"] = new System.Text.Json.Nodes.JsonArray(pins.ToArray());
+            int Index(string binding) => pins.FindIndex(x => x["bindingId"]!.GetValue<string>() == binding);
+            // Pins are positional: the swapped trigger can move, and its event frame differs from damage_applied.
+            entry["binding"] = Index(id); entry["layout"] = Fixture.Layout(s.Kernel, id); step["binding"] = Index(heal);
+            step["inputs"]![0]!["fromEventSlot"] = Fixture.Slot(s.Kernel, id, "outputs", "target");
+            step["inputs"]![0]!["slot"] = Fixture.Slot(s.Kernel, heal, "inputs", "target");
             s.Kernel.LoadPlan(plan.ToJsonString(), new[] { read, "gtfo.enemy.health.write" });
             if (suffix == "death_started") s.Die(); else s.Break();
             var result = s.Tick().Commands.Single().Result;
@@ -70,17 +77,17 @@ internal static class IntegrationCases
 
     private static void Hooks()
     {
-        var k = new RuntimeKernel(new("forge.runtime", "1.2.0", "1.0.0", "20403457"));
+        var k = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
         k.BeginWorld(1); k.RegisterModule(CombatContracts.Module());
         using var session = EnemyPluginSession.Start(k, () => true, _ => { }, () => { }, () => { });
         var rows = new List<CommandContext>();
-        using var sink = k.RegisterModule(new("1.0.0", Fixture.SinkRegistry,
+        using var sink = k.RegisterModule(new(RuntimeKernel.ApiVersion, Fixture.SinkRegistry,
             new Dictionary<string, CommandHandler> { ["test.record"] = c =>
                 { rows.Add(c); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
             new[] { new BindingSupport("test.lifecycle.binding.record", "implementation-only", new[] { "test.record" }) }));
         var actor = Scene.NewEnemy(); session.Module.TrackSpawn(actor);
         foreach (var suffix in new[] { "death_started", "limb_broken" })
-            k.LoadPlan(Fixture.Plan(Scene.Fixtures, suffix), new[] { "gtfo.enemy.lifecycle.read", "gtfo.enemy.limbs.read", "test.record" });
+            k.LoadPlan(Fixture.Plan(k, Scene.Fixtures, suffix), new[] { "gtfo.enemy.lifecycle.read", "gtfo.enemy.limbs.read", "test.record" });
         k.StartRuntime(() => { });
         var sessionProperty = typeof(ForgeEnemy.Native.Plugin).GetProperty("Session", BindingFlags.Static | BindingFlags.NonPublic)!;
         sessionProperty.SetValue(null, session);
