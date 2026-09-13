@@ -8,6 +8,6 @@
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../../ForgeRuntime/ShutdownSequence.cs" Link="ShutdownSequence.cs" />
+    <Compile Include="../../Native/ShutdownSequence.cs" Link="ShutdownSequence.cs" />
   </ItemGroup>
 </Project>

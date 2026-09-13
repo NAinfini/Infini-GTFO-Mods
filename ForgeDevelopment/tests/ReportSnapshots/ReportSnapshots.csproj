@@ -8,8 +8,8 @@
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../../ForgeRuntime/DiagnosticsReport.cs" Link="DiagnosticsReport.cs" />
-    <Compile Include="../../../ForgeRuntime/AsyncReportWriter.cs" Link="AsyncReportWriter.cs" />
-    <Compile Include="../../../ForgeRuntime/ProjectObjectReferences.cs" Link="ProjectObjectReferences.cs" />
+    <Compile Include="../../Native/DiagnosticsReport.cs" Link="DiagnosticsReport.cs" />
+    <Compile Include="../../Native/AsyncReportWriter.cs" Link="AsyncReportWriter.cs" />
+    <Compile Include="../../Native/ProjectObjectReferences.cs" Link="ProjectObjectReferences.cs" />
   </ItemGroup>
 </Project>

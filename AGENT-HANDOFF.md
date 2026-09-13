@@ -79,7 +79,7 @@ Forge 是给**普通 GTFO 玩家**的创作工具。目标用户不会做地图�
 | **U-ENEMY** | F5 | `ForgeEnemy/**` | U-RUNTIME | 已在推进中，继续 |
 | **U-MAP-MOD** | F5/F9 | `ForgeMap/**` | U-RUNTIME | 生成逻辑归位 + 模型 Adapter 调用链 |
 | **U-WEAPON-MOD** | F5 | `ForgeWeapon/**` | U-RUNTIME | 三模式接入同一套 |
-| **U-DEV-MOD** | F5 | `ForgeDevelopment/**` | U-RUNTIME | D2 诊断源码从宿主迁出 |
+| **U-DEV-MOD** | F5 | `ForgeDevelopment/**` | U-RUNTIME | D2 已切换；剩游戏内三种加载模式核验，之后 D3 |
 | **U-DOCS-MOD** | 全程 | 本仓库全部 markdown | 无 | 过时陈述清零、矛盾消除、失效引用修复 |
 
 `ForgeRuntime/Plugin.cs`、`GameBindings/GameRuntimeBridge.cs`、`GameBindings/NativeHooks.cs`、公共 csproj 与根文档是共享文件，改动前必须先交接。InfiniTweaks、旧发行 ZIP、用户模型与地图内容不属于这些单元。两个构建同时写同一个 SDK 输出目录会冲突，集成构建由负责人串行执行或使用明确隔离的输出目录。
@@ -96,7 +96,7 @@ Forge 是给**普通 GTFO 玩家**的创作工具。目标用户不会做地图�
 | U-ENEMY | E2 空间要求 | 实际 collider、尺寸、移动/导航 profile 与出生空间要求的证据 | 不把 Position 快照或模型包围盒当作碰撞证据 |
 | U-MAP-MOD | MAP2 重新定范围 | 按总案 4.2 把地图生成的底层逻辑纳入本包范围，给出资源侧 Adapter 的接口形状 | 未证实的生成/导航不得实现为假成功或自动 fallback |
 | U-WEAPON-MOD | W1 原生接线 | 原生装备观察接入、方法体阶段核验、首批真实 binding | 事务未交付先完成证据与纯合同，不在本域做第二资源账本 |
-| U-DEV-MOD | D2 拆包 | 15 个诊断源、21 个测试与脚本、5 个共享切换文件的迁移与独立 BepInEx 入口 | 不与 Runtime 的旧采集器同时激活；Development 缺失不得停用已授权玩法 |
+| U-DEV-MOD | D2 游戏内核验 → D3 | 在独立测试 profile 核验不安装、安装但 Runtime 非 Authoring、Authoring 启用三种加载，确认前两种无诊断 Hook、线程与热键；随后按 D3 接作者对象回指 | 安装需当次明确授权；不恢复宿主内诊断，不另建第二套采集器 |
 
 每次委派指定本表中的一个有边界批次，连同以下模板：
 

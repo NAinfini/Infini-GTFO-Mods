@@ -1,0 +1,586 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+
+namespace ForgeDevelopment.Native;
+
+internal enum ProjectScanStatus { NotRequested, Pending, Complete, Partial, Cancelled, Rejected }
+internal enum ProjectSourceVerification { NotProvided, Pending, Matched, Mismatch, Unavailable, Cancelled }
+internal enum ProjectReferenceStatus { Matched, Ambiguous, Missing, Inactive, Unverified }
+internal enum ProjectReferenceReason
+{
+    Unique, MultipleCandidates, NoCandidate, LayoutInactive, ScanPartial, ScanCancelled,
+    SourceMismatch, SourceUnavailable, SourcePending, UnsupportedDimension, ZoneUnresolved,
+    CreationContextUnverified, AreaMappingIncomplete, ObservationBudgetExceeded, WorldEpochUnavailable
+}
+
+// These receipts are diagnostic identities, not executable EntityReference values.
+public sealed record DiagnosticNativeObject
+{
+    public string Kind { get; }
+    public int InstanceId { get; }
+
+    public DiagnosticNativeObject(string kind, int instanceId)
+    {
+        if (kind is not ("zone" or "geomorph" or "area")) throw new ArgumentOutOfRangeException(nameof(kind));
+        if (instanceId == 0) throw new ArgumentOutOfRangeException(nameof(instanceId));
+        Kind = kind;
+        InstanceId = instanceId;
+    }
+}
+
+internal sealed record ProjectResourcePin(string Id, string Revision);
+internal abstract record ProjectLocator;
+internal sealed record ProjectZoneLocator(uint LayoutId, int Dimension, int Layer, int LocalIndex) : ProjectLocator;
+internal sealed record ProjectRoomLocator(string ZoneAuthorId, ProjectResourcePin Room, string SourcePrefab) : ProjectLocator;
+internal sealed record ProjectObjectDeclaration(string ExpeditionId, string AuthorId, ProjectLocator Locator)
+{
+    internal string Kind => Locator is ProjectZoneLocator ? "zone" : "room";
+    internal object LocatorDocument => Locator switch
+    {
+        ProjectZoneLocator zone => new { kind = "zone", layoutId = zone.LayoutId, dimension = zone.Dimension,
+            layer = zone.Layer, localIndex = zone.LocalIndex },
+        ProjectRoomLocator room => new { kind = "unique-geomorph-in-zone", zoneAuthorId = room.ZoneAuthorId,
+            room = new { id = room.Room.Id, revision = room.Room.Revision }, sourcePrefab = room.SourcePrefab },
+        _ => throw new InvalidOperationException("Unsupported project locator.")
+    };
+}
+
+internal sealed record ProjectLayoutKey(uint LayoutId, int Dimension, int Layer);
+internal sealed record ProjectZoneCandidate(int InstanceId, uint LayoutId, int Dimension, int Layer, int LocalIndex)
+{
+    internal ProjectZoneLocator Locator => new(LayoutId, Dimension, Layer, LocalIndex);
+    internal object Document => new { kind = "zone", instanceId = InstanceId, layoutId = LayoutId,
+        dimension = Dimension, layer = Layer, localIndex = LocalIndex };
+}
+
+internal sealed record ProjectAreaCandidate(int InstanceId, int Uid);
+internal sealed record ProjectGeomorphObservation(int InstanceId, int ZoneInstanceId, string SourcePrefab,
+    bool CreationContextVerified, IReadOnlyList<ProjectAreaCandidate> Areas)
+{
+    internal object Document(int maximumAreas) => new { kind = "geomorph", instanceId = InstanceId,
+        zoneInstanceId = ZoneInstanceId, sourcePrefab = SourcePrefab,
+        areas = Array.AsReadOnly(Areas.Take(maximumAreas).Select(area => new { instanceId = area.InstanceId, uid = area.Uid }).ToArray()) };
+}
+
+internal sealed record ProjectReferenceOverflow(long DroppedNativeObjects, long DroppedCandidates, long DroppedAreas)
+{
+    internal object Document => new { droppedNativeObjects = DroppedNativeObjects,
+        droppedCandidates = DroppedCandidates, droppedAreas = DroppedAreas };
+}
+
+internal sealed record ProjectReferenceGroup(ProjectObjectDeclaration Declaration, ProjectReferenceStatus Status,
+    ProjectReferenceReason ReasonCode, int ObservedCandidateCount, bool CandidatesTruncated, IReadOnlyList<object> Candidates)
+{
+    internal object Document => new { expeditionId = Declaration.ExpeditionId, kind = Declaration.Kind,
+        authorId = Declaration.AuthorId, locator = Declaration.LocatorDocument,
+        status = ProjectObjectReferences.Wire(Status), reasonCode = ProjectObjectReferences.Wire(ReasonCode),
+        observedCandidateCount = ObservedCandidateCount, candidatesTruncated = CandidatesTruncated, candidates = Candidates };
+}
+
+internal sealed record ProjectReferenceSnapshot(long WorldEpoch, long? SimulationTick, ProjectScanStatus ScanStatus,
+    ProjectSourceVerification SourceVerification, IReadOnlyList<ProjectReferenceGroup> Groups, ProjectReferenceOverflow Overflow)
+{
+    internal object Document => new { worldEpoch = WorldEpoch, simulationTick = SimulationTick, scope = "generated-floor",
+        scanStatus = ProjectObjectReferences.Wire(ScanStatus), sourceVerification = ProjectObjectReferences.Wire(SourceVerification),
+        groups = Array.AsReadOnly(Groups.Select(group => group.Document).ToArray()), overflow = Overflow.Document };
+}
+
+internal static class ProjectObjectReferences
+{
+    internal const string ProjectFormat = "gtfo-forge-project";
+    internal const string ReportFormat = "gtfo-forge-diagnostics-report";
+    internal const int MaximumDeclarations = 4096, MaximumExpeditions = 50;
+    internal const int MaximumZonesPerExpedition = 128, MaximumRoomsPerExpedition = 512, MaximumActiveLayouts = 128;
+    internal const int MaximumCandidatesPerGroup = 2, MaximumCandidates = 8192;
+    internal const int MaximumAreas = 16384, MaximumNativeObjects = 32768;
+    internal const int MaximumManifestBytes = 4 * 1024 * 1024, MaximumReportBytes = 16 * 1024 * 1024;
+    internal const long MaximumSafeInteger = 9_007_199_254_740_991;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
+    internal static string Wire(Enum value)
+    {
+        if (!Enum.IsDefined(value.GetType(), value)) throw new ArgumentOutOfRangeException(nameof(value));
+        var name = value.ToString();
+        var result = new StringBuilder(name.Length + 8);
+        for (var i = 0; i < name.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(name[i])) result.Append('_');
+            result.Append(char.ToLowerInvariant(name[i]));
+        }
+        return result.ToString();
+    }
+
+    internal static void RequireObject(JsonElement value, params string[] fields)
+    {
+        if (value.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Expected a JSON object.");
+        var remaining = new HashSet<string>(fields, StringComparer.Ordinal);
+        foreach (var property in value.EnumerateObject())
+            if (!remaining.Remove(property.Name)) throw new InvalidDataException($"Unknown or duplicate field: {property.Name}.");
+        if (remaining.Count != 0) throw new InvalidDataException($"Missing field: {remaining.First()}.");
+    }
+
+    internal static string ReadText(JsonElement value, int maximumChars, int maximumUtf8Bytes)
+    {
+        if (value.ValueKind != JsonValueKind.String) throw new InvalidDataException("Expected a string.");
+        var text = value.GetString()!;
+        if (text.Length == 0 || text.Length > maximumChars || text.Any(char.IsControl))
+            throw new InvalidDataException("String is empty, too long, or contains control characters.");
+        try
+        {
+            if (StrictUtf8.GetByteCount(text) > maximumUtf8Bytes) throw new InvalidDataException("String byte budget exceeded.");
+        }
+        catch (EncoderFallbackException error) { throw new InvalidDataException("Invalid Unicode string.", error); }
+        return text;
+    }
+
+    internal static string ReadAuthorId(JsonElement value)
+    {
+        var id = ReadText(value, 64, 64);
+        if (!AsciiAlphanumeric(id[0]) || id.Any(character => !AsciiAlphanumeric(character) && character is not ('.' or '_' or ':' or '-')))
+            throw new InvalidDataException("Invalid author ID.");
+        return id;
+    }
+
+    internal static string ReadSha256(JsonElement value)
+    {
+        var hash = ReadText(value, 64, 64);
+        if (hash.Length != 64 || hash.Any(character => character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+            throw new InvalidDataException("Expected a lowercase SHA-256 value.");
+        return hash;
+    }
+
+    internal static string ReadSourcePrefab(JsonElement value) => ValidateSourcePrefab(ReadText(value, 1024, 4096));
+
+    internal static string ValidateSourcePrefab(string path)
+    {
+        if (string.IsNullOrEmpty(path) || path.Length > 1024 || !path.StartsWith("Assets/", StringComparison.Ordinal) ||
+            path.Contains('\\') || path.Any(char.IsControl) || path.Split('/').Any(part => part is "" or "." or ".."))
+            throw new InvalidDataException("Expected a complete, unchanged native Assets/ prefab identity.");
+        try
+        {
+            if (StrictUtf8.GetByteCount(path) > 4096) throw new InvalidDataException("Prefab byte budget exceeded.");
+        }
+        catch (EncoderFallbackException error) { throw new InvalidDataException("Invalid prefab Unicode.", error); }
+        return path;
+    }
+
+    internal static long ReadInteger(JsonElement value, long minimum, long maximum)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) ||
+            !double.IsFinite(number) || number != Math.Truncate(number) || number < minimum || number > maximum)
+            throw new InvalidDataException("Integer is outside its permitted range.");
+        return checked((long)number);
+    }
+
+    internal static void ValidateEpoch(long worldEpoch, long? simulationTick)
+    {
+        if (worldEpoch < 0 || worldEpoch > MaximumSafeInteger) throw new ArgumentOutOfRangeException(nameof(worldEpoch));
+        if (simulationTick.HasValue && (simulationTick.Value < 0 || simulationTick.Value > MaximumSafeInteger))
+            throw new ArgumentOutOfRangeException(nameof(simulationTick));
+    }
+
+    internal static IReadOnlyList<ProjectObjectDeclaration> Parse(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() > MaximumDeclarations)
+            throw new InvalidDataException("Invalid objectReferences array or declaration budget exceeded.");
+        var result = new List<ProjectObjectDeclaration>(value.GetArrayLength());
+        var identities = new HashSet<(string Expedition, string Kind, string Author)>();
+        var zoneTargets = new HashSet<(string Expedition, ProjectZoneLocator Zone)>();
+        var roomTargets = new HashSet<(string Expedition, string Zone, string Prefab)>();
+        var counts = new Dictionary<string, (int Zones, int Rooms)>(StringComparer.Ordinal);
+        foreach (var entry in value.EnumerateArray())
+        {
+            RequireObject(entry, "expeditionId", "kind", "authorId", "locator");
+            var expedition = ReadAuthorId(entry.GetProperty("expeditionId"));
+            var author = ReadAuthorId(entry.GetProperty("authorId"));
+            var kind = ReadText(entry.GetProperty("kind"), 4, 4);
+            var locator = entry.GetProperty("locator");
+            ProjectLocator parsed;
+            if (kind == "zone")
+            {
+                RequireObject(locator, "kind", "layoutId", "dimension", "layer", "localIndex");
+                if (ReadText(locator.GetProperty("kind"), 4, 4) != "zone") throw new InvalidDataException("Zone locator kind mismatch.");
+                var zone = new ProjectZoneLocator((uint)ReadInteger(locator.GetProperty("layoutId"), 1, uint.MaxValue),
+                    (int)ReadInteger(locator.GetProperty("dimension"), 0, int.MaxValue),
+                    (int)ReadInteger(locator.GetProperty("layer"), 0, 2),
+                    (int)ReadInteger(locator.GetProperty("localIndex"), 0, int.MaxValue));
+                if (!zoneTargets.Add((expedition, zone))) throw new InvalidDataException("Native zone tuple has more than one author in the expedition.");
+                parsed = zone;
+            }
+            else if (kind == "room")
+            {
+                RequireObject(locator, "kind", "zoneAuthorId", "room", "sourcePrefab");
+                if (ReadText(locator.GetProperty("kind"), 32, 32) != "unique-geomorph-in-zone")
+                    throw new InvalidDataException("Unsupported room locator.");
+                var pin = locator.GetProperty("room");
+                RequireObject(pin, "id", "revision");
+                var id = ReadText(pin.GetProperty("id"), 512, 2048);
+                if (id.Any(character => char.IsWhiteSpace(character) || character is '/' or '\\'))
+                    throw new InvalidDataException("Invalid room resource ID.");
+                var room = new ProjectRoomLocator(ReadAuthorId(locator.GetProperty("zoneAuthorId")),
+                    new ProjectResourcePin(id, ReadSha256(pin.GetProperty("revision"))), ReadSourcePrefab(locator.GetProperty("sourcePrefab")));
+                if (!roomTargets.Add((expedition, room.ZoneAuthorId, room.SourcePrefab)))
+                    throw new InvalidDataException("A unique geomorph locator has more than one author in the expedition.");
+                parsed = room;
+            }
+            else throw new InvalidDataException("Unsupported object reference kind.");
+            if (!identities.Add((expedition, kind, author))) throw new InvalidDataException("Duplicate author identity.");
+            counts.TryGetValue(expedition, out var count);
+            count = kind == "zone" ? (count.Zones + 1, count.Rooms) : (count.Zones, count.Rooms + 1);
+            counts[expedition] = count;
+            if (counts.Count > MaximumExpeditions || count.Zones > MaximumZonesPerExpedition || count.Rooms > MaximumRoomsPerExpedition)
+                throw new InvalidDataException("Expedition object reference budget exceeded.");
+            result.Add(new ProjectObjectDeclaration(expedition, author, parsed));
+        }
+        foreach (var declaration in result)
+            if (declaration.Locator is ProjectRoomLocator room && !identities.Contains((declaration.ExpeditionId, "zone", room.ZoneAuthorId)))
+                throw new InvalidDataException("Room zoneAuthorId must name a declared zone in the same expedition.");
+        return result.AsReadOnly();
+    }
+
+    private static bool AsciiAlphanumeric(char value) => value is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9';
+}
+
+internal sealed class ProjectObjectReferenceScan
+{
+    private readonly object _gate = new();
+    private readonly IReadOnlyList<ProjectObjectDeclaration> _declarations;
+    private readonly Dictionary<(string Expedition, string Author), ProjectZoneLocator> _declaredZones;
+    private readonly long _worldEpoch;
+    private readonly Dictionary<int, ProjectZoneCandidate> _zones = new();
+    private readonly Dictionary<int, ProjectGeomorphObservation> _geomorphs = new();
+    private readonly Dictionary<int, (string Kind, int Owner)> _nativeObjects = new();
+    private readonly HashSet<ProjectLayoutKey> _activeLayouts = new();
+    private readonly HashSet<int> _supportedDimensions = new();
+    private ProjectScanStatus _status;
+    private ProjectSourceVerification _sourceVerification;
+    private long? _simulationTick;
+    private bool _started, _observationFault, _budgetExceeded;
+    private int _areaCount;
+    private long _droppedNativeObjects, _droppedAreas;
+
+    internal ProjectObjectReferenceScan(IReadOnlyList<ProjectObjectDeclaration> declarations, long worldEpoch,
+        long? simulationTick, ProjectSourceVerification sourceVerification)
+    {
+        ProjectObjectReferences.ValidateEpoch(worldEpoch, simulationTick);
+        if (!Enum.IsDefined(typeof(ProjectSourceVerification), sourceVerification))
+            throw new ArgumentOutOfRangeException(nameof(sourceVerification));
+        if (declarations.Count > ProjectObjectReferences.MaximumDeclarations) throw new ArgumentOutOfRangeException(nameof(declarations));
+        _declarations = Array.AsReadOnly(declarations.ToArray());
+        _declaredZones = _declarations.Where(declaration => declaration.Locator is ProjectZoneLocator)
+            .ToDictionary(declaration => (declaration.ExpeditionId, declaration.AuthorId), declaration => (ProjectZoneLocator)declaration.Locator);
+        _worldEpoch = worldEpoch;
+        _simulationTick = simulationTick;
+        _sourceVerification = sourceVerification;
+        _status = worldEpoch == 0 ? ProjectScanStatus.Rejected : ProjectScanStatus.NotRequested;
+    }
+
+    internal void SetSourceVerification(ProjectSourceVerification value)
+    {
+        if (!Enum.IsDefined(typeof(ProjectSourceVerification), value)) throw new ArgumentOutOfRangeException(nameof(value));
+        lock (_gate)
+        {
+            if (_status is ProjectScanStatus.Cancelled or ProjectScanStatus.Rejected) return;
+            // A late hash worker cannot revive a cancelled or terminal source result.
+            if (_sourceVerification == ProjectSourceVerification.NotProvided && value == ProjectSourceVerification.Pending)
+                _sourceVerification = value;
+            else if (_sourceVerification == ProjectSourceVerification.Pending && value != ProjectSourceVerification.NotProvided)
+                _sourceVerification = value;
+        }
+    }
+
+    internal void Start(IReadOnlyList<ProjectLayoutKey> activeLayouts, long? simulationTick)
+    {
+        ProjectObjectReferences.ValidateEpoch(_worldEpoch, simulationTick);
+        lock (_gate)
+        {
+            if (_started || _status is ProjectScanStatus.Cancelled or ProjectScanStatus.Rejected) return;
+            _started = true;
+            UpdateTick(simulationTick);
+            if (activeLayouts.Count > ProjectObjectReferences.MaximumActiveLayouts)
+            {
+                _budgetExceeded = true;
+                _status = ProjectScanStatus.Rejected;
+                return;
+            }
+            foreach (var layout in activeLayouts)
+            {
+                if (layout.LayoutId == 0 || layout.Dimension < 0 || layout.Layer is < 0 or > 2)
+                {
+                    _observationFault = true;
+                    _status = ProjectScanStatus.Rejected;
+                    return;
+                }
+                _activeLayouts.Add(layout);
+                _supportedDimensions.Add(layout.Dimension);
+            }
+            _status = ProjectScanStatus.Pending;
+        }
+    }
+
+    internal void ObserveZone(ProjectZoneCandidate zone)
+    {
+        lock (_gate)
+        {
+            if (_status != ProjectScanStatus.Pending) return;
+            if (zone.InstanceId == 0 || zone.LayoutId == 0 || zone.Dimension < 0 || zone.Layer is < 0 or > 2 || zone.LocalIndex < 0)
+            { _observationFault = true; return; }
+            if (_zones.TryGetValue(zone.InstanceId, out var existing))
+            { if (existing != zone) _observationFault = true; return; }
+            if (!AddNative(zone.InstanceId, "zone", 0)) return;
+            _zones.Add(zone.InstanceId, zone);
+        }
+    }
+
+    internal void ObserveGeomorph(ProjectGeomorphObservation observation)
+    {
+        lock (_gate)
+        {
+            if (_status != ProjectScanStatus.Pending) return;
+            if (observation.InstanceId == 0 || observation.ZoneInstanceId == 0 || observation.Areas == null)
+            { _observationFault = true; return; }
+            var sourcePrefab = string.Empty;
+            if (observation.CreationContextVerified)
+            {
+                try { sourcePrefab = ProjectObjectReferences.ValidateSourcePrefab(observation.SourcePrefab); }
+                catch (InvalidDataException) { _observationFault = true; return; }
+            }
+            // Inspect Count before enumeration, so one malformed giant collection is bounded.
+            if (observation.Areas.Count > ProjectObjectReferences.MaximumAreas)
+            {
+                Add(ref _droppedAreas, observation.Areas.Count);
+                _budgetExceeded = true;
+                return;
+            }
+            var uniqueAreas = new Dictionary<int, ProjectAreaCandidate>();
+            foreach (var area in observation.Areas)
+            {
+                if (area == null || area.InstanceId == 0) { _observationFault = true; continue; }
+                if (uniqueAreas.TryGetValue(area.InstanceId, out var oldArea))
+                { if (oldArea != area) _observationFault = true; }
+                else uniqueAreas.Add(area.InstanceId, area);
+            }
+            var areas = uniqueAreas.Values.OrderBy(area => area.InstanceId).ToArray();
+            if (_geomorphs.TryGetValue(observation.InstanceId, out var existing))
+            {
+                if (existing.ZoneInstanceId != observation.ZoneInstanceId || existing.SourcePrefab != sourcePrefab ||
+                    existing.CreationContextVerified != observation.CreationContextVerified || !existing.Areas.SequenceEqual(areas))
+                    _observationFault = true;
+                return;
+            }
+            if (!AddNative(observation.InstanceId, "geomorph", observation.ZoneInstanceId)) return;
+            var accepted = new List<ProjectAreaCandidate>(areas.Length);
+            if (areas.Length > ProjectObjectReferences.MaximumAreas - _areaCount)
+            {
+                Add(ref _droppedAreas, areas.Length);
+                _budgetExceeded = true;
+            }
+            else
+            {
+                foreach (var area in areas)
+                {
+                    if (AddNative(area.InstanceId, "area", observation.InstanceId)) { accepted.Add(area); _areaCount++; }
+                    else Add(ref _droppedAreas, 1);
+                }
+            }
+            _geomorphs.Add(observation.InstanceId, new ProjectGeomorphObservation(observation.InstanceId,
+                observation.ZoneInstanceId, sourcePrefab, observation.CreationContextVerified, accepted.AsReadOnly()));
+        }
+    }
+
+    internal void MarkPartial()
+    {
+        lock (_gate) if (_status == ProjectScanStatus.Pending) _observationFault = true;
+    }
+
+    internal void Complete(long? simulationTick)
+    {
+        ProjectObjectReferences.ValidateEpoch(_worldEpoch, simulationTick);
+        lock (_gate)
+        {
+            if (_status != ProjectScanStatus.Pending) return;
+            UpdateTick(simulationTick);
+            if (_geomorphs.Values.Any(geomorph => !_zones.ContainsKey(geomorph.ZoneInstanceId))) _observationFault = true;
+            _status = _observationFault || _budgetExceeded ? ProjectScanStatus.Partial : ProjectScanStatus.Complete;
+        }
+    }
+
+    internal void Cancel(long? simulationTick)
+    {
+        ProjectObjectReferences.ValidateEpoch(_worldEpoch, simulationTick);
+        lock (_gate)
+        {
+            if (_status is ProjectScanStatus.Cancelled or ProjectScanStatus.Rejected) return;
+            UpdateTick(simulationTick);
+            _started = true;
+            _status = ProjectScanStatus.Cancelled;
+            if (_sourceVerification == ProjectSourceVerification.Pending) _sourceVerification = ProjectSourceVerification.Cancelled;
+        }
+    }
+
+    internal void Reject()
+    {
+        lock (_gate)
+        {
+            if (_started || _status == ProjectScanStatus.Cancelled) return;
+            _started = true;
+            _status = ProjectScanStatus.Rejected;
+            if (_sourceVerification == ProjectSourceVerification.Pending) _sourceVerification = ProjectSourceVerification.Unavailable;
+        }
+    }
+
+    internal ProjectReferenceSnapshot Snapshot()
+    {
+        lock (_gate)
+        {
+            // Index once. Matching does not rescan all native objects for every declaration.
+            var zones = _zones.Values.OrderBy(zone => zone.InstanceId).GroupBy(zone => zone.Locator)
+                .ToDictionary(group => group.Key, group => group.ToArray());
+            var geomorphs = _geomorphs.Values.Where(geomorph => geomorph.CreationContextVerified)
+                .OrderBy(geomorph => geomorph.InstanceId).GroupBy(geomorph => (geomorph.ZoneInstanceId, geomorph.SourcePrefab))
+                .ToDictionary(group => group.Key, group => group.ToArray());
+            var unknownCreationZones = _geomorphs.Values.Where(geomorph => !geomorph.CreationContextVerified)
+                .Select(geomorph => geomorph.ZoneInstanceId).ToHashSet();
+            var restriction = Restriction();
+            // Layout IDs alone do not identify an expedition when authors reuse them.
+            // Require the complete declared layout-key set, never a matching subset.
+            var activeExpeditions = _declaredZones.GroupBy(pair => pair.Key.Expedition)
+                .Where(group => group.Select(pair => new ProjectLayoutKey(pair.Value.LayoutId,
+                    pair.Value.Dimension, pair.Value.Layer)).ToHashSet().SetEquals(_activeLayouts))
+                .Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
+
+            Resolution ResolveZone(ProjectZoneLocator locator)
+            {
+                var candidates = zones.GetValueOrDefault(locator) ?? Array.Empty<ProjectZoneCandidate>();
+                var examples = candidates.Take(ProjectObjectReferences.MaximumCandidatesPerGroup).Select(candidate => (object)candidate).ToArray();
+                if (restriction.HasValue) return new(ProjectReferenceStatus.Unverified, restriction.Value, candidates.Length, examples);
+                if (!_supportedDimensions.Contains(locator.Dimension))
+                    return new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.UnsupportedDimension, candidates.Length, examples);
+                if (!_activeLayouts.Contains(new ProjectLayoutKey(locator.LayoutId, locator.Dimension, locator.Layer)))
+                    return new(ProjectReferenceStatus.Inactive, ProjectReferenceReason.LayoutInactive, candidates.Length, examples);
+                return ByCount(candidates.Length, examples);
+            }
+
+            Resolution ResolveRoom(ProjectObjectDeclaration declaration, ProjectRoomLocator locator)
+            {
+                var zoneLocator = _declaredZones[(declaration.ExpeditionId, locator.ZoneAuthorId)];
+                var parent = ResolveZone(zoneLocator);
+                var parentCandidates = zones.GetValueOrDefault(zoneLocator) ?? Array.Empty<ProjectZoneCandidate>();
+                var candidates = parentCandidates.Length == 1
+                    ? geomorphs.GetValueOrDefault((parentCandidates[0].InstanceId, locator.SourcePrefab)) ?? Array.Empty<ProjectGeomorphObservation>()
+                    : Array.Empty<ProjectGeomorphObservation>();
+                var examples = candidates.Take(ProjectObjectReferences.MaximumCandidatesPerGroup).Select(candidate => (object)candidate).ToArray();
+                if (restriction.HasValue) return new(ProjectReferenceStatus.Unverified, restriction.Value, candidates.Length, examples);
+                if (parent.Status == ProjectReferenceStatus.Inactive)
+                    return new(ProjectReferenceStatus.Inactive, ProjectReferenceReason.LayoutInactive, candidates.Length, examples);
+                if (parent.Status != ProjectReferenceStatus.Matched)
+                    return new(ProjectReferenceStatus.Unverified,
+                        parent.Reason == ProjectReferenceReason.UnsupportedDimension ? parent.Reason : ProjectReferenceReason.ZoneUnresolved,
+                        candidates.Length, examples);
+                // An unverified source in the same zone might be another candidate; it cannot establish uniqueness.
+                if (unknownCreationZones.Contains(parentCandidates[0].InstanceId))
+                    return new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.CreationContextUnverified, candidates.Length, examples);
+                if (candidates.Length == 1 && candidates[0].Areas.Count == 0)
+                    return new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.AreaMappingIncomplete, 1, examples);
+                return ByCount(candidates.Length, examples);
+            }
+
+            var groups = new List<ProjectReferenceGroup>(_declarations.Count);
+            var remainingCandidates = ProjectObjectReferences.MaximumCandidates;
+            var remainingAreas = ProjectObjectReferences.MaximumAreas;
+            long droppedCandidates = 0;
+            var droppedAreas = _droppedAreas;
+            foreach (var declaration in _declarations)
+            {
+                Resolution result;
+                if (!restriction.HasValue && !activeExpeditions.Contains(declaration.ExpeditionId))
+                    result = new(ProjectReferenceStatus.Inactive, ProjectReferenceReason.LayoutInactive, 0, Array.Empty<object>());
+                else if (!restriction.HasValue && activeExpeditions.Count > 1)
+                    result = new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.ZoneUnresolved, 0, Array.Empty<object>());
+                else
+                    result = declaration.Locator is ProjectZoneLocator zone ? ResolveZone(zone) : ResolveRoom(declaration, (ProjectRoomLocator)declaration.Locator);
+                var examples = result.Examples.Take(remainingCandidates).ToArray();
+                remainingCandidates -= examples.Length;
+                if (examples.Length != result.Examples.Length)
+                {
+                    Add(ref droppedCandidates, result.Examples.Length - examples.Length);
+                    result = result with { Status = ProjectReferenceStatus.Unverified, Reason = ProjectReferenceReason.ObservationBudgetExceeded };
+                }
+                var documents = new List<object>(examples.Length);
+                foreach (var example in examples)
+                {
+                    if (example is ProjectZoneCandidate zoneCandidate) documents.Add(zoneCandidate.Document);
+                    else if (example is ProjectGeomorphObservation geomorph)
+                    {
+                        var areaCount = Math.Min(remainingAreas, geomorph.Areas.Count);
+                        remainingAreas -= areaCount;
+                        documents.Add(geomorph.Document(areaCount));
+                        if (areaCount != geomorph.Areas.Count)
+                        {
+                            Add(ref droppedAreas, geomorph.Areas.Count - areaCount);
+                            result = result with { Status = ProjectReferenceStatus.Unverified, Reason = ProjectReferenceReason.ObservationBudgetExceeded };
+                        }
+                    }
+                    else throw new InvalidOperationException("Unexpected native candidate type.");
+                }
+                groups.Add(new ProjectReferenceGroup(declaration, result.Status, result.Reason, result.Count,
+                    result.Count > examples.Length, documents.AsReadOnly()));
+            }
+            var snapshotStatus = _status == ProjectScanStatus.Complete && (droppedCandidates > 0 || droppedAreas > _droppedAreas)
+                ? ProjectScanStatus.Partial : _status;
+            return new ProjectReferenceSnapshot(_worldEpoch, _simulationTick, snapshotStatus, _sourceVerification, groups.AsReadOnly(),
+                new ProjectReferenceOverflow(_droppedNativeObjects, droppedCandidates, droppedAreas));
+        }
+    }
+
+    private ProjectReferenceReason? Restriction()
+    {
+        if (_worldEpoch == 0) return ProjectReferenceReason.WorldEpochUnavailable;
+        if (_status == ProjectScanStatus.Cancelled) return ProjectReferenceReason.ScanCancelled;
+        if (_budgetExceeded) return ProjectReferenceReason.ObservationBudgetExceeded;
+        if (_sourceVerification == ProjectSourceVerification.Mismatch) return ProjectReferenceReason.SourceMismatch;
+        if (_sourceVerification == ProjectSourceVerification.Pending) return ProjectReferenceReason.SourcePending;
+        if (_sourceVerification != ProjectSourceVerification.Matched) return ProjectReferenceReason.SourceUnavailable;
+        if (_status != ProjectScanStatus.Complete || _observationFault) return ProjectReferenceReason.ScanPartial;
+        return null;
+    }
+
+    private bool AddNative(int instanceId, string kind, int owner)
+    {
+        if (_nativeObjects.TryGetValue(instanceId, out var existing))
+        {
+            if (existing != (kind, owner)) { _observationFault = true; return false; }
+            return true;
+        }
+        if (_nativeObjects.Count >= ProjectObjectReferences.MaximumNativeObjects)
+        {
+            Add(ref _droppedNativeObjects, 1);
+            _budgetExceeded = true;
+            return false;
+        }
+        _nativeObjects.Add(instanceId, (kind, owner));
+        return true;
+    }
+
+    private void UpdateTick(long? tick)
+    {
+        if (tick.HasValue && _simulationTick.HasValue && tick.Value < _simulationTick.Value) _observationFault = true;
+        _simulationTick = tick;
+    }
+
+    private static Resolution ByCount(int count, object[] examples) => count switch
+    {
+        0 => new(ProjectReferenceStatus.Missing, ProjectReferenceReason.NoCandidate, count, examples),
+        1 => new(ProjectReferenceStatus.Matched, ProjectReferenceReason.Unique, count, examples),
+        _ => new(ProjectReferenceStatus.Ambiguous, ProjectReferenceReason.MultipleCandidates, count, examples)
+    };
+
+    private static void Add(ref long value, long count) => value = Math.Min(ProjectObjectReferences.MaximumSafeInteger,
+        value + Math.Min(Math.Max(0, count), ProjectObjectReferences.MaximumSafeInteger - value));
+
+    private sealed record Resolution(ProjectReferenceStatus Status, ProjectReferenceReason Reason, int Count, object[] Examples);
+}

@@ -11,6 +11,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
+    <!-- The BepInEx plugin builds separately against a compiled host; this assembly stays SDK-only. -->
+    <Compile Remove="Native\**\*.cs" />
     <ProjectReference Include="../ForgeRuntime/Framework/ForgeRuntime.Framework.csproj" />
   </ItemGroup>
 </Project>

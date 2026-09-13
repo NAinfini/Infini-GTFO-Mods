@@ -1,18 +1,20 @@
 using Mono.Cecil;
 
-if (args.Length != 4) throw new ArgumentException("Arguments: BepInEx directory, compiled InfiniTweaks.dll, compiled ForgeRuntime.dll, native dump.cs for this game build");
+if (args.Length != 4) throw new ArgumentException("Arguments: BepInEx directory, compiled InfiniTweaks.dll, compiled ForgeDevelopment.Native.dll, native dump.cs for this game build");
 var bodies = new NativeBodyMap(args[3]);
 using var resolver = new DefaultAssemblyResolver();
 foreach (string directory in new[] { "core", "interop", "plugins" }) resolver.AddSearchDirectory(Path.Combine(args[0], directory));
 using var mod = AssemblyDefinition.ReadAssembly(args[1], new ReaderParameters { AssemblyResolver = resolver });
 using var forge = AssemblyDefinition.ReadAssembly(args[2], new ReaderParameters { AssemblyResolver = resolver });
-foreach (var assembly in new[] { mod, forge })
-    if (assembly.MainModule.AssemblyReferences.Any(r => r.Name is "InfiniTweaks" or "ForgeRuntime"))
-        throw new Exception($"{assembly.Name.Name} must not depend on the other plugin assembly.");
+// Quality of Life stays free of Forge; performance and authoring diagnostics live only in the optional Development plugin.
+if (mod.MainModule.AssemblyReferences.Any(r => r.Name.StartsWith("ForgeRuntime") || r.Name.StartsWith("ForgeDevelopment")))
+    throw new Exception("InfiniTweaks must not depend on a Forge assembly.");
+if (forge.MainModule.AssemblyReferences.Any(r => r.Name == "InfiniTweaks"))
+    throw new Exception("ForgeDevelopment must not depend on the InfiniTweaks assembly.");
 foreach (var name in new[] { "PerformanceDiagnostics", "PerformanceMonitor", "PerformanceSampleWindow", "SceneInventory" })
 {
     if (mod.MainModule.Types.Any(t => t.Name == name) || !forge.MainModule.Types.Any(t => t.Name == name))
-        throw new Exception($"Diagnostic type {name} must belong exclusively to Forge Runtime.");
+        throw new Exception($"Diagnostic type {name} must belong exclusively to Forge Development.");
 }
 var telemetry = mod.MainModule.Types.Single(t => t.FullName == "InfiniTweaks.Telemetry");
 if (!telemetry.IsPublic || telemetry.Events.Count != 3) throw new Exception("QOL optional telemetry contract is missing.");

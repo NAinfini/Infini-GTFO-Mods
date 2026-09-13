@@ -134,9 +134,7 @@ source / owner / instigator / recipient 四个角色在网络语义下各自的�
 
 ## 尚未收口的具体项
 
-`ForgeRuntime/tests/test_import_log.py` 的跨端 reader 用例仍硬编码 `site/map-balance-report.js`，而网站实际文件已改名为 `.ts`。这项修复归 Development 与网站责任任务，不引入 stub、跳过或复制替身。
-
-`ForgeRuntime/PERFORMANCE-REVIEW.md` 的内容实际是 InfiniTweaks 的标记与 HUD 性能对照，不是 Runtime 的内容。它现在放在本目录只是历史遗留，是否移到 `InfiniTweaks/` 待用户决定。
+已排除编译的原型 `CanonicalTriggerRuntime.cs` 与 `ForgeRuntimeHost.cs` 仍文本引用 D2 后已不在宿主内的 `PerformanceDiagnostics`；它们不参与任何构建，随 R1 记录的原型退休在 R4 收尾时删除。
 
 ## 聚焦验收矩阵
 

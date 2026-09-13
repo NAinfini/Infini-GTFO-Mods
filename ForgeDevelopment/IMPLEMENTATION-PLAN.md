@@ -2,7 +2,7 @@
 
 未完成批次按总案 v2.0 第 13 节的 F 阶段重排。**已交付内容见 [README.md](README.md)，实际执行结果见 [VALIDATION.md](VALIDATION.md)，仓库整体状态见 [ARCHITECTURE.md](../ARCHITECTURE.md)。**
 
-上位依据：[唯一总案](../../Infini-GTFO-Model-Site/Docs/rework/FORGE-COMPLETE-PLAN.md) 第 1、8、13 节。本包对应工作单元 **U-DEV-MOD**，阶段 F5，停止条件是 D2 把诊断源码从宿主迁出。发生语义差异先核对总案与实际代码，不在本文件私自改写 canonical 合同。
+上位依据：[唯一总案](../../Infini-GTFO-Model-Site/Docs/rework/FORGE-COMPLETE-PLAN.md) 第 1、8、13 节。本包对应工作单元 **U-DEV-MOD**，阶段 F5，D2 已把诊断源码从宿主迁出（实现与本地验证等级），剩余停止条件是游戏内三种加载模式的实际核验。发生语义差异先核对总案与实际代码，不在本文件私自改写 canonical 合同。
 
 ## 输入、输出和观测边界
 
@@ -20,21 +20,19 @@
 
 保留的验收要求：新旧 world、非法项目、部分扫描、未知 geomorph 来源和取消都可区分。
 
-## D2 — 拆出真正可选的 Development 插件（未做，B 批唯一缺口）
+## D2 — 拆出真正可选的 Development 插件（已实现并本地验证，游戏加载待核验）
 
-**这是本仓库 B 批唯一没做完的事。** 迁移输入已经准备好：`d2-migration-inventory.json` 记录 15 个诊断源码、21 个测试与脚本的 source→target 与 hash，以及 5 个共享切换文件。消费者行号是文本引用清单，不冒充语义调用图；**迁移前必须重新核对 hash**。原迁移表里没列的 `ProjectInspectionSession` 与 `DevelopmentInspection` 已补入；本目录新增的 ReportSnapshots、Shutdown 的编译链接以及 `verify-diagnostics` 路径也必须同步更新。
+切换已完成，结构见 [README](README.md#当前状态d2-已切换未做游戏加载验收)，证据见 [VALIDATION.md](VALIDATION.md#d2--独立插件切换)。逐项落点：诊断源与测试已迁移，保留唯一的 Report 与 Scan 实现；宿主 `Plugin` 已移除作者采集、monitor 与诊断清理；设置已拆分，Development 用独立的 `NAinfini.ForgeDevelopment.cfg` 且不迁移旧键；启动门槛是 Runtime `Authoring` 且 `Plugin.Runtime` 非空，本插件不登记 provider；宿主 Hook 选择已删除，双方 csproj 与原生元数据测试已更新。**唯一未完成的是核验不安装、安装但关闭、启用三种实际加载模式**，需要安装到独立测试 profile，须当次明确授权。下面保留原切换要求作为验收依据。
 
 公共接入已经存在：`ForgeRuntime.Plugin.Runtime` 与模块句柄的 `ObserveLifecycle`。Off 或停止时入口为 null；未 Advance 的 tick = -1 与 authority = null 不作为已观测的世界数据；注册发生在依赖插件的 Load 中，早于首个 FixedUpdate 的 `StartRuntime` 冻结点。详见 [公开生命周期合同](../ForgeRuntime/Framework/HOST-LIFECYCLE.md)。
 
-**一次切换必须共同完成以下五项，不启动第二套采集器：**
+**原切换要求（一次共同完成，不启动第二套采集器）：**
 
 迁移诊断源及其 namespace 与测试链接，保留唯一的 Report 与 Scan 实现和当前的未提交内容。Runtime 的 `Plugin` 移除作者采集初始化、两个作者 monitor、诊断失败清理和可选的 Telemetry 装配；FrameworkMonitor、世界时钟、游戏阶段和权限仍留在宿主。`AuthoringSettings` 拆分——Mode、PlanPath、AllowedPermissions 归 Runtime（这部分 R2b-1 已完成），报告、扫描、性能选项归 Development；新 GUID、配置名、producer 身份与一次性迁移由 Runtime 同批核定，**旧的 Off 不得自动变成启用**。独立的 Development 入口只有在显式启用且真实 Runtime 可用时才订阅、采集和登记自己的 provider；失败与退出逐项清理，**正常玩法不得依赖 Development**；只有 Runtime 分发 SDK。修改宿主的 Hook 选择、双方的 csproj 与原生签名测试，然后核验不安装、安装但关闭、启用三种实际加载模式。
 
 保留原生日志 callback 的托管根引用；启动失败和退出时分别撤销日志、Harmony、Unity 回调、Telemetry 与后台 writer，**一个异常不能阻止其余清理**。
 
 退出验收：普通玩家不启动诊断线程、采样、热键或 Hook；退出后无重复订阅；反复进出图无对象或回调泄漏。
-
-**不要与 Runtime 负责人并发进行半套切换。** 同一批次里 `Plugin.cs` 与 `WorldInspection.cs` 只能有一个写入者。
 
 ## D3 — 作者对象回指和生成证据
 
@@ -93,9 +91,9 @@
 
 ## Agent 范围
 
-常规拥有 `ForgeDevelopment/**`。D2 需要迁移表中的 `ForgeRuntime` 诊断文件，由 [AGENT-HANDOFF](../AGENT-HANDOFF.md) 的 Runtime 接口负责人安排一次文件所有权切换。
+常规拥有 `ForgeDevelopment/**`，D2 后包括全部诊断源码；`ForgeRuntime/Plugin.cs` 等共享文件的改动仍按 [AGENT-HANDOFF](../AGENT-HANDOFF.md) 先交接。
 
-功能阶段从本目录迁入后的实际 csproj 与脚本路径运行 Reports、ProjectChecks、Samples、SceneInventory、Telemetry 和 Python 报告测试，并完整构建 Runtime + Development。最后在真实的 GTFO profile 分别测采集关闭、开启、切关、异常与退出；安装需要当时任务的明确授权。
+功能阶段用 `scripts/verify-diagnostics.py` 从本目录的实际 csproj 与脚本路径运行全部套件，并完整构建 Runtime + Development 原生插件。最后在真实的 GTFO profile 分别测采集关闭、开启、切关、异常与退出；安装需要当时任务的明确授权。
 
 ## 总案机制工作队列（4 类）
 

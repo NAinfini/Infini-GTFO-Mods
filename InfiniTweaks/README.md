@@ -2,7 +2,7 @@
 
 本目录是独立的 Quality of Life 模组，功能不属于 Forge 重构范围。以下构建和测试命令在本目录执行；仓库入口见 [README](../README.md)。
 
-A configurable GTFO quality-of-life collection in one DLL. Gameplay changes default to disabled or vanilla strength; flashlight improvements, compact statistics and performance diagnostics are enabled by default.
+A configurable GTFO quality-of-life collection in one DLL. Gameplay changes default to disabled or vanilla strength; flashlight improvements and compact statistics are enabled by default. Performance and authoring diagnostics are not part of this Quality of Life mod.
 
 Infini Tweaks does not use MTFO and never controls the flashlight's on/off state.
 
@@ -10,7 +10,7 @@ Infini Tweaks does not use MTFO and never controls the flashlight's on/off state
 
 Damage statistics now use native health-loss events observed on each client, without a modded-host requirement. Accuracy sync uses v6 and requires matching peers. Damage before joining cannot be recovered.
 
-Forge Runtime remains a separate optional diagnostics DLL. Archive owns chat and weapon descriptions; EWC is excluded.
+Performance and authoring diagnostics live in the separate optional Forge Development plugin, which ordinary play does not need. Archive owns chat and weapon descriptions; EWC is excluded.
 
 Marker configuration uses one overall switch, one distance per category, and a clear-marker key. Retired per-item sections and appearance overrides are removed on startup; existing category distances are retained.
 
@@ -54,7 +54,7 @@ Restart the game after editing the config.
 
 ### Authoring diagnostics
 
-Performance collection has moved to the optional [Forge Runtime](../ForgeRuntime/README.md) plugin. Infini Tweaks creates no diagnostics monitor, collector, files or logging thread. Without Forge Runtime, its lightweight measurement scopes do no sampling.
+Performance collection belongs to the optional [Forge Development](../ForgeDevelopment/README.md) plugin. Infini Tweaks creates no diagnostics monitor, collector, files or logging thread. Its public `Telemetry` events only let Forge Development time Infini's own hot paths; with no subscriber the measurement scopes do no sampling. The marker and HUD performance comparison is kept in [PERFORMANCE-REVIEW.md](../ForgeDevelopment/PERFORMANCE-REVIEW.md).
 
 ### Casual-co-op modules (2.2.4)
 
@@ -128,7 +128,6 @@ When upgrading from Infini Flashlight, remove its DLL to avoid applying beam adj
 ```powershell
 $env:GTFO_BEPINEX_PATH = "$env:APPDATA\r2modmanPlus-local\GTFO\profiles\YourProfile\BepInEx"
 dotnet build InfiniTweaks.csproj -c Release
-dotnet build ../ForgeRuntime/ForgeRuntime.csproj -c Release
 ```
 
 Offline regression tests link the production player patches and datablock code against managed game doubles:
@@ -142,7 +141,7 @@ They check low-stamina clamping, local/remote/bot scope, friendly-fire direction
 The casual-module checks cover distance/aim visibility, perfect-roll matching, held-pack HUD filtering, bounded rewards, effective damage and statistics. `dotnet run --project tests/ResourceSlots -c Release` executes production native-slot registration/callback/occupancy logic with managed doubles; it replaces the deleted polled-selector geometry tests. Removed stacking tests do not count toward this DLL because Core owns stacking. Statistics model tests exercise independent peer resets, snapshots, authority and host migration. Run native patch contract validation after building:
 
 ```powershell
-dotnet run --project tests/NativeContracts/NativeContracts.csproj -c Release -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -- $env:GTFO_BEPINEX_PATH "$PWD/bin/Release/InfiniTweaks.dll" "$PWD/../ForgeRuntime/bin/Release/ForgeRuntime.dll" "<本游戏版本的 dump.cs 路径>"
+dotnet run --project tests/NativeContracts/NativeContracts.csproj -c Release -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -- $env:GTFO_BEPINEX_PATH "$PWD/bin/Release/InfiniTweaks.dll" "<ForgeDevelopment.Native.dll 路径，见 ../ForgeDevelopment/scripts/verify-diagnostics.py>" "<本游戏版本的 dump.cs 路径>"
 ```
 
 This reads assembly metadata without executing game code. Live acceptance remains listed in `REVIEW.md`.

@@ -69,15 +69,11 @@ if args.integration:
     suites = [('Architecture', []), ('Framework', ['--fixtures', fixtures]),
               ('HostIntegration', ['--host', host] if host else []), ('LifecycleWork', ['--fixtures', fixtures]),
               ('EntityObservation', ['--probe-registration']), ('GameBindings', ['--fixtures', fixtures]),
-              ('PluginStartup', []), ('HostConfiguration', []), ('Reports', []), ('ProjectChecks', []),
-              ('DevelopmentInspection', []), ('Samples', []), ('Telemetry', [])]
+              ('PluginStartup', []), ('HostConfiguration', [])]
     for name, arguments in suites:
         dll = build(f'ForgeRuntime/tests/{name}/{name}.csproj', name)
         if dll:
             run(name, ['dotnet', dll, *arguments])
-    scene = build('ForgeRuntime/tests/SceneInventory/SceneInventoryTests.csproj', 'SceneInventory')
-    if scene:
-        run('SceneInventory', ['dotnet', scene])
 after = snapshot()
 (out / 'source-after.json').write_text(json.dumps(after, indent=2), encoding='utf-8')
 drift = sorted(p for p in set(before) | set(after) if before.get(p) != after.get(p))

@@ -1,4 +1,4 @@
-using ForgeRuntime;
+using ForgeDevelopment.Native;
 
 internal static class ReceiptTests
 {

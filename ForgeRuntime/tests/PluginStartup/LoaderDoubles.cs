@@ -46,6 +46,11 @@ namespace HarmonyLib
     {
         public Harmony(string guid) { Probe.Call("harmony:new"); }
         public void UnpatchSelf() => Probe.Call("hook:unpatch");
+        public void PatchAll(System.Reflection.Assembly assembly)
+        {
+            foreach (var type in assembly.GetTypes().Where(t => t.IsDefined(typeof(HarmonyPatch), false)))
+                CreateClassProcessor(type).Patch();
+        }
         public Processor CreateClassProcessor(Type type) => new(type);
     }
     public sealed class Processor

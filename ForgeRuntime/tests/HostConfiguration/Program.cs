@@ -52,16 +52,6 @@ try
             Check(RuntimeSettings.AllowedPermissions.Value == "gtfo.enemy.health.read,gtfo.enemy.health.write", "saved config changed permissions");
             Check(reopened.Keys.Count == 3, "saved host config includes diagnostics");
         });
-    Case("host-only save preserves unbound authoring settings", () => {
-        var config = Config("Off");
-        File.AppendAllText(config.ConfigFilePath, "\n[Authoring]\nProjectManifest = projects/kept.json\nExportReportKey = F11\n\n[Performance Diagnostics]\nEnablePerformanceLogging = false\n");
-        config.Reload(); config.SaveOnConfigSet = true; RuntimeSettings.Bind(config); config.Save();
-        Check(config.Keys.Count == 3, "host bound diagnostic settings during save");
-        var reopened = new ConfigFile(config.ConfigFilePath, false) { SaveOnConfigSet = false };
-        Check(reopened.Bind("Authoring", "ProjectManifest", "missing", "").Value == "projects/kept.json", "authoring manifest was discarded");
-        Check(reopened.Bind("Authoring", "ExportReportKey", "missing", "").Value == "F11", "authoring key was discarded");
-        Check(!reopened.Bind("Performance Diagnostics", "EnablePerformanceLogging", true, "").Value, "diagnostic opt-out was overwritten");
-    });
     Case("empty plan and permissions remain empty", () => {
         var path = Path.Combine(root, "empty.cfg"); File.WriteAllText(path, "[Runtime]\nMode = Off\n");
         var config = new ConfigFile(path, false) { SaveOnConfigSet = false }; RuntimeSettings.Bind(config);

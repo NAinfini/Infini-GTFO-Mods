@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using ForgeRuntime;
+using ForgeDevelopment.Native;
 
 internal static class QueueBoundaryTests
 {

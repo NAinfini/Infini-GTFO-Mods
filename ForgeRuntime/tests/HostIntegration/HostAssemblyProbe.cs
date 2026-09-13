@@ -17,6 +17,12 @@ internal static class HostAssemblyProbe
             && runtime.PropertyType.FullName == typeof(RuntimeKernel).FullName
             && runtime.PropertyType.Scope.Name == "ForgeRuntime.Framework", "Plugin.Runtime does not expose the shared public SDK type");
         Verify.That(!host.MainModule.Types.Any(t => t.Name == "FrameworkStartup"), "retired private startup latch still compiled");
+        string[] diagnostics = { "RuntimeDiagnostics", "AuthoringMonitor", "PerformanceMonitor", "PerformanceDiagnostics", "DiagnosticsReport", "TelemetryBridge", "Settings" };
+        Verify.That(!host.MainModule.Types.Any(t => diagnostics.Contains(t.Name)), "diagnostics implementation is still compiled into the host");
+        Verify.That(host.MainModule.Types.Where(t => t.CustomAttributes.Any(a => a.AttributeType.FullName == "HarmonyLib.HarmonyPatch"))
+            .All(t => t.Namespace == "ForgeRuntime.GameBindings"), "host patches game code outside its framework bindings");
+        Verify.That(!plugin.CustomAttributes.Any(a => a.AttributeType.Name == "BepInDependency")
+            && !references.Any(r => r.Name.StartsWith("ForgeDevelopment", StringComparison.Ordinal)), "host depends on an optional plugin");
         var calls = host.MainModule.Types.SelectMany(t => t.Methods).Where(m => m.HasBody)
             .SelectMany(m => m.Body.Instructions).Select(i => i.Operand).OfType<MethodReference>();
         Verify.That(calls.Any(m => m.DeclaringType.FullName == typeof(RuntimeKernel).FullName && m.Name == "StartRuntime"),

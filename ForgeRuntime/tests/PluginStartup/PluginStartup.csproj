@@ -10,7 +10,5 @@
     <Compile Include="../../Plugin.cs" Link="Production/Plugin.cs" />
     <Compile Include="../../RuntimeMode.cs" Link="Production/RuntimeMode.cs" />
     <Compile Include="../../RuntimeSettings.cs" Link="Production/RuntimeSettings.cs" />
-    <Compile Include="../../AuthoringSettings.cs" Link="Production/AuthoringSettings.cs" />
-    <Compile Include="../../GameBindings/PluginPatchSelection.cs" Link="Production/PluginPatchSelection.cs" />
   </ItemGroup>
 </Project>

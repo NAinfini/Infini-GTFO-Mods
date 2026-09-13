@@ -14,14 +14,16 @@ import xml.etree.ElementTree as ET
 PROJECTS = (
     ("host", "ForgeRuntime/ForgeRuntime.csproj", False),
     ("development", "ForgeDevelopment/ForgeDevelopment.csproj", False),
-    ("reports", "ForgeRuntime/tests/Reports/Reports.csproj", True),
-    ("project-checks", "ForgeRuntime/tests/ProjectChecks/ProjectChecks.csproj", True),
-    ("inspection", "ForgeRuntime/tests/DevelopmentInspection/DevelopmentInspection.csproj", True),
+    ("development-native", "ForgeDevelopment/Native/ForgeDevelopment.Native.csproj", False),
+    ("plugin-startup", "ForgeDevelopment/tests/PluginStartup/PluginStartup.csproj", True),
+    ("reports", "ForgeDevelopment/tests/Reports/Reports.csproj", True),
+    ("project-checks", "ForgeDevelopment/tests/ProjectChecks/ProjectChecks.csproj", True),
+    ("inspection", "ForgeDevelopment/tests/DevelopmentInspection/DevelopmentInspection.csproj", True),
     ("snapshots", "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj", True),
     ("shutdown", "ForgeDevelopment/tests/Shutdown/Shutdown.csproj", True),
-    ("scene-inventory", "ForgeRuntime/tests/SceneInventory/SceneInventoryTests.csproj", True),
-    ("telemetry", "ForgeRuntime/tests/Telemetry/Telemetry.csproj", True),
-    ("samples", "ForgeRuntime/tests/Samples/Samples.csproj", True),
+    ("scene-inventory", "ForgeDevelopment/tests/SceneInventory/SceneInventoryTests.csproj", True),
+    ("telemetry", "ForgeDevelopment/tests/Telemetry/Telemetry.csproj", True),
+    ("samples", "ForgeDevelopment/tests/Samples/Samples.csproj", True),
 )
 
 def source_hashes(repo: Path) -> dict[str, str]:
@@ -82,14 +84,26 @@ def main() -> int:
     artifacts = output / "artifacts"
     options = ["-c", "Release", "--artifacts-path", str(artifacts), "-p:GTFOBepInExPath=" + str(profile)]
     execute("dotnet-version", ["dotnet", "--version"])
+    # The plugin compiles against the host and SDK built above, never against an installed profile copy.
+    host_inputs = ["-p:ForgeRuntimeAssembly=" + str(artifacts / "bin/ForgeRuntime/release/ForgeRuntime.dll"),
+                   "-p:ForgeFrameworkAssembly=" + str(artifacts / "bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll")]
     for label, relative, runnable in PROJECTS:
-        if execute(label + "-build", ["dotnet", "build", relative] + options) or not runnable:
+        extra = host_inputs if label == "development-native" else []
+        if execute(label + "-build", ["dotnet", "build", relative] + options + extra) or not runnable:
             continue
         project = repo / relative
         assembly = ET.parse(project).findtext("./PropertyGroup/AssemblyName") or project.stem
         binary = artifacts / "bin" / project.stem / "release" / (assembly + ".dll")
         execute(label, ["dotnet", str(binary)])
-    execute("python-tools", [sys.executable, "-m", "unittest", "discover", "-s", "ForgeRuntime/tests", "-p", "test_*.py"])
+    layout = "ForgeDevelopment/tests/NativeLayout/NativeLayout.csproj"
+    if not execute("native-layout-build", ["dotnet", "build", layout] + options):
+        bin_root = artifacts / "bin"
+        execute("native-layout", ["dotnet", str(bin_root / "NativeLayout/release/DevelopmentNativeLayout.dll"), str(profile),
+                                  str(bin_root / "ForgeRuntime/release/ForgeRuntime.dll"),
+                                  str(bin_root / "ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll"),
+                                  str(bin_root / "ForgeDevelopment.Native/release/ForgeDevelopment.Native.dll"),
+                                  str(output / "native-layout.json")])
+    execute("python-tools", [sys.executable, "-m", "unittest", "discover", "-s", "ForgeDevelopment/tests", "-p", "test_*.py"])
     after = source_hashes(repo)
     (output / "sources-after.json").write_text(json.dumps(after, indent=2), encoding="utf-8")
     changed = sorted(p for p in before.keys() | after.keys() if before.get(p) != after.get(p))

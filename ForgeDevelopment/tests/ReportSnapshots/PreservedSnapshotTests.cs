@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using ForgeRuntime;
+using ForgeDevelopment.Native;
 
 // Prior regression assertions preserved from the earlier continuation.
 internal static class PreservedSnapshotTests

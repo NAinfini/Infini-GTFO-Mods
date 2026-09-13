@@ -41,17 +41,13 @@ internal static class NativeEvidence
 
         bool Patch(CustomAttribute a) => a.AttributeType.FullName == "HarmonyLib.HarmonyPatch";
         var patches = forgeTypes.Where(t => t.CustomAttributes.Any(Patch)).ToArray();
-        var play = patches.Where(t => PluginPatchSelection.Includes(RuntimeMode.Play, t.Namespace)).ToArray();
-        string[] expectedPlay = { "FrameworkStateChanged", "FrameworkWorldCleanup", "FrameworkSessionReset", "FrameworkCheckpointRestore" };
-        Require(play.Select(t => t.Name).OrderBy(x => x).SequenceEqual(expectedPlay.OrderBy(x => x)), "Play actual compiled patch set changed");
-        Require(!patches.Any(t => PluginPatchSelection.Includes(RuntimeMode.Off, t.Namespace)), "Off enables actual patches");
-        Require(patches.All(t => PluginPatchSelection.Includes(RuntimeMode.Authoring, t.Namespace)), "Authoring omitted existing patches");
-        foreach (string diagnostic in new[] { "FactoryStart", "GenerationJob", "DamageSample", "WeaponSample" })
-            Require(patches.Any(t => t.Name == diagnostic) && !play.Any(t => t.Name == diagnostic), "Play enabled diagnostic " + diagnostic);
+        string[] expectedHost = { "FrameworkStateChanged", "FrameworkWorldCleanup", "FrameworkSessionReset", "FrameworkCheckpointRestore" };
+        // Diagnostics live in the optional Development plugin; every host detour is a framework world binding.
+        Require(patches.All(t => t.Namespace == "ForgeRuntime.GameBindings")
+            && patches.Select(t => t.Name).OrderBy(x => x).SequenceEqual(expectedHost.OrderBy(x => x)), "Host actual compiled patch set changed");
         var load = forgeTypes.Single(t => t.FullName == "ForgeRuntime.Plugin").Methods.Single(m => m.Name == "Load");
-        Require(load.Body.Instructions.Any(i => i.Operand is MethodReference method && method.DeclaringType.Name == "PluginPatchSelection" && method.Name == "Types"), "Plugin bypasses tested patch selection");
-        Require(!load.Body.Instructions.Any(i => i.Operand is MethodReference method && method.Name == "PatchAll"), "Plugin still patches all authoring hooks");
-        foreach (var type in play)
+        Require(load.Body.Instructions.Any(i => i.Operand is MethodReference method && method.DeclaringType.FullName == "HarmonyLib.Harmony" && method.Name == "PatchAll"), "Plugin does not install its own host patch set");
+        foreach (var type in patches)
         {
             var attribute = type.CustomAttributes.Single(Patch);
             var targetType = attribute.ConstructorArguments.Select(a => a.Value).OfType<TypeReference>().Single();
@@ -91,7 +87,7 @@ internal static class NativeEvidence
         Require(send.Any(l => l.Contains("call 0000000181633510h")) && send.Any(l => l.EndsWith("call rax")), "Native packet send and local receive path absent");
         Require(receive.Any(l => l.Contains("call 0000000181BB5AE0h")) && receive.Any(l => l.Contains("movss dword ptr [rbx+20h],xmm0")), "Enemy health readback is not native decoded assignment");
         Console.WriteLine("NATIVE SIGNATURE/PATCH GROUP/HASH CHECKED; not executed in GTFO. GameAssembly SHA256 " + hash);
-        Console.WriteLine("Play patches: " + string.Join(", ", play.Select(t => t.Name)));
+        Console.WriteLine("Host patches: " + string.Join(", ", patches.Select(t => t.Name)));
         return checks;
     }
 }

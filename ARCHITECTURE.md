@@ -8,7 +8,7 @@
 
 ## 1. 当前构建状态
 
-`dotnet build Forge.Architecture.sln -c Release` 通过，0 警告 0 错误。**完整 GTFO 宿主 `ForgeRuntime/ForgeRuntime.csproj` 现在也通过，0 警告 0 错误**；旧文档反复出现的「10 个既有诊断错误」已由 D1 与 R1 修复，`RuntimeDiagnostics.cs` 现在调用带 epoch 的 `ProjectChecks.Load(_report, epoch, tick)`，`WorldInspection.cs` 不再引用退役的 `Observe` / `CompleteExpectations`。独立的 `ForgeEnemy/Native/ForgeEnemy.Native.csproj` 插件工程同样构建通过。
+`dotnet build Forge.Architecture.sln -c Release` 通过，0 警告 0 错误。**完整 GTFO 宿主 `ForgeRuntime/ForgeRuntime.csproj` 现在也通过，0 警告 0 错误**；旧文档反复出现的「10 个既有诊断错误」已由 D1 与 R1 修复，`RuntimeDiagnostics.cs` 现在调用带 epoch 的 `ProjectChecks.Load(_report, epoch, tick)`，`WorldInspection.cs` 不再引用退役的 `Observe` / `CompleteExpectations`。独立的 `ForgeEnemy/Native/ForgeEnemy.Native.csproj` 与 D2 新建的 `ForgeDevelopment/Native/ForgeDevelopment.Native.csproj` 插件工程同样构建通过，0 警告 0 错误。
 
 宿主与 GameBindings 构建需要 `GTFO_BEPINEX_PATH` 或 `-p:GTFOBepInExPath=<BepInEx 目录>` 指向合法的本地编译引用；命令不安装模组。当前使用 .NET SDK 10.0.400 编译仓库的 net6.0 目标，Trigger 的测试工程保留 3 条 NETSDK1138 目标框架生命周期提示，未更改目标框架。
 
@@ -28,12 +28,13 @@
 | --- | --- | --- |
 | Architecture | 36 | 编译后真实 DLL 的边界检查 |
 | Framework | 253 | **已包含** timing/state 116 与 execution-result 49，不再另加 |
-| HostIntegration / LifecycleWork | 50 / 57 | 编译后 SDK + 实际宿主元数据 |
-| GameBindings：fixtures / bridge / native metadata | 60 / 57 / 58 | 三种模式共享基础断言。58 是 E1 切换后的数字；切换前记录为 62（宿主当时编译 7 个 Hook）。**待重跑确认** |
-| Reports / ProjectChecks / DevelopmentInspection | 99 / 202 / 47 | 诊断侧回归 |
+| HostIntegration / LifecycleWork | 53 / 57 | 编译后 SDK + 实际宿主元数据；53 是 D2 后 `--host` 的数字，新增宿主不含诊断的检查 |
+| GameBindings：fixtures / bridge / native metadata | 60 / 57 / 51 | 三种模式共享基础断言。51 是 D2 后的 native 数字（模式分派检查换成宿主只有 4 个 Framework Hook）；60 与 57 是 D2 之前的记录。**fixtures 模式当前失败**于 `Unsupported plan version`：网站未提交的 F0 fixture 已把 schemaVersion 改为 2，SDK 仍只接受 1，随 F0 定稿处理 |
+| Reports / ProjectChecks / DevelopmentInspection | 99 / 202 / 47 | 诊断侧回归，D2 后位于 `ForgeDevelopment/tests/` |
 | SceneInventory / Telemetry / Samples | 8 / 56 / 7 | 诊断侧回归 |
 | Shutdown / ReportSnapshots | 31 / 100 | ReportSnapshots 的 100 含保留的原 37 项 |
-| PluginStartup / HostConfiguration | 42 / 70 | 宿主启动编排与真实 BepInEx 配置文件 |
+| 宿主 PluginStartup / HostConfiguration | 35 / 66 | 宿主启动编排与真实 BepInEx 配置文件；D2 移除诊断用例后的数字 |
+| Development：PluginStartup / NativeLayout | 54 / 23 | 插件入口编排替身测试；编译后宿主与插件元数据及 10 个 Hook 的 interop 解析 |
 | Enemy：receiver / 实体观察 / 插件 / LifecycleFacts | 40 / 66 / 24 / 52 | LifecycleFacts 的 52 覆盖死亡流程与肢体破坏 |
 | Enemy：CommitAudit 现行路径 / NativeLayout / 原生静态审计 | 32 / 38 / 112 | 静态审计对应 99 个精确签名 |
 | Map：MapIdentity / MapContracts | 126 / 33 | 托管身份实现与 SDK 消费方 |
@@ -41,7 +42,7 @@
 | Weapon：元数据 / 核验工具 | 312 / 24 | metadata-only 证据等级 |
 | Trigger：纯计算与集合 / R3 与空间与筛选 / Acceptance | 1613 / 1529 / 2082 | 三者存在重叠；Acceptance 含可变端口与权重 |
 | Trigger：T1 跨语言 | TypeScript 125 + C# 75 | 27 个共享计划 |
-| Python（ForgeRuntime/tests） | 41 中 40 通过 | `test_import_log` 的跨端 reader 用例仍硬编码网站已改名的 `site/map-balance-report.js`，实际文件为 `.ts` |
+| Python（ForgeDevelopment/tests） | 41/41 | 跨端 reader 用例已指向网站现行的 `site/map-balance-report.ts` |
 
 **Trigger 的默认完整入口仍然失败。** `python ForgeTrigger/tools/validate-trigger.py --mutations` 最后一次退出码为 1：pure 与 r3 通过，t1 失败于旧作者元数据入口要求共享 heal 定义也带 `authoring-contract-only` 标记。这是 C 批未关闭的直接门槛，不能用 `--r3-only` 专项通过覆盖。
 
@@ -53,7 +54,7 @@
 
 **A 批（计划与骨架）已完成。** 公共 SDK 独立编译、五个模块工程、架构验收入口与六份实施计划都已存在。
 
-**B 批（真实包边界）基本收口但未关闭。** Runtime 的 R1 编译基线、R2a 公开生命周期、R2b-1 宿主配置与启动隔离已交付；Development 的 D1 诊断接线与入队快照修复已交付；Enemy 的 E1 源码/程序集切换已完成——唯一接收器在 `ForgeEnemy/Native/EnemyModule.cs`，Runtime 不再创建 Enemy provider，`ForgeEnemy/Native/Plugin.cs` 是带 `[BepInPlugin("NAinfini.ForgeEnemy")]` 和 `[BepInDependency("NAinfini.ForgeRuntime","1.2.0")]` 的真实插件。**唯一未做的是 D2**：15 个诊断源、21 个测试/脚本与 5 个共享切换文件仍留在 `ForgeRuntime/`，独立 Development 插件入口尚未建立。
+**B 批（真实包边界）基本收口但未关闭。** Runtime 的 R1 编译基线、R2a 公开生命周期、R2b-1 宿主配置与启动隔离已交付；Development 的 D1 诊断接线与入队快照修复已交付；Enemy 的 E1 源码/程序集切换已完成——唯一接收器在 `ForgeEnemy/Native/EnemyModule.cs`，Runtime 不再创建 Enemy provider，`ForgeEnemy/Native/Plugin.cs` 是带 `[BepInPlugin("NAinfini.ForgeEnemy")]` 和 `[BepInDependency("NAinfini.ForgeRuntime","1.2.0")]` 的真实插件。Development 的 D2 切换也已完成到实现与本地验证等级：16 个诊断源、全部诊断测试与 Python 工具迁到 `ForgeDevelopment/`，`ForgeDevelopment/Native/Plugin.cs` 是只在 Runtime `Authoring` 模式下启动的独立插件，宿主不再含诊断。**B 批尚未关闭的是游戏内证据**：Enemy 与 Development 插件都没有在 GTFO 中实际加载过，Development 的三种加载模式未核验。
 
 **C 批（共享合同）进行中。** R3a 的实体观察登记、注销清理与只读保护已在共享 SDK 实际接通；R4a 的可变端口元数据校验与精确 revision 解析已落地，v1 计划加载器明确拒绝可变端口执行。R3、R4 整体未关闭，T1 门槛未过，T2–T7 未完成。
 
@@ -68,6 +69,8 @@ flowchart TD
   Host[ForgeRuntime / GTFO 宿主] --> SDK[ForgeRuntime.Framework / 公共 SDK]
   EnemyNative[ForgeEnemy.Native / BepInEx 插件] --> Host
   EnemyNative --> SDK
+  DevNative[ForgeDevelopment.Native / 可选 BepInEx 插件] --> Host
+  DevNative --> SDK
   Development[ForgeDevelopment] --> SDK
   Trigger[ForgeTrigger] --> SDK
   Map[ForgeMap] --> SDK
@@ -81,14 +84,15 @@ flowchart TD
 | 工程 | 当前内容 | 所有权 |
 | --- | --- | --- |
 | `ForgeRuntime/Framework/ForgeRuntime.Framework.csproj` | 唯一公共 SDK：注册、严格计划、周期/数值 lease、结果合同、实体观察、可变端口元数据 | Runtime |
-| `ForgeRuntime/ForgeRuntime.csproj` | GTFO 宿主：模拟时钟、世界/会话桥、启动配置、模块宿主，**外加尚未迁出的全部诊断源码** | Runtime，诊断部分待 D2 移交 |
-| `ForgeRuntime/GameBindings/` | 只剩 4 个文件：`FrameworkFiles.cs`、`GameRuntimeBridge.cs`、`NativeHooks.cs`、`PluginPatchSelection.cs` | Runtime |
+| `ForgeRuntime/ForgeRuntime.csproj` | GTFO 宿主：模拟时钟、世界/会话桥、启动配置、模块宿主；不含诊断 | Runtime |
+| `ForgeRuntime/GameBindings/` | 只剩 3 个文件：`FrameworkFiles.cs`、`GameRuntimeBridge.cs`、`NativeHooks.cs`（`PluginPatchSelection.cs` 已在 D2 删除） | Runtime |
 | `ForgeEnemy/Native/ForgeEnemy.Native.csproj` | 真实 BepInEx 插件与唯一 Enemy 接收器、5 个 Hook、原生观察器 | Enemy |
 | `ForgeEnemy/ForgeEnemy.csproj` | 托管辅助工程（`Receivers/`、包身份常量），**不是玩家发行包** | Enemy |
 | `ForgeMap/ForgeMap.csproj` | 空 provider + 内部身份表/创建票据/生命周期会话 | Map |
 | `ForgeWeapon/ForgeWeapon.csproj` | 空 provider + 装备身份索引/会话/进程内票据 | Weapon |
 | `ForgeTrigger/ForgeTrigger.csproj` | 空 provider + `Pure/` 纯计算与集合、`Targeting/` 目标与筛选 | Trigger |
-| `ForgeDevelopment/ForgeDevelopment.csproj` | 空 provider，无诊断源码 | Development |
+| `ForgeDevelopment/Native/ForgeDevelopment.Native.csproj` | 可选 BepInEx 插件：全部诊断、报告、性能采集与 10 个诊断 Hook，只在 `Authoring` 下启动 | Development |
+| `ForgeDevelopment/ForgeDevelopment.csproj` | SDK-only 空 provider，排除 `Native/**` | Development |
 
 `Forge.Architecture.sln` 覆盖公共 SDK、五个模块和架构验收程序，特意不代替宿主的完整构建。所有项目沿用 `net6.0`，没有新增 NuGet 包、DI 容器、第二套事件总线或状态机框架。
 
@@ -105,9 +109,9 @@ flowchart TD
 | Enemy | `forge.module.gtfo.enemy` | `1.0.0` | **5 个 binding，由 Native 插件注册** |
 | 共享 combat 合同 | `forge.contract.combat` | — | 5 个 canonical 定义，0 个 binding |
 
-`ForgeEnemy/ModuleDefinition.cs` 现在只保留包身份常量，`Create()` 方法已删除，因此不可能与 Native 的真实 provider 重复注册。这些是本仓库的代码身份，不是已核定的 Thunderstore 包 ID 或已发布依赖锁；只有 Runtime 的 `NAinfini.ForgeRuntime` 与 Enemy 的 `NAinfini.ForgeEnemy` 是已写入源码的 BepInEx GUID。
+`ForgeEnemy/ModuleDefinition.cs` 现在只保留包身份常量，`Create()` 方法已删除，因此不可能与 Native 的真实 provider 重复注册。这些是本仓库的代码身份，不是已核定的 Thunderstore 包 ID 或已发布依赖锁；只有 Runtime 的 `NAinfini.ForgeRuntime`、Enemy 的 `NAinfini.ForgeEnemy` 与 Development 的 `NAinfini.ForgeDevelopment` 是已写入源码的 BepInEx GUID。
 
-共享 `CombatContracts` 的 **5 个** canonical 定义是 `forge.trigger.combat.damage_applied`、`forge.action.combat.heal`、`forge.trigger.combat.health_changed`、`forge.trigger.enemy.death_started`、`forge.trigger.combat.limb_broken`。旧文档写「3 个」的地方是 E3 之前的历史数字。Enemy 相应持有 **5 个** binding 与 **5 个** Hook（Spawned / Despawned / Damage / DeathStarted / LimbBroken），Runtime 保留 **4 个**世界/会话/检查点 Hook。
+共享 `CombatContracts` 的 **5 个** canonical 定义是 `forge.trigger.combat.damage_applied`、`forge.action.combat.heal`、`forge.trigger.combat.health_changed`、`forge.trigger.enemy.death_started`、`forge.trigger.combat.limb_broken`。旧文档写「3 个」的地方是 E3 之前的历史数字。Enemy 相应持有 **5 个** binding 与 **5 个** Hook（Spawned / Despawned / Damage / DeathStarted / LimbBroken），Runtime 保留 **4 个**世界/会话/检查点 Hook，Development 插件另有 **10 个**诊断 Hook。
 
 ## 7. 按 v2.0 的 F 阶段重排的批次表
 
@@ -121,7 +125,7 @@ flowchart TD
 | **F5 Enemy 接入**（U-ENEMY） | 敌人身份、攻防、AI、技能、生成要求接到同一套 | `ForgeEnemy/**` | 三端出生协作完整场景通过 |
 | **F5/F9 Map 接入与模型 Adapter**（U-MAP-MOD） | 空间、任务、设备、玩家流程；**并把地图生成的底层逻辑收进 Forge Map**，运行期由 Forge Map 调用对方模组已加载的模型资源 | `ForgeMap/**` | 生成逻辑归位 + Adapter 调用链；至少三家不同作者的 Geo 包走同一条流程 |
 | **F5 Weapon 接入**（U-WEAPON-MOD） | 武器/工具/消耗品三模式接入同一套 | `ForgeWeapon/**` | 三模式各自完整场景通过 |
-| **F5 Development**（U-DEV-MOD） | D2 诊断源码从宿主迁出，独立可选插件 | `ForgeDevelopment/**` | 不装 Development 的普通玩家不启动任何采集 |
+| **F5 Development**（U-DEV-MOD） | D2 诊断源码从宿主迁出，独立可选插件（已实现并本地验证；游戏内三种加载模式待授权核验） | `ForgeDevelopment/**` | 不装 Development 的普通玩家不启动任何采集 |
 | **F8 词表补齐** | 词表从 244 补到 614；variable / state / event / session / authoring 与地基同级优先 | 各领域 | 全部原子有实现与绑定 |
 | **F10 发布收口** | 离线包 manifest、依赖闭包、唯一发行结构、替代路径清理 | Runtime + 各领域 | 从网站离线导出到独立测试 profile 的完整闭环 |
 | **全程 文档**（U-DOCS-MOD） | 本仓库全部 markdown | 全部 `.md` | 过时陈述清零、矛盾消除、失效引用修复 |

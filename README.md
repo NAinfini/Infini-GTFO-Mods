@@ -14,12 +14,12 @@ Forge 是给普通 GTFO 玩家的创作工具。玩家在网站上自由组装�
 
 | 目录 | 职责 | 当前状态 |
 | --- | --- | --- |
-| [ForgeRuntime](ForgeRuntime/README.md) | 公共 SDK、唯一调度、状态、结果、预算、**网络层与社区修复** | 宿主与 SDK 已构建通过；诊断源码待 D2 迁出；网络层未开工 |
+| [ForgeRuntime](ForgeRuntime/README.md) | 公共 SDK、唯一调度、状态、结果、预算、**网络层与社区修复** | 宿主与 SDK 已构建通过，宿主不含诊断；网络层未开工 |
 | [ForgeTrigger](ForgeTrigger/README.md) | 跨域逻辑节点，覆盖全部领域的横切基座 | 纯计算、集合、目标筛选、空间与可变端口/权重底层已实现；空 provider，无可执行 binding |
 | [ForgeMap](ForgeMap/README.md) | 空间、任务、设备、遭遇、玩家流程，**并持有地图生成的底层逻辑** | 内部身份表与生命周期已在生产程序集；空 provider，无对外 resolver |
 | [ForgeWeapon](ForgeWeapon/README.md) | 武器、工具、消耗品 | 装备身份托管实现已交付；空 provider，无游戏 binding |
 | [ForgeEnemy](ForgeEnemy/README.md) | 敌人身份、接收器、AI、技能、生成要求 | **唯一有真实 BepInEx 插件与 5 个 binding 的模块**，全部 implementation-only |
-| [ForgeDevelopment](ForgeDevelopment/README.md) | 可选作者诊断、性能采样、报告 | 空骨架；诊断源码仍在 ForgeRuntime 内 |
+| [ForgeDevelopment](ForgeDevelopment/README.md) | 可选作者诊断、性能采样、报告 | D2 已切换为只在 Authoring 下启动的独立 BepInEx 插件，未做游戏加载验收 |
 | [InfiniTweaks](InfiniTweaks/README.md) | 独立 Quality of Life 模组 | 已有完整工程，不属于 Forge 实施范围 |
 
 每个模组固定三份常驻文档：`README.md` 说明当前能力与边界，`IMPLEMENTATION-PLAN.md` 说明未完成的批次，`VALIDATION.md` 记录当前验证结果并带「上次更新」戳。一次性交接记录不再保留，历史从 Git 查阅。
