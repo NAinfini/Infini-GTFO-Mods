@@ -44,6 +44,8 @@ R3_MUTATIONS += [('filter-reversed-relation', 'Targeting/ObservedRecipientFilter
 
 R3_MUTATIONS.append(('filter-normalizes-receiver', 'Targeting/RecipientFilterPolicy.cs', 'copy[i] = TextValue(values[i]);', 'copy[i] = Text(RuntimeJson.From(values[i]));'))
 
+R3_MUTATIONS += [('capsule-exclusive', 'Targeting/ObservedSpatialNodes.cs', 'point[2])) <= radius,', 'point[2])) < radius,'), ('box-shallow', 'Targeting/ObservedSpatialNodes.cs', 'Delta(row.Position[1], point[1]) <= height / 2d && Delta(row.Position[2], point[2]) <= radius', 'Delta(row.Position[1], point[1]) <= radius && Delta(row.Position[2], point[2]) <= radius')]
+
 def sources(site: Path) -> list[Path]:
     paths = [ROOT/'ModuleDefinition.cs', ROOT/'ForgeTrigger.csproj']
     for directory in ['Pure','Targeting','tests/Pure','tests/R3Consumers','tests/Contracts','tests/Acceptance','tools']:

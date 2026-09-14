@@ -4,6 +4,19 @@
 
 计划与状态见两仓统一框架第 6 节 U-TRIGGER（链接见[仓库 README](../README.md)）；本文只记带日期的运行记录。
 
+## 空间 capsule/box 实现（2026-09-14）
+
+`ObservedVolumeShape` 增加 `Capsule`、`Box`。`Overlap` 仍是一次形状分派：sphere `Distance ≤ radius`、cylinder `Horizontal ≤ radius && |Δy| ≤ height/2`、capsule 照网站 `logic-evaluator.ts:89` 的 `half = max(height/2 − radius, 0)`、`dy = max(|Δy| − half, 0)`、`hypot(Δx, dy, Δz) ≤ radius`，box 照同一文件 `:90-91` 的“extents 是世界轴半尺寸”逐轴 `|Δ| ≤ 半尺寸`。四种形状都是闭判定（边界点算命中，无额外容差），半径与高度仍在任何原生观察之前由共用的 `Bounds` 拒绝（`spatial-parameter`）。`SpatialTests.cs` 把生成器的 `cases`（117 行）与 `unimplemented` recorded 行（capsule/box 2 行）合并成 119 行全部消费，删除了“未实现形状只列不算”的跳过分支，并新增 `VolumeShapes`：覆盖网站向量没有的样本（`[0,3.5,0]` 在球外但在 capsule 内、`height ≤ 2·radius` 的退化、box 角点与其外 0.001）与 capsule/box 的非正半径、负高度、NaN 高度拒绝。注意 capsule 那一组向量与同参数 sphere 组结果完全相同，生成器本身区分不出“capsule 当成球”，这条由 `[0,3.5,0]` 断言补上。
+
+`R3_MUTATIONS` 新增两种错误实现：`capsule-exclusive`（capsule 半径判定改成 `<`）与 `box-shallow`（box 纵向半尺寸改成 `radius`）。
+
+复跑（网站工作树含并行任务的未提交改动）：
+
+| 命令 | 结果 |
+| --- | --- |
+| `python ForgeTrigger/tools/validate-trigger.py --r3-only` | 退出 0；spatial 360 项、117 cases + 2 recorded；recipient-filter 628 项；R3 `passed`，1858 项（原 1836） |
+| `python ForgeTrigger/tools/validate-trigger.py --r3-only --mutations` | 16 种错误实现全部检出：`capsule-exclusive` 失败于 case 117 与“短轴 capsule 退化为球”，`box-shallow` 失败于 case 118 与“box 半尺寸逐轴闭判定”；整体退出 1，唯一原因是结尾的源哈希复核报 `Consumed source changed during full validation`——运行期间并行任务在改网站 `site/forge/*.ts`（该入口的被消费源之一），不是检出失败。需在网站工作树静止时复跑一次才能得到退出 0 的记录 |
+
 ## D-017 R4-a：`compare` 注册为 evaluate 绑定（2026-09-14）
 
 `ModuleDefinition.Create()` 不再是空 provider。它注册能力 `forge.condition.predicate.compare`（逐字取目录行），以及 binding `forge.module.trigger.binding.compare`（`role: evaluate`，handler `trigger.condition.compare`）。evaluator 调用既有的 `PureConditions.Compare`，`compare_operator` 按成员下标对应 `ScalarComparison`。宿主 `ForgeRuntime.csproj` 链接本模块源码并注册它，`--export-manifest` 因此带出该 provider、能力与 binding。
@@ -43,7 +56,7 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 | 集合跨端样例 | 272 组 814 项 | 覆盖八项 2.0.0 定义与 `empty` 策略 |
 | R3 角色 / 空间 / 筛选 | 1836 项 | 含空间与筛选跨端消费 |
 | 筛选跨端样例 | 164 组 628 项 | 151 值正例 + 13 预期拒绝 |
-| 空间跨端样例 | 117 组 360 项 | C# 消费 sphere/cylinder、nearest/farthest（anchor）、chain；capsule/box 2 组列为 C# 未实现，不计通过 |
+| 空间跨端样例 | 117 组 360 项 + capsule/box 2 组 recorded 行（R3 1858 项，2026-09-14 复跑） | C# 消费 sphere/cylinder/capsule/box、nearest/farthest（anchor）、chain；capsule/box 两组由网站 recorded 行改为真实断言，不再列为 C# 未实现 |
 | T1 跨语言 | TypeScript 361、C# 911 | 34 组 wire 样例 |
 | T1 目录审计 | 424 基础节点；62 个 typed 作者定义 | D-004 共享：heal@2.0.0 与 4 个战斗/死亡 trigger 逐字段对照目录行 |
 | Acceptance（可变端口与权重） | 2557 项断言 | 61 组可变端口样例、300 组权重样例 |

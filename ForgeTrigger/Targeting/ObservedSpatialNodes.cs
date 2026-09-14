@@ -6,7 +6,7 @@ using ForgeTrigger.Pure;
 
 namespace ForgeTrigger.Targeting;
 
-public enum ObservedVolumeShape { Sphere, Cylinder }
+public enum ObservedVolumeShape { Sphere, Cylinder, Capsule, Box }
 
 /// <summary>Current point-position selection via the public R3 query. No discovery, LOS or collision certificate.</summary>
 public static class ObservedSpatialNodes
@@ -16,15 +16,23 @@ public static class ObservedSpatialNodes
         ObservedVolumeShape shape, double radius, double height, bool candidatesComplete)
     {
         var point = Point(center); Bounds(radius, 0.000001, 1000); Bounds(height, 0.000001, 2000);
-        if (shape is not (ObservedVolumeShape.Sphere or ObservedVolumeShape.Cylinder))
-            throw new RuntimeContractException("spatial-shape", "Only point sphere/cylinder selection is implemented.");
+        if (shape is not (ObservedVolumeShape.Sphere or ObservedVolumeShape.Cylinder
+            or ObservedVolumeShape.Capsule or ObservedVolumeShape.Box))
+            throw new RuntimeContractException("spatial-shape", "Only point sphere/cylinder/capsule/box selection is implemented.");
         if (!candidatesComplete)
             throw new RuntimeContractException("spatial-candidates-incomplete", "An incomplete candidate set cannot establish all-target coverage.");
         var snapshots = Observe(runtime, candidates);
-        return Array.AsReadOnly(snapshots.Where(row => shape == ObservedVolumeShape.Sphere
-            ? Distance(row.Position, point) <= radius
-            : Horizontal(row.Position, point) <= radius && Delta(row.Position[1], point[1]) <= height / 2d)
-            .OrderBy(row => ReferenceCollections.OrderKey(row.Ref), StringComparer.Ordinal).Select(row => row.Ref).ToArray());
+        // Every shape is world-axis aligned and closed: a position exactly on the boundary is inside.
+        return Array.AsReadOnly(snapshots.Where(row => shape switch
+        {
+            ObservedVolumeShape.Sphere => Distance(row.Position, point) <= radius,
+            ObservedVolumeShape.Cylinder => Horizontal(row.Position, point) <= radius && Delta(row.Position[1], point[1]) <= height / 2d,
+            // Capsule: a `height`-long segment along Y with `radius` hemispheres, so an axis shorter than the diameter degenerates to the sphere.
+            ObservedVolumeShape.Capsule => Magnitude(Delta(row.Position[0], point[0]),
+                Math.Max(Delta(row.Position[1], point[1]) - Math.Max(height / 2d - radius, 0), 0), Delta(row.Position[2], point[2])) <= radius,
+            // Box: the remaining defined shape, with world-axis half sizes radius/height/radius, the `extents` the website reads.
+            _ => Delta(row.Position[0], point[0]) <= radius && Delta(row.Position[1], point[1]) <= height / 2d && Delta(row.Position[2], point[2]) <= radius
+        }).OrderBy(row => ReferenceCollections.OrderKey(row.Ref), StringComparer.Ordinal).Select(row => row.Ref).ToArray());
     }
     public static ReferenceSelection Nearest(RuntimeKernel runtime, IReadOnlyList<EntityReference> candidates,
         IReadOnlyList<double> center, int count) => OrderedDistance(runtime, candidates, center, count, false);
