@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ForgeRuntime.Framework;
@@ -5,6 +6,21 @@ namespace ForgeRuntime.Framework;
 /// <summary>I-DIAG level. Ordered so an enabled check is one integer comparison; host cfg can only choose Off, Error or Info,
 /// Trace exists only after <see cref="RuntimeKernel.ElevateLogging"/>.</summary>
 public enum RuntimeLogLevel { Off = 0, Error = 1, Info = 2, Trace = 3 }
+
+/// <summary>The one player-tier `Logging.Level` vocabulary, shared by the Runtime cfg and every package cfg: `off`, `error`
+/// or `info`, case and surrounding whitespace insensitive. The SDK reads no cfg of its own; a package plugin reads its own
+/// entry and parses the raw text here, so every package accepts the same values and rejects a malformed one with the same
+/// message. `trace` is deliberately absent: only elevation reaches it.</summary>
+public static class RuntimeLogConfiguration
+{
+    public static RuntimeLogLevel ParseLevel(string value) => value.Trim().ToLowerInvariant() switch
+    {
+        "off" => RuntimeLogLevel.Off,
+        "error" => RuntimeLogLevel.Error,
+        "info" => RuntimeLogLevel.Info,
+        _ => throw new InvalidOperationException("Unsupported Forge Logging.Level; use off, error or info. Native startup was not attempted.")
+    };
+}
 
 /// <summary>Rate-limit tier the writer applies; Elevated is irreversible for the session.</summary>
 public enum RuntimeLogTier { Player, Elevated }

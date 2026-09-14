@@ -14,8 +14,8 @@ internal sealed class Scene : IDisposable
     internal Scene(bool observe = true, bool start = true)
     {
         Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
-        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
-        Module = new(Kernel, () => Allowed, _ => { }, observe ? (actor, reference) => Reader(actor, reference) : null);
+        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Module = new(Kernel, RuntimeLogLevel.Off, () => Allowed, _ => { }, observe ? (actor, reference) => Reader(actor, reference) : null);
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);
         if (start) Kernel.StartRuntime(() => { });
     }

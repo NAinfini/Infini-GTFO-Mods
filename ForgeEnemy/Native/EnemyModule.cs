@@ -51,7 +51,7 @@ internal sealed partial class EnemyModule : IDisposable
     private bool _disposed;
     internal bool IsRegistered => !_disposed && _registration.IsRegistered;
 
-    internal EnemyModule(RuntimeKernel kernel, Func<bool> canExecute, Action<string> report,
+    internal EnemyModule(RuntimeKernel kernel, RuntimeLogLevel logLevel, Func<bool> canExecute, Action<string> report,
         Func<EnemyAgent, EntityReference, RuntimeEntitySnapshot?>? observe = null)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
@@ -70,7 +70,7 @@ internal sealed partial class EnemyModule : IDisposable
         {
             EntityObservers = observe == null ? null : new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
                 { ["gtfo.enemy"] = ObserveEntity }
-        });
+        }, logLevel);
         try
         {
             _lifecycle = _registration.ObserveLifecycle(value =>

@@ -20,7 +20,7 @@ internal sealed class MapPluginSession : IDisposable
     private MapPluginSession(RuntimeKernel kernel, Action<string> report, Action removeHooks)
     { _kernel = kernel; _report = report; _removeHooks = removeHooks; }
 
-    internal static MapPluginSession Start(RuntimeKernel kernel, Action<string> report, Action<string> log,
+    internal static MapPluginSession Start(RuntimeKernel kernel, RuntimeLogLevel logLevel, Action<string> report, Action<string> log,
         Action installHooks, Action removeHooks)
     {
         ArgumentNullException.ThrowIfNull(kernel); ArgumentNullException.ThrowIfNull(report);
@@ -33,7 +33,7 @@ internal sealed class MapPluginSession : IDisposable
         try
         {
             // Duplicate provider or entity namespace throws atomically before any Harmony patch is attempted.
-            session.Module = new PlayerIdentityModule(kernel, () => !session._faulted, log, report);
+            session.Module = new PlayerIdentityModule(kernel, logLevel, () => !session._faulted, log, report);
             hooksAttempted = true; installHooks();
             return session;
         }

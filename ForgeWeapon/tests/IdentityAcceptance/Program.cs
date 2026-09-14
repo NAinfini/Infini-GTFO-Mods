@@ -265,7 +265,7 @@ sealed class Fixture : IDisposable
     public Fixture(bool host = true, bool start = true, int maxActive = 1024, int maxHistory = 8192)
     {
         Kernel.BeginWorld(7);
-        Session = new EquipmentIdentitySession(Kernel,
+        Session = new EquipmentIdentitySession(Kernel, RuntimeLogLevel.Off,
             e => { NativeCalls++; return NativeHook?.Invoke(e) ?? NativeAlive; },
             e => { OwnerCalls++; return OwnerHook?.Invoke(e) ?? OwnerAlive; }, maxActive, maxHistory);
         if (start) Start(host);

@@ -19,11 +19,11 @@ internal sealed class AuditScene
     internal AuditScene(bool subscribe = false)
     {
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
-        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
-        Module = new EnemyModule(Kernel, () => Allowed, Messages.Add);
+        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Module = new EnemyModule(Kernel, RuntimeLogLevel.Off, () => Allowed, Messages.Add);
         Actor = CreateEnemy(); Reference = Module.TrackSpawn(Actor);
         if (!subscribe) return;
-        Kernel.RegisterModule(LocalPlan.Recorder(Records.Add));
+        Kernel.RegisterModule(LocalPlan.Recorder(Records.Add), RuntimeLogLevel.Off);
         LocalPlan.Load(Kernel, LocalPlan.Build(Kernel, "test.audit.damage", EnemyModule.DamageBinding, LocalPlan.RecordBinding, ("target", "target")));
     }
     internal static EnemyAgent CreateEnemy(long pointer = 10, ushort globalId = 7)

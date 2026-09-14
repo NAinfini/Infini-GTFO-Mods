@@ -186,10 +186,28 @@ Case("provider level gates and fixed rejection codes", () => {
         Check(sink.Records.Count == (int)configured && sink.Levels.All(l => l.Tier == RuntimeLogTier.Player
             && l.Providers.SequenceEqual(new[] { new RuntimeLogProviderLevel(Runtime, configured) })), "sink received wrong records or level table");
         RejectCode("log-provider-unregistered", () => kernel.LogGate("test.domain"), "unregistered provider received a level");
-        kernel.RegisterModule(Module("test.domain"));
-        RejectCode("log-provider-unregistered", () => kernel.LogGate("test.domain"), "registered domain provider received a default level");
         RejectCode("log-provider-unregistered", () => kernel.WriteLog(Record(RuntimeLogLevel.Error, "gate", 1) with { Provider = "test.domain" }),
             "domain record passed without a level entry");
+        RejectCode("log-level", () => kernel.RegisterModule(Module("test.trace"), RuntimeLogLevel.Trace), "trace accepted as a registration level");
+        RejectCode("log-provider-unregistered", () => kernel.LogGate("test.trace"), "rejected registration left a level entry");
+        // D-007: the level arrives with the registration, and one package registering several providers passes the same one to each.
+        var domain = kernel.RegisterModule(Module("test.domain"), RuntimeLogLevel.Info);
+        using var second = kernel.RegisterModule(Module("test.domain.second"), RuntimeLogLevel.Info);
+        Check(kernel.LogGate("test.domain").Level == RuntimeLogLevel.Info && kernel.LogGate("test.domain.second").Level == RuntimeLogLevel.Info,
+            "a registered provider did not receive the level it was handed");
+        kernel.WriteLog(Record(RuntimeLogLevel.Info, "gate", 1) with { Provider = "test.domain" });
+        Check(sink.Records.Count == (int)configured + 1 && sink.Records[^1].Provider == "test.domain", "registered domain record did not reach the sink");
+        Check(sink.Levels[^1].Providers.SequenceEqual(new[] {
+            new RuntimeLogProviderLevel(Runtime, configured), new RuntimeLogProviderLevel("test.domain", RuntimeLogLevel.Info),
+            new RuntimeLogProviderLevel("test.domain.second", RuntimeLogLevel.Info) }), "registration did not republish the level table");
+        domain.Dispose();
+        RejectCode("log-provider-unregistered", () => kernel.LogGate("test.domain"), "unregistered provider kept its level");
+        RejectCode("log-provider-unregistered", () => kernel.WriteLog(Record(RuntimeLogLevel.Error, "gate", 1) with { Provider = "test.domain" }),
+            "domain record passed after unregistration");
+        // The Runtime's own entry belongs to the host constructor: a module claiming that provider id can neither replace nor drop it.
+        using (var reserved = kernel.RegisterModule(Module(Runtime), RuntimeLogLevel.Info))
+            Check(kernel.LogGate(Runtime).Level == configured, "a module replaced the Runtime's own level");
+        Check(kernel.LogGate(Runtime).Level == configured, "unregistering a module dropped the Runtime's own level");
     }
     var checkedSink = new CaptureSink(); var validating = Kernel(checkedSink, RuntimeLogLevel.Info);
     var plan = new RuntimeLogPlan { PlanId = "plan", ResourceId = "resource", ResourceRevision = "1" };
@@ -206,6 +224,8 @@ Case("provider level gates and fixed rejection codes", () => {
     RejectCode("log-unconfigured", () => unconfigured.WriteLog(Record(RuntimeLogLevel.Error, "x", 1)), "kernel without sink wrote");
     RejectCode("log-unconfigured", unconfigured.ElevateLogging, "kernel without sink elevated");
     RejectCode("log-provider-unregistered", () => unconfigured.LogGate(Runtime), "kernel without sink has a level table");
+    using var tableless = unconfigured.RegisterModule(Module("test.domain"), RuntimeLogLevel.Info);
+    RejectCode("log-provider-unregistered", () => unconfigured.LogGate("test.domain"), "kernel without sink published a level entry");
 });
 
 Case("elevation is once, registration-only and irreversible", () => {

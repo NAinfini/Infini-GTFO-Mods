@@ -20,8 +20,8 @@ var blocked = new List<(string Id, string Reason)>();
 RuntimeKernel Kernel()
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
-    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module()); kernel.RegisterModule(ControlContracts.Module());
-    kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create()); return kernel;
+    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off); kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
+    kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off); return kernel;
 }
 EnemyAgent Enemy(ushort id = 7, long pointer = 10)
 {
@@ -109,7 +109,7 @@ Check(attempts == 2 && successfulStartup.StartupState == RuntimeStartupState.Rea
 
 var kernel = Kernel(); bool allowed = true;
 var messages = new List<string>();
-var module = new EnemyModule(kernel, () => allowed, messages.Add);
+var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => allowed, messages.Add);
 var enemy = Enemy(); var reference = module.TrackSpawn(enemy);
 var result = Heal(module, reference);
 Check(result.Status == "succeeded" && enemy.Damage.Health == 55 && enemy.Damage.Sends == 1, "explicit target +5 HP");
@@ -291,7 +291,7 @@ bool TryJunction(string link, string target)
 
 if (args.Length >= 2 && args[0] == "--export-manifest")
 {
-    var exportKernel = Kernel(); _ = new EnemyModule(exportKernel, () => true, messages.Add);
+    var exportKernel = Kernel(); _ = new EnemyModule(exportKernel, RuntimeLogLevel.Off, () => true, messages.Add);
     File.WriteAllText(args[1], exportKernel.ExportManifest());
     Console.WriteLine("ACTUAL MODULE MANIFEST " + Path.GetFullPath(args[1]));
 }
@@ -313,8 +313,8 @@ if (args.Length >= 2 && args[0] == "--bridge")
     {
         bridgeEnemies?.Dispose();
         GameRuntimeBridge.Initialize(RuntimeLogLevel.Error);
-        bridgeEnemies = new EnemyModule(GameRuntimeBridge.Kernel!, () => GameRuntimeBridge.CanExecute, message => Plugin.PluginLog.LogWarning(message));
-        GameRuntimeBridge.Kernel!.RegisterModule(Recorder(context => { records.Add(context); onRecord?.Invoke(); }));
+        bridgeEnemies = new EnemyModule(GameRuntimeBridge.Kernel!, RuntimeLogLevel.Off, () => GameRuntimeBridge.CanExecute, message => Plugin.PluginLog.LogWarning(message));
+        GameRuntimeBridge.Kernel!.RegisterModule(Recorder(context => { records.Add(context); onRecord?.Invoke(); }), RuntimeLogLevel.Off);
     }
     // death_started is claimed once per life: every dispatch attempt spawns a fresh life, so a closed gate is what stops it.
     EntityReference? life = null;
@@ -338,7 +338,12 @@ if (args.Length >= 2 && args[0] == "--bridge")
         File.WriteAllText(manifestCollision, "blocks the manifest directory");
         InitializeBridge();
         var failedKernel = GameRuntimeBridge.Kernel!;
-        var failedOwner = failedKernel.RegisterModule(ProbeModule());
+        // D-007: the Runtime's own built-in providers ship no package cfg, so they carry the Runtime's cfg level.
+        using (var builtins = JsonDocument.Parse(failedKernel.ExportManifest()))
+            Check(builtins.RootElement.GetProperty("registry").GetProperty("providers").EnumerateArray()
+                .All(p => failedKernel.LogGate(p.GetProperty("id").GetString()!).Level == RuntimeLogLevel.Error),
+                "a Runtime built-in provider did not take the Runtime's own log level");
+        var failedOwner = failedKernel.RegisterModule(ProbeModule(), RuntimeLogLevel.Off);
         var failedStates = new List<RuntimeLifecycleEvent>();
         var failedSub = failedOwner.ObserveLifecycle(failedStates.Add);
         Check(failedKernel.IsRegistrationOpen && !GameRuntimeBridge.CanExecute, "initial registration window and phase gate");
@@ -360,7 +365,7 @@ if (args.Length >= 2 && args[0] == "--bridge")
         File.Delete(manifestCollision);
         InitializeBridge();
         var liveKernel = GameRuntimeBridge.Kernel!;
-        var liveOwner = liveKernel.RegisterModule(ProbeModule());
+        var liveOwner = liveKernel.RegisterModule(ProbeModule(), RuntimeLogLevel.Off);
         var liveStates = new List<RuntimeLifecycleEvent>();
         var liveSub = liveOwner.ObserveLifecycle(liveStates.Add);
         var badSub = liveOwner.ObserveLifecycle(e => { if (e.Kind == RuntimeLifecycleKind.StartupChanged) throw new InvalidOperationException("observer test failure"); }, false);
@@ -378,7 +383,7 @@ if (args.Length >= 2 && args[0] == "--bridge")
         Check(liveKernel.StartupState == RuntimeStartupState.Ready && GameRuntimeBridge.CanExecute, "bridge readiness/phase gate not connected");
         Check(!badSub.IsActive && liveSub.IsActive && liveKernel.LifecycleFaultCount == 1, "bad observer stopped healthy gameplay");
         Check(liveStates.Count(e => e.Kind == RuntimeLifecycleKind.StartupChanged && e.Current.StartupState == RuntimeStartupState.Ready) == 1, "ready notification repeated");
-        Reject(() => liveKernel.RegisterModule(ProbeModule()), "late module registration allowed by bridge");
+        Reject(() => liveKernel.RegisterModule(ProbeModule(), RuntimeLogLevel.Off), "late module registration allowed by bridge");
         int observerLogs = Plugin.PluginLog.Messages.Count(m => m.StartsWith("warning:Forge lifecycle observer removed:", StringComparison.Ordinal));
         Frame(); Frame();
         Check(Plugin.PluginLog.Messages.Count(m => m.StartsWith("warning:Forge lifecycle observer removed:", StringComparison.Ordinal)) == observerLogs && observerLogs == 1, "observer error repeats every frame");
@@ -430,7 +435,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
 {
     string root = Path.GetFullPath(args[1]);
     var cases = RuntimeJson.Parse(File.ReadAllText(Path.Combine(root, "cases.json")));
-    var live = Kernel(); var liveModule = new EnemyModule(live, () => true, messages.Add);
+    var live = Kernel(); var liveModule = new EnemyModule(live, RuntimeLogLevel.Off, () => true, messages.Add);
     // The website plans are compiled against the runtime's own manifest, and every invalid plan is a one-field edit of
     // a valid one. Pins older than this registry would make each invalid plan "fail" on binding-lock instead of its own
     // defect, so a stale fixture set is blocked as a whole rather than run.
@@ -480,7 +485,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
         foreach (var invalid in cases.GetProperty("invalidPlans").EnumerateArray())
         {
             string id = invalid.GetProperty("id").GetString()!;
-            var candidate = Kernel(); _ = new EnemyModule(candidate, () => true, messages.Add);
+            var candidate = Kernel(); _ = new EnemyModule(candidate, RuntimeLogLevel.Off, () => true, messages.Add);
             string bad = File.ReadAllText(Path.Combine(root, invalid.GetProperty("file").GetString()!));
             if (invalid.TryGetProperty("grantedPermissions", out _))
                 blocked.Add(("fixtures.invalid-plan-" + id, "I-PACK D-009 dropped LoadPlan's permissions override that this case exercises; " +

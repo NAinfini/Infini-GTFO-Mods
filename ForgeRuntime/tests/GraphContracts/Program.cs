@@ -10,7 +10,7 @@ foreach (var row in vectors.RootElement.GetProperty("registrations").EnumerateAr
         var kernel = Suite.Kernel(); var before = kernel.ExportManifest();
         if (row.GetProperty("accepted").GetBoolean())
         {
-            kernel.RegisterModule(Suite.Module(row.GetProperty("seed")));
+            kernel.RegisterModule(Suite.Module(row.GetProperty("seed")), RuntimeLogLevel.Off);
             using var manifest = JsonDocument.Parse(kernel.ExportManifest());
             Suite.Check(Suite.Equal(manifest.RootElement.GetProperty("registry").GetProperty("capabilities")[0],
                 row.GetProperty("seed").GetProperty("capabilities")[0]), "Metadata changed on registration.");
@@ -18,7 +18,7 @@ foreach (var row in vectors.RootElement.GetProperty("registrations").EnumerateAr
         }
         else
         {
-            Suite.Reject(() => kernel.RegisterModule(Suite.Module(row.GetProperty("seed"))));
+            Suite.Reject(() => kernel.RegisterModule(Suite.Module(row.GetProperty("seed")), RuntimeLogLevel.Off));
             Suite.Check(kernel.ExportManifest() == before, "Failed registration was not atomic.");
         }
     });

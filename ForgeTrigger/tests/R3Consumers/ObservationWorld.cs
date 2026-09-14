@@ -17,7 +17,7 @@ internal sealed class ObservationWorld : IDisposable
         var module = Definition("test.trigger.spatial",
             prefixes.ToDictionary(p => p, p => (Func<EntityReference, bool>)Resolve),
             prefixes.ToDictionary(p => p, p => (Func<EntityReference, RuntimeEntitySnapshot?>)Observe));
-        Handle = Kernel.RegisterModule(module);
+        Handle = Kernel.RegisterModule(module, RuntimeLogLevel.Off);
         if (start) { Kernel.StartRuntime(() => Kernel.BeginWorld(1)); Kernel.Advance(0, true); }
     }
     private bool Resolve(EntityReference reference) => OnResolve?.Invoke(reference)

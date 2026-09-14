@@ -130,7 +130,7 @@ NumericBoundaryTests.Run(Check);
 var module = ForgeTrigger.ModuleDefinition.Create();
 Check(module.Handlers.Count == 0 && module.BindingSupport.Count == 0, "helpers are not advertised as runtime handlers");
 var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "pure-test-no-game"));
-using (kernel.RegisterModule(module))
+using (kernel.RegisterModule(module, RuntimeLogLevel.Off))
 {
     var before = kernel.ExportManifest();
     ScalarNodes.Binary(ScalarOperation.Add, 1, 2); SeededNodes.Uniform(0, 1, 42);

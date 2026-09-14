@@ -27,7 +27,7 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 从 MAP5 切出的先行切片，目的是给 Weapon 等领域提供经核验的玩家引用。MAP5 其余内容（生命状态映射、救起与重生、落点、检查点）未开始。
 
 `Native/ForgeMap.Native.csproj` 是独立项目，引用真实 interop 编译，不进入 `ForgeMap.dll`：
-- `Plugin`：BepInEx 插件 `NAinfini.ForgeMap` / `Infini Forge Map` / `0.1.0`，依赖 `NAinfini.ForgeRuntime` 1.2.0。宿主 Off 时不注册、不装 Hook；Load 只允许一次，`Unload()` 返回 false。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
+- `Plugin`：BepInEx 插件 `NAinfini.ForgeMap` / `Infini Forge Map` / `0.1.0`，依赖 `NAinfini.ForgeRuntime` 1.2.0。宿主 Off 时不注册、不装 Hook；Load 只允许一次，`Unload()` 返回 false。本包自己的 cfg 是 `BepInEx/config/NAinfini.ForgeMap.cfg`，D-007 的 `[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启，非法值在注册前抛错；该级别随注册交给内核，成为 `forge.module.gtfo.map` 这个 provider 自己的级别。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
 - `MapPluginSession`：与 Enemy 相同的顺序。注册窗口内先注册模块（重复 provider 或 `gtfo.player` 命名空间冲突在装 Hook 前原子失败），再装 Hook；失败回滚先卸 Hook 再注销并保留原始异常；回调异常锁存故障并清表；释放时先注销再卸 Hook；所属线程检查。
 - `PlayerIdentityModule`：在 `ModuleDefinition.Create()` 上只追加 `EntityResolvers["gtfo.player"]` 与 `EntityInstanceResolvers["gtfo.player"]`，不注册 observer、capability 或 binding，也不另造 provider。
 - `MapNativeHooks`：2 个 `Priority.Last` postfix，只决定何时读回、不读参数：`PlayerManager.OnPlayerSpawned` 与 `PlayerManager.OnPlayerDespawned`。两者都是非虚方法，由 `PlayerReplicationManager.OnSpawn` / `OnDeSpawn` 调用，本地、远端与 bot 玩家都经过这里（静态调用边见证据文件）。选这两个是因为它们是所有玩家生成与销毁的共同汇合点：`RegisterPlayerAgent` 与 `PlayerSync.OnSpawn` 没有直接调用者（接口派发），`PlayerAgent.Setup` / `OnDespawn` 是被 `LocalPlayerAgent` 覆盖的虚方法。
@@ -70,7 +70,7 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 | `map.plan-rejected` | Error | `plan=<planId 或 -> code=<assembly.*/descriptor.*> path=<BepInEx 相对路径> at=<$ 路径>` |
 | `map.package-rejected` | Error | `code=assembly.package-layout path=<BepInEx 相对路径>`；包级拒绝时没有计划行 |
 
-路径形如 `plugins/<Team-Pkg>/forge/maps/<planId>.assembly.json`。这些行**还不是** I-DIAG 的 `forge.log.v1` 记录：`plan.loaded` / `plan.rejected` 归 Runtime sink，Map 的 cfg `Logging.Level`（D-007）未落地，现在只是 BepInEx 日志诊断。
+路径形如 `plugins/<Team-Pkg>/forge/maps/<planId>.assembly.json`。这些行**还不是** I-DIAG 的 `forge.log.v1` 记录：`plan.loaded` / `plan.rejected` 归 Runtime sink，现在只是 BepInEx 日志诊断。Map 的 cfg `Logging.Level`（D-007 阶段 A）已随注册进入内核级别表，本阶段还没有记录点用它。
 
 `tests/MapPlanDiscovery` 用 `$env:TEMP` 下合成夹具覆盖无目录、空目录、合法与非法计划（多个错误码）、非计划文件、多包与重复 level layout；包级规则只有一处实现，`tests/MapAssemblyPlan` 的包级用例与 `tests/MapNativeAdapter` 的接线用例都走它。
 

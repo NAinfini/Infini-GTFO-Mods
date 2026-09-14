@@ -27,12 +27,6 @@ internal static class RuntimeSettings
         // Raw text for the same reason as Mode; trace is deliberately not accepted here, only ForgeDevelopment elevation reaches it.
         var level = config.Bind("Logging", "Level", "error",
             "Forge Runtime records written to BepInEx/forge-logs/*.jsonl: off, error or info. error writes only when something goes wrong; info also writes normal records. Error and info records are mirrored to the console. Runtime.Mode Off starts no writer. Restart required.");
-        LogLevel = level.Value.Trim().ToLowerInvariant() switch
-        {
-            "off" => RuntimeLogLevel.Off,
-            "error" => RuntimeLogLevel.Error,
-            "info" => RuntimeLogLevel.Info,
-            _ => throw new InvalidOperationException("Unsupported Forge Logging.Level; use off, error or info. Native startup was not attempted.")
-        };
+        LogLevel = RuntimeLogConfiguration.ParseLevel(level.Value);
     }
 }

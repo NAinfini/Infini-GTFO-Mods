@@ -17,13 +17,13 @@ internal sealed class MapIdentitySession : IDisposable
     private readonly RuntimeLifecycleSubscription lifecycle;
     private bool disposed, probing;
 
-    internal MapIdentitySession(RuntimeKernel kernel, Func<MapCreationTicket, MapNativeIdentity, bool> nativeIsCurrent,
-        int maxEntries = 4096)
+    internal MapIdentitySession(RuntimeKernel kernel, RuntimeLogLevel logLevel,
+        Func<MapCreationTicket, MapNativeIdentity, bool> nativeIsCurrent, int maxEntries = 4096)
     {
         this.kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
         this.nativeIsCurrent = nativeIsCurrent ?? throw new ArgumentNullException(nameof(nativeIsCurrent));
         index = new MapObjectIdentityIndex(maxEntries);
-        registration = kernel.RegisterModule(ModuleDefinition.Create());
+        registration = kernel.RegisterModule(ModuleDefinition.Create(), logLevel);
         try
         {
             lifecycle = registration.ObserveLifecycle(OnLifecycle);

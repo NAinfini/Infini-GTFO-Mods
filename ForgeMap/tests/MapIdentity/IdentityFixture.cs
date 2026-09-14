@@ -14,7 +14,7 @@ sealed class IdentityFixture : IDisposable
     internal IdentityFixture(int limit = 4096, bool start = true)
     {
         Kernel.BeginWorld(1);
-        Session = new MapIdentitySession(Kernel, Probe, limit);
+        Session = new MapIdentitySession(Kernel, RuntimeLogLevel.Off, Probe, limit);
         if (start && !Kernel.StartRuntime(() => {})) throw new InvalidOperationException("Test startup failed.");
     }
     private bool Probe(MapCreationTicket ticket, MapNativeIdentity value)

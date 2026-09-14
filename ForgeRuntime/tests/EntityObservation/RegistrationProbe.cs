@@ -15,7 +15,7 @@ static class RegistrationProbe
         {
             EntityObservers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
             { ["test.entity"] = r => { observed++; return ContractTests.Entity(r); } }
-        });
+        }, RuntimeLogLevel.Off);
         kernel.StartRuntime(() => { }); kernel.Advance(0, true);
         var result = kernel.InspectEntities(new[] { reference });
         Console.WriteLine($"REGISTRATION PROBE: status={result.Status}, code={result.Code}, observerCalls={observed}, item={result.Items[0].Code}");

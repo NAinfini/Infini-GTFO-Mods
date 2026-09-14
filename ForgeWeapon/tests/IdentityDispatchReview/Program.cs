@@ -131,14 +131,14 @@ Test("missing-host-permission-rejects-plan-before-dispatch", () =>
 Test("duplicate-equipment-registration-does-not-damage-live-session", () =>
 {
     var kernel = new RuntimeKernel(new("fixture.dispatch.registration", "1.0.0", RuntimeKernel.ApiVersion, "synthetic"));
-    using var session = new EquipmentIdentitySession(kernel, _ => true, _ => true); string before = kernel.ExportManifest();
-    Rejected("provider-conflict", () => new EquipmentIdentitySession(kernel, _ => true, _ => true));
+    using var session = new EquipmentIdentitySession(kernel, RuntimeLogLevel.Off, _ => true, _ => true); string before = kernel.ExportManifest();
+    Rejected("provider-conflict", () => new EquipmentIdentitySession(kernel, RuntimeLogLevel.Off, _ => true, _ => true));
     Check(before == kernel.ExportManifest(), "failed registration altered registry"); kernel.StopRuntime();
 });
 Test("startup-failure-disposal-does-not-throw", () =>
 {
     var kernel = new RuntimeKernel(new("fixture.dispatch.startup", "1.0.0", RuntimeKernel.ApiVersion, "synthetic"));
-    var session = new EquipmentIdentitySession(kernel, _ => true, _ => true); kernel.BeginWorld(7);
+    var session = new EquipmentIdentitySession(kernel, RuntimeLogLevel.Off, _ => true, _ => true); kernel.BeginWorld(7);
     try { kernel.StartRuntime(() => throw new InvalidOperationException("fixture-startup-failure")); }
     catch (InvalidOperationException) { }
     Check(kernel.StartupState == RuntimeStartupState.Failed, "startup failure did not latch");
@@ -167,9 +167,9 @@ sealed class Fixture : IDisposable
     internal Fixture(bool loadPlan = true)
     {
         Kernel.BeginWorld(7);
-        Session = new(Kernel, _ => ThrowNativeRead ? throw new InvalidOperationException("fixture-reader") : NativeLive, _ => OwnerLive);
+        Session = new(Kernel, RuntimeLogLevel.Off, _ => ThrowNativeRead ? throw new InvalidOperationException("fixture-reader") : NativeLive, _ => OwnerLive);
         Item = new(new("gtfo.equipment:a", 7, 1), "fixture.rifle", "r1", Owner, "GearStandard", EquipmentLocation.Inventory, true, true);
-        Dispatch = Kernel.RegisterModule(Module());
+        Dispatch = Kernel.RegisterModule(Module(), RuntimeLogLevel.Off);
         Kernel.StartRuntime(() => { if (loadPlan) Kernel.LoadPlan(Plan()); });
         Kernel.Advance(0, true); Session.Record(Item);
     }

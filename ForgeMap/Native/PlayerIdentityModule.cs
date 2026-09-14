@@ -34,7 +34,7 @@ internal sealed class PlayerIdentityModule : IDisposable
     private bool _disposed;
     internal bool IsRegistered => !_disposed && _registration.IsRegistered;
 
-    internal PlayerIdentityModule(RuntimeKernel kernel, Func<bool> canObserve, Action<string> log, Action<string> warn)
+    internal PlayerIdentityModule(RuntimeKernel kernel, RuntimeLogLevel logLevel, Func<bool> canObserve, Action<string> log, Action<string> warn)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
         _canObserve = canObserve ?? throw new ArgumentNullException(nameof(canObserve));
@@ -47,7 +47,7 @@ internal sealed class PlayerIdentityModule : IDisposable
         {
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [EntityKind] = IsCurrent },
             EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>> { [EntityKind] = ResolveInstance }
-        });
+        }, logLevel);
         try
         {
             // Checkpoint reload, level cleanup and authority loss reach Map as a host world change; no local copy.

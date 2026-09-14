@@ -10,7 +10,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 ### 公共 SDK
 
-`Framework/` 是不依赖 Unity 或 GTFO 类型的注册、严格计划验证、世界与实体生命周期、单一有界队列和执行结果合同，编译为独立的 `ForgeRuntime.Framework.dll`。第一方游戏模块与未来扩展都走同一个 `Plugin.Runtime.RegisterModule`。只允许模块用自己的返回句柄发布或取消——这是受信模块之间的所有权约束，不是任意第三方 DLL 的安全沙箱。
+`Framework/` 是不依赖 Unity 或 GTFO 类型的注册、严格计划验证、世界与实体生命周期、单一有界队列和执行结果合同，编译为独立的 `ForgeRuntime.Framework.dll`。第一方游戏模块与未来扩展都走同一个 `Plugin.Runtime.RegisterModule(module, level)`，级别是该包自己 cfg 的 `Logging.Level`（D-007）。只允许模块用自己的返回句柄发布或取消——这是受信模块之间的所有权约束，不是任意第三方 DLL 的安全沙箱。
 
 `Framework/CombatContracts.cs` 注册 5 个通用 combat canonical 定义（承伤事实、治疗动作、生命变化事实、死亡流程、肢体破坏），0 个 binding。Enemy 模块只注册自己的实际 binding 和 `gtfo.enemy:<GlobalID>` 接收器；来源、目标与阵营独立。
 
@@ -18,7 +18,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 ### 宿主启动与配置
 
-宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`（默认 `Play`，D-011：Rundown 包不带基础包 cfg）、`Logging.Level`（默认 `error`）。原键名与命名、数字模式值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
+宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`（默认 `Play`，D-011：Rundown 包不带基础包 cfg）、`Logging.Level`（默认 `error`）。这一项只管 Runtime 自己的 provider；每个领域包都有自己的 `[Logging] Level`（D-007），不共用这一项。原键名与命名、数字模式值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
 
 `Off` 只绑定宿主键，不启动任何组件或 Hook，也不扫描计划。`Play` 与 `Authoring` 启动同一个宿主：4 个世界/会话/检查点 Hook（`harmony.PatchAll` 只扫描宿主程序集）与 `FrameworkMonitor`。**宿主不含任何诊断、报告或性能采集**；两种模式唯一的区别是可选的 [ForgeDevelopment](../ForgeDevelopment/README.md) 插件只在 `Authoring` 下启动。模式变更需要重启进程，不支持热卸载。
 
@@ -28,9 +28,13 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 **计划发现（I-PACK D-009）不再走单一配置路径。** `Play`/`Authoring` 下，首个固定更新在其他插件注册完成后，按包目录扫描离线计划：只看 `BepInEx/plugins` 的一级子目录，每个子目录下若存在 `forge/plans`（不存在则静默跳过，不算错误），取其中直接子文件、按 ordinal 精确匹配 `.plan.json` 后缀的文件（不递归、不识别其他扩展名）；发现顺序按 `/` 分隔的 BepInEx 相对路径以 `StringComparer.Ordinal` 排序。单文件超过 4 MiB 按 `json-size` 单独拒绝，且不计入下面的合并预算；其余文件按合并上限 256 个/64 MiB 做尾部优先淘汰——只要剩余集合仍超个数或字节上限，就反复剔除排序最靠后的一个文件（`plan-budget`），不是遇到第一个超限文件就停止接受后面的文件。链接/联接与转义检查只在确认 `forge/plans` 存在后，沿 `<目录>→forge→plans` 链与文件本身进行，命中按 `plan-path` 拒绝；IO 读取失败或非法 UTF-8 按 `invalid-json` 拒绝。每个文件独立产生一条 `plan.loaded`/`plan.rejected`（带 `path`，前者还带 `permissions`）；同一 planId 出现在多个文件中全部按 `plan-conflict` 拒绝，消息带上冲突组内全部相对路径；解析后的计划总数上限仍是 128（`plan-budget`）。本次进程只扫描一次，不支持热重载。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
 
-### 执行日志（D-007 阶段 B）
+### 执行日志（D-007 阶段 A+B）
 
-**记录点尚未接入。** 内核与 Enemy、Map、Weapon、Trigger 都还没有调用日志接口，所以玩家层现在不会写出任何业务记录；目前可用的只有 Runtime 自身的级别、sink 和提级接口，SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-b)。领域包的级别条目在阶段 A 随必填参数 `RegisterModule(RuntimeModule, RuntimeLogLevel)` 加入；在那之前查领域 provider 的级别会以 `log-provider-unregistered` 拒绝，不给默认值。
+**记录点尚未接入。** 内核与 Enemy、Map、Weapon、Trigger 都还没有调用日志接口，所以玩家层现在不会写出任何业务记录；已经落地的是 sink、级别表与提级接口，SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-ab)。
+
+阶段 A 的注册级别已落地：`RegisterModule(RuntimeModule, RuntimeLogLevel)` 的级别是必填参数，各包原生插件在 Load 里读自己的 `[Logging] Level` 后交给内核，级别不放进 `RuntimeModule`。级别表因此覆盖 Runtime 自己（`forge.runtime`，用宿主 cfg）以及每个已注册的领域 provider；注销即移除。未注册的 provider 仍以 `log-provider-unregistered` 拒绝，不给默认值。Runtime 自己随宿主注册的 CombatContracts、ControlContracts 与 Trigger 框架模块没有包 cfg，走只对宿主程序集可见的内部路径取 Runtime 的级别。
+
+各包 cfg 与宿主同构：`[Logging] Level` 接受 `off`、`error`、`info`（大小写与首尾空白不敏感），默认 `error`，按原始文本解析，其他值（包括 `trace`）在注册之前失败。改动需要重启。`Runtime.Mode = Off` 时依赖 Runtime 的插件在自己的 Load 里直接返回，既不注册也不绑定 cfg。
 
 `[Logging] Level` 接受 `off`、`error`、`info`（大小写与首尾空白不敏感），默认 `error`，按原始文本解析，其他值（包括 `trace`）在原生初始化之前失败。改动需要重启。`Runtime.Mode = Off` 时宿主不初始化，也就没有 writer。
 
@@ -79,7 +83,7 @@ Level = error
 
 **工程。** `ForgeRuntime.csproj` 是 GTFO 宿主（模拟时钟、世界与会话桥、启动配置、计划发现 `GameBindings/PlanDiscovery.cs`、日志 writer `Logging/RuntimeLogWriter.cs`，不含诊断）；`Framework/ForgeRuntime.Framework.csproj` 是唯一公共 SDK。各领域的托管工程（`ForgeTrigger`、`ForgeMap`、`ForgeWeapon`、`ForgeEnemy`）只引用 SDK；`ForgeEnemy/ForgeEnemy.csproj` 只是托管辅助，不是玩家发行包；ForgeDevelopment 没有托管工程。根 `Forge.Architecture.sln` 覆盖 SDK、四个领域托管工程与 `tests/Architecture`，不代替宿主完整构建。架构验收检查：领域程序集只引用同一份 SDK、不含 Unity/BepInEx/Harmony 引用、不内嵌第二个内核、provider 可共存、重复注册以 `provider-conflict` 原子拒绝、注册不启动工作、注销幂等。全部工程 `net6.0`，没有 DI 容器、第二套事件总线或状态机框架。
 
-**注册身份。** 只有调用方显式 `RegisterModule` 才登记 provider，加载程序集不启动任何工作。
+**注册身份。** 只有调用方显式 `RegisterModule(module, level)` 才登记 provider，级别同样是必填；加载程序集不启动任何工作。
 
 | 模块 | provider ID | 版本 | 注册内容 |
 | --- | --- | --- | --- |

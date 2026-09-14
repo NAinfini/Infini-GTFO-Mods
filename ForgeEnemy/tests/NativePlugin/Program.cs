@@ -19,7 +19,7 @@ void Throws(Action action) { try { action(); } catch { return; } throw new Excep
 RuntimeKernel Kernel()
 {
     var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
-    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module()); return kernel;
+    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off); return kernel;
 }
 EnemyAgent Enemy()
 {
@@ -39,21 +39,21 @@ RuntimeModule Dependency(string id) => new(RuntimeKernel.ApiVersion, RuntimeJson
 { new BindingSupport(id + ".binding.read", "implementation-only", Array.Empty<string>()) });
 Case("session.duplicate-before-hooks", () =>
 {
-    var kernel = Kernel(); using var first = new EnemyModule(kernel, () => true, _ => { });
+    var kernel = Kernel(); using var first = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
     string before = kernel.ExportManifest(); int installed = 0, removed = 0;
-    Throws(() => EnemyPluginSession.Start(kernel, () => true, _ => { }, () => installed++, () => removed++));
+    Throws(() => EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => installed++, () => removed++));
     Require(installed == 0 && removed == 0 && kernel.ExportManifest() == before, "Duplicate changed existing ownership.");
 });
 Case("session.install-failure-rollback", () =>
 {
     var kernel = Kernel(); string before = kernel.ExportManifest(); int removed = 0;
-    Throws(() => EnemyPluginSession.Start(kernel, () => true, _ => { }, () => throw new IOException("patch"), () => removed++));
+    Throws(() => EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => throw new IOException("patch"), () => removed++));
     Require(removed == 1 && kernel.ExportManifest() == before, "Partial registration or hooks survived.");
 });
 Case("session.cleanup-failure-preserves-cause", () =>
 {
     var kernel = Kernel(); string before = kernel.ExportManifest(); var primary = new IOException("primary");
-    try { EnemyPluginSession.Start(kernel, () => true, _ => { }, () => throw primary, () => throw new Exception("cleanup")); }
+    try { EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => throw primary, () => throw new Exception("cleanup")); }
     catch (Exception error)
     {
         Require(ReferenceEquals(primary, error) && error.Data.Contains("ForgeEnemy.CleanupFailures"), "Primary failure was hidden.");
@@ -64,12 +64,12 @@ Case("session.cleanup-failure-preserves-cause", () =>
 Case("session.registration-window", () =>
 {
     var kernel = Kernel(); kernel.StartRuntime(() => { }); int calls = 0;
-    Throws(() => EnemyPluginSession.Start(kernel, () => true, _ => { }, () => calls++, () => calls++));
+    Throws(() => EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => calls++, () => calls++));
     Require(calls == 0, "Late registration touched hooks.");
 });
 Case("session.callback-and-reporter-fault", () =>
 {
-    var kernel = Kernel(); using var session = EnemyPluginSession.Start(kernel, () => true,
+    var kernel = Kernel(); using var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true,
         _ => throw new IOException("reporter"), () => { }, () => { });
     kernel.StartRuntime(() => { });
     session.Guard(_ => throw new InvalidOperationException("native callback")); int callbacks = 0;
@@ -80,8 +80,8 @@ Case("session.callback-and-reporter-fault", () =>
 Case("session.real-plan-and-world-cleanup", () =>
 {
     var kernel = Kernel(); int removed = 0; var records = new List<CommandContext>();
-    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
-    kernel.RegisterModule(LocalPlan.Recorder(records.Add));
+    var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => removed++);
+    kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
     var plan = DeathPlan(kernel);
     var actor = Enemy(); var reference = session.Module.TrackSpawn(actor);
     kernel.StartRuntime(() => LocalPlan.Load(kernel, plan));
@@ -107,10 +107,16 @@ Case("plugin.missing-runtime", () =>
     var plugin = new NativePlugin(); Throws(plugin.Load); Throws(plugin.Load);
     Require(Harmony.Patches == 0, "Unavailable host still installed patches.");
 });
+Case("plugin.invalid-log-level", () =>
+{
+    Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Play; Host.Runtime = Kernel();
+    var plugin = new NativePlugin(); plugin.Config.Preset["Logging.Level"] = "verbose"; Throws(plugin.Load);
+    Require(NativePlugin.Session == null && Harmony.Patches == 0, "Malformed Logging.Level still installed native work.");
+});
 Case("plugin.old-provider-conflict", () =>
 {
     Host.Runtime = Kernel(); Host.CanExecuteGameplay = true;
-    using var existing = new EnemyModule(Host.Runtime, () => true, _ => { });
+    using var existing = new EnemyModule(Host.Runtime, RuntimeLogLevel.Off, () => true, _ => { });
     string before = Host.Runtime.ExportManifest(); Throws(new NativePlugin().Load);
     Require(Harmony.Patches == 0 && Harmony.Unpatches == 0 && Host.Runtime.ExportManifest() == before,
         "Native plugin patched or removed a provider it did not own.");
@@ -133,28 +139,28 @@ Case("session.readonly-error-data-keeps-primary", () =>
 {
     var kernel = Kernel(); string before = kernel.ExportManifest(); var primary = new ReadOnlyDataFailure();
     Exception? caught = null;
-    try { EnemyPluginSession.Start(kernel, () => true, _ => { }, () => throw primary, () => throw new IOException("unpatch")); }
+    try { EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => throw primary, () => throw new IOException("unpatch")); }
     catch (Exception error) { caught = error; }
     Require(ReferenceEquals(primary, caught) && kernel.ExportManifest() == before, "Cleanup evidence replaced primary exception or left a provider.");
 });
 Case("session.message-getter-cannot-escape-guard", () =>
 {
     var kernel = Kernel(); var logs = new List<string>();
-    using var session = EnemyPluginSession.Start(kernel, () => true, logs.Add, () => { }, () => { });
+    using var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, logs.Add, () => { }, () => { });
     session.Guard(_ => throw new MessageGetterFailure());
     Require(session.Faulted && session.LastFault != null && logs.Count == 1, "Native fault reporting escaped or lost the failure latch.");
 });
 Case("session.wrong-thread-callback-is-not-invoked", () =>
 {
     var kernel = Kernel(); int calls = 0;
-    using var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => { });
+    using var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => { });
     Throws(() => Task.Run(() => session.Guard(_ => calls++)).GetAwaiter().GetResult());
     Require(calls == 0 && !session.Faulted && session.Module.IsRegistered, "Off-thread guard invoked a callback or mutated the session.");
 });
 Case("session.wrong-thread-dispose-keeps-ownership", () =>
 {
     var kernel = Kernel(); int removed = 0;
-    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
+    var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => removed++);
     try
     {
         Throws(() => Task.Run(session.Dispose).GetAwaiter().GetResult());
@@ -167,8 +173,8 @@ Case("session.dispatch-dispose-rejects-before-unpatch", () =>
 {
     var kernel = Kernel(); int removed = 0; Exception? rejection = null; EnemyPluginSession? dispatching = null;
     // The dispatched step tries to tear the session down from inside the kernel's dispatch.
-    kernel.RegisterModule(LocalPlan.Recorder(_ => { try { dispatching!.Dispose(); } catch (Exception error) { rejection = error; } }));
-    var session = dispatching = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
+    kernel.RegisterModule(LocalPlan.Recorder(_ => { try { dispatching!.Dispose(); } catch (Exception error) { rejection = error; } }), RuntimeLogLevel.Off);
+    var session = dispatching = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => removed++);
     try
     {
         var plan = DeathPlan(kernel);
@@ -205,8 +211,8 @@ Case("plugin.cleanup-readonly-data-always-clears-session", () =>
 Case("session.in-use-dispose-remains-retryable", () =>
 {
     var kernel = Kernel(); int removed = 0;
-    using var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
-    using var dependency = kernel.RegisterModule(Dependency("test.enemy_dependency"));
+    using var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => removed++);
+    using var dependency = kernel.RegisterModule(Dependency("test.enemy_dependency"), RuntimeLogLevel.Off);
     Throws(session.Dispose);
     Require(removed == 0 && !session.Faulted && session.Module.IsRegistered, "Rejected disposal removed hooks or changed a live session.");
     dependency.Dispose(); session.Dispose();
@@ -215,7 +221,7 @@ Case("session.in-use-dispose-remains-retryable", () =>
 Case("session.unpatch-failure-remains-inert", () =>
 {
     var kernel = Kernel(); int removed = 0, callbacks = 0;
-    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => { removed++; throw new IOException("native cleanup"); });
+    var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => { removed++; throw new IOException("native cleanup"); });
     Throws(session.Dispose); session.Guard(_ => callbacks++); session.Dispose();
     Require(removed == 1 && callbacks == 0 && !session.Module.IsRegistered && session.Faulted,
         "Failed unpatch left executable ownership or retried a native operation.");
@@ -228,14 +234,14 @@ Case("session.failed-start-residual-registration-is-inert", () =>
     {
         try
         {
-            EnemyPluginSession.Start(kernel, () => { gateReads++; return true; }, _ => { }, () =>
+            EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => { gateReads++; return true; }, _ => { }, () =>
             {
                 // Test-only access: inspect the otherwise unreachable module left by a failed rollback.
                 var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
                 var registry = typeof(RuntimeKernel).GetField("registry", flags)!.GetValue(kernel)!;
                 var handlers = (IDictionary<string, CommandHandler>)registry.GetType().GetField("Handlers", flags)!.GetValue(registry)!;
                 orphan = (EnemyModule)handlers[EnemyModule.HealBinding].Target!;
-                dependency = kernel.RegisterModule(Dependency("test.retained_dependency")); throw primary;
+                dependency = kernel.RegisterModule(Dependency("test.retained_dependency"), RuntimeLogLevel.Off); throw primary;
             }, () => { });
         }
         catch (Exception error) { caught = error; }
@@ -248,7 +254,7 @@ Case("session.failed-start-residual-registration-is-inert", () =>
 Case("session.throwing-error-data-and-reporter-keep-evidence", () =>
 {
     var kernel = Kernel(); var primary = new DataGetterFailure(); Exception? caught = null;
-    try { EnemyPluginSession.Start(kernel, () => true, _ => throw new IOException("reporter"),
+    try { EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => throw new IOException("reporter"),
         () => throw primary, () => throw new IOException("cleanup")); }
     catch (Exception error) { caught = error; }
     Require(ReferenceEquals(primary, caught) && EnemyPluginSession.LastCleanupDiagnostic?.Contains("attachment=") == true
@@ -256,13 +262,13 @@ Case("session.throwing-error-data-and-reporter-keep-evidence", () =>
 });
 Case("session.null-message-is-safe", () =>
 {
-    using var session = EnemyPluginSession.Start(Kernel(), () => true, _ => { }, () => { }, () => { });
+    using var session = EnemyPluginSession.Start(Kernel(), RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => { });
     session.Guard(_ => throw new NullMessageFailure());
     Require(session.Faulted && session.LastFault?.Contains(nameof(NullMessageFailure)) == true, "Null exception message escaped the guard.");
 });
 Case("session.fault-diagnostic-is-bounded-and-once", () =>
 {
-    var logs = new List<string>(); using var session = EnemyPluginSession.Start(Kernel(), () => true, logs.Add, () => { }, () => { });
+    var logs = new List<string>(); using var session = EnemyPluginSession.Start(Kernel(), RuntimeLogLevel.Off, () => true, logs.Add, () => { }, () => { });
     session.Guard(_ => throw new Exception(new string('x', 20000)));
     session.Guard(_ => throw new Exception("must not run"));
     Require(session.LastFault?.Length <= 2048 && logs.Count == 1 && logs[0].Length < 4096, "Unbounded or repeated failure reporting.");

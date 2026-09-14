@@ -24,7 +24,7 @@ internal static class ObserverRegistrationCases
         };
     private static void RejectAtomic(RuntimeKernel k, RuntimeModule module, string code)
     {
-        string before = k.ExportManifest(); Code(() => k.RegisterModule(module), code);
+        string before = k.ExportManifest(); Code(() => k.RegisterModule(module, RuntimeLogLevel.Off), code);
         Require(k.ExportManifest() == before, "Rejected observer registration mutated the registry.");
     }
     internal static void Run()
@@ -33,7 +33,7 @@ internal static class ObserverRegistrationCases
             RejectAtomic(Kernel(), Module("test.owner", new[] { "test.entity" }, false), "entity-observer-owner"));
         Case("registration.foreign-resolver", () =>
         {
-            var k = Kernel(); using var a = k.RegisterModule(Module("test.first", new[] { "test.entity" }));
+            var k = Kernel(); using var a = k.RegisterModule(Module("test.first", new[] { "test.entity" }), RuntimeLogLevel.Off);
             RejectAtomic(k, Module("test.second", new[] { "test.entity" }, false), "entity-observer-owner");
         });
         Case("registration.null-observer", () =>
@@ -56,8 +56,8 @@ internal static class ObserverRegistrationCases
         Case("registration.global-budget", () =>
         {
             var k = Kernel();
-            using var a = k.RegisterModule(Module("test.first", Enumerable.Range(0, 128).Select(i => "test.first" + i).ToArray()));
-            using var b = k.RegisterModule(Module("test.second", Enumerable.Range(0, 128).Select(i => "test.second" + i).ToArray()));
+            using var a = k.RegisterModule(Module("test.first", Enumerable.Range(0, 128).Select(i => "test.first" + i).ToArray()), RuntimeLogLevel.Off);
+            using var b = k.RegisterModule(Module("test.second", Enumerable.Range(0, 128).Select(i => "test.second" + i).ToArray()), RuntimeLogLevel.Off);
             RejectAtomic(k, Module("test.third", new[] { "test.extra" }), "entity-observer-budget");
         });
         Case("registration.dispose-cleans-observer", () =>
@@ -66,11 +66,11 @@ internal static class ObserverRegistrationCases
             var a = Module("test.old", new[] { "test.entity" }) with
             { EntityObservers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
                 { ["test.entity"] = _ => { oldCalls++; return Snapshot("old"); } } };
-            var old = k.RegisterModule(a); old.Dispose(); old.Dispose();
+            var old = k.RegisterModule(a, RuntimeLogLevel.Off); old.Dispose(); old.Dispose();
             var b = Module("test.new", new[] { "test.entity" }) with
             { EntityObservers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
                 { ["test.entity"] = _ => { newCalls++; return Snapshot("new"); } } };
-            using var fresh = k.RegisterModule(b);
+            using var fresh = k.RegisterModule(b, RuntimeLogLevel.Off);
             k.StartRuntime(() => { });
             Require(k.InspectEntities(new[] { Ref }).RequireComplete().Single().Kind == "new"
                 && oldCalls == 0 && newCalls == 1, "Old observer survived unregister or shadowed its replacement.");
@@ -81,7 +81,7 @@ internal static class ObserverRegistrationCases
             var m = Module("test.owner", new[] { "test.entity" }) with
             { EntityObservers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
                 { ["test.entity"] = _ => { Code(() => subscription!.Dispose(), "entity-observer-mutation"); return Snapshot("test"); } } };
-            using var owner = k.RegisterModule(m);
+            using var owner = k.RegisterModule(m, RuntimeLogLevel.Off);
             subscription = owner.ObserveLifecycle(_ => { }); k.StartRuntime(() => { });
             Require(k.InspectEntities(new[] { Ref }).IsComplete && subscription.IsActive,
                 "A read-only entity callback cancelled the lifecycle subscription.");
@@ -89,7 +89,7 @@ internal static class ObserverRegistrationCases
         });
         Case("registration.lifecycle-self-disposal-remains-legal", () =>
         {
-            var k = Kernel(); using var owner = k.RegisterModule(Module("test.owner", new[] { "test.entity" }));
+            var k = Kernel(); using var owner = k.RegisterModule(Module("test.owner", new[] { "test.entity" }), RuntimeLogLevel.Off);
             RuntimeLifecycleSubscription? subscription = null;
             subscription = owner.ObserveLifecycle(e =>
             { if (e.Kind == RuntimeLifecycleKind.TickAdvanced) subscription!.Dispose(); }, false);
@@ -100,7 +100,7 @@ internal static class ObserverRegistrationCases
         {
             var k = Kernel();
             RejectAtomic(k, Module("test.owner", new[] { "test.entity" }, false), "entity-observer-owner");
-            using var valid = k.RegisterModule(Module("test.owner", new[] { "test.entity" }));
+            using var valid = k.RegisterModule(Module("test.owner", new[] { "test.entity" }), RuntimeLogLevel.Off);
             k.StartRuntime(() => { });
             Require(k.InspectEntities(new[] { Ref }).IsComplete, "Failed registration left a partial reservation.");
         });

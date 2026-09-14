@@ -29,15 +29,15 @@ EnemyAgent Enemy(long pointer = 10)
 (RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) Scene()
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
-    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module());
-    var module = new EnemyModule(kernel, () => true, _ => { });
+    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+    var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
     var actor = Enemy(); return (kernel, module, actor, module.TrackSpawn(actor));
 }
 // damage_applied -> record(target): observes exactly what the receiver publishes, with no heal in the loop.
 (RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref, List<CommandContext> Records) DamageScene()
 {
     var scene = Scene(); var records = new List<CommandContext>();
-    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add));
+    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
     LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.damage", EnemyModule.DamageBinding, LocalPlan.RecordBinding, ("target", "target")));
     return (scene.Kernel, scene.Module, scene.Enemy, scene.Ref, records);
 }
@@ -45,7 +45,7 @@ EnemyAgent Enemy(long pointer = 10)
 (RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref, List<CommandContext> Records) HealthScene()
 {
     var scene = Scene(); var records = new List<CommandContext>();
-    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add));
+    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
     LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.health", EnemyModule.HealthChangedBinding, LocalPlan.RecordBinding,
         ("target", "target"), ("value", "value"), ("delta", "delta")));
     return (scene.Kernel, scene.Module, scene.Enemy, scene.Ref, records);
@@ -447,7 +447,7 @@ Case("lifecycle.thread", () =>
 Case("lifecycle.single-provider", () =>
 {
     var registry = Scene(); var manifest = registry.Kernel.ExportManifest(); bool conflict = false;
-    try { _ = new EnemyModule(registry.Kernel, () => true, _ => { }); }
+    try { _ = new EnemyModule(registry.Kernel, RuntimeLogLevel.Off, () => true, _ => { }); }
     catch (RuntimeContractException error) { conflict = error.Code == "provider-conflict"; }
     return (conflict && registry.Kernel.ExportManifest() == manifest && Heal(registry.Module, registry.Ref).Status == "succeeded",
         "A second Enemy provider is rejected without damaging the registered provider.", "Registry unchanged.");

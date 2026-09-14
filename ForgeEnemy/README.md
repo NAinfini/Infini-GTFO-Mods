@@ -12,6 +12,8 @@
 
 Off 模式下插件不注册也不打 Hook。Load 是单次尝试，失败后必须重启进程；原生 IL2CPP Hook 是进程级的，热重载没有已验证的恢复合同，`Unload()` 返回 false。
 
+本包有自己的 cfg `BepInEx/config/NAinfini.ForgeEnemy.cfg`，D-007 的 `[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启；Load 读到非法值时抛错，不做静默回退。该级别随注册交给内核，成为 `forge.module.gtfo.enemy` 这个 provider 自己的级别（`RegisterModule(module, level)`），不放进 `RuntimeModule`。宿主 `Runtime.Mode = Off` 时插件提前返回，既不注册也不读这一项。
+
 ## 当前 binding（全部 implementation-only）
 
 Native 插件持有 **5 个** binding 与 **5 个** Hook；Runtime 保留 4 个世界与会话 Hook。共享的 canonical 定义在 SDK 的 `CombatContracts` 里，共 5 个。

@@ -16,9 +16,9 @@ internal sealed class Scene : IDisposable
     internal Dam_EnemyDamageLimb Limb => Enemy.Damage.DamageLimbs[0];
     internal Scene(bool load = true, bool start = true)
     {
-        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
-        Module = new(Kernel, () => Allowed, Messages.Add);
-        Sink = Kernel.RegisterModule(LocalPlan.Recorder(c => { Records.Add(c); OnRecord?.Invoke(c); }));
+        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Module = new(Kernel, RuntimeLogLevel.Off, () => Allowed, Messages.Add);
+        Sink = Kernel.RegisterModule(LocalPlan.Recorder(c => { Records.Add(c); OnRecord?.Invoke(c); }), RuntimeLogLevel.Off);
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);
         if (load) { Load("death_started"); Load("limb_broken"); }
         if (start) Kernel.StartRuntime(() => { });

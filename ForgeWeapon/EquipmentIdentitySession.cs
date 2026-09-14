@@ -19,7 +19,7 @@ public sealed class EquipmentIdentitySession : IDisposable
     private readonly RuntimeLifecycleSubscription lifecycle;
     private readonly object ticketOwner = new();
     private bool disposed, probing;
-    public EquipmentIdentitySession(RuntimeKernel kernel, Func<EquipmentObservation, bool> nativeIsCurrent,
+    public EquipmentIdentitySession(RuntimeKernel kernel, RuntimeLogLevel logLevel, Func<EquipmentObservation, bool> nativeIsCurrent,
         Func<EntityReference, bool> ownerIsCurrent, int maxActive = 1024, int maxHistory = 8192)
     {
         this.kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
@@ -30,7 +30,7 @@ public sealed class EquipmentIdentitySession : IDisposable
         {
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>
             { [EntityNamespace] = IsCurrent }
-        });
+        }, logLevel);
         try
         {
             lifecycle = registration.ObserveLifecycle(ObserveLifecycle);

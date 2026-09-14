@@ -10,7 +10,7 @@ internal static class ResolutionTests
         {
             Suite.Test("resolve:" + row.GetProperty("name").GetString(), () =>
             {
-                var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(row.GetProperty("seed")));
+                var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(row.GetProperty("seed")), RuntimeLogLevel.Off);
                 var before = kernel.ExportManifest();
                 JsonElement Resolve() => kernel.ResolveGraphContract(row.GetProperty("id").GetString()!,
                     row.GetProperty("version").GetString()!, row.GetProperty("parameters"));
@@ -43,7 +43,7 @@ internal static class ResolutionTests
         var neighbours = new[] { $"{parts[0]}.{parts[1]}.{parts[2] + 1}", $"{parts[0]}.{parts[1] + 1}.0", $"{parts[0] + 1}.0.0" };
         Suite.Test("exact-lock-lifecycle-and-thread", () =>
         {
-            var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Suite.Module(seed));
+            var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Suite.Module(seed), RuntimeLogLevel.Off);
             var empty = RuntimeJson.EmptyObject;
             foreach (var neighbour in neighbours)
                 Suite.Reject(() => kernel.ResolveGraphContract(id, neighbour, empty), "capability-version");
@@ -55,18 +55,18 @@ internal static class ResolutionTests
                 .GetAwaiter().GetResult();
             var retained = kernel.ResolveGraphContract(id, version, Count(maximum));
             var before = kernel.ExportManifest();
-            Suite.Reject(() => kernel.RegisterModule(Suite.Module(seed)), "provider-conflict");
+            Suite.Reject(() => kernel.RegisterModule(Suite.Module(seed), RuntimeLogLevel.Off), "provider-conflict");
             Suite.Check(before == kernel.ExportManifest(), "Duplicate revision modified registry.");
             handle.Dispose();
             Suite.Reject(() => kernel.ResolveGraphContract(id, version, empty), "capability-unavailable");
             Suite.Check(retained.GetProperty("inputs").GetArrayLength() == maximum, "Returned metadata depended on live registration.");
-            kernel.RegisterModule(Suite.Module(seed));
+            kernel.RegisterModule(Suite.Module(seed), RuntimeLogLevel.Off);
             Suite.Check(Suite.Equal(retained, kernel.ResolveGraphContract(id, version, Count(maximum))),
                 "Reregistering changed definition semantics.");
         });
         Suite.Test("read-only-lifecycle-observation", () =>
         {
-            var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Suite.Module(seed));
+            var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Suite.Module(seed), RuntimeLogLevel.Off);
             var observations = 0;
             using var subscription = handle.ObserveLifecycle(_ =>
             {
@@ -86,12 +86,12 @@ internal static class ResolutionTests
             var template = candidate["capabilities"]![0]!["graph"]!["variadic"]!["port"]!;
             var fitting = nameBudget - ("_" + maximum).Length;
             template["id"] = new string('a', fitting);
-            var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(RuntimeJson.Parse(candidate.ToJsonString())));
+            var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(RuntimeJson.Parse(candidate.ToJsonString())), RuntimeLogLevel.Off);
             var resolved = kernel.ResolveGraphContract(id, version, Count(maximum));
             Suite.Check(resolved.GetProperty("inputs")[maximum - 1].GetProperty("id").GetString()!.Length == nameBudget,
                 "The bounded name boundary was rejected or shortened.");
             template["id"] = new string('a', fitting + 1);
-            Suite.Reject(() => Suite.Kernel().RegisterModule(Suite.Module(RuntimeJson.Parse(candidate.ToJsonString()))),
+            Suite.Reject(() => Suite.Kernel().RegisterModule(Suite.Module(RuntimeJson.Parse(candidate.ToJsonString())), RuntimeLogLevel.Off),
                 "variadic-port-name-budget");
         });
         Suite.Test("flags-units-schema-and-order", () =>
@@ -103,7 +103,7 @@ internal static class ResolutionTests
                 port!["unit"] = "m"; port["schema"] = "test.measurement";
                 port["optional"] = false; port["nullable"] = false;
             }
-            var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(RuntimeJson.Parse(candidate.ToJsonString())));
+            var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(RuntimeJson.Parse(candidate.ToJsonString())), RuntimeLogLevel.Off);
             var resolved = kernel.ResolveGraphContract(id, version, Count(maximum));
             var inputs = resolved.GetProperty("inputs");
             var template = graph.GetProperty("variadic").GetProperty("port").GetProperty("id").GetString()!;
@@ -120,7 +120,7 @@ internal static class ResolutionTests
         {
             var row = vectors.GetProperty("registrations").EnumerateArray().First(r => r.GetProperty("name").GetString() == "actual:forge.modifier.value.constant");
             var capability = row.GetProperty("seed").GetProperty("capabilities")[0];
-            var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(row.GetProperty("seed")));
+            var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(row.GetProperty("seed")), RuntimeLogLevel.Off);
             Suite.Check(Suite.Equal(kernel.ResolveGraphContract("forge.modifier.value.constant", capability.GetProperty("version").GetString()!,
                     RuntimeJson.From(new { value = 5 })), capability.GetProperty("graph")), "Fixed metadata changed.");
         });

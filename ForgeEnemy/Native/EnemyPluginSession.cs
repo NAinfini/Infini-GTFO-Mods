@@ -21,7 +21,7 @@ internal sealed class EnemyPluginSession : IDisposable
     private EnemyPluginSession(RuntimeKernel kernel, Action<string> report, Action removeHooks)
     { _kernel = kernel; _report = report; _removeHooks = removeHooks; }
 
-    internal static EnemyPluginSession Start(RuntimeKernel kernel, Func<bool> canExecute,
+    internal static EnemyPluginSession Start(RuntimeKernel kernel, RuntimeLogLevel level, Func<bool> canExecute,
         Action<string> report, Action installHooks, Action removeHooks)
     {
         ArgumentNullException.ThrowIfNull(kernel); ArgumentNullException.ThrowIfNull(canExecute);
@@ -34,7 +34,7 @@ internal sealed class EnemyPluginSession : IDisposable
         try
         {
             // Duplicate registration throws atomically before any new Harmony patches are attempted.
-            session.Module = new EnemyModule(kernel, () => !session._faulted && canExecute(), report, EnemyEntityObserver.Read);
+            session.Module = new EnemyModule(kernel, level, () => !session._faulted && canExecute(), report, EnemyEntityObserver.Read);
             hooksAttempted = true; installHooks();
             return session;
         }

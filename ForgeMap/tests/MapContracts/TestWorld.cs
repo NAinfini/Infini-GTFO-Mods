@@ -14,8 +14,8 @@ sealed class TestWorld
     public TestWorld(bool loadPlan = true)
     {
         Kernel.BeginWorld(1);
-        Kernel.RegisterModule(ForgeMap.ModuleDefinition.Create());
-        Handle = Kernel.RegisterModule(Module());
+        Kernel.RegisterModule(ForgeMap.ModuleDefinition.Create(), RuntimeLogLevel.Off);
+        Handle = Kernel.RegisterModule(Module(), RuntimeLogLevel.Off);
         if (loadPlan && !Kernel.StartRuntime(() => Kernel.LoadPlan(Plan())))
             throw new InvalidOperationException("Synthetic host failed to start.");
     }

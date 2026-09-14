@@ -14,7 +14,7 @@
 
 ## 模块接入
 
-在首个 Runtime FixedUpdate 之前，从公开的 `Plugin.Runtime` 取得宿主，调用 `RegisterModule(RuntimeModule)`；第一方模块也走同一个接口。模块声明一个 provider、自己拥有的 capability，以及自己提供的 bindings，结构与网站 ForgeRegistry 完全一致。扩展 bindings 可以引用已注册的共同 canonical capability，不重新声明也不覆盖它。**计划词汇中的 planned 不能注册成可执行能力。**
+在首个 Runtime FixedUpdate 之前，从公开的 `Plugin.Runtime` 取得宿主，调用 `RegisterModule(RuntimeModule, RuntimeLogLevel)`；第一方模块也走同一个接口。级别是必填参数，来自该包自己 cfg 的 `Logging.Level`（D-007，见下文），**不放进 `RuntimeModule`**；一个包注册多个 provider 时逐个传同一个级别。Runtime 自己随宿主注册的内置 provider（CombatContracts、ControlContracts、Trigger 框架模块）没有包 cfg，走只对宿主程序集可见的内核内部路径取 Runtime 自己的级别，不经公开参数伪造。模块声明一个 provider、自己拥有的 capability，以及自己提供的 bindings，结构与网站 ForgeRegistry 完全一致。扩展 bindings 可以引用已注册的共同 canonical capability，不重新声明也不覆盖它。**计划词汇中的 planned 不能注册成可执行能力。**
 
 `RuntimeModule` 的 `Handlers` 以 `binding.handler` 字符串映射同步 `CommandHandler`。`EntityResolvers` 按精确对象 ID 前缀注册，例如 `gtfo.enemy` 对应 `gtfo.enemy:7`；ID 始终是字符串，完整引用还包含 worldEpoch 与 lifeEpoch。接收者有效性和具体游戏接收能力由所属模块再次检查，核心不按阵营或实体种类推断治疗与伤害目标。
 
@@ -80,13 +80,13 @@
 
 `TickResult` 另带 `Schedules` 和 `StateLeases` 收据，但**只包含该次 `Advance` 期间**产生的条目。主动调用 `Cancel()`、`Release()` 或 `CancelScope` 不保证出现在之后的 `TickResult` 里；这些调用应读方法自身的返回值和句柄的 `Status`/`Code`。
 
-## 执行日志 sink 与级别（D-007 阶段 B）
+## 执行日志 sink 与级别（D-007 阶段 A+B）
 
-合同在 `RuntimeLogContracts.cs`，内核侧在 `RuntimeKernel.Logging.cs`。宿主用 `RuntimeKernel(identity, limits, IRuntimeLogSink sink, RuntimeLogLevel runtimeLogLevel)` 构造内核，sink 在内核生命周期内固定，没有注册或替换接口。`RuntimeLogLevel` 为 `Off < Error < Info < Trace`，构造参数只接受 off、error、info（否则 `log-level`），trace 只能经提级得到。
+合同在 `RuntimeLogContracts.cs`，内核侧在 `RuntimeKernel.Logging.cs`。宿主用 `RuntimeKernel(identity, limits, IRuntimeLogSink sink, RuntimeLogLevel runtimeLogLevel)` 构造内核，sink 在内核生命周期内固定，没有注册或替换接口。`RuntimeLogLevel` 为 `Off < Error < Info < Trace`，构造参数只接受 off、error、info（否则 `log-level`），trace 只能经提级得到。`RuntimeLogConfiguration.ParseLevel(string)` 是宿主 cfg 与各包 cfg 共用的文本词表：off、error、info，大小写与首尾空白不敏感，非法值抛同一条消息；SDK 自己不读任何 cfg。
 
 - `RuntimeLogRecord` 是 `readonly struct`，以 `in` 传给 `IRuntimeLogSink.Write(in record, RuntimeLogLevels levels)`。字段：Level、Code、Provider、SubjectProvider?、Tick、WorldEpoch、Frame?、CommandId?、EventId?、CauseId?、RootEventId?、Plan?（planId 与 resource id/revision）、Entry?、Step?、Binding?、Result?（status、commit?、reason）。**没有 message 与 inputs**：消息由 sink 在后台线程拼，调用点不构造字符串；inputs 属于 Development 的 trace recorder，未实现。status 与 commit 本阶段是不做词表校验的字符串。
-- 级别表按 provider 保存。本阶段只有 Runtime 自身（`Identity.Id`）有条目，级别来自宿主 cfg。**领域 provider 不进表、没有默认级别**，`LogGate` 或 `WriteLog` 查不到时抛 `log-provider-unregistered`，不会静默当作 off 或 error。领域包的级别条目在阶段 A 随必填参数 `RegisterModule(RuntimeModule, RuntimeLogLevel)` 进入。
-- `ElevateLogging()` 把所有条目升为 Trace 并切换到提级限流档。只在注册窗口内接受一次；窗口关闭（Ready、Failed、Stopped）或第二次调用都抛 `log-elevation-rejected`，不可撤销。级别门是同一个可变对象，提级前取得的门也会看到 Trace。
+- 级别表按 provider 保存。每个条目在注册时建立：`RegisterModule(module, level)` 的级别只接受 off、error、info（否则 `log-level`），注册成功后该 provider 的 `LogGate` 返回这个级别；未注册的 provider 仍然抛 `log-provider-unregistered`，不静默当作 off 或 error。注销时移除条目，之后再查同样报错，不允许句柄失效后继续写。Runtime 自己的条目（`Identity.Id`）由宿主构造建立、也不由模块注销删除：模块即便声明同一个 provider id 也替换或删除不了它。表变化（注册、注销、提级）都立即发布新快照。
+- `ElevateLogging()` 把所有条目升为 Trace 并切换到提级限流档。只在注册窗口内接受一次；窗口关闭（Ready、Failed、Stopped）或第二次调用都抛 `log-elevation-rejected`，不可撤销。级别门是同一个可变对象，提级前取得的门也会看到 Trace；提级之后注册的 provider 也是 Trace，不是它的 cfg 值。
 - `WriteLog(in record)` 是记录点到 sink 的唯一通道：所属线程（`wrong-thread`）；无 sink 的内核抛 `log-unconfigured`；缺 code、provider 或不完整的 plan/result 抛 `log-record`；Off 或门未开抛 `log-level-disabled`。调用点应先比对门，再构造记录。
 - 每次级别表变化都会发布新的 `RuntimeLogLevels` 快照（按 provider 排序、带 tier），sink 据引用变化重写 `log.level`。
 - `RuntimeLogCodes` 只有 `log.dropped` 与 `log.level`；其余码表等网站拍板。

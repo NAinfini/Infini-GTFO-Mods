@@ -107,7 +107,7 @@ internal static class R3ConsumerTests
                 EntityObservers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>>
                 { ["test.entity"] = r => Entities.TryGetValue(r.Id, out var e) ? e : null }
             };
-            Handle = Kernel.RegisterModule(module);
+            Handle = Kernel.RegisterModule(module, RuntimeLogLevel.Off);
             Kernel.StartRuntime(() => Kernel.BeginWorld(1));
             Kernel.Advance(0, host);
         }

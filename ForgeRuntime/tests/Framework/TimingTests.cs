@@ -383,7 +383,7 @@ sealed class TimingScenario
         }
         return Kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> {
             [provider] = r => r.WorldEpoch == World && Lives.TryGetValue(r.Id, out var life) && r.LifeEpoch == life
-        } });
+        } }, RuntimeLogLevel.Off);
     }
     public void Plan(string id, string provider, bool secondAction = false, int steps = 1, Action<JsonNode>? tweak = null)
     {
@@ -400,7 +400,7 @@ sealed class TimingScenario
         var parameters = new JsonObject(); if (valueType != null) parameters["valueType"] = valueType;
         json["capabilities"] = new JsonArray(JsonNode.Parse(RuntimeJson.From(new { id, owner = provider, kind = "state", label = "Numeric contribution", version = "1.0.0", parameters }).GetRawText()));
         json["bindings"] = new JsonArray();
-        return Kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), BindingSupport = Array.Empty<BindingSupport>() });
+        return Kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), BindingSupport = Array.Empty<BindingSupport>() }, RuntimeLogLevel.Off);
     }
     public NumericLeaseRequest Lease(string provider, string id, EntityReference target, double additive = 5, double multiplier = 1)
         => new(id, State, "1.0.0", target, "scope", "speed", Entity(provider, "source"), 10, additive, multiplier);

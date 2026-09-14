@@ -16,7 +16,7 @@ internal sealed class TestWorld : IDisposable
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.weapon.test", "0.1.0",
             RuntimeKernel.ApiVersion, "synthetic-no-game"));
         Kernel.BeginWorld(7);
-        Session = new EquipmentIdentitySession(Kernel, _ =>
+        Session = new EquipmentIdentitySession(Kernel, RuntimeLogLevel.Off, _ =>
         {
             NativeReads++; DuringProbe?.Invoke(); return NativeCurrent;
         }, _ => { OwnerReads++; return OwnerCurrent; }, maxActive, maxHistory);

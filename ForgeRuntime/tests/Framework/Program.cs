@@ -37,7 +37,7 @@ void RejectCode(Action action, string code, string name)
     Check(a.Publish(s.Event("a1", "example.alpha", tick: 2)).Code == "event-id-conflict", "reusing identity with changed event rejects");
     Check(a.Publish(s.Event("cross", "example.beta")).Code == "binding-owner", "module cannot publish another module binding");
     Reject(() => s.Register("example.alpha"), "provider conflict rejects atomically");
-    Reject(() => s.Kernel.RegisterModule(Fixture.Module("example.third") with { ApiVersion = "1.0.0" }), "API version mismatch");
+    Reject(() => s.Kernel.RegisterModule(Fixture.Module("example.third") with { ApiVersion = "1.0.0" }, RuntimeLogLevel.Off), "API version mismatch");
     Check(b.IsRegistered, "rejected registration does not damage other module");
 }
 {
@@ -116,7 +116,7 @@ void RejectCode(Action action, string code, string name)
     var handlers = new Dictionary<string, CommandHandler> { [Fixture.Handler("example.alpha")] = _ => { s.Applied.Add("original"); using var doc = JsonDocument.Parse("{\"actual\":0}"); return CommandResult.Succeeded(doc.RootElement); } };
     var permissions = new List<string> { "example.health.write" };
     var module = Fixture.Module("example.alpha") with { Handlers = handlers, BindingSupport = Fixture.Support("example.alpha", permissions), EntityResolvers = s.Resolvers("example.alpha") };
-    var a = s.Kernel.RegisterModule(module);
+    var a = s.Kernel.RegisterModule(module, RuntimeLogLevel.Off);
     handlers[Fixture.Handler("example.alpha")] = _ => throw new Exception("mutated"); permissions.Clear();
     s.Plan("alpha", "example.alpha");
     using (var doc = JsonDocument.Parse("{\"target\":{\"id\":\"example.alpha:1\",\"worldEpoch\":1,\"lifeEpoch\":1}}"))
@@ -157,7 +157,7 @@ void RejectCode(Action action, string code, string name)
     Load(bad, "node-kind", "entrypoint binding index must name a trigger");
     var planned = Fixture.Module("example.planned"); var registry = JsonNode.Parse(planned.RegistryJson)!;
     registry["bindings"]![0]!["status"] = "planned";
-    Reject(() => s.Kernel.RegisterModule(planned with { RegistryJson = registry.ToJsonString() }), "planned catalog entry cannot register execution");
+    Reject(() => s.Kernel.RegisterModule(planned with { RegistryJson = registry.ToJsonString() }, RuntimeLogLevel.Off), "planned catalog entry cannot register execution");
 }
 {
     // Promotion: a value parameter becomes an input appended after the resolved inputs, driven by the event.
@@ -168,7 +168,7 @@ void RejectCode(Action action, string code, string name)
     });
     var seed = JsonNode.Parse(module.RegistryJson)!;
     seed["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"amount\",\"type\":\"number\"}"));
-    var handle = s.Kernel.RegisterModule(module with { RegistryJson = seed.ToJsonString(), EntityResolvers = s.Resolvers(id) });
+    var handle = s.Kernel.RegisterModule(module with { RegistryJson = seed.ToJsonString(), EntityResolvers = s.Resolvers(id) }, RuntimeLogLevel.Off);
     JsonNode Step(JsonNode plan) => plan["entrypoints"]![0]!["steps"]![0]!;
     JsonNode Promoted()
     {
@@ -205,7 +205,7 @@ void RejectCode(Action action, string code, string name)
         enumSeed["capabilities"]![1]!["graph"]!["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"schema\":\"compare_operator\",\"nullable\":true}"));
         // A structural literal narrows the index basis to its own inline `values`, not the shared set.
         enumSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"policy\",\"type\":\"enum\",\"role\":\"structural\",\"required\":true,\"values\":[\"floor\",\"ceil\",\"nearest\"]}"));
-        var enumHandle = s.Kernel.RegisterModule(enumModule with { RegistryJson = enumSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) });
+        var enumHandle = s.Kernel.RegisterModule(enumModule with { RegistryJson = enumSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) }, RuntimeLogLevel.Off);
         JsonNode EnumPlan(string policyConstantJson)
         {
             var plan = JsonNode.Parse(Fixture.Plan(s.Kernel, "enum_value", enumId))!;
@@ -246,7 +246,7 @@ void RejectCode(Action action, string code, string name)
         var opSeed = JsonNode.Parse(opModule.RegistryJson)!;
         opSeed["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"schema\":\"compare_operator\"}"));
         opSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"set\":\"compare_operator\"}"));
-        var opHandle = s.Kernel.RegisterModule(opModule with { RegistryJson = opSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) });
+        var opHandle = s.Kernel.RegisterModule(opModule with { RegistryJson = opSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) }, RuntimeLogLevel.Off);
         var opPlan = JsonNode.Parse(Fixture.Plan(s.Kernel, "promote_enum", enumId))!;
         opPlan["entrypoints"]![0]!["layout"]!["outputs"]![2]!["valueSet"] = 0;
         Step(opPlan)["layout"]!["constants"] = JsonNode.Parse("[5,null]"); Step(opPlan)["layout"]!["promoted"] = JsonNode.Parse("[1]");
@@ -302,7 +302,7 @@ void RejectCode(Action action, string code, string name)
     }).ToArray();
     static object Layout(JsonElement contract, object[] constants) => new { inputs = Slots(contract.GetProperty("inputs")), outputs = Slots(contract.GetProperty("outputs")), constants, promoted = Array.Empty<int>() };
     var graphKernel = new RuntimeKernel(Fixture.Identity); graphKernel.BeginWorld(1);
-    graphKernel.RegisterModule(ControlContracts.Module());
+    graphKernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
     var branchBinding = "forge.contract.control.binding.branch";
     // One module: the recorded-event trigger, the recorded action, and one pure condition (role evaluate, one
     // evaluator). The trigger gains a numeric output so the pure step is fed from a real event slot.
@@ -322,7 +322,7 @@ void RejectCode(Action action, string code, string name)
         role = "evaluate", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() }).GetRawText()));
     graphKernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
         Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = _ => RuntimeJson.From(new { value = true }) },
-        BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } });
+        BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off);
     var graph = RuntimeJson.Parse(graphKernel.ExportManifest()).GetProperty("registry");
     JsonElement Row(string list, string rowId) => graph.GetProperty(list).EnumerateArray().Single(r => r.GetProperty("id").GetString() == rowId);
     var pinIds = new[] { Fixture.Trigger(id), id + ".binding.apply", id + ".binding.compare", branchBinding }.OrderBy(x => x, StringComparer.Ordinal).ToArray();
@@ -375,12 +375,12 @@ void RejectCode(Action action, string code, string name)
     (RuntimeKernel Kernel, RuntimeModuleHandle Module) GraphKernel(EvaluatorHandler? evaluator = null, CommandHandler? action = null)
     {
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
-        kernel.RegisterModule(ControlContracts.Module());
+        kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         var module = kernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
             Handlers = action == null ? graphModule.Handlers : new Dictionary<string, CommandHandler> { [Fixture.Handler(id)] = action },
             Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = evaluator ?? (_ => RuntimeJson.From(new { value = true })) },
             BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) },
-            EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [id] = r => r.Id == id + ":1" && r.WorldEpoch == 1 && r.LifeEpoch == 1 } });
+            EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [id] = r => r.Id == id + ":1" && r.WorldEpoch == 1 && r.LifeEpoch == 1 } }, RuntimeLogLevel.Off);
         return (kernel, module);
     }
     void Bad(Action<JsonNode> mutate, string code, string name)
@@ -407,7 +407,7 @@ void RejectCode(Action action, string code, string name)
     otherKernel.RegisterModule(otherModule with { RegistryJson = otherSeed.ToJsonString(),
         Handlers = new Dictionary<string, CommandHandler>(),
         BindingSupport = new[] { new BindingSupport(Fixture.Trigger("example.other"), "implementation-only", Array.Empty<string>()),
-            new BindingSupport("example.other.binding.sequence", "implementation-only", Array.Empty<string>()) } });
+            new BindingSupport("example.other.binding.sequence", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off);
     var otherRegistry = RuntimeJson.Parse(otherKernel.ExportManifest()).GetProperty("registry");
     JsonElement OtherRow(string list, string rowId) => otherRegistry.GetProperty(list).EnumerateArray().Single(r => r.GetProperty("id").GetString() == rowId);
     JsonNode OtherPin(string pin)
@@ -445,7 +445,7 @@ void RejectCode(Action action, string code, string name)
         kernel.RegisterModule(otherModule with { RegistryJson = otherSeed.ToJsonString(),
             Handlers = new Dictionary<string, CommandHandler>(),
             BindingSupport = new[] { new BindingSupport(Fixture.Trigger("example.other"), "implementation-only", Array.Empty<string>()),
-                new BindingSupport("example.other.binding.sequence", "implementation-only", Array.Empty<string>()) } });
+                new BindingSupport("example.other.binding.sequence", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off);
         RejectCode(() => kernel.LoadPlan(candidate.ToJsonString()), code, name);
     }
     BadOther(p => { }, "control-unsupported", "R4-a only routes forge.control.flow.branch");
@@ -453,16 +453,16 @@ void RejectCode(Action action, string code, string name)
     // The evaluator table is exact in both directions: every implemented `evaluate` binding needs one, and nothing
     // else may be registered — a stale entry is a provider-side bug, not a spare handler the kernel can ignore.
     {
-        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1); kernel.RegisterModule(ControlContracts.Module());
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1); kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         RejectCode(() => kernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
-            BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }),
+            BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off),
             "missing-evaluator", "an evaluate binding without an evaluator rejects");
     }
     {
-        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1); kernel.RegisterModule(ControlContracts.Module());
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1); kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         RejectCode(() => kernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
             Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = _ => RuntimeJson.From(new { value = true }), [id + ".handler.spare"] = _ => RuntimeJson.From(new { value = true }) },
-            BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }),
+            BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off),
             "unused-evaluator", "an evaluator with no evaluate binding rejects");
     }
     Bad(p => Step(p, 0)["nodeKind"] = "condition", "node-kind", "a step nodeKind outside action/control/pure rejects");
@@ -522,10 +522,10 @@ void RejectCode(Action action, string code, string name)
     static (RuntimeKernel Kernel, RuntimeModuleHandle Handle) CompareKernel(List<string> applied)
     {
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
-        kernel.RegisterModule(ControlContracts.Module());
-        kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create());
+        kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
+        kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off);
         var handle = kernel.RegisterModule(Fixture.Module(Provider, _ => { applied.Add("action"); return CommandResult.Succeeded(RuntimeJson.EmptyObject); })
-            with { EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [Provider] = r => r.Id == Provider + ":1" && r.WorldEpoch == 1 && r.LifeEpoch == 1 } });
+            with { EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [Provider] = r => r.Id == Provider + ":1" && r.WorldEpoch == 1 && r.LifeEpoch == 1 } }, RuntimeLogLevel.Off);
         return (kernel, handle);
     }
     // Tolerance widens equality and shifts the ordered comparisons towards acceptance, so the last rows are chosen
@@ -578,7 +578,7 @@ void RejectCode(Action action, string code, string name)
         var module = Fixture.Module("example.contract"); var json = JsonNode.Parse(module.RegistryJson)!;
         mutate(json["capabilities"]![1]!["graph"]!);
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
-        void Register() => kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() });
+        void Register() => kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() }, RuntimeLogLevel.Off);
         if (code == null) Reject(Register, name); else RejectCode(Register, code, name);
     }
     Bad(g => g.AsObject().Remove("recipients"), "recipient-contract", "every action declares recipients");
@@ -598,7 +598,7 @@ void RejectCode(Action action, string code, string name)
         var module = Fixture.Module("example.contract_codes"); var json = JsonNode.Parse(module.RegistryJson)!;
         json["capabilities"]![1]!["graph"]!["outputs"]![1]!["codes"] = JsonNode.Parse("[\"first-code\",\"second-code\"]");
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
-        var handle = kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() });
+        var handle = kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() }, RuntimeLogLevel.Off);
         Check(handle.IsRegistered, "a valid result-port codes array registers");
     }
 }
@@ -607,7 +607,7 @@ void RejectCode(Action action, string code, string name)
     var common = Fixture.Module("forge.contract.test");
     var commonJson = JsonNode.Parse(common.RegistryJson)!;
     commonJson["bindings"] = new JsonArray();
-    var commonHandle = kernel.RegisterModule(common with { RegistryJson = commonJson.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), BindingSupport = Array.Empty<BindingSupport>() });
+    var commonHandle = kernel.RegisterModule(common with { RegistryJson = commonJson.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), BindingSupport = Array.Empty<BindingSupport>() }, RuntimeLogLevel.Off);
 var calls = 0; var handles = new List<RuntimeModuleHandle>();
 foreach (var provider in new[] { "example.alpha", "example.beta" })
 {
@@ -615,7 +615,7 @@ foreach (var provider in new[] { "example.alpha", "example.beta" })
     var json = JsonNode.Parse(module.RegistryJson)!; json["capabilities"] = new JsonArray();
     json["bindings"]![0]!["capabilityId"] = Fixture.TriggerCapability("forge.contract.test");
     json["bindings"]![1]!["capabilityId"] = Fixture.ActionCapability("forge.contract.test");
-    handles.Add(kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [provider] = _ => true } }));
+    handles.Add(kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [provider] = _ => true } }, RuntimeLogLevel.Off));
     kernel.LoadPlan(Fixture.Plan(kernel, provider, provider));
 }
 Check(JsonDocument.Parse(kernel.ExportManifest()).RootElement.GetProperty("registry").GetProperty("capabilities").GetArrayLength() == 2, "two extension modules reuse canonical semantics without duplicate definitions");
@@ -691,7 +691,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
                 .ToDictionary(b => b.GetProperty("handler").GetString()!, b => (CommandHandler)(_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)));
             var evaluators = bindings.Where(b => b.GetProperty("role").GetString() == "evaluate").ToDictionary(b => b.GetProperty("handler").GetString()!, b => doubles[b.GetProperty("handler").GetString()!]);
             var support = manifest.GetProperty("bindingSupport").EnumerateArray().Where(b => bindings.Any(row => row.GetProperty("id").GetString() == b.GetProperty("bindingId").GetString())).Select(b => new BindingSupport(b.GetProperty("bindingId").GetString()!, b.GetProperty("verification").GetString()!, b.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!).ToArray())).ToArray();
-            kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new { providers = new[] { provider }, capabilities, bindings }).GetRawText(), handlers, support) { Evaluators = evaluators });
+            kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new { providers = new[] { provider }, capabilities, bindings }).GetRawText(), handlers, support) { Evaluators = evaluators }, RuntimeLogLevel.Off);
         }
         return kernel;
     }
@@ -756,7 +756,7 @@ sealed class Scenario
     public Dictionary<string, Func<EntityReference, bool>> Resolvers(string id) => new() { [id] = r => r.Id == id + ":1" && r.WorldEpoch == World && r.LifeEpoch == Life };
     public RuntimeModuleHandle Register(string id, CommandHandler? handler = null) => Kernel.RegisterModule(Fixture.Module(id, handler ?? (ctx => {
         Applied.Add(id + ":" + ctx.Parameters.GetProperty("amount").GetDouble()); return CommandResult.Succeeded(RuntimeJson.From(new { actual = ctx.Parameters.GetProperty("amount").GetDouble() }));
-    })) with { EntityResolvers = Resolvers(id) });
+    })) with { EntityResolvers = Resolvers(id) }, RuntimeLogLevel.Off);
     public void Plan(string plan, string provider, int steps = 1) => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, steps));
     public RuntimeEvent Event(string id, string provider, long tick = 1) => new(id, Fixture.Trigger(provider), World, tick, "shared-scope", RuntimeJson.From(new { target = new EntityReference(provider + ":1", World, Life) }));
 }

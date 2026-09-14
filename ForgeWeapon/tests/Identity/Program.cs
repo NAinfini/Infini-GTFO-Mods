@@ -175,9 +175,9 @@ Case("live-replacement-needs-explicit-retirement", w =>
 Case("not-ready-and-registration-window", w =>
 {
     Reject(() => w.Session.Record(w.Item()), "equipment.not-authoritative-ready");
-    Reject(() => new EquipmentIdentitySession(w.Kernel, _ => true, _ => true), "provider-conflict");
+    Reject(() => new EquipmentIdentitySession(w.Kernel, RuntimeLogLevel.Off, _ => true, _ => true), "provider-conflict");
     w.Start(); var before = w.Kernel.ExportManifest();
-    Reject(() => new EquipmentIdentitySession(w.Kernel, _ => true, _ => true), "registration-closed");
+    Reject(() => new EquipmentIdentitySession(w.Kernel, RuntimeLogLevel.Off, _ => true, _ => true), "registration-closed");
     Check(w.Kernel.ExportManifest() == before, "rejected registration is atomic");
 }, start: false);
 Case("stop-clears-and-dispose-is-idempotent", w =>

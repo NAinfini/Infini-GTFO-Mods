@@ -1,6 +1,8 @@
 using System;
 using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Unity.IL2CPP;
+using ForgeRuntime.Framework;
 using HarmonyLib;
 using HostPlugin = ForgeRuntime.Plugin;
 
@@ -26,13 +28,14 @@ public sealed class Plugin : BasePlugin
             Log.LogInfo("Forge Enemy Off: no registration or native hooks.");
             return;
         }
+        var logLevel = LoggingLevel(Config);
         var kernel = HostPlugin.Runtime
             ?? throw new InvalidOperationException("Forge Runtime is unavailable; Enemy cannot initialize.");
         var harmony = new Harmony(PluginGuid);
         EnemyPluginSession? created = null;
         try
         {
-            created = EnemyPluginSession.Start(kernel, () => HostPlugin.CanExecuteGameplay,
+            created = EnemyPluginSession.Start(kernel, logLevel, () => HostPlugin.CanExecuteGameplay,
                 message => Log.LogWarning(message),
                 () =>
                 {
@@ -60,4 +63,13 @@ public sealed class Plugin : BasePlugin
 
     // Native IL2CPP hooks are process-lifetime; live reload has no validated recovery contract.
     public override bool Unload() => false;
+
+    // D-007: this package's own player-tier level, read once per Load and handed to the kernel with the registration.
+    // A malformed value fails startup instead of silently selecting a default.
+    private static RuntimeLogLevel LoggingLevel(ConfigFile config)
+    {
+        var level = config.Bind("Logging", "Level", "error",
+            "Forge Enemy records written to BepInEx/forge-logs/*.jsonl: off, error or info. error writes only when something goes wrong; info also writes normal records. Error and info records are mirrored to the console. Restart required.");
+        return RuntimeLogConfiguration.ParseLevel(level.Value);
+    }
 }

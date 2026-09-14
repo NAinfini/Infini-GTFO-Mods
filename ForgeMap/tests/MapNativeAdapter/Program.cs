@@ -56,7 +56,7 @@ RuntimeModule Other(string id, bool playerResolver) => new(RuntimeKernel.ApiVers
 }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>(),
     playerResolver ? new Dictionary<string, Func<EntityReference, bool>> { ["gtfo.player"] = _ => true } : null);
 MapPluginSession Start(RuntimeKernel kernel, List<string> info, List<string> warn, Action? install = null, Action? remove = null)
-    => MapPluginSession.Start(kernel, m => { outputs.Add(m); warn.Add(m); }, m => { outputs.Add(m); info.Add(m); },
+    => MapPluginSession.Start(kernel, RuntimeLogLevel.Off, m => { outputs.Add(m); warn.Add(m); }, m => { outputs.Add(m); info.Add(m); },
         install ?? (() => { }), remove ?? (() => { }));
 (SNet_Player Player, PlayerAgent Agent) Spawn(ulong lookup, bool bot = false)
 {
@@ -97,20 +97,20 @@ Case("module.provider-and-player-namespace-only", () =>
         Require(registry.GetProperty("capabilities").GetArrayLength() == 0 && registry.GetProperty("bindings").GetArrayLength() == 0,
             "Player identity claimed capabilities or bindings.");
     }
-    Throws("entity-namespace-conflict", () => kernel.RegisterModule(Other("test.player_namespace", true)));
+    Throws("entity-namespace-conflict", () => kernel.RegisterModule(Other("test.player_namespace", true), RuntimeLogLevel.Off));
     Throws("entity-instance-resolver-owner", () => kernel.RegisterModule(Other("test.player_lookup", false) with
-        { EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>> { ["gtfo.player"] = _ => null } }));
+        { EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>> { ["gtfo.player"] = _ => null } }, RuntimeLogLevel.Off));
 });
 Case("session.duplicate-map-provider-before-hooks", () =>
 {
-    var kernel = Kernel(); using var existing = kernel.RegisterModule(ModuleDefinition.Create());
+    var kernel = Kernel(); using var existing = kernel.RegisterModule(ModuleDefinition.Create(), RuntimeLogLevel.Off);
     string before = kernel.ExportManifest(); int installs = 0, removes = 0;
     Throws(null, () => Start(kernel, new(), new(), () => installs++, () => removes++));
     Require(installs == 0 && removes == 0 && kernel.ExportManifest() == before, "Duplicate provider touched hooks or ownership.");
 });
 Case("session.foreign-player-namespace-before-hooks", () =>
 {
-    var kernel = Kernel(); using var other = kernel.RegisterModule(Other("test.player_owner", true));
+    var kernel = Kernel(); using var other = kernel.RegisterModule(Other("test.player_owner", true), RuntimeLogLevel.Off);
     string before = kernel.ExportManifest(); int installs = 0;
     Throws("entity-namespace-conflict", () => Start(kernel, new(), new(), () => installs++));
     Require(installs == 0 && kernel.ExportManifest() == before, "Namespace conflict touched hooks or ownership.");
@@ -392,7 +392,7 @@ Case("session.native-fault-latches-and-clears", () =>
 Case("session.reporter-failure-cannot-escape", () =>
 {
     var kernel = Kernel();
-    using var session = MapPluginSession.Start(kernel, _ => throw new IOException("reporter"), _ => { }, () => { }, () => { });
+    using var session = MapPluginSession.Start(kernel, RuntimeLogLevel.Off, _ => throw new IOException("reporter"), _ => { }, () => { }, () => { });
     kernel.StartRuntime(() => { }); session.Guard(_ => throw new InvalidOperationException("native callback"));
     Require(session.Faulted && session.LastReporterFailure == "IOException", "Reporter failure escaped the guard.");
 });
@@ -445,9 +445,14 @@ Case("plugin.missing-runtime", () =>
     Host.Runtime = null; var plugin = new MapPlugin(); Throws(null, plugin.Load); Throws(null, plugin.Load);
     Require(Harmony.Patches == 0 && MapPlugin.Session == null, "Unavailable host still installed patches.");
 });
+Case("plugin.invalid-log-level", () =>
+{
+    Host.Runtime = Kernel(); var plugin = new MapPlugin(); plugin.Config.Preset["Logging.Level"] = "verbose"; Throws(null, plugin.Load);
+    Require(MapPlugin.Session == null && Harmony.Patches == 0, "Malformed Logging.Level still installed native work.");
+});
 Case("plugin.existing-map-provider-conflict", () =>
 {
-    Host.Runtime = Kernel(); using var existing = Host.Runtime.RegisterModule(ModuleDefinition.Create());
+    Host.Runtime = Kernel(); using var existing = Host.Runtime.RegisterModule(ModuleDefinition.Create(), RuntimeLogLevel.Off);
     string before = Host.Runtime.ExportManifest(); Throws(null, new MapPlugin().Load);
     Require(Harmony.Patches == 0 && Harmony.Unpatches == 0 && MapPlugin.Session == null && Host.Runtime.ExportManifest() == before,
         "Plugin patched or removed a provider it did not own.");

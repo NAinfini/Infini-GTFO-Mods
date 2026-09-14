@@ -19,7 +19,7 @@ internal static class PlanBoundaryTests
         void Refused(string seed, string plan, string name)
         {
             var kernel = Suite.Kernel();
-            kernel.RegisterModule(Module(fixture.GetProperty(seed)));
+            kernel.RegisterModule(Module(fixture.GetProperty(seed)), RuntimeLogLevel.Off);
             Suite.Reject(() => kernel.LoadPlan(plan), "layout-mismatch");
             Suite.Check(kernel.LoadedPlans == 0 && kernel.QueuedEvents == 0 && calls == 0,
                 name + ": rejected plan created execution or side effects.");
@@ -30,7 +30,7 @@ internal static class PlanBoundaryTests
             Suite.Test(plan + "-executes-once", () =>
             {
                 calls = 0;
-                var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Module(fixture.GetProperty(seed)));
+                var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Module(fixture.GetProperty(seed)), RuntimeLogLevel.Off);
                 kernel.BeginWorld(1);
                 kernel.StartRuntime(() => kernel.LoadPlan(fixture.GetProperty(plan).GetRawText()));
                 var evt = new RuntimeEvent(plan + "-event", Trigger, 1, 0, "test-scope",
@@ -45,7 +45,7 @@ internal static class PlanBoundaryTests
             });
         Suite.Test("expanded-port-group-layout", () =>
         {
-            var kernel = Suite.Kernel(); kernel.RegisterModule(Module(fixture.GetProperty("variableSeed")));
+            var kernel = Suite.Kernel(); kernel.RegisterModule(Module(fixture.GetProperty("variableSeed")), RuntimeLogLevel.Off);
             var outputs = kernel.ResolveGraphContract(Provider + ".action", "1.0.0", RuntimeJson.From(new { output_count = 3 }))
                 .GetProperty("outputs").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToArray();
             Suite.Check(outputs.SequenceEqual(new[] { "value_1", "value_2", "value_3", "result" }),

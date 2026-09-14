@@ -5,10 +5,32 @@ namespace BepInEx
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class BepInDependency : Attribute { public BepInDependency(string id, string version) { } }
 }
+namespace BepInEx.Configuration
+{
+    public sealed class ConfigEntry<T>
+    {
+        public T Value { get; set; }
+        internal ConfigEntry(T value) { Value = value; }
+    }
+    // Only the members the production plugin reads: one raw-text entry, with Preset driving a malformed value.
+    public sealed class ConfigFile
+    {
+        public readonly Dictionary<string, string> Preset = new();
+        private readonly Dictionary<string, object> entries = new();
+        public ConfigEntry<T> Bind<T>(string section, string key, T value, string description)
+        {
+            string id = section + "." + key;
+            if (entries.TryGetValue(id, out var prior)) return (ConfigEntry<T>)prior;
+            var entry = new ConfigEntry<T>(Preset.TryGetValue(id, out var selected) ? (T)(object)selected : value);
+            entries.Add(id, entry); return entry;
+        }
+    }
+}
 namespace BepInEx.Unity.IL2CPP
 {
     public abstract class BasePlugin
     {
+        public BepInEx.Configuration.ConfigFile Config { get; } = new();
         public TestLog Log { get; } = new();
         public abstract void Load();
         public virtual bool Unload() => false;

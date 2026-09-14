@@ -14,8 +14,8 @@ internal sealed class Scene : IDisposable
 
     internal Scene(bool start = true)
     {
-        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
-        Module = new(Kernel, () => Allowed, _ => { });
+        Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Module = new(Kernel, RuntimeLogLevel.Off, () => Allowed, _ => { });
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);
         if (start) Kernel.StartRuntime(() => { });
     }

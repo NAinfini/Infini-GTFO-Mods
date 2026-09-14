@@ -65,13 +65,26 @@ public sealed partial class RuntimeKernel
     private void Mutable()
     { ReadThread(); NoLifecycleMutation(); RuntimeJson.Require(!advancing, "reentrant-mutation", "Cannot change registration, plans or world during dispatch."); }
     internal bool IsRegistered(string provider, long token) => modules.TryGetValue(provider, out var current) && current == token;
-    public RuntimeModuleHandle RegisterModule(RuntimeModule module)
+    /// <summary>I-DIAG D-007. The level is the registering package's own cfg value and is required: a provider has no level
+    /// until its package hands one over, and the level table never invents a default for it. One package registering more
+    /// than one provider passes the same level for each. The Runtime's own built-in providers do not come through here.</summary>
+    public RuntimeModuleHandle RegisterModule(RuntimeModule module, RuntimeLogLevel level)
+    {
+        RuntimeJson.Require(level is RuntimeLogLevel.Off or RuntimeLogLevel.Error or RuntimeLogLevel.Info, "log-level",
+            "Configured log levels are off, error or info; trace is only reachable through elevation.");
+        return Register(module, level);
+    }
+    /// <summary>The Runtime's own built-in providers (CombatContracts, ControlContracts, the trigger frame module) ship no
+    /// package cfg, so they take the Runtime provider's level. Host assembly only: a domain package must hand over its own.</summary>
+    internal RuntimeModuleHandle RegisterBuiltinModule(RuntimeModule module) => Register(module, runtimeLogLevel);
+    private RuntimeModuleHandle Register(RuntimeModule module, RuntimeLogLevel level)
     {
         Mutable(); RuntimeJson.Require(IsRegistrationOpen, "registration-closed", "Module registration is frozen before host startup.");
         RuntimeJson.Require(modules.Count < 128, "module-budget", "Module capacity reached.");
         var next = registry.WithModule(module, ApiVersion, out var provider);
         RuntimeJson.Require(next.Providers.Count <= 2048 && next.Capabilities.Count <= 2048 && next.Bindings.Count <= 2048, "registry-budget", "Registration capacity reached.");
         registry = next; var token = ++generation; modules.Add(provider, token);
+        RegisterLogGate(provider, level);
         return new RuntimeModuleHandle(this, provider, token);
     }
     internal void Unregister(RuntimeModuleHandle handle)
@@ -86,6 +99,7 @@ public sealed partial class RuntimeKernel
         StopScheduledSource(provider, null, "module-unregistered"); StopStateSource(provider, null, "module-unregistered");
         RemoveLifecycleObservers(provider, handle.Generation);
         modules.Remove(provider); registry.Providers.Remove(provider);
+        UnregisterLogGate(provider);
         foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Evaluators.Remove(id); registry.Support.Remove(id); }
         foreach (var id in ownedCaps) { registry.Capabilities.Remove(id); registry.CapabilityRegistrants.Remove(id); }
         foreach (var key in registry.Resolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.Resolvers.Remove(key);

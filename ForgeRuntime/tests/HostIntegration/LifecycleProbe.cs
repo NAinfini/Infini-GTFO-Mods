@@ -15,7 +15,7 @@ internal static class LifecycleProbe
     }
     internal static void Startup()
     {
-        var k = Kernel(); var owner = k.RegisterModule(Module("test.lifecycle.owner"));
+        var k = Kernel(); var owner = k.RegisterModule(Module("test.lifecycle.owner"), RuntimeLogLevel.Off);
         var seen = new List<RuntimeLifecycleEvent>(); using var sub = owner.ObserveLifecycle(seen.Add);
         Verify.That(seen.Count == 1 && seen[0].Kind == RuntimeLifecycleKind.Snapshot, "current snapshot missing");
         Verify.That(k.IsRegistrationOpen && k.Lifecycle.SimulationTick == -1, "initial lifecycle is fabricated");
@@ -23,11 +23,11 @@ internal static class LifecycleProbe
         Verify.That(k.StartRuntime(() => {
             attempts++;
             Verify.That(!k.IsRegistrationOpen && k.StartupState == RuntimeStartupState.Starting, "freeze must precede initialization");
-            Verify.Reject(() => k.RegisterModule(Module("test.lifecycle.late")), "late registration accepted");
+            Verify.Reject(() => k.RegisterModule(Module("test.lifecycle.late"), RuntimeLogLevel.Off), "late registration accepted");
         }), "startup did not complete");
         Verify.That(attempts == 1 && k.StartupState == RuntimeStartupState.Ready, "ready state missing");
         Verify.That(!k.StartRuntime(() => attempts++) && attempts == 1, "startup repeated");
-        Verify.Reject(() => k.RegisterModule(Module("test.lifecycle.after")), "registration reopened after readiness");
+        Verify.Reject(() => k.RegisterModule(Module("test.lifecycle.after"), RuntimeLogLevel.Off), "registration reopened after readiness");
         Verify.That(seen.Select(e => e.Current.StartupState).SequenceEqual(new[] {
             RuntimeStartupState.Registering, RuntimeStartupState.Starting, RuntimeStartupState.Ready }), "startup order changed");
         k.Advance(0, true); k.Advance(0, true);
@@ -47,7 +47,7 @@ internal static class LifecycleProbe
     internal static void FailedStartup()
     {
         var k = Kernel(); int attempts = 0;
-        var owner = k.RegisterModule(Module("test.lifecycle.failure"));
+        var owner = k.RegisterModule(Module("test.lifecycle.failure"), RuntimeLogLevel.Off);
         var seen = new List<RuntimeLifecycleEvent>(); using var sub = owner.ObserveLifecycle(seen.Add);
         try { k.StartRuntime(() => { attempts++; throw new IOException("fixture startup error"); }); }
         catch (IOException) { }
@@ -55,19 +55,19 @@ internal static class LifecycleProbe
         Verify.That(attempts == 1 && k.StartupState == RuntimeStartupState.Failed, "failed initialization retried");
         Verify.That(seen.Last().Current.StartupState == RuntimeStartupState.Failed, "failure observation missing");
         Verify.That(k.LoadedPlans == 0 && k.QueuedEvents == 0, "failed startup retained work");
-        Verify.Reject(() => k.RegisterModule(Module("test.lifecycle.retry")), "failed startup reopened registration");
+        Verify.Reject(() => k.RegisterModule(Module("test.lifecycle.retry"), RuntimeLogLevel.Off), "failed startup reopened registration");
         Verify.Reject(() => k.Advance(1, true), "failed startup dispatched work");
         k.StopRuntime(); owner.Dispose();
     }
     internal static void Ownership()
     {
-        var k = Kernel(); var a = k.RegisterModule(Module("test.lifecycle.a"));
-        var b = k.RegisterModule(Module("test.lifecycle.b")); int first = 0, second = 0;
+        var k = Kernel(); var a = k.RegisterModule(Module("test.lifecycle.a"), RuntimeLogLevel.Off);
+        var b = k.RegisterModule(Module("test.lifecycle.b"), RuntimeLogLevel.Off); int first = 0, second = 0;
         var old = a.ObserveLifecycle(_ => first++, false);
         using var other = b.ObserveLifecycle(_ => second++, false);
         a.Dispose(); a.Dispose();
         Verify.That(!old.IsActive && other.IsActive, "unregister leaked observers or removed another module");
-        var replacement = k.RegisterModule(Module("test.lifecycle.a"));
+        var replacement = k.RegisterModule(Module("test.lifecycle.a"), RuntimeLogLevel.Off);
         using var fresh = replacement.ObserveLifecycle(_ => first++, false);
         old.Dispose(); k.BeginWorld(2);
         Verify.That(first == 1 && second == 1 && fresh.IsActive, "old generation removed new subscription");
@@ -79,7 +79,7 @@ internal static class LifecycleProbe
     }
     internal static void Isolation()
     {
-        var k = Kernel(); var owner = k.RegisterModule(Module("test.lifecycle.isolation"));
+        var k = Kernel(); var owner = k.RegisterModule(Module("test.lifecycle.isolation"), RuntimeLogLevel.Off);
         int healthy = 0;
         using var bad = owner.ObserveLifecycle(_ => throw new InvalidOperationException(new string('x', 9000)), false);
         using var good = owner.ObserveLifecycle(_ => healthy++, false);
@@ -104,12 +104,12 @@ internal static class LifecycleProbe
         var held = new List<RuntimeLifecycleSubscription>();
         for (int m = 0; m < RuntimeKernel.MaximumLifecycleObservers / RuntimeKernel.MaximumLifecycleObserversPerModule; m++)
         {
-            var owner = k.RegisterModule(Module("test.lifecycle.p" + m)); owners.Add(owner);
+            var owner = k.RegisterModule(Module("test.lifecycle.p" + m), RuntimeLogLevel.Off); owners.Add(owner);
             for (int i = 0; i < RuntimeKernel.MaximumLifecycleObserversPerModule; i++)
                 held.Add(owner.ObserveLifecycle(_ => { }, false));
         }
         Verify.That(held.Count == RuntimeKernel.MaximumLifecycleObservers, "capacity setup incomplete");
-        var extra = k.RegisterModule(Module("test.lifecycle.extra"));
+        var extra = k.RegisterModule(Module("test.lifecycle.extra"), RuntimeLogLevel.Off);
         Verify.Reject(() => extra.ObserveLifecycle(_ => { }, false), "global observer budget bypassed");
         held[0].Dispose();
         using var recovered = extra.ObserveLifecycle(_ => { }, false);
@@ -123,7 +123,7 @@ internal static class LifecycleProbe
     }
     internal static void Threading()
     {
-        var k = Kernel(); var owner = k.RegisterModule(Module("test.lifecycle.thread"));
+        var k = Kernel(); var owner = k.RegisterModule(Module("test.lifecycle.thread"), RuntimeLogLevel.Off);
         using var sub = owner.ObserveLifecycle(_ => { }, false);
         foreach (Action work in new Action[] { () => { _ = k.Lifecycle; },
             () => owner.ObserveLifecycle(_ => { }), () => sub.Dispose(), () => k.StartRuntime(() => { }),

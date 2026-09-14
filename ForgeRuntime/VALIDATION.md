@@ -4,6 +4,40 @@
 
 计划与状态见两仓统一框架第 6 节 U-RUNTIME（链接见[仓库 README](../README.md)）。本文只记录 Runtime 侧各次交付的实际内容、复跑命令与仍然存在的失败；没有任何游戏、安装、多人或恢复验收。
 
+## D-007 阶段 A — 注册时必填日志级别（2026-09-14）
+
+> 本节按任务要求放在顶部；本文件其余章节仍是按交付时间顺序排列的历史记录，下面 D-007 阶段 B 一节里的"只有 Runtime 自身有条目"是当时的记录，已被本节的注册级别取代。
+
+**改动。** SDK 的注册入口改为 `RegisterModule(RuntimeModule module, RuntimeLogLevel level)`，单参数重载删除，不留兼容路径；`level` 只接受 off、error、info，传 trace 报 `log-level`（提级是唯一的 trace 入口）。级别不放进 `RuntimeModule`：内核在注册成功时为该 provider 建 `RuntimeLogGate(level)`，注销时移除。`LogGate` 对已注册 provider 返回其级别，对未注册 provider 仍报 `log-provider-unregistered`；级别表在注册、注销与提级时发布新快照，snapshot 因此总是包含已注册 provider。提级之后再注册的 provider 也是 Trace，不是它的 cfg 值。Runtime 自己的条目（`Identity.Id`）由宿主构造建立，注册与注销两侧都跳过它，模块即使声明同一个 provider id 也不能替换或删除。Runtime 自己随宿主注册的 CombatContracts、ControlContracts 与 Trigger 框架模块没有包 cfg：它们走 `internal RegisterBuiltinModule`（Framework 程序集加 `InternalsVisibleTo("ForgeRuntime")`，只有宿主程序集能调用），取 Runtime 自己的级别，不经公开参数伪造。
+
+新增 `RuntimeLogConfiguration.ParseLevel(string)` 作为宿主 cfg 与各包 cfg 共用的文本词表（off/error/info，大小写与首尾空白不敏感，非法值抛同一条消息）；`RuntimeSettings` 改用它，行为不变。SDK 仍然不读任何 cfg。
+
+**各包接线。** Enemy、Weapon、Map 三个原生插件在自己的 `Load` 里绑定 `[Logging] Level`（默认 `error`，改动需重启，非法值在注册前抛错），把级别经 `EnemyPluginSession.Start` / `WeaponNativeSession.Start` / `MapPluginSession.Start` 传到 `EnemyModule` / `EquipmentIdentitySession` / `PlayerIdentityModule` 的 `RegisterModule` 调用；`MapIdentitySession` 与 `EquipmentIdentitySession` 的公开构造函数同样新增该参数。宿主 `Runtime.Mode = Off` 时三个插件都在读 cfg 之前返回，`Off` 下不会写出新的包 cfg 文件。Enemy、Map、Weapon 三个插件的测试替身补了 `BepInEx.Configuration.ConfigFile` / `ConfigEntry<T>` 与 `BasePlugin.Config`，并各加一条 `plugin.invalid-log-level` 用例（非法值在装 Hook 前失败）。
+
+**测试迁移。** 138 处测试 `RegisterModule` 调用点与 40 处模块/会话构造点改为显式传级别（测试统一传 `RuntimeLogLevel.Off`）。`tests/RuntimeLog` 的 provider 级别用例改为：未注册报 `log-provider-unregistered`；注册时传 info 后 `LogGate` 返回 info 且该 provider 的记录能进 sink；trace 作为注册级别被拒且不留条目；一个包注册两个 provider 时共用同一级别；注销后再次报错且记录被拒。`tests/GameBindings` 新增"Runtime 内置 provider 取 Runtime 自己的级别"断言。
+
+**编译（本次实际执行，未运行任何测试）。** `dotnet build <工程> -v q --artifacts-path $env:TEMP\dsh-d7a`，`GTFO_BEPINEX_PATH` 指向只读的 `Forge-MapEditor-QA` profile；三个原生工程另传 `-p:ForgeRuntimeAssembly=<artifacts>/bin/ForgeRuntime/debug/ForgeRuntime.dll` 与 `-p:ForgeFrameworkAssembly=<artifacts>/bin/ForgeRuntime.Framework/debug/ForgeRuntime.Framework.dll`（ForgeEnemy 各测试工程按自身 csproj 要求也传了 SDK 程序集）。`ForgeRuntime.Framework`、`ForgeRuntime` 宿主、三个 `Native` 工程与 33 个测试/领域工程共 38 次构建，退出码全为 0，0 警告 0 错误。
+
+**待 Claude 统一运行的测试（尚未运行，不能记为通过）。** 期望值按现有断言推断，只列本批直接相关者：
+
+| 套件与参数 | 本批关注点 |
+| --- | --- |
+| `tests/RuntimeLog --root <新目录>` | 注册/注销级别、级别表快照、Runtime 自己的条目不被模块替换或删除、提级与既有 writer 场景全部通过（原 127 项基础上调整 provider 级别用例） |
+| `tests/HostConfiguration` | `[Logging] Level` 的合法/非法值与保存往返不变；解析改走 `RuntimeLogConfiguration.ParseLevel` 后消息与拒绝行为一致 |
+| `tests/PluginStartup` | 宿主插件仍在 Harmony 与宿主初始化之前拒绝非法级别 |
+| `tests/GameBindings`（默认与 `--native`） | 新增内置 provider 级别断言；注册调用点补参后原有边界断言不变 |
+| `tests/HostIntegration --host <ForgeRuntime.dll>` | 日志调用点 IL 检查仍通过；宿主注册内置 provider 的调用点不构造字符串 |
+| `tests/ForgeTrigger`（Contracts / Pure / R3Consumers / Acceptance） | 补级别参数后注册与观察者语义不变 |
+| `ForgeEnemy/tests/NativePlugin` | 新增 `plugin.invalid-log-level`；其余 plugin/session 用例不变 |
+| `ForgeEnemy/tests/LifecycleFacts`、`EntityObservation`、`BehaviorObservation`、`CommitAudit`、`ReceiverProbe`、`SpawnRequirements` | 构造点补级别参数后原有断言不变 |
+| `ForgeMap/tests/MapNativeAdapter` | 新增 `plugin.invalid-log-level`；Map 插件接线与身份用例不变 |
+| `ForgeMap/tests/MapIdentity`、`MapContracts` | `MapIdentitySession` 新参数后的生命周期与注册用例不变 |
+| `ForgeWeapon/tests/NativeAdapter` | 新增 `plugin.invalid-log-level`；会话启动顺序与 owner 用例不变 |
+| `ForgeWeapon/tests/Identity`、`IdentityAcceptance`、`IdentityDispatchReview` | `EquipmentIdentitySession` 新参数后的注册、冲突与派发用例不变 |
+| `tests/Framework`、`GraphContracts`、`LifecycleWork`、`EntityObservation`、`Architecture` | 注册调用点补参后全部原有断言不变 |
+
+**未做/未验证。** 内核与领域都还没有记录点，玩家层仍不会写出任何业务记录；`log.level` 两行上限只在"注册期先于首条记录"的前提下成立（注册窗口在 `StartRuntime` 前关闭）；没有加载 GTFO，没有实机验证 `forge-logs` 输出或各包 cfg 文件的实际生成。网站合同 §I-DIAG 不需要改（接口文字与实现一致），如需补充可在 577 行后加一句"领域包 provider 的级别表条目在注销时移除"。
+
 ## R1 — 宿主编译基线
 
 R1 交接记录末段那三条 REOPENED 阻塞已全部解决：`ForgeEnemy/Receivers/EnemyHealthCommit.cs` 的 `RuntimeJson.Text` 缺失、`GameBindings/EnemyModule.cs` 的 `DamageObservation` 缺少 `damagePointer` 参数、以及六模块架构工程因此无法构建。旧 `GameBindings/EnemyModule.cs` 已在 E1 切换中移除。

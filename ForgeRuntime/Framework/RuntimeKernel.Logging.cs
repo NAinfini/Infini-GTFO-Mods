@@ -8,11 +8,13 @@ public sealed partial class RuntimeKernel
 {
     private readonly IRuntimeLogSink? logSink;
     private readonly Dictionary<string, RuntimeLogGate> logGates = new(StringComparer.Ordinal);
+    private readonly RuntimeLogLevel runtimeLogLevel;
     private RuntimeLogLevels? logLevels;
 
     /// <summary>Host constructor. The sink is fixed for this kernel's lifetime. <paramref name="runtimeLogLevel"/> is the host cfg
-    /// level of the Runtime's own provider (<see cref="RuntimeIdentity.Id"/>); domain providers are not in the level table yet
-    /// because their level arrives with registration, so looking them up is a contract violation rather than a default.</summary>
+    /// level of the Runtime's own provider (<see cref="RuntimeIdentity.Id"/>); a domain provider has no level until its package
+    /// hands one over with <see cref="RuntimeKernel.RegisterModule"/>, so looking one up earlier is a contract violation
+    /// rather than a default.</summary>
     public RuntimeKernel(RuntimeIdentity identity, RuntimeLimits limits, IRuntimeLogSink logSink, RuntimeLogLevel runtimeLogLevel)
         : this(identity, limits)
     {
@@ -20,8 +22,29 @@ public sealed partial class RuntimeKernel
         RuntimeJson.Require(runtimeLogLevel is RuntimeLogLevel.Off or RuntimeLogLevel.Error or RuntimeLogLevel.Info,
             "log-level", "Configured log levels are off, error or info; trace is only reachable through elevation.");
         this.logSink = logSink;
+        this.runtimeLogLevel = runtimeLogLevel;
         logGates.Add(identity.Id, new RuntimeLogGate(runtimeLogLevel));
         PublishLogLevels(RuntimeLogTier.Player);
+    }
+
+    /// <summary>Adds the entry a registering provider's level needs and republishes the table before that provider can write
+    /// anything, so its first record is announced against the right table. A provider registered after elevation is Trace
+    /// like every other one, never its cfg value; a kernel without a sink keeps no table at all. The Runtime's own entry
+    /// belongs to the host constructor, so a module claiming that provider id can neither replace nor drop it.</summary>
+    private void RegisterLogGate(string providerId, RuntimeLogLevel level)
+    {
+        if (logSink == null || providerId == Identity.Id) return;
+        logGates[providerId] = new RuntimeLogGate(logLevels!.Tier == RuntimeLogTier.Elevated ? RuntimeLogLevel.Trace : level);
+        PublishLogLevels(logLevels.Tier);
+    }
+
+    /// <summary>Drops the entry of an unregistered provider. The Runtime's own entry belongs to the host constructor, not to
+    /// a module, so a module claiming that provider id can never take Runtime logging down with it.</summary>
+    private void UnregisterLogGate(string providerId)
+    {
+        if (logSink == null || providerId == Identity.Id) return;
+        logGates.Remove(providerId);
+        PublishLogLevels(logLevels!.Tier);
     }
 
     /// <summary>Raises every provider to Trace for the rest of the session. Accepted once, only while registration is open,

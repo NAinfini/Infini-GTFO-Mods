@@ -25,7 +25,7 @@ internal sealed class WeaponNativeSession : IDisposable
     private WeaponNativeSession(RuntimeKernel kernel, Action<string> report, Action removeHooks)
     { _kernel = kernel; _report = report; _removeHooks = removeHooks; }
 
-    internal static WeaponNativeSession Start(RuntimeKernel kernel, Func<bool> canExecute,
+    internal static WeaponNativeSession Start(RuntimeKernel kernel, RuntimeLogLevel logLevel, Func<bool> canExecute,
         Action<string> report, Action<string> info, Action installHooks, Action removeHooks)
     {
         ArgumentNullException.ThrowIfNull(kernel); ArgumentNullException.ThrowIfNull(canExecute);
@@ -41,7 +41,7 @@ internal sealed class WeaponNativeSession : IDisposable
         {
             session.Adapter = new EquipmentNativeAdapter(kernel, () => !session._faulted && canExecute(), report, info);
             // Duplicate provider registration throws here, before any detour is attempted.
-            session.Identity = new EquipmentIdentitySession(kernel, session.Adapter.IsNativeCurrent, kernel.IsEntityCurrent);
+            session.Identity = new EquipmentIdentitySession(kernel, logLevel, session.Adapter.IsNativeCurrent, kernel.IsEntityCurrent);
             session.Adapter.Attach(session.Identity);
             Current = session;
             hooksAttempted = true; installHooks();

@@ -39,7 +39,7 @@ static class InstanceResolutionTests
             if (begin) Kernel.BeginWorld(1);
             Handle = Kernel.RegisterModule(Module("test.entities",
                 new() { ["test.entity"] = r => Owner?.Invoke(r) ?? Live.Contains(r) },
-                new() { ["test.entity"] = value => { Calls++; return Answer(value); } }));
+                new() { ["test.entity"] = value => { Calls++; return Answer(value); } }), RuntimeLogLevel.Off);
             if (start) Kernel.StartRuntime(() => { });
             return this;
         }
@@ -53,26 +53,26 @@ static class InstanceResolutionTests
     private static void Registration()
     {
         var kernel = Kernel(); Func<object, EntityReference?> any = _ => null;
-        Check.Reject(() => kernel.RegisterModule(Module("test.a", null, new() { ["test.entity"] = any })),
+        Check.Reject(() => kernel.RegisterModule(Module("test.a", null, new() { ["test.entity"] = any }), RuntimeLogLevel.Off),
             "instance resolver without any resolver", "entity-instance-resolver-owner");
-        Check.Reject(() => kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["test.other"] = any })),
+        Check.Reject(() => kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["test.other"] = any }), RuntimeLogLevel.Off),
             "instance resolver for a namespace this provider does not resolve", "entity-instance-resolver-owner");
-        Check.Reject(() => kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["Bad"] = any })),
+        Check.Reject(() => kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["Bad"] = any }), RuntimeLogLevel.Off),
             "invalid instance resolver namespace", "entity-instance-resolver");
-        Check.Reject(() => kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = null! })),
+        Check.Reject(() => kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = null! }), RuntimeLogLevel.Off),
             "null instance resolver", "entity-instance-resolver");
-        var owner = kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = any }));
+        var owner = kernel.RegisterModule(Module("test.a", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = any }), RuntimeLogLevel.Off);
         Check.That(owner.IsRegistered, "failed registrations were atomic; the provider id is still free");
-        Check.Reject(() => kernel.RegisterModule(Module("test.b", null, new() { ["test.entity"] = any })),
+        Check.Reject(() => kernel.RegisterModule(Module("test.b", null, new() { ["test.entity"] = any }), RuntimeLogLevel.Off),
             "another provider cannot attach an instance resolver to an owned namespace", "entity-instance-resolver-owner");
-        Check.Reject(() => kernel.RegisterModule(Module("test.b", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = any })),
+        Check.Reject(() => kernel.RegisterModule(Module("test.b", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = any }), RuntimeLogLevel.Off),
             "another provider cannot take over the namespace with its own resolver", "entity-namespace-conflict");
         var instance = new Native(); int ownerCalls = 0, otherCalls = 0;
         var probe = Kernel(); probe.BeginWorld(1);
         probe.RegisterModule(Module("test.a", new() { ["test.a_entity"] = _ => true },
-            new() { ["test.a_entity"] = _ => { ownerCalls++; return null; } }));
+            new() { ["test.a_entity"] = _ => { ownerCalls++; return null; } }), RuntimeLogLevel.Off);
         probe.RegisterModule(Module("test.b", new() { ["test.b_entity"] = _ => true },
-            new() { ["test.b_entity"] = _ => { otherCalls++; return new EntityReference("test.b_entity:1", 1, 1); } }));
+            new() { ["test.b_entity"] = _ => { otherCalls++; return new EntityReference("test.b_entity:1", 1, 1); } }), RuntimeLogLevel.Off);
         probe.StartRuntime(() => { });
         Check.That(probe.ResolveEntityInstance("test.a_entity", instance) == null && ownerCalls == 1 && otherCalls == 0,
             "only the owning provider is asked; a null answer never falls back to another provider");
@@ -95,7 +95,7 @@ static class InstanceResolutionTests
             "ready runtime without a world returns null without asking the provider");
 
         var failed = Kernel();
-        failed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = _ => null }));
+        failed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = _ => null }), RuntimeLogLevel.Off);
         try { failed.StartRuntime(() => throw new InvalidOperationException("startup")); } catch (InvalidOperationException) { }
         Check.Reject(() => failed.ResolveEntityInstance("test.entity", new Native()), "failed runtime rejects instance lookup", "runtime-not-ready");
         Check.Reject(() => failed.IsEntityCurrent(new EntityReference("test.entity:1", 0, 1)), "failed runtime rejects currency check", "runtime-not-ready");
@@ -122,7 +122,7 @@ static class InstanceResolutionTests
         var world = new World().Register();
         Check.Reject(() => world.Kernel.ResolveEntityInstance("test.unknown", world.Instance), "unknown kind has no instance resolver", "entity-resolver");
         var observed = Kernel(); observed.BeginWorld(1);
-        observed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, null));
+        observed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, null), RuntimeLogLevel.Off);
         observed.StartRuntime(() => { });
         Check.Reject(() => observed.ResolveEntityInstance("test.entity", new Native()),
             "resolver-only namespace does not enumerate or guess an instance", "entity-resolver");
@@ -140,8 +140,8 @@ static class InstanceResolutionTests
     {
         var routed = Kernel(); routed.BeginWorld(1);
         var other = new EntityReference("test.other:1", 1, 1);
-        routed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = _ => other }));
-        routed.RegisterModule(Module("test.others", new() { ["test.other"] = r => r == other }, null));
+        routed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, new() { ["test.entity"] = _ => other }), RuntimeLogLevel.Off);
+        routed.RegisterModule(Module("test.others", new() { ["test.other"] = r => r == other }, null), RuntimeLogLevel.Off);
         routed.StartRuntime(() => { });
         Check.That(routed.IsEntityCurrent(other) && routed.ResolveEntityInstance("test.entity", new Native()) == null,
             "a current reference from another provider's namespace is still returned as null");
@@ -212,7 +212,7 @@ static class InstanceResolutionTests
         var with = new World().Register(start: false);
         var without = Kernel(); without.BeginWorld(1);
         without.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, Registry("test.entities"), new Dictionary<string, CommandHandler>(),
-            Array.Empty<BindingSupport>(), new Dictionary<string, Func<EntityReference, bool>> { ["test.entity"] = _ => true }));
+            Array.Empty<BindingSupport>(), new Dictionary<string, Func<EntityReference, bool>> { ["test.entity"] = _ => true }), RuntimeLogLevel.Off);
         Check.That(with.Kernel.ExportManifest() == without.ExportManifest(), "manifest does not expose instance resolvers");
     }
 }

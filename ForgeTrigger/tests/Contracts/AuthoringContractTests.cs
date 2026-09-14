@@ -28,7 +28,7 @@ internal static class AuthoringContractTests
             var module = new RuntimeModule(RuntimeKernel.ApiVersion, seed.GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
             if (row.GetProperty("accepted").GetBoolean())
             {
-                using (kernel.RegisterModule(module))
+                using (kernel.RegisterModule(module, RuntimeLogLevel.Off))
                 {
                     var snapshot = RuntimeJson.Parse(kernel.ExportManifest());
                     check(snapshot.GetProperty("registry").GetProperty("capabilities").GetArrayLength() == 1, "single-owner metadata registered " + id);
@@ -39,7 +39,7 @@ internal static class AuthoringContractTests
             }
             else
             {
-                try { kernel.RegisterModule(module); check(false, "unsupported metadata accepted " + id); }
+                try { kernel.RegisterModule(module, RuntimeLogLevel.Off); check(false, "unsupported metadata accepted " + id); }
                 catch (RuntimeContractException error)
                 {
                     check(error.Code == row.GetProperty("expectedCode").GetString()

@@ -26,7 +26,7 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 
 `Record` 只在同一生命、同一 owner、同一槽位且都在 Inventory 时，直接观察到 `IsWielded` 翻转，才发布 equipped 或 unequipped 事实。初始快照、移动、转交和新生命都不发布。
 
-当前必须在 Runtime 的注册窗口内显式创建 Session 并传入两个真正核验当前原生实例和玩家生命的探测函数。原生接线里这两个函数分别是 `EquipmentNativeAdapter.IsNativeCurrent`（严格读回）与 SDK 的 `RuntimeKernel.IsEntityCurrent`（owner 是 ForgeMap 登记的 `gtfo.player` 引用，由其拥有者核验）。写入与解析要求 Runtime Ready 且已完成首个 host tick，未初始化、客户端、未知权限与注销状态都不接收记录。示例测试里的永真探测**只能用于合成输入，绝不能作为游戏默认实现**。
+当前必须在 Runtime 的注册窗口内显式创建 Session 并传入本包 cfg 的 `Logging.Level`（D-007，随 `RegisterModule` 交给内核）与两个真正核验当前原生实例和玩家生命的探测函数。原生接线里这两个函数分别是 `EquipmentNativeAdapter.IsNativeCurrent`（严格读回）与 SDK 的 `RuntimeKernel.IsEntityCurrent`（owner 是 ForgeMap 登记的 `gtfo.player` 引用，由其拥有者核验）。写入与解析要求 Runtime Ready 且已完成首个 host tick，未初始化、客户端、未知权限与注销状态都不接收记录。示例测试里的永真探测**只能用于合成输入，绝不能作为游戏默认实现**。
 
 索引不生成世界、生命或资源身份，也不从 slot、模型、资源名、owner 或裸指针推断另一个身份。新实例必须由原生接线提供经核验的新引用；同一 ID 必须在精确退役之后以更大的 lifeEpoch 再出现。历史到预算上限时明确拒绝，**不淘汰旧记录后放行重放**。探测期间重入 Record / Remove / Dispose 会被拒绝；探测中发生世界切换、停止或注销会重新检查，迟到的观察不能写进新世界。
 
@@ -35,7 +35,7 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 `Native/ForgeWeapon.Native.csproj` 是独立项目，引用真实 interop 程序集与宿主 `ForgeRuntime.dll` 编译，不进入 `ForgeWeapon.dll`，也不引用 ForgeMap 程序集。
 
 组成：
-- `Plugin`：BepInEx 插件 `NAinfini.ForgeWeapon` / `Infini Forge Weapon` / `0.1.0`（与 `ForgeWeapon.dll` 版本一致），依赖 `NAinfini.ForgeRuntime` 1.2.0 与 `NAinfini.ForgeMap` 0.1.0。宿主 Off 时不注册、不装 Hook；宿主不可用时抛出；Load 只允许一次，失败回滚并保留原始异常，`Unload()` 返回 false（不热卸载）。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
+- `Plugin`：BepInEx 插件 `NAinfini.ForgeWeapon` / `Infini Forge Weapon` / `0.1.0`（与 `ForgeWeapon.dll` 版本一致），依赖 `NAinfini.ForgeRuntime` 1.2.0 与 `NAinfini.ForgeMap` 0.1.0。宿主 Off 时不注册、不装 Hook；宿主不可用时抛出；Load 只允许一次，失败回滚并保留原始异常，`Unload()` 返回 false（不热卸载）。本包自己的 cfg 是 `BepInEx/config/NAinfini.ForgeWeapon.cfg`，D-007 的 `[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启，非法值在注册前抛错；该级别随注册交给内核，成为 `forge.module.gtfo.weapon` 这个 provider 自己的级别。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
 - `WeaponNativeSession` 按固定顺序启动：注册窗口内先注册身份 Session（重复 provider 在装 Hook 前失败），再装 Hook；失败时回滚，释放时先注销再卸 Hook。任何意外异常都锁存故障，并清空句柄表。
 - `WeaponNativeHooks` 有 8 个 `Priority.Last` 的 postfix-only Hook，只读回、不改参数或返回值：
   - `PlayerBackpack.CreateAndStoreBackpackItem` / `TryClearSlot` / `DestroyAllInstance` / `SetDeployed`

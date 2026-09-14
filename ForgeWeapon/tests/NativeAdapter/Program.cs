@@ -42,7 +42,7 @@ Case("session.registration-before-hooks", () =>
 });
 Case("session.duplicate-provider-before-hooks", () =>
 {
-    var w = new World(start: false); var other = w.Kernel.RegisterModule(ModuleDefinition.Create());
+    var w = new World(start: false); var other = w.Kernel.RegisterModule(ModuleDefinition.Create(), RuntimeLogLevel.Off);
     string before = w.Kernel.ExportManifest();
     Throws("provider-conflict", () => w.StartSession());
     Require(w.Installs == 0 && w.Removes == 0 && WeaponNativeSession.Current == null && w.Kernel.ExportManifest() == before,
@@ -413,9 +413,15 @@ Case("plugin.missing-runtime", () =>
     Host.Runtime = null; var plugin = new WeaponPlugin(); Throws(null, plugin.Load); Throws(null, plugin.Load);
     Require(Harmony.Patches == 0 && WeaponNativeSession.Current == null, "Unavailable host still installed patches.");
 });
+Case("plugin.invalid-log-level", () =>
+{
+    var w = new World(start: false); Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Play; Host.Runtime = w.Kernel;
+    var plugin = new WeaponPlugin(); plugin.Config.Preset["Logging.Level"] = "verbose"; Throws(null, plugin.Load);
+    Require(WeaponNativeSession.Current == null && Harmony.Patches == 0, "Malformed Logging.Level still installed native work.");
+});
 Case("plugin.existing-weapon-provider-conflict", () =>
 {
-    var w = new World(start: false); Host.Runtime = w.Kernel; using var existing = w.Kernel.RegisterModule(ModuleDefinition.Create());
+    var w = new World(start: false); Host.Runtime = w.Kernel; using var existing = w.Kernel.RegisterModule(ModuleDefinition.Create(), RuntimeLogLevel.Off);
     string before = w.Kernel.ExportManifest(); Throws("provider-conflict", new WeaponPlugin().Load);
     Require(Harmony.Patches == 0 && Harmony.Unpatches == 0 && WeaponNativeSession.Current == null && w.Kernel.ExportManifest() == before,
         "Plugin patched or removed a provider it did not own.");
@@ -518,15 +524,15 @@ sealed class World : IDisposable
                     return instance is SNet_Player player && PlayerRefs.TryGetValue(player, out var reference) ? reference : null;
                 }
             } : null
-        });
-        consumer = Kernel.RegisterModule(ConsumerModule());
+        }, RuntimeLogLevel.Off);
+        consumer = Kernel.RegisterModule(ConsumerModule(), RuntimeLogLevel.Off);
         if (!start) return;
         StartSession();
         StartRuntime();
     }
 
     internal WeaponNativeSession StartSession(Action? install = null, Action? remove = null)
-        => WeaponNativeSession.Start(Kernel, () => CanExecute, Reports.Add, Infos.Add,
+        => WeaponNativeSession.Start(Kernel, RuntimeLogLevel.Off, () => CanExecute, Reports.Add, Infos.Add,
             install ?? (() => { Installs++; DuringInstall?.Invoke(); }), remove ?? (() => Removes++));
 
     internal void StartRuntime()

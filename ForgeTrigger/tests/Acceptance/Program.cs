@@ -8,7 +8,7 @@ var output = Path.GetFullPath(args[1]);
 if (args[0] == "export")
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "independent-acceptance-no-game"));
-    using var canonical = kernel.RegisterModule(CombatContracts.Module());
+    using var canonical = kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
     File.WriteAllText(Path.Combine(output, "sdk-canonical-manifest.json"), kernel.ExportManifest());
     return 0;
 }

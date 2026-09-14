@@ -150,8 +150,8 @@ using (var fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "tes
 
 // Dependencies follow actual references; Enemy bindings are read from the real provider registry.
 var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
-kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module());
-using var module = new EnemyModule(kernel, () => true, _ => { });
+kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+using var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
 using var manifest = JsonDocument.Parse(kernel.ExportManifest());
 var enemyBindingRows = manifest.RootElement.GetProperty("registry").GetProperty("bindings").EnumerateArray()
     .Where(b => b.GetProperty("providerId").GetString() == ModuleDefinition.ProviderId).ToArray();

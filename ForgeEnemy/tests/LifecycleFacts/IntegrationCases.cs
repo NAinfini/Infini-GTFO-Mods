@@ -73,10 +73,10 @@ internal static class IntegrationCases
     private static void Hooks()
     {
         var k = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
-        k.BeginWorld(1); k.RegisterModule(CombatContracts.Module());
-        using var session = EnemyPluginSession.Start(k, () => true, _ => { }, () => { }, () => { });
+        k.BeginWorld(1); k.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        using var session = EnemyPluginSession.Start(k, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => { });
         var rows = new List<CommandContext>();
-        using var sink = k.RegisterModule(LocalPlan.Recorder(rows.Add));
+        using var sink = k.RegisterModule(LocalPlan.Recorder(rows.Add), RuntimeLogLevel.Off);
         var actor = Scene.NewEnemy(); session.Module.TrackSpawn(actor);
         foreach (var suffix in new[] { "death_started", "limb_broken" }) LocalPlan.Load(k, Scene.FactPlan(k, suffix));
         k.StartRuntime(() => { });

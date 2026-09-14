@@ -27,8 +27,8 @@ internal sealed class WorkFixture
         // The website manifest owns the pins and the permission declarations; the capabilities and the trigger
         // evaluator come from the SDK, and the native enemy surface is registered from the manifest's own rows with
         // managed doubles, so the fixture exercises the declared contracts rather than a copy of them.
-        Kernel.RegisterModule(CombatContracts.Module());
-        Kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create());
+        Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off);
         var declared = manifest.GetProperty("registry");
         var enemyProvider = declared.GetProperty("providers").EnumerateArray()
             .Single(p => p.GetProperty("id").GetString() == "forge.module.gtfo.enemy");
@@ -42,7 +42,7 @@ internal sealed class WorkFixture
             { Commits++; OnCommit?.Invoke(ctx); return CommandResult.Succeeded(RuntimeJson.EmptyObject); }));
         Owner = Kernel.RegisterModule(new(RuntimeKernel.ApiVersion,
             RuntimeJson.From(new { providers = new[] { enemyProvider }, capabilities = Array.Empty<object>(), bindings = enemyBindings }).GetRawText(),
-            enemyHandlers, enemySupport, new Dictionary<string, Func<EntityReference, bool>> { ["gtfo.enemy"] = r => r == Target }));
+            enemyHandlers, enemySupport, new Dictionary<string, Func<EntityReference, bool>> { ["gtfo.enemy"] = r => r == Target }), RuntimeLogLevel.Off);
         Plan = LocalPlan();
         RegisterState();
         if (ready) { Kernel.StartRuntime(() => Kernel.LoadPlan(Plan)); Kernel.Advance(0, true); }
@@ -124,7 +124,7 @@ internal sealed class WorkFixture
             capabilities = new[] { new { id = StateId, owner = id, kind = "state", version = "1.0.0",
                 label = "Lifecycle cleanup test contribution", parameters = new { valueType = "numeric-contribution" } } },
             bindings = Array.Empty<object>()
-        }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>()));
+        }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>()), RuntimeLogLevel.Off);
     }
     internal RuntimeEvent Event(string id, long tick = 10) => new(id, Trigger, Kernel.WorldEpoch, tick,
         "test.lifecycle.scope", RuntimeJson.From(new { source = (EntityReference?)null, target = Target, amount = 10,

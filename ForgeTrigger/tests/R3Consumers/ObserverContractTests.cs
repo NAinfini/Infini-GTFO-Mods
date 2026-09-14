@@ -52,17 +52,17 @@ internal static class ObserverContractTests
         void RejectAtomic(string name, RuntimeModule module)
         {
             var before = k.ExportManifest();
-            try { k.RegisterModule(module); check(false, name + " accepted"); }
+            try { k.RegisterModule(module, RuntimeLogLevel.Off); check(false, name + " accepted"); }
             catch (RuntimeContractException) { check(k.ExportManifest() == before, name + " is atomic"); }
         }
         RejectAtomic("observer without resolver", ObservationWorld.Definition("test.orphan", new Dictionary<string, Func<EntityReference, bool>>(), observers));
         var nullObserver = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>> { ["test.owner"] = null! };
         RejectAtomic("null observer", ObservationWorld.Definition("test.null", resolvers, nullObserver));
-        var handle = k.RegisterModule(ObservationWorld.Definition("test.owner.module", resolvers, observers));
+        var handle = k.RegisterModule(ObservationWorld.Definition("test.owner.module", resolvers, observers), RuntimeLogLevel.Off);
         RejectAtomic("observer stealing resolver", ObservationWorld.Definition("test.thief", new Dictionary<string, Func<EntityReference, bool>>(), observers));
         handle.Dispose();
         var replacements = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>> { ["test.owner"] = _ => entity };
-        using var replacement = k.RegisterModule(ObservationWorld.Definition("test.replacement", resolvers, replacements));
+        using var replacement = k.RegisterModule(ObservationWorld.Definition("test.replacement", resolvers, replacements), RuntimeLogLevel.Off);
         // Mutating supplied dictionaries after registration must not change the selected callbacks.
         replacements["test.owner"] = _ => null;
         k.StartRuntime(() => k.BeginWorld(1)); k.Advance(0, true);
@@ -72,7 +72,7 @@ internal static class ObserverContractTests
         var manyResolvers = Enumerable.Range(0, 257).ToDictionary(i => "test.n" + i, i => (Func<EntityReference, bool>)(_ => true));
         var manyObservers = manyResolvers.Keys.ToDictionary(id => id, id => (Func<EntityReference, RuntimeEntitySnapshot?>)(_ => null));
         var baseline = budgetKernel.ExportManifest();
-        try { budgetKernel.RegisterModule(ObservationWorld.Definition("test.large", manyResolvers, manyObservers)); check(false, "observer capacity ignored"); }
+        try { budgetKernel.RegisterModule(ObservationWorld.Definition("test.large", manyResolvers, manyObservers), RuntimeLogLevel.Off); check(false, "observer capacity ignored"); }
         catch (RuntimeContractException error) { check(error.Code == "entity-observer-budget" && baseline == budgetKernel.ExportManifest(), "observer capacity rejects atomically"); }
         budgetKernel.StopRuntime();
     }

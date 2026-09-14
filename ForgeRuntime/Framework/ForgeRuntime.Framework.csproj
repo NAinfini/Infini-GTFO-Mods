@@ -9,4 +9,11 @@
     <Version>1.0.0</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- D-007 stage A: the host assembly registers the Runtime's own built-in providers with the Runtime's level through
+         RegisterBuiltinModule. That path is internal, so no domain package can reach it through the public SDK surface. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>ForgeRuntime</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

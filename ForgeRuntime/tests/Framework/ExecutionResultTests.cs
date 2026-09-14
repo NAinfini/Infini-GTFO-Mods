@@ -197,7 +197,7 @@ internal static class ExecutionResultTests
                 throw new InvalidOperationException("resolver failed");
             };
             var module = Fixture.Module("example.alpha") with { EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { ["example.alpha"] = resolver } };
-            var a = s.Kernel.RegisterModule(module);
+            var a = s.Kernel.RegisterModule(module, RuntimeLogLevel.Off);
             s.Plan("resolver-plan", "example.alpha");
             a.Publish(s.Event("resolver-event", "example.alpha"));
             var tick = s.Kernel.Advance(1, true);

@@ -25,13 +25,13 @@ var production = ForgeTrigger.ModuleDefinition.Create();
 Check(production.Handlers.Count == 0 && production.BindingSupport.Count == 0,
     "production Trigger does not advertise test handlers or support");
 var registration = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
-using (var registered = registration.RegisterModule(production))
+using (var registered = registration.RegisterModule(production, RuntimeLogLevel.Off))
 {
     var snapshot = RuntimeJson.Parse(registration.ExportManifest()).GetProperty("registry");
     Check(snapshot.GetProperty("capabilities").GetArrayLength() == 0 && snapshot.GetProperty("bindings").GetArrayLength() == 0,
         "production Trigger manifest remains empty");
     var before = registration.ExportManifest();
-    Reject(() => registration.RegisterModule(production), "provider-conflict", "duplicate provider rejected");
+    Reject(() => registration.RegisterModule(production, RuntimeLogLevel.Off), "provider-conflict", "duplicate provider rejected");
     Check(before == registration.ExportManifest(), "duplicate rejection is atomic");
     registration.BeginWorld(1);
     Check(registration.Advance(0, true).CommandsExecuted == 0 && registration.QueuedEvents == 0,
@@ -47,7 +47,7 @@ if (args[0] == "export")
     using var harness = new Harness(seed);
     File.WriteAllText(Path.Combine(output, "sdk-manifest.json"), harness.Kernel.ExportManifest());
     var canonicalKernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "canonical-contract-audit-no-game"));
-    using (canonicalKernel.RegisterModule(CombatContracts.Module()))
+    using (canonicalKernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off))
         File.WriteAllText(Path.Combine(output, "sdk-canonical-manifest.json"), canonicalKernel.ExportManifest());
     Console.WriteLine($"PASS {assertions} export/architecture assertions; synthetic manifest only.");
     return;
@@ -155,7 +155,7 @@ sealed class Harness : IDisposable
                 Calls.Add(context);
                 return Outcome == "unknown" ? CommandResult.FailedUnknown("synthetic-unknown") : CommandResult.Succeeded(RuntimeJson.From(new { value = context.Inputs.GetProperty("value").GetDouble() }));
             } }, support, new Dictionary<string, Func<EntityReference, bool>>
-            { ["test.entity"] = e => e.WorldEpoch == Kernel.WorldEpoch && Lives.TryGetValue(e.Id, out var life) && e.LifeEpoch == life }));
+            { ["test.entity"] = e => e.WorldEpoch == Kernel.WorldEpoch && Lives.TryGetValue(e.Id, out var life) && e.LifeEpoch == life }), RuntimeLogLevel.Off);
     }
     public RuntimeEvent Event() => new("event-1", "test.trigger.binding.event", 1, 1, "scope",
         RuntimeJson.From(new { target = new EntityReference("test.entity:target", 1, 1), amount = 5, enabled = true, position = new[] { 0, 0, 0 }, distance = 10, maybe_target = (EntityReference?)null }),

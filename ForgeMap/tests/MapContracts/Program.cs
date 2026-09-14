@@ -106,7 +106,7 @@ Check(!assembly.GetReferencedAssemblies().Any(a => a.Name!.StartsWith("Unity") |
 }
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("map1.lifecycle.test", "1.0.0", RuntimeKernel.ApiVersion, "offline-fixture"));
-    using var map = kernel.RegisterModule(ForgeMap.ModuleDefinition.Create());
+    using var map = kernel.RegisterModule(ForgeMap.ModuleDefinition.Create(), RuntimeLogLevel.Off);
     var observed = new List<RuntimeLifecycleKind>();
     using var observer = map.ObserveLifecycle(value => observed.Add(value.Kind));
     Check(observed.SequenceEqual(new[] { RuntimeLifecycleKind.Snapshot }), "Map handle observes public current lifecycle snapshot");

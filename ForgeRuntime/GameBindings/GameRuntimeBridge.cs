@@ -46,9 +46,10 @@ internal static class GameRuntimeBridge
         _log = new RuntimeLogWriter(Path.Combine(Paths.BepInExRootPath, RuntimeLogWriter.DirectoryName), Plugin.PluginLog, RuntimeLogLimits.Default);
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, GameBuild), new RuntimeLimits(), _log, logLevel);
         Kernel.BeginWorld(_epoch);
-        Kernel.RegisterModule(CombatContracts.Module());
-        Kernel.RegisterModule(ControlContracts.Module());
-        Kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create());
+        // D-007: the Runtime's own providers carry the Runtime cfg level; only packages with their own plugin pass one.
+        Kernel.RegisterBuiltinModule(CombatContracts.Module());
+        Kernel.RegisterBuiltinModule(ControlContracts.Module());
+        Kernel.RegisterBuiltinModule(ForgeTrigger.ModuleDefinition.Create());
     }
 
     internal static void FixedTick()

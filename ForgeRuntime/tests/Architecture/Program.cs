@@ -41,7 +41,7 @@ foreach (var definition in definitions)
 {
     var module = definition.Create();
     Check(module.GetType().Assembly == sdk, definition.Type.Namespace + " uses the public SDK type");
-    handles.Add(kernel.RegisterModule(module));
+    handles.Add(kernel.RegisterModule(module, RuntimeLogLevel.Off));
 }
 Check(handles.Select(h => h.ProviderId).Distinct().Count() == definitions.Length, "all providers can coexist");
 var manifestBeforeDuplicate = kernel.ExportManifest();
@@ -65,7 +65,7 @@ using (var manifest = JsonDocument.Parse(manifestBeforeDuplicate))
 }
 try
 {
-    kernel.RegisterModule(definitions[0].Create());
+    kernel.RegisterModule(definitions[0].Create(), RuntimeLogLevel.Off);
     throw new Exception("FAIL: duplicate provider accepted");
 }
 catch (RuntimeContractException error)
@@ -82,8 +82,8 @@ Check(handles.All(h => !h.IsRegistered), "module disposal is idempotent");
 using (var manifest = JsonDocument.Parse(kernel.ExportManifest()))
     Check(manifest.RootElement.GetProperty("registry").GetProperty("providers").GetArrayLength() == 0, "all providers unregister cleanly");
 // The existing shared combat definitions moved into the SDK without claiming a receiver implementation.
-using (var combat = kernel.RegisterModule(CombatContracts.Module()))
-using (var control = kernel.RegisterModule(ControlContracts.Module()))
+using (var combat = kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off))
+using (var control = kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off))
 using (var manifest = JsonDocument.Parse(kernel.ExportManifest()))
 {
     var registry = manifest.RootElement.GetProperty("registry");
