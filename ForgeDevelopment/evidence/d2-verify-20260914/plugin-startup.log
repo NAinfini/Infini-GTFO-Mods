@@ -1,0 +1,19 @@
+PASS Off host mode keeps Development inactive
+PASS Play host mode keeps Development inactive
+PASS Authoring without a published Runtime fails before diagnostic work
+PASS Authoring starts exactly one collector set
+PASS performance logging opt-out skips only the performance collector
+PASS successful Load cannot be repeated
+PASS inactive Load cannot be retried into an active one
+PASS startup failure at settings:bind
+PASS startup failure at settings:authoring
+PASS startup failure at diagnostics:init
+PASS startup failure at harmony:new
+PASS startup failure at hook:patch
+PASS startup failure at component:add:AuthoringMonitor
+PASS startup failure at component:add:PerformanceMonitor
+PASS startup failure at log:loaded
+PASS one failing cleanup does not block the rest
+PASS unwritable exception Data preserves the startup exception
+Development plugin bootstrap: 54 assertions passed; 0 scenarios failed.
+Production Development Plugin.cs with managed host/BepInEx/Unity/Harmony doubles; no game injection.

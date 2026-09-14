@@ -1,0 +1,326 @@
+{
+  "format": "forge-development-validation",
+  "passed": true,
+  "evidenceLevel": "build-and-managed-tests-only",
+  "sourceChangesDuringRun": [],
+  "commands": [
+    {
+      "label": "dotnet-version",
+      "command": [
+        "dotnet",
+        "--version"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.156
+    },
+    {
+      "label": "host-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeRuntime/ForgeRuntime.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 3.672
+    },
+    {
+      "label": "development-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/ForgeDevelopment.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.609
+    },
+    {
+      "label": "development-native-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/Native/ForgeDevelopment.Native.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx",
+        "-p:ForgeRuntimeAssembly=C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+        "-p:ForgeFrameworkAssembly=C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.297
+    },
+    {
+      "label": "plugin-startup-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/PluginStartup/PluginStartup.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.5
+    },
+    {
+      "label": "plugin-startup",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\PluginStartup\\release\\PluginStartup.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.078
+    },
+    {
+      "label": "reports-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/Reports/Reports.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.531
+    },
+    {
+      "label": "reports",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\Reports\\release\\Reports.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.375
+    },
+    {
+      "label": "project-checks-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/ProjectChecks/ProjectChecks.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.641
+    },
+    {
+      "label": "project-checks",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ProjectChecks\\release\\ProjectChecks.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.203
+    },
+    {
+      "label": "inspection-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/DevelopmentInspection/DevelopmentInspection.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.484
+    },
+    {
+      "label": "inspection",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\DevelopmentInspection\\release\\DevelopmentInspection.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.188
+    },
+    {
+      "label": "snapshots-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/ReportSnapshots/ReportSnapshots.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.484
+    },
+    {
+      "label": "snapshots",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ReportSnapshots\\release\\ReportSnapshots.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.453
+    },
+    {
+      "label": "shutdown-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/Shutdown/Shutdown.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.422
+    },
+    {
+      "label": "shutdown",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\Shutdown\\release\\Shutdown.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.094
+    },
+    {
+      "label": "scene-inventory-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/SceneInventory/SceneInventoryTests.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.422
+    },
+    {
+      "label": "scene-inventory",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\SceneInventoryTests\\release\\SceneInventoryTests.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.062
+    },
+    {
+      "label": "telemetry-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/Telemetry/Telemetry.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.453
+    },
+    {
+      "label": "telemetry",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\Telemetry\\release\\Telemetry.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.078
+    },
+    {
+      "label": "samples-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/Samples/Samples.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.407
+    },
+    {
+      "label": "samples",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\Samples\\release\\Samples.dll"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.078
+    },
+    {
+      "label": "native-layout-build",
+      "command": [
+        "dotnet",
+        "build",
+        "ForgeDevelopment/tests/NativeLayout/NativeLayout.csproj",
+        "-c",
+        "Release",
+        "--artifacts-path",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts",
+        "-p:GTFOBepInExPath=C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.453
+    },
+    {
+      "label": "native-layout",
+      "command": [
+        "dotnet",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\NativeLayout\\release\\DevelopmentNativeLayout.dll",
+        "C:\\Users\\nainf\\AppData\\Roaming\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ForgeRuntime\\release\\ForgeRuntime.dll",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ForgeRuntime.Framework\\release\\ForgeRuntime.Framework.dll",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\artifacts\\bin\\ForgeDevelopment.Native\\release\\ForgeDevelopment.Native.dll",
+        "C:\\Users\\nainf\\AppData\\Local\\Temp\\forge-dev-d2-verify-20260914\\native-layout.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.25
+    },
+    {
+      "label": "python-tools",
+      "command": [
+        "C:\\Program Files\\Python310\\python.exe",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "ForgeDevelopment/tests",
+        "-p",
+        "test_*.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 4.609
+    }
+  ],
+  "gameExecuted": false,
+  "installed": false
+}

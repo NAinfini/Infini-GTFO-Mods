@@ -1,15 +1,25 @@
 # ForgeDevelopment 验证记录
 
-**上次更新：2026-09-13**（D2 切换后重写；D1 部分合并自原 CONTINUATION-STATUS、D1-CONTINUATION、D1-INTEGRATION-REVIEW、D1-SNAPSHOT-DELIVERY、D1-VALIDATION 五份交接记录）。
+**上次更新：2026-09-14**（补记 D2 全量运行记录；D2 切换后重写于 2026-09-13；D1 部分合并自原 CONTINUATION-STATUS、D1-CONTINUATION、D1-INTEGRATION-REVIEW、D1-SNAPSHOT-DELIVERY、D1-VALIDATION 五份交接记录）。
 
-## 最后一次记录的通过数
+## 运行记录 2026-09-14 — `verify-diagnostics.py` 全量
 
-`verify-diagnostics.py` 全量一次运行，每一步退出 0：
+- 提交：`dac0bdb501fc93eaeda5c68c08e24ada23e8fabc`（运行前后相同）；工作区只有与本包无关的未跟踪文件 `ForgeMap/tests/fixtures/resource-adapter/SHA256SUMS`
+- 环境：Windows 11，.NET SDK 10.0.400，Python 3.10.10；`GTFO_BEPINEX_PATH` 指向 r2modman `Forge-MapEditor-QA` profile 的 `BepInEx`，**只作编译引用**
+- 命令（仓库根目录）：
 
-| 套件 | 结果 |
+  ```powershell
+  $env:GTFO_BEPINEX_PATH="$env:APPDATA\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx"
+  python ForgeDevelopment/scripts/verify-diagnostics.py --bepinex "$env:GTFO_BEPINEX_PATH" --output "$env:TEMP\forge-dev-d2-verify-20260914"
+  ```
+
+- 结果：进程退出码 0；25 条子命令全部退出 0（合计约 32 秒）；`summary.json` 为 `passed: true`、`sourceChangesDuringRun: []`、`gameExecuted: false`、`installed: false`
+- 证据：[`evidence/d2-verify-20260914/`](evidence/d2-verify-20260914/)（每步日志、`commands.json`、`summary.json`、`native-layout.json`、运行前后源码 hash、控制台输出）；构建产物留在临时目录，未入库
+
+| 套件 | 结果（取自本次日志） |
 | --- | --- |
-| 宿主 / SDK 模块 / 原生插件构建 | 0 警告 0 错误 |
-| PluginStartup（本包插件入口） | 54 项断言 |
+| 宿主 / SDK 模块 / 原生插件，以及 10 个测试工程构建 | 13 次构建均 0 警告 0 错误 |
+| PluginStartup（本包插件入口） | 54 项断言通过，0 个场景失败 |
 | Reports | 99/99 |
 | ProjectChecks | 202/202 |
 | DevelopmentInspection | 47/47 |
@@ -19,7 +29,13 @@
 | NativeLayout（编译后宿主 + 原生插件元数据） | 23/23 |
 | Python 离线工具 | 41/41 |
 
-Python 的跨端 reader 用例此前硬编码网站旧文件 `site/map-balance-report.js`；源码现在已指向 `site/map-balance-report.ts`，本次随迁移后的路径全量通过。
+数字与 D2 切换时那次没有写日期的全量运行一致。
+
+**变异检测：没有。** `verify-diagnostics.py` 没有 full 与 mutation 之分，只有这一种全量模式；本包测试也没有注入变异再确认检出的用例。缺陷检出的证据只有 D1 的红测（见下文 D1 节），本次没有复跑。
+
+**这次运行不能证明：** 游戏能加载本插件（没有启动 GTFO，也没有安装到任何 profile）；三种加载模式；原生 Hook 真正执行，以及 IL2CPP detour 是否安全；GC 之后的原生 callback；采集在主线程上的开销；进出图、切关后的残留；主客机、迟加入与检查点恢复。NativeLayout 只从元数据确认 Hook 目标能在本机 interop 程序集中解析；本次没有复跑 InfiniTweaks NativeContracts。
+
+Python 的跨端 reader 用例此前硬编码网站旧文件 `site/map-balance-report.js`；源码现在已指向 `site/map-balance-report.ts`，按迁移后的路径通过。
 
 ## D2 — 独立插件切换
 
