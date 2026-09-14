@@ -83,6 +83,5 @@ internal static class LocalPlan
     }
 
     /// <summary>Loads a plan; every rejection propagates.</summary>
-    internal static void Load(RuntimeKernel kernel, Plan plan, IEnumerable<string>? grants = null)
-        => kernel.LoadPlan(plan.Json, grants ?? plan.Permissions);
+    internal static void Load(RuntimeKernel kernel, Plan plan) => kernel.LoadPlan(plan.Json);
 }

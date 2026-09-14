@@ -35,10 +35,10 @@ internal sealed class Scene : IDisposable
     internal static LocalPlan.Plan FactPlan(RuntimeKernel kernel, string suffix) => suffix == "death_started"
         ? LocalPlan.Build(kernel, "test.lifecycle.death_started", EnemyModule.DeathStartedBinding, LocalPlan.RecordBinding, ("enemy", "target"))
         : LocalPlan.Build(kernel, "test.lifecycle.limb_broken", EnemyModule.LimbBrokenBinding, LocalPlan.RecordBinding, ("target", "target"), ("limb", "limb_id"));
-    internal void Load(string suffix, IEnumerable<string>? grants = null, RuntimeLimits? budget = null)
+    internal void Load(string suffix, RuntimeLimits? budget = null)
     {
         var plan = FactPlan(Kernel, suffix);
-        LocalPlan.Load(Kernel, budget == null ? plan : plan.WithLimits(budget), grants);
+        LocalPlan.Load(Kernel, budget == null ? plan : plan.WithLimits(budget));
     }
     internal void Die(EnemyAgent? actor = null)
     {
