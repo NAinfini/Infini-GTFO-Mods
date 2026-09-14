@@ -33,8 +33,6 @@ public sealed class Plugin : BasePlugin
         PluginLog = Log;
         RuntimeSettings.Bind(Config);
         ConfiguredMode = RuntimeSettings.Mode;
-        var planPath = RuntimeSettings.PlanPath.Value;
-        var permissions = RuntimeSettings.AllowedPermissions.Value;
         var logLevel = RuntimeSettings.LogLevel;
         if (ConfiguredMode == RuntimeMode.Off)
         {
@@ -48,10 +46,10 @@ public sealed class Plugin : BasePlugin
         {
             harmony = new Harmony(PluginGuid);
             hostAttempted = true;
-            GameRuntimeBridge.Initialize(planPath, permissions, logLevel);
+            GameRuntimeBridge.Initialize(logLevel);
             harmony.PatchAll(typeof(Plugin).Assembly);
             frameworkMonitor = AddComponent<FrameworkMonitor>();
-            Log.LogInfo($"{PluginName} {PluginVersion} loaded in {ConfiguredMode} mode. Framework plans require explicit path and permissions; native bindings are not game-verified.");
+            Log.LogInfo($"{PluginName} {PluginVersion} loaded in {ConfiguredMode} mode. Plans are discovered under BepInEx/plugins/*/forge/plans; native bindings are not game-verified.");
             _loadComplete = true;
         }
         catch (Exception original)

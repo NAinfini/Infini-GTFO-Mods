@@ -6,15 +6,8 @@ namespace ForgeRuntime.GameBindings;
 
 internal static class FrameworkFiles
 {
+    /// <summary>D-009's single-file cap; enforced by <see cref="PlanDiscovery"/> before it reads a candidate's bytes.</summary>
     internal const int MaximumPlanBytes = 4 * 1024 * 1024;
-    internal static string ReadPlan(string root, string relative)
-    {
-        var path = Resolve(root, relative);
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (stream.Length > MaximumPlanBytes) throw new InvalidDataException("Framework plan exceeds 4 MiB.");
-        using var reader = new StreamReader(stream, new UTF8Encoding(false, true), true);
-        return reader.ReadToEnd();
-    }
     internal static void WriteManifest(string root, string json)
     {
         const string relative = "ForgeRuntime/capabilities.json";

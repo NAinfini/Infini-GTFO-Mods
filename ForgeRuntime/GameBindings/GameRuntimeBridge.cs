@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using BepInEx;
 using ForgeRuntime.Framework;
@@ -20,8 +19,6 @@ internal static class GameRuntimeBridge
     private static long _epoch, _tick;
     private static bool _pendingStop;
     private static long _reportedLifecycleFaults;
-    private static string _planPath = "";
-    private static string[] _permissions = Array.Empty<string>();
     internal static bool CanExecute
     {
         get
@@ -34,7 +31,7 @@ internal static class GameRuntimeBridge
         }
     }
 
-    internal static void Initialize(string planPath, string permissions, RuntimeLogLevel logLevel)
+    internal static void Initialize(RuntimeLogLevel logLevel)
     {
         if (Kernel != null) throw new InvalidOperationException("Forge Runtime is already initialized.");
         using (var stream = File.OpenRead(Path.Combine(Paths.GameRootPath, "GameAssembly.dll")))
@@ -44,8 +41,6 @@ internal static class GameRuntimeBridge
             if (!string.Equals(actual, GameAssemblySha256, StringComparison.Ordinal))
                 throw new InvalidOperationException("Forge native binding does not support this GameAssembly hash: " + actual);
         }
-        _planPath = planPath;
-        _permissions = permissions.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToArray();
         _pendingStop = false; _reportedLifecycleFaults = 0;
         _inLevel = _suspended = _blockedUntilLobby = _dispatching = _pendingInvalidation = false; _epoch = 1; _tick = 0;
         _log = new RuntimeLogWriter(Path.Combine(Paths.BepInExRootPath, RuntimeLogWriter.DirectoryName), Plugin.PluginLog, RuntimeLogLimits.Default);
@@ -64,11 +59,8 @@ internal static class GameRuntimeBridge
             {
                 // BepInEx dependent plugins have registered through Plugin.Runtime before the first Unity tick.
                 FrameworkFiles.WriteManifest(Paths.BepInExRootPath, kernel.ExportManifest());
-                if (!string.IsNullOrWhiteSpace(_planPath))
-                {
-                    kernel.LoadPlan(FrameworkFiles.ReadPlan(Paths.BepInExRootPath, _planPath), _permissions);
-                    Plugin.PluginLog.LogInfo("Forge framework loaded the explicitly configured offline plan: " + _planPath);
-                }
+                var discovered = PlanDiscovery.Scan(Paths.BepInExRootPath);
+                if (discovered.Count > 0) kernel.LoadPlans(discovered);
             });
         }
         ReportLifecycleFaults(kernel);
