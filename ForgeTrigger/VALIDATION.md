@@ -15,7 +15,8 @@
 | 命令 | 结果 |
 | --- | --- |
 | `python ForgeTrigger/tools/validate-trigger.py --r3-only` | 退出 0；spatial 360 项、117 cases + 2 recorded；recipient-filter 628 项；R3 `passed`，1858 项（原 1836） |
-| `python ForgeTrigger/tools/validate-trigger.py --r3-only --mutations` | 16 种错误实现全部检出：`capsule-exclusive` 失败于 case 117 与“短轴 capsule 退化为球”，`box-shallow` 失败于 case 118 与“box 半尺寸逐轴闭判定”；整体退出 1，唯一原因是结尾的源哈希复核报 `Consumed source changed during full validation`——运行期间并行任务在改网站 `site/forge/*.ts`（该入口的被消费源之一），不是检出失败。需在网站工作树静止时复跑一次才能得到退出 0 的记录 |
+| `python ForgeTrigger/tools/validate-trigger.py --r3-only --mutations` | 16 种错误实现全部检出：`capsule-exclusive` 失败于 case 117 与“短轴 capsule 退化为球”，`box-shallow` 失败于 case 118 与“box 半尺寸逐轴闭判定”；整体退出 1，唯一原因是结尾的源哈希复核报 `Consumed source changed during full validation`——运行期间并行任务在改网站 `site/forge/*.ts`（该入口的被消费源之一），不是检出失败 |
+| `python ForgeTrigger/tools/validate-trigger.py --r3-only --mutations`（网站 `site/forge` 静止后复跑，产物 `artifacts/trigger-20260914-181631`） | 退出 0，`status: passed`；R3 1858 项；`capsule-exclusive` 仍失败于 case 117 与“短轴 capsule 退化为球”，`box-shallow` 仍失败于 case 118 与“box 半尺寸逐轴闭判定”，源哈希复核通过 |
 
 ## D-017 R4-a：`compare` 注册为 evaluate 绑定（2026-09-14）
 
