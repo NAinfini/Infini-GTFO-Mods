@@ -16,7 +16,7 @@ sealed class TestWorld
         Kernel.BeginWorld(1);
         Kernel.RegisterModule(ForgeMap.ModuleDefinition.Create());
         Handle = Kernel.RegisterModule(Module());
-        if (loadPlan && !Kernel.StartRuntime(() => Kernel.LoadPlan(Plan(), new[] { Permission })))
+        if (loadPlan && !Kernel.StartRuntime(() => Kernel.LoadPlan(Plan())))
             throw new InvalidOperationException("Synthetic host failed to start.");
     }
     public EntityReference Add(string key, long life = 1)
@@ -57,7 +57,7 @@ sealed class TestWorld
             new Dictionary<string, Func<EntityReference, bool>> { [Prefix] = reference =>
                 reference.WorldEpoch == Kernel.WorldEpoch && Lives.TryGetValue(reference.Id, out var life) && life == reference.LifeEpoch });
     }
-    public string Plan()
+    public string Plan(string[]? permissions = null)
     {
         var registry = RuntimeJson.Parse(Kernel.ExportManifest()).GetProperty("registry");
         var bindings = registry.GetProperty("bindings").EnumerateArray()
@@ -83,7 +83,7 @@ sealed class TestWorld
         return RuntimeJson.From(new {
             schemaVersion = 2, kind = "forge-runtime-plan", planId = "map1.test.plan",
             resource = new { id = "map1.test.shared-room", revision = "fixture-revision" }, runtime = Kernel.Identity,
-            domain = "map", authority = "host", failurePolicy = "stop-entrypoint", permissions = new[] { Permission }, dependencies = Array.Empty<string>(),
+            domain = "map", authority = "host", failurePolicy = "stop-entrypoint", permissions = permissions ?? new[] { Permission }, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth }, bindings = pins,
             entrypoints = new[] { new { nodeId = "Observed", binding = Binding(Trigger), layout = Layout(trigger),
                 steps = new[] { new { nodeId = "RecordIdentity", binding = Binding(Action), layout = Layout(action),

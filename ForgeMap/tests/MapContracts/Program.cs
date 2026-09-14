@@ -86,7 +86,12 @@ Check(!assembly.GetReferencedAssemblies().Any(a => a.Name!.StartsWith("Unity") |
 }
 {
     var world = new TestWorld(false);
-    Reject(() => world.Kernel.LoadPlan(world.Plan(), Array.Empty<string>()), "Plan cannot grant itself write permissions");
+    // The plan declares a write permission no binding in its own closure requires; permission-lock demands an
+    // exact match, so a plan cannot grant itself a permission it was never bound to earn.
+    var rejected = false;
+    try { world.Kernel.LoadPlan(world.Plan(new[] { TestWorld.Permission, "map1.test.unearned-write" })); }
+    catch (RuntimeContractException error) { rejected = error.Code == "permission-lock"; }
+    Check(rejected, "Plan cannot grant itself write permissions");
 }
 {
     var world = new TestWorld(); world.Publish("cancel-me", world.Add("scope-target"));

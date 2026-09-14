@@ -59,15 +59,14 @@ foreach (var row in wire.GetProperty("cases").EnumerateArray())
     using var harness = new Harness(seed);
     var id = row.GetProperty("id").GetString()!;
     var plan = row.GetProperty("plan").GetRawText();
-    var grants = row.GetProperty("grants").EnumerateArray().Select(x => x.GetString()!).ToArray();
     if (row.GetProperty("accepted").GetBoolean())
     {
-        harness.Kernel.LoadPlan(plan, grants);
+        harness.Kernel.LoadPlan(plan);
         Check(harness.Kernel.LoadedPlans == 1, "shared plan accepted: " + id);
     }
     else
     {
-        Reject(() => harness.Kernel.LoadPlan(plan, grants), row.GetProperty("code").GetString()!, "shared plan rejected: " + id);
+        Reject(() => harness.Kernel.LoadPlan(plan), row.GetProperty("code").GetString()!, "shared plan rejected: " + id);
         Check(harness.Kernel.LoadedPlans == 0 && harness.Kernel.QueuedEvents == 0, "rejected plan has no work: " + id);
     }
 }
@@ -77,7 +76,7 @@ var chainPlan = wire.GetProperty("cases").EnumerateArray().First(r => r.GetPrope
 void Exercise(string name, Action<Harness> test, string? plan = null)
 {
     using var h = new Harness(seed);
-    h.Kernel.LoadPlan(plan ?? validPlan, new[] { "test.permission.record" });
+    h.Kernel.LoadPlan(plan ?? validPlan);
     h.Kernel.BeginWorld(1); h.Kernel.Advance(0, true);
     test(h); Console.WriteLine("SCENARIO: " + name);
 }

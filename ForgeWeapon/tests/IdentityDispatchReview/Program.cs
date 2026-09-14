@@ -123,7 +123,9 @@ Test("post-commit-source-cleanup-does-not-undo-fixture-effect", () =>
 Test("missing-host-permission-rejects-plan-before-dispatch", () =>
 {
     using var f = new Fixture(loadPlan: false);
-    Rejected("permission-denied", () => f.Kernel.LoadPlan(f.Plan(), Array.Empty<string>()));
+    // The plan's own permissions omit the action binding's required permission; permission-lock demands an exact
+    // match, so this can never load without it.
+    Rejected("permission-lock", () => f.Kernel.LoadPlan(f.Plan(Array.Empty<string>())));
     Check(f.Kernel.LoadedPlans == 0 && f.Kernel.QueuedEvents == 0, "denied plan was installed");
 });
 Test("duplicate-equipment-registration-does-not-damage-live-session", () =>
@@ -168,7 +170,7 @@ sealed class Fixture : IDisposable
         Session = new(Kernel, _ => ThrowNativeRead ? throw new InvalidOperationException("fixture-reader") : NativeLive, _ => OwnerLive);
         Item = new(new("gtfo.equipment:a", 7, 1), "fixture.rifle", "r1", Owner, "GearStandard", EquipmentLocation.Inventory, true, true);
         Dispatch = Kernel.RegisterModule(Module());
-        Kernel.StartRuntime(() => { if (loadPlan) Kernel.LoadPlan(Plan(), new[] { "fixture.dispatch.use" }); });
+        Kernel.StartRuntime(() => { if (loadPlan) Kernel.LoadPlan(Plan()); });
         Kernel.Advance(0, true); Session.Record(Item);
     }
     internal DispatchResult Queue(EntityReference? source = null)
@@ -229,14 +231,14 @@ sealed class Fixture : IDisposable
     }).ToArray();
     private static object Layout(JsonElement graph) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants = Array.Empty<object>(), promoted = Array.Empty<int>() };
     private static int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
-    internal string Plan()
+    internal string Plan(string[]? permissions = null)
     {
         var kinds = new[] { "action", "trigger" }; var trigger = Graph("trigger"); var action = Graph("action");
         return RuntimeJson.From(new
         {
             schemaVersion = 2, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
             runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
-            permissions = new[] { "fixture.dispatch.use" }, dependencies = Array.Empty<string>(),
+            permissions = permissions ?? new[] { "fixture.dispatch.use" }, dependencies = Array.Empty<string>(),
             limits = new { maxEventsPerTick = 8, maxCommandsPerTick = 8, maxQueuedEvents = 8, maxCausalDepth = 4 },
             bindings = kinds.Select(kind => new
             {

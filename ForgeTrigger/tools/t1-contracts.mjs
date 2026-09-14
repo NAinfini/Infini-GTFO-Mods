@@ -36,7 +36,7 @@ for (const row of suite.validGraphs) {
     const reordered = structuredClone(row.graph); reordered.nodes.reverse(); reordered.edges.reverse();
     check(compileForgeRuntimePlan(reordered, manifest, options(row.id)).semanticJson === compiled.semanticJson,
         'enumeration order does not change linear plan: ' + row.id);
-    wires.push({id: row.id, accepted: true, plan: compiled.plan, grants: grant});
+    wires.push({id: row.id, accepted: true, plan: compiled.plan});
 }
 for (const row of suite.invalidGraphs) {
     if (row.stage === 'compile') {
@@ -58,7 +58,7 @@ function mutate(input, changes) {
 for (const row of suite.invalidPlans) {
     const plan = mutate(wires[0].plan, row.changes), grants = row.grants ?? grant;
     rejects(() => validateForgeRuntimePlan(plan, manifest, grants), row.error, 'wire: ' + row.id);
-    wires.push({id: row.id, accepted: false, plan, grants, code: row.code});
+    wires.push({id: row.id, accepted: false, plan, code: row.code});
 }
 for (const name of ['branch', 'add']) {
     const plan = structuredClone(wires[0].plan);
@@ -72,7 +72,7 @@ for (const name of ['branch', 'add']) {
     plan.entrypoints[0].binding = pin('test.trigger.binding.event');
     plan.entrypoints[0].steps[0].binding = pin(binding.id);
     rejects(() => validateForgeRuntimePlan(plan, manifest, grant), 'Unsupported runtime node kind', 'wire cannot disguise ' + name + ' as action');
-    wires.push({id: 'disguised-' + name, accepted: false, plan, grants: grant, code: 'node-kind'});
+    wires.push({id: 'disguised-' + name, accepted: false, plan, code: 'node-kind'});
 }
 const renamed = structuredClone(manifest);
 for (const c of renamed.registry.capabilities) c.label = 'Different display label';
@@ -157,7 +157,7 @@ write('node-audit.json', report);
 const provenanceOnly = structuredClone(wires[0].plan);
 provenanceOnly.resource.revision = 'unresolved-resource-revision';
 check(validateForgeRuntimePlan(provenanceOnly, manifest, grant).kind === 'compiled-runtime-plan', 'plan resource revision is provenance, not resource-catalog validation');
-wires.push({id:'resource-revision-provenance-only', accepted:true, plan:provenanceOnly, grants:grant});
+wires.push({id:'resource-revision-provenance-only', accepted:true, plan:provenanceOnly});
 write('wire-cases.json', {schemaVersion:1,evidence:'synthetic-no-game', cases:wires});
 write('typescript-result.json', {assertions,status:'passed',gameVerified:false,graphNegativeCases:suite.invalidGraphs.length,sharedWireCases:wires.length});
 console.log(JSON.stringify({status:'passed',assertions,baseNodes:rows.length,typedAuthoringNodes:logic.capabilities.length,missingFromCatalog,wireCases:wires.length}));

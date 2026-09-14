@@ -2038,19 +2038,18 @@
       "error": "permission|differs"
     },
     {
-      "id": "denied-host-permission",
+      "id": "missing-required-permission",
       "changes": [
         {
           "operation": "set",
           "path": [
-            "planId"
+            "permissions"
           ],
-          "value": "denied"
+          "value": []
         }
       ],
-      "code": "permission-denied",
-      "error": "Missing runtime permission",
-      "grants": []
+      "code": "permission-lock",
+      "error": "permission|differs"
     },
     {
       "id": "unused-dependency",

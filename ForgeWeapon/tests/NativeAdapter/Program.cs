@@ -474,7 +474,7 @@ sealed class World : IDisposable
 
     internal void StartRuntime()
     {
-        Kernel.StartRuntime(() => Kernel.LoadPlan(Plan(), new[] { ModuleDefinition.WieldReadPermission, RecordPermission }));
+        Kernel.StartRuntime(() => Kernel.LoadPlan(Plan()));
         Kernel.Advance(0, true);
     }
 
