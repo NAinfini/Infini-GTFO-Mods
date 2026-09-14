@@ -1,8 +1,16 @@
 # ForgeTrigger 验证记录
 
-**上次更新：2026-09-13**（由原 `VALIDATION.md` 与 `VALIDATION-CURRENT.md` 合并而成，另并入 T1-CONTRACT-MAP、T1-T7-STATUS 与四份 T2 交接记录的实际结果）。
+**上次更新：2026-09-14**（由原 `VALIDATION.md` 与 `VALIDATION-CURRENT.md` 合并而成，另并入 T1-CONTRACT-MAP、T1-T7-STATUS 与四份 T2 交接记录的实际结果）。
 
-## 当前结论：完整入口通过（托管与跨语言证据）
+计划与状态见两仓统一框架第 6 节 U-TRIGGER（链接见[仓库 README](../README.md)）；本文只记带日期的运行记录。
+
+## 完整入口复跑：向量工具改从 logic-evaluator 导入（2026-09-14，`trigger-20260914-094748`）
+
+D-009、J-003 之后的两次复跑失败：`artifacts/trigger-20260914-093810` 的 pure、independent、spatial-fixtures 退出 1，TS 向量生成报 `previewLogicPrimitive is not a function`；`trigger-20260914-094340` 只剩 independent 的 authoring-vectors 报 `preview is not a function`。根因是网站把 `previewLogicPrimitive` 从 `site/forge/logic-preview.ts` 移到 `site/forge/logic-evaluator.ts`，而 `tools/` 下 `spatial-vectors.mjs`、`recipient-filter-vectors.mjs`、`pure-vectors.mjs`、`collection-vectors.mjs`、`acceptance-vectors.mjs` 仍从旧模块导入。五处导入改为 `logic-evaluator` 后（`24e3051`），在模组 `17b3078` 加该改动、网站 `b055a577`（工作树的未提交改动不涉及 `site/forge/`）上执行 `python ForgeTrigger/tools/validate-trigger.py --mutations`：进程退出 0，summary `status=passed`、`checksStatus=passed`；pure（C# 1697 项，23 项纯计算、293 组向量）、t1（C# 911、TypeScript 361，34 组 wire，424 基础节点、62 个 typed 作者定义、目录缺失 0）、independent（Acceptance 2557 项）、r3（1836 项）。日志里各错误实现副本的 `status: failed` 行是预期的检出，summary 的 mutation 检查整体通过。
+
+`runtimeReady=false`、`publicationReady=false`、`gameVerified=false` 不变。
+
+## 完整入口对齐 2.0.0 目录行（2026-09-13，`align-trigger-m`）
 
 ```powershell
 python ForgeTrigger/tools/validate-trigger.py --mutations
@@ -45,9 +53,9 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 **R3 观察器登记缺口已解除。** 曾经的阻塞是 `RuntimeRegistry.WithModule` 只登记 EntityResolvers 而不读取 `module.EntityObservers`，`RuntimeKernel.InspectEntity` 因此返回 `entity-observer-unavailable`，整个查询变成 `entity-query-incomplete`；`Unregister` 也只清理 resolver。这些已由 Runtime 的 R3a 在共享 SDK 中实际接通，见 [Runtime 验证记录](../ForgeRuntime/VALIDATION.md)。
 
-**生命周期订阅注销保护也已合入。** 曾经 417 项中剩余 2 项失败（`entity observer disposed lifecycle subscription`、`subscription remains intact`），根因是 `RemoveLifecycleObserver` 允许实体观察回调注销生命周期订阅。现在只在实体观察期间禁止该入口，普通清理、停止后清理与生命周期回调自注销都保留。当时的隔离补丁提案已被合入的实现取代，已从 `handoff/` 删除。
+**生命周期订阅注销保护也已合入。** 曾经 417 项中剩余 2 项失败（`entity observer disposed lifecycle subscription`、`subscription remains intact`），根因是 `RemoveLifecycleObserver` 允许实体观察回调注销生命周期订阅。现在只在实体观察期间禁止该入口，普通清理、停止后清理与生命周期回调自注销都保留。当时的隔离补丁提案已被合入的实现取代并删除。
 
-**independent 缺失的 mutation 覆盖已补上。** 早先 runner 半成品曾放在 `handoff/validate-independent.incomplete.txt`，完整入口因此记为 blocked；现在由 `validate-independent.py` 实际执行，半成品已删除。
+**independent 缺失的 mutation 覆盖已补上。** 早先只有一个未完成的 runner 半成品，完整入口因此记为 blocked；现在由 `validate-independent.py` 实际执行，半成品已删除。
 
 **SDK 不支持 variadic 也已解除。** `RuntimeRegistry` 曾把 `graph.variadic` 当未知字段拒绝，导致 T1 的 C# 注册在 `RuntimeJson.Shape → RuntimeRegistry.Validate` 处失败。Runtime 的 R4a 能校验该元数据并按精确 revision 解析端口；U-RUNTIME 的 plan v2 加载器会按注册合同展开 variadic/portGroups，但 T1 的作者定义没有运行绑定，**元数据可登记不等于图已可执行**。
 

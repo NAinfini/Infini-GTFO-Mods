@@ -2,11 +2,7 @@
 
 **上次更新：2026-09-14**（E2 批次；本文件合并自原 E1-BOUNDARY-HANDOFF、E1-NATIVE-CUTOVER、E1-PLUGIN-LIFETIME-SAFETY、E1-R3-INTEGRATION、E2-DELIVERY、E2-OBSERVATION-HANDOFF、E23-CONTINUATION、E3-LIFECYCLE-FACTS、E3-SAFETY-HANDOFF 九份交接记录）。
 
-## 当前结论
-
-E1 的源码与程序集切换完成，R3 实体观察在共享 SDK 中实际接通，E3 的死亡流程与肢体破坏两个事件已接入真实 provider 和计划调度。E2 交付了 API 冻结 v2、出生空间要求合同 v1 与身份替身用例。完整宿主、Native 插件与托管辅助工程构建都通过，0 警告 0 错误。
-
-**全部结果都是 implementation-only 或离线数据等级。** 没有启动 GTFO、没有安装、没有主客机或迟加入测试、没有执行任何原生游戏方法。E2 的运行时核验（见[待游戏内核验](#待游戏内核验)）、E3 剩余的 damage 与 status、E4–E7 全部未完成。
+计划与状态见两仓统一框架第 6 节 U-ENEMY（链接见[仓库 README](../README.md)）；本文只记带日期的运行记录。全部结果都是 implementation-only 或离线数据等级，没有启动 GTFO。
 
 ## 最后一次记录的通过数
 

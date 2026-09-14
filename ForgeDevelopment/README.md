@@ -2,11 +2,11 @@
 
 可选的作者诊断包：观察生成、空间、性能、异常与运行证据，关联到作者对象并输出报告。
 
-**普通玩家默认不依赖这个包。** 它不调度正常玩法，也不把"没有报错"解释为地图正确。按总案第 1 节的定位，需要玩家自己启用诊断回传才能用起来的能力不算完成——诊断是作者型用户的第二层入口，不是玩家必经路径。
+**普通玩家默认不依赖这个包。** 它不调度正常玩法，也不把"没有报错"解释为地图正确。需要玩家自己启用诊断回传才能用起来的能力不算完成——诊断是作者型用户的第二层入口，不是玩家必经路径。
 
-仓库整体状态见 [ARCHITECTURE.md](../ARCHITECTURE.md)，未完成批次见 [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)，验证结果见 [VALIDATION.md](VALIDATION.md)。**所有性能相关内容都归本包**，一般游玩用不到；InfiniTweaks 只放 Quality of Life 功能。历史记录：[1.1.0 制作端范围](AUTHORING-SCOPE.md)、[InfiniTweaks 标记与 HUD 性能对照](PERFORMANCE-REVIEW.md)。
+计划与状态见两仓统一框架第 6 节 U-DEV-MOD（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)。**所有性能相关内容都归本包**，一般游玩用不到；InfiniTweaks 只放 Quality of Life 功能。历史记录：[1.1.0 制作端范围](AUTHORING-SCOPE.md)、[InfiniTweaks 标记与 HUD 性能对照](PERFORMANCE-REVIEW.md)。
 
-## 当前状态：D2 已切换，未做游戏加载验收
+## 工程与启动门槛
 
 两个工程：
 

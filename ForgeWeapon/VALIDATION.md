@@ -2,19 +2,6 @@
 
 **上次更新：2026-09-13**（内容合并自原 W1-IDENTITY-HANDOFF、W1-IDENTITY-ACCEPTANCE-HANDOFF、W1-IDENTITY-REVIEW-HANDOFF、W1-NATIVE-API-AUDIT 四份交接记录与旧 VALIDATION）。
 
-## 当前结论
-
-已交付 W1 的元数据核验、装备身份托管实现和首批原生观察接线。原生接线的证据等级是 **implementation-only**，外加本机静态原生证据。
-
-**W1 未关闭，W2–W8 未开始。** 仍待完成的有：
-- 游戏内核验。W1 加载入口已交付，等级 **implementation-only**，owner 经 SDK 从 ForgeMap 解析；清单见下文，尚未执行。
-- 非背包生成路径。
-- 共享 R3/R5 合同的消费。
-- 模型、rig 与动画的运行时核验。
-- 全部游戏验证。
-
-`ModuleDefinition` 现在注册 2 个观察型 binding，全部是 `implementation-only`。没有启动 GTFO、没有主客机、没有安装或发布。
-
 ## W1 游戏加载入口（2026-09-13，implementation-only）
 
 新增 `Native/Plugin.cs`，删除 `WeaponPlayerReferences`。适配器与身份会话都只经 SDK 的 `ResolveEntityInstance("gtfo.player", …)` 与 `IsEntityCurrent` 使用 ForgeMap 的玩家引用，接口见 [Runtime 验证记录](../ForgeRuntime/VALIDATION.md#原生实例解析2026-09-13)。适配器新增有界的信息日志，格式见 [README](README.md#原生观察接线implementation-only)。
@@ -118,7 +105,7 @@ NativeEvidence 的证据范围：直接 near call 边与方法边界来自 dump 
 | 公开队列与命令联调 | 20/20 | 消费实际编译的 `EquipmentIdentitySession` 与唯一 SDK |
 | 元数据核验 | 312/312 | metadata-only |
 | 核验工具正反测试 | 24/24 | 变异的是合同副本，不是游戏文件 |
-| 跨模块架构断言 | 通过 | 当时记录 35 项；**现行 Program.cs 是 36 项**，见 [ARCHITECTURE.md](../ARCHITECTURE.md#2-架构断言数是-36) |
+| 跨模块架构断言 | 通过 | 当时记录 35 项；**现行 Program.cs 是 36 项**，见 `ForgeRuntime/tests/Architecture/Program.cs` |
 | 故意错误实现 | 6/6 被检出 | 合并前是四类与五类两套，现已按检错范围合并；所有错误版本先编译成功 |
 
 **这些数量描述不同层的检查，不能相加作为已实现的玩法数。** 24 个工具测试里的错误输入拒绝是测试预期，不是 24 个游戏场景；312 是所选文件、类型与成员的核验断言，不是完整的原生语义证明；6 个变异防护不是六项原生玩法。

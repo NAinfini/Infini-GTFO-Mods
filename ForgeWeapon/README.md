@@ -2,15 +2,15 @@
 
 武器、工具、消耗品共用一个装备领域与 Workshop：装备实例、输入与攻击、弹药与能源与库存、部署与回收、装备表现。时间、状态、目标与事务的基础由 Runtime 提供，**不为每种工具或药剂复制一套框架**。
 
-仓库整体状态见 [ARCHITECTURE.md](../ARCHITECTURE.md)，未完成批次见 [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)，验证结果见 [VALIDATION.md](VALIDATION.md)。
+计划与状态见两仓统一框架第 6 节 U-WEAPON-MOD（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)。
 
 ## 工坊里的"标准武器"本身就是一张图
 
-按总案第 2 节，内置预设与玩家自制的行为共享同一条编译、校验、执行路径。治疗炮台、命中标记、ping 不是三个系统，是同一批原子的三种拼法——治疗炮台 = 部署动作 + 范围查询 + 关系过滤 + 周期 Control + 治疗 Action，外观在工坊里配。**任何为内置预设开的特权通道都是设计缺陷。**
+内置预设与玩家自制的行为共享同一条编译、校验、执行路径。治疗炮台、命中标记、ping 不是三个系统，是同一批原子的三种拼法——治疗炮台 = 部署动作 + 范围查询 + 关系过滤 + 周期 Control + 治疗 Action，外观在工坊里配。**任何为内置预设开的特权通道都是设计缺陷。**
 
 这条对本包的含义是：Weapon 提供的是真实的装备实例、成本、攻击与部署这些**领域能力**，不是成品功能开关。玩家怎么把它们拼起来由 Trigger 的图决定。
 
-## 当前代码状态
+## 运行清单与 W1 装备身份
 
 `ModuleDefinition.Create()` 注册 provider `forge.module.gtfo.weapon` 与两个观察型 trigger capability：`forge.trigger.input.equipped`（装备切入）与 `forge.trigger.input.unequipped`（装备切出）。每个 capability 有一个 `role=observe`、`status=implemented` 的 binding，都没有 handler。bindingSupport 均为 **`implementation-only`**，所需权限 `gtfo.equipment.wield.read`。
 
@@ -90,14 +90,7 @@ W1 已交付只读的元数据核验工具与精确的输入锁：Steam app `493
 
 `tests/fixtures/w1-runtime-acceptance.json` 里的 20 个完整接线规格已经写好但 **0 个执行**，`verification=not-executed`；它们不是新的 Runtime IR 也不是已实现的库存服务，不计为通过的玩法测试。
 
-W1 仍待完成：
-- 游戏内核验：加载入口已是 implementation-only，按 [VALIDATION.md](VALIDATION.md#游戏内核验清单未执行) 的清单在隔离 profile 执行，记录结果前不算验证。
-- 非背包生成路径的采集。
-- 共享 R3/R5 合同的消费。
-- 模型、rig 与动画的运行时核验。
-- 全部游戏验证。
-
-W2–W8 未开始。当前 DLL 不是玩家发行物。
+游戏内核验按 [VALIDATION.md](VALIDATION.md#游戏内核验清单未执行) 的清单在隔离 profile 执行，记录结果前不算验证。当前 DLL 不是玩家发行物。
 
 ## 复跑
 

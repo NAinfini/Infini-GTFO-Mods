@@ -1,8 +1,8 @@
 # ForgeMap 地图生成与资源侧 Adapter 规格
 
-版本 2026-09-13，对应批次 MAP2 重新定范围（U-MAP-MOD）。上位依据是网站仓库 `Docs/rework/FORGE-COMPLETE-PLAN.md` 第 4.2 节。本文件只定义归属、接口形状和验收方法；**除第 5 节列出的本地检查外，文中的生成步骤全部停在"计划"等级**，没有生成器实现，也没有任何游戏执行。
+版本 2026-09-13，对应批次 MAP2 重新定范围（U-MAP-MOD）。上位依据是两仓统一框架（网站仓库 `Docs/forge-contract/FORGE-FRAMEWORK.md`）的 U-MAP-MOD 与 D-010、D-012、D-013。本文件只定义归属、接口形状和验收方法；**除第 5 节列出的本地检查外，文中的生成步骤全部停在"计划"等级**，没有生成器实现，也没有任何游戏执行。
 
-证据等级沿用总案：计划 → 实现 → 本地验证 → 浏览器验证 → 游戏验证。原生 API 的"签名存在"写作 metadata，不等于调用语义、合法阶段或复制行为已核验。
+证据等级沿用框架 §2.1：计划 → 实现 → 本地验证 → 联调验证 → 浏览器验证 → 游戏验证。原生 API 的"签名存在"写作 metadata，不等于调用语义、合法阶段或复制行为已核验。
 
 ## 1. 现在谁在生成地图
 
@@ -38,7 +38,7 @@
 | G9 | 合法空间发布 | 就绪的导航、area / course node、Enemy 空间需求 | 可查询的合法空间（带不足原因），供 encounter、deployable、玩家落点使用 | Map | `AIG_CourseNode`、`LG_Area.m_courseNode`（metadata） | 计划；Enemy 需求接口未交付 |
 | G10 | 实例与拓扑登记 | G7 的创建观察 | 地址 → 实体引用、拓扑图、观测缺口 | Map | 创建上下文 Hook（Development D3） | 托管部分本地验证；原生未验证 |
 
-生成未完成时的采样成功不能记作房间可用；静态检查（G2–G6）通过不能记作生成成功。LGTuner、Zone_Randomizer、MushroomSeedFixed、ExtraDoor、DoubleSidedDoors 在新链路里**不再承担生成职责**；它们的机制语义作为 `deterministic-layout`、`extra-door-topology` 的来源证据保留，是否仍需作为依赖要逐机制在 M7 决定。Geo 包仍是运行依赖；MTFO 仍是内容加载器。
+生成未完成时的采样成功不能记作房间可用；静态检查（G2–G6）通过不能记作生成成功。LGTuner、Zone_Randomizer、MushroomSeedFixed、ExtraDoor、DoubleSidedDoors 在新链路里**不再承担生成职责**；它们的机制语义作为 `deterministic-layout`、`extra-door-topology` 的来源证据保留，是否仍需作为依赖要逐机制在 M7 决定。按框架 D-010、D-012，近期房间只用原版 geomorph，第三方 Geo 包不接入，第 3 节资源侧 Adapter 与第 6 节 B 组暂缓；LGTuner 依赖在 ForgeMap 生成完全替代它之后删除（D-013）；MTFO 仍是内容加载器。
 
 ## 3. 资源侧 Adapter 接口形状
 
@@ -154,5 +154,5 @@ python "$m/tools/verify_native_api.py" "$m/evidence/map2-scope-2026-09-13/genera
 | 网站 | 按第 3.1 节输出资源描述符（提取器归网站）；native room 的 revision 规则 | `forge/resource-adapters.ts` 目前只有 pin 与预览，运行期阻塞 `native-resource-binding-unverified` |
 | 网站 | 第三位不同作者的 geometry pin（现有 CheeseGeos、ZaeroGeos 两家） | 同上 |
 | Runtime | 公开的"关卡构建开始 / 构建完成 / NavMesh 就绪"生命周期观察；现在只有 `BeginWorld(worldEpoch)` | `ForgeRuntime/Framework` 中无生成阶段相关 API |
-| Enemy | 按敌人类型的空间需求（clearance、movement、collision）只读合同，供 G9 | 本包 IMPLEMENTATION-PLAN MAP2 / MAP4 开始条件 |
-| Development D3 | 在 G7 的实例化点提供创建上下文（票据、对象、source），不借反射结果直接登记 | `ForgeDevelopment` 计划 D3 开始条件要求 Map 的创建身份 |
+| Enemy | 按敌人类型的空间需求（clearance、movement、collision）只读合同，供 G9 | 框架 §6 U-MAP-MOD 的 MAP2 / MAP4 开始条件 |
+| Development D3 | 在 G7 的实例化点提供创建上下文（票据、对象、source），不借反射结果直接登记 | 框架 §6 U-DEV-MOD 的 D3 开始条件要求 Map 的创建身份 |

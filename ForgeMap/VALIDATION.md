@@ -2,12 +2,6 @@
 
 **上次更新：2026-09-13**（内容合并自原 MAP1-DELIVERY 与 MAP1-IDENTITY-CONTINUATION 两份交接记录）。
 
-## 当前结论
-
-MAP1 的原生 API 取证、字节复核、SDK 消费方测试，以及生产程序集内的身份表、创建生命票据与 R2 生命周期接入都已交付并通过。
-
-**没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；MAP1 整体未关闭。MAP2 只完成了定范围（规格、fixture、签名锁），没有 C# 实现；MAP5a 玩家实体身份为 implementation-only（唯一的游戏 Hook、对外 resolver 与原生实例解析器，见下两节），MAP5 其余与 MAP3–MAP9、MAP-GEN、MAP-ADAPTER 未开始。** 正式 `ModuleDefinition` 保持空运行清单，`nativeGameExecuted`、`nativeHooksInstalled`、`gameplayBindingsRegistered` 都是 false；`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分，原生部分 `nativeExecuted: false`。
-
 ## MAP5a — gtfo.player 原生实例解析（2026-09-13）
 
 `PlayerIdentityModule` 同时登记 `EntityInstanceResolvers["gtfo.player"]`，Weapon 由此经 SDK 的 `ResolveEntityInstance` 取得装备 owner，接口见 [Runtime 验证记录](../ForgeRuntime/VALIDATION.md#原生实例解析2026-09-13)。证据等级不变：**implementation-only + 本机静态原生证据**；没有新的原生读取签名，证据文件未改。
@@ -79,7 +73,7 @@ MapIdentity 从 126 项增加到 134 项：新增同资源两个 placement 的�
 | --- | --- |
 | 实际 Map 身份实现 + 原生探针替身 | 126 项断言通过，退出码 0 |
 | 原有 Map SDK 消费方回归 | 33 项断言通过，退出码 0 |
-| 跨模块架构回归 | 通过（当时记录 35 项；**现行 Program.cs 是 36 项**，见 [ARCHITECTURE.md](../ARCHITECTURE.md#2-架构断言数是-36)） |
+| 跨模块架构回归 | 通过（当时记录 35 项；**现行 Program.cs 是 36 项**，见 `ForgeRuntime/tests/Architecture/Program.cs`） |
 | 三组 Release 构建 | MapIdentity、MapContracts、`Forge.Architecture.sln` 均 0 警告 0 错误 |
 | 构建与测试期间的源码一致性 | 相关源码集合及 SHA-256 前后一致 |
 

@@ -2,19 +2,17 @@
 
 Map 与 Room 的空间、设备、任务、遭遇、玩家生命流程与进程、世界表现，**以及地图生成的底层逻辑**。
 
-仓库整体状态见 [ARCHITECTURE.md](../ARCHITECTURE.md)，未完成批次见 [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)，验证结果见 [VALIDATION.md](VALIDATION.md)。
+计划与状态见两仓统一框架第 6 节 U-MAP-MOD（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)。
 
-## 本包按 v2.0 新增的两项职责
+## 地图生成归本包
 
-总案第 4.2 节把**地图生成的底层逻辑**划给 ForgeMap。驱动这个决定的是维护成本：每家 Geo 包的写法和底层代码都不一样，逐包跟一套实现意味着永远单独维护十家。把生成逻辑收到本包，Adapter 只负责"资源怎么读出来"这一层，新接一个包就只写一个资源侧 Adapter，不动生成逻辑。
+地图生成的底层逻辑归 ForgeMap，不由各个房间包各自实现。近期只用原版 geomorph（框架 D-010、D-012）：自定义地图生成照做，第三方房间包的模型、资源侧 Adapter、素材提取与 geometry pin 暂缓。ForgeMap 生成还要完全接替 LGTuner 现在承担的两件事：同一区域多个房间按顺序放置、加载额外环境资源（D-013）。
 
-因此本包同时是**模型 Adapter 的运行期调用方**。链路分两段，不要混为一谈：编辑期由网站从模组包里提取模型、拆成可组合小件、在地图编辑器里渲染；**运行期由 Forge Map 直接读取对方模组已在游戏内加载的模型资源，按玩家的拼装结果生成**。玩家的依赖列表和现在一致——他仍然装那个 Geo 包，我们调用它；我们不持有拆解后的资源副本去分发。
+归属与接口形状见 [GENERATION-SPEC.md](GENERATION-SPEC.md)：生成步骤 G0–G10 各自的输入输出与归属、资源描述符与正反 fixture、运行期调用链、游戏内验证步骤，以及需要网站与其他单元提供的最小接口。**这些目前是计划、fixture 形状和原生签名证据，没有生成器的 C# 实现。**
 
-归属与接口形状见 [GENERATION-SPEC.md](GENERATION-SPEC.md)：现在谁在生成地图、生成步骤 G0–G10 各自的输入输出与归属和证据等级、资源侧 Adapter 描述符与正反 fixture、运行期调用链、游戏内验证步骤，以及需要网站与其他单元提供的最小接口。**这些目前是计划、fixture 形状和原生签名证据，没有生成器或 Adapter 的 C# 实现。**
+## 运行清单与 MAP1 内部身份层
 
-## 当前代码状态
-
-**运行清单仍没有 capability 或 binding。** `ModuleDefinition.Create()` 的 capabilities 与 bindings 都是空数组，没有地图 Action。唯一对外的运行期能力是 MAP5a 的 `gtfo.player` 实体 resolver 与原生实例解析器，它们在独立的 `Native/ForgeMap.Native.csproj` 插件里，见下一节。
+**运行清单没有 capability 或 binding。** `ModuleDefinition.Create()` 的 capabilities 与 bindings 都是空数组，没有地图 Action。唯一对外的运行期能力是 MAP5a 的 `gtfo.player` 实体 resolver 与原生实例解析器，它们在独立的 `Native/ForgeMap.Native.csproj` 插件里，见下一节。
 
 已经在生产程序集内的是内部身份层，只有显式构造 Session 才登记这一空 provider 并订阅生命周期，不会自动加载：
 

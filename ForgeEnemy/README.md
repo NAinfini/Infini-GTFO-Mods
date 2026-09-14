@@ -2,7 +2,7 @@
 
 敌人实例、健康与战斗接收器、AI 与感知与移动、弱点与技能，以及生成的空间要求。遭遇的数量、时机和分布归 Map；Enemy 不复制地图的遭遇调度。
 
-**这是六个包里唯一有真实 BepInEx 插件和已注册 binding 的模块。** 仓库整体状态见 [ARCHITECTURE.md](../ARCHITECTURE.md)，未完成批次见 [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)，验证结果见 [VALIDATION.md](VALIDATION.md)。
+计划与状态见两仓统一框架第 6 节 U-ENEMY（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)。
 
 ## 工程结构
 

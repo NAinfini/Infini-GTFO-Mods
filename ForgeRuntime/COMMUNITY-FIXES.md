@@ -13,13 +13,13 @@
 **官方覆盖口径。** 官方最后一次涉及玩法的补丁是 [2024-06-04][p20240604]；[2025-10-17][p20251017] 只是 Unity 安全补丁；此后到 2026-07-25 的公告中没有补丁。表中「未核实（无官方条目）」指全部公告中都没有对应描述，只能说明没被官方记录修过，**不等于已确认仍复现**。
 
 **结论口径。**
-- **收**：缺陷描述具体、落在 Forge 责任域内、没有官方覆盖证据，且模组在 R8 之后仍有维护或发布。进入修复清单后仍要按总案 4.3 复现和验证。收的都是问题与行为规格；除 MIT 许可的 TheArchive 外，不复用任何实现。
+- **收**：缺陷描述具体、落在 Forge 责任域内、没有官方覆盖证据，且模组在 R8 之后仍有维护或发布。进入修复清单后仍要按 U-NET 的 N0、N6 复现和验证。收的都是问题与行为规格；除 MIT 许可的 TheArchive 外，不复用任何实现。
 - **待核实**：缺陷描述不足、无法独立复现、可能已被官方覆盖，或是缺陷还是设计意图无法判断。
 - **不收**：已被官方覆盖、已弃用且被其他条目取代、与 Forge 架构冲突（另起网络通道、人为模拟延迟），或是纯客户端表现改动。
 
 **局限。** README 是作者自述，不能证明当前游戏行为；若干缺陷细节只在 Discord 链接里，无法访问；关键词筛选可能漏掉只在 README 正文里写修复的包；只在 GitHub 或 Discord 发布、未上 Thunderstore 的修复没有覆盖；「纯客户端表现不收」这条是按任务给出的冲突口径执行的，用户已决定暂不收纯客户端表现类修复。
 
-**顺带发现。** 主表中有 11 个修复/网络包已被 `catalog/mechanism-blueprints.json` 当作机制来源引用：AggroFix、hostType6SpawnEnemyFix、PierceBugFix、FireRateFPSFix、RealBackBonus、BetterDoorBulletCollision、NoInterruptions、PlayerSync、Netstat、NetworkQualityTracker、OptionalNetworkAPI。这与 4.3 / N0「修复清单与机制目录分开维护、单独成表」冲突，应交给 U-BLUEPRINT 处理。
+**顺带发现。** 主表中有 11 个修复/网络包已被 `catalog/mechanism-blueprints.json` 当作机制来源引用：AggroFix、hostType6SpawnEnemyFix、PierceBugFix、FireRateFPSFix、RealBackBonus、BetterDoorBulletCollision、NoInterruptions、PlayerSync、Netstat、NetworkQualityTracker、OptionalNetworkAPI。这与 N0「修复清单与机制目录分开维护、单独成表」冲突，应交给 U-BLUEPRINT 处理。
 
 ## 主表：候选修复与网络包
 

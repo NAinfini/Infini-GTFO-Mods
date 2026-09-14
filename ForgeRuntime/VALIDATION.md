@@ -2,15 +2,11 @@
 
 **上次更新：2026-09-14**（内容合并自 R1、R2a、R2a-cleanup、R2b-1、R3a、R4a 六份交接记录与旧采集版验证记录）。
 
-全仓库的测试计数汇总在 [ARCHITECTURE.md 第 3 节](../ARCHITECTURE.md#3-测试计数各自独立不相加)。本文记录 Runtime 侧各次交付的实际内容、复跑命令与仍然存在的失败。
-
-## 当前结论
-
-完整 GTFO 宿主与 `Forge.Architecture.sln` 都构建通过，0 警告 0 错误。R1 编译基线、R2a 公开生命周期、R2b-1 宿主配置与启动隔离、R3a 实体观察接线、R4a 可变端口元数据解析已交付并有实现级证据。D2 同批从宿主移除了全部诊断，见下文。**R2 整体、R3、R4、R5–R8 未关闭；没有任何游戏、安装、多人或恢复验收。**
-
-R1 交接记录末段那三条 REOPENED 阻塞已全部解决：`ForgeEnemy/Receivers/EnemyHealthCommit.cs` 的 `RuntimeJson.Text` 缺失、`GameBindings/EnemyModule.cs` 的 `DamageObservation` 缺少 `damagePointer` 参数、以及六模块架构工程因此无法构建。旧 `GameBindings/EnemyModule.cs` 已在 E1 切换中移除。
+计划与状态见两仓统一框架第 6 节 U-RUNTIME（链接见[仓库 README](../README.md)）。本文只记录 Runtime 侧各次交付的实际内容、复跑命令与仍然存在的失败；没有任何游戏、安装、多人或恢复验收。
 
 ## R1 — 宿主编译基线
+
+R1 交接记录末段那三条 REOPENED 阻塞已全部解决：`ForgeEnemy/Receivers/EnemyHealthCommit.cs` 的 `RuntimeJson.Text` 缺失、`GameBindings/EnemyModule.cs` 的 `DamageObservation` 缺少 `damagePointer` 参数、以及六模块架构工程因此无法构建。旧 `GameBindings/EnemyModule.cs` 已在 E1 切换中移除。
 
 合并进来的 `Infini.ForgeRuntime` 原型被默认 compile glob 误编进生产宿主，同时生产宿主与 SDK 与测试也被误编进原型工程，复现出 59 个错误。两个工程现在显式分离源码，生产只引用 `ForgeRuntime.Framework`。**原型不是生产 API 也不是 fallback**，它的退休是 R4 的显式收尾项；新合并的源码与其独立测试保留。原型单独构建通过，其 14 项测试需要显式 `dotnet --roll-forward Major`（本机没装 .NET 8），这不改变 net6.0 生产目标，原型的检查也不计作生产 SDK 或游戏支持证据。2026-09-13 原型源码、测试工程与其 CI 工作流已整体删除。
 
@@ -213,6 +209,47 @@ website `Tests/Forge/fixtures/runtime` 的 27 个非法计划（不是任务文�
 **ReceiverProbe 的 `commit.kernel-unknown-no-retry` 与 LifecycleFacts 的 `integration.real-heal-death_started`/`integration.real-heal-limb_broken` 仍列 BLOCKED。** 根因是 `ForgeEnemy/tests/Shared/Blockers.cs` 的 `Heal` 常量与其在 `ReceiverProbe/Program.cs`、`LifecycleFacts` 里的引用是硬编码的无条件阻塞，文本仍写"J-003 未实现"——J-003 本批已经落地并经 Framework `--fixtures`/CommitAudit 验证，但这三个用例没有随之自动解除，因为阻塞判断本身没有读取任何运行时状态。解除需要新写用 `LocalPlan` 从内核注册表构造 事实→Heal 计划并恢复 +5HP 断言（README 里已写明的解除条件），属于新增测试基础设施，不在本次 J-003 loader 实现 + heal 合并的范围内，留作后续修复项。`GameBindings/Program.cs` 里同类的 `HealBlocker`/`bridge.configured-heal-plan-commits-5hp` 未见于本批 `--fixtures`/默认运行的失败或阻塞列表中（该 bridge 场景未在本次跑的两个模式里触发），未重新核实，一并留作后续检查项。
 
 `ForgeTrigger/tools/validate-trigger.py --mutations` 的 `pure` 与 `independent` 两个阶段在 TypeScript 向量生成步骤失败（`previewLogicPrimitive is not a function`、`preview is not a function`），栈顶都在站内 `site/forge` 的 TS 导出函数缺失，与本批改动的 C# 文件无关，也不是 J-003/r11 涉及的路径；只有 t1 阶段（消费共享 SDK 的 C# 断言）被跑到并通过。这个 TS 侧失败未进一步排查。
+
+## U-RUNTIME/R4 调研：完整 lowering 卡在计划格式（2026-09-14）
+
+按工作顺序（heal 合并 → J-003 → R4 → player bindings）开始 R4 完整 lowering。范围是契约里点名的四项：步骤间数据边、pure 节点运行期求值（selector/condition/modifier）、条件分支、control 节点。逐项核对源码后结论是：**这四项在当前 I-PLAN schemaVersion 2 wire 格式里都不存在，C# 与网站两侧完全对称地卡在同一处，不是本仓单独能补的缺口。**
+
+核对依据（只读，未改动网站仓库）：
+
+- `RuntimePlan.cs`（本仓）：`Load()` 的 `node-kind` 检查只接受 `capability.kind == "trigger"` 或 `"action"`；步骤输入 `{slot, fromEventSlot}` 的 `fromEventSlot` 只按 `entryId` 对应触发器的事件输出解析，不存在"从前一步输出取值"的形状；执行链每个节点最多一条后继（`entrypoint.steps` 是数组，不是带分支的图）。
+- 网站 `site/forge/runtime-compiler.ts`（只读核对，未改动）：`linearContract` 与本仓逐条对称（`kind === 'trigger' || 'action'`、`executionOutputs.length <= 1`）；`foldPureNodes` 只把 locked 内建 pure 节点在**编译期**常量折叠，端口含 `entity`/`resource`/`handle` 时直接不折叠且无法编译（`worldPortTypes` 排除折叠）；主循环里 `requireRuntime(data.from.node === entryId, ...)`——数据输入必须直接来自入口触发器，逐字禁止步骤间数据边；`execution.get(current).length <= 1` 的注释原文是 "Runtime execution branch requires control lowering"，即分支本就是网站自己标注的未来扩展点，当前直接拒绝编译。
+- 网站 `site/forge/runtime-contracts.ts`：`ForgeRuntimeInputBinding` 类型只有 `{slot, fromEventSlot}` 与 `{slot, value}` 两种变体，没有"引用另一步输出"的第三种形状；`ForgeRuntimeStep`/`ForgeRuntimeEntrypoint` 是纯线性数组，没有 kind 判别字段，无法表达 control 节点。
+- I-CATALOG（`catalog/capability-catalog.json`）里 `selector`/`condition`/`modifier`/`control` 四类能力已经有 44/63/37/46 条定义（authoring 层的端口与参数合同已存在），但绑定角色（`role`）目前只有 `execute`（action）与 `observe`（trigger）两种（`RuntimeRegistry.cs:153`），没有给 pure 求值 handler 用的第三种角色；这是注册合同层面的缺口，不只是计划文件格式的缺口。
+
+即：网站编译器与本仓加载器目前是同一套线性子集的两份独立实现，彼此对称地拒绝这四项，而不是网站已经走在前面、本仓没跟上。按任务约束（不发明格式），本批没有为这四项写任何 C# 代码；已确认的 recipient-policy 参数、enum 值端口两个相邻缺口不在本次任务范围内，分别按契约原文维持现状（前者显式等待与网站同批放开；后者复核后发现 `RuntimeGraphContracts.RuntimeValueTypes` 与网站 `forgeRuntimeValuePortTypes` 均已把 `enum` 列入端口允许类型，属既有实现，非本批改动）。
+
+本批只做了验证性复跑，确认上述调研没有引入回归，隔离产物目录 `%TEMP%\forge-r4-artifacts-20260914`，`GTFO_BEPINEX_PATH` 指向 `Forge-MapEditor-QA` profile（仅供编译引用）：
+
+```powershell
+dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx目录>
+dotnet build Forge.Architecture.sln -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx目录>
+dotnet build ForgeRuntime/tests/Framework/Framework.csproj -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx目录>
+dotnet build ForgeRuntime/tests/GameBindings/GameBindings.csproj -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx目录>
+dotnet build ForgeRuntime/tests/LifecycleWork/LifecycleWork.csproj -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx目录>
+dotnet build ForgeEnemy/tests/CommitAudit/CommitAudit.csproj -c Release --artifacts-path <隔离目录> --disable-build-servers -p:GTFOBepInExPath=<BepInEx目录> -p:ForgeFrameworkAssembly=<隔离目录>\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+python ForgeRuntime/tests/GraphContracts/verify.py --website ..\Infini-GTFO-Model-Site
+```
+
+| 套件与参数 | 结果 |
+| --- | --- |
+| `ForgeRuntime/ForgeRuntime.csproj` 构建 | 0 警告 0 错误 |
+| `Forge.Architecture.sln` 构建 | 0 警告 0 错误 |
+| Framework（默认） | 274 passed |
+| Framework `--fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime` | 302 passed |
+| GameBindings（默认） | PASS 39，BLOCKED 0 |
+| GameBindings `--fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime` | PASS 70，BLOCKED 0 |
+| LifecycleWork `--fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime` | 57 assertions passed，0 groups failed |
+| CommitAudit | 68/68，BLOCKED 0 |
+| GraphContracts `verify.py --website ..\Infini-GTFO-Model-Site`（非 `--integration`） | typescript 生成 exit 0；graph-contracts 1770 passed，0 failed；`sourceStable: true`，`changedSources: []` |
+
+以上数字与 09cdb70/17b3078（J-003、r11）落地时记录的一致，确认本批调研没有改动任何生产源码，也没有引入回归。本批没有跑 HostIntegration、PluginStartup、HostConfiguration、EntityObservation、ReceiverProbe、LifecycleFacts、RuntimeLog、Trigger、Map、Weapon 套件。以上都是托管替身与编译后元数据证据，没有加载 GTFO。
+
+R4 完整 lowering 的四项（步骤间数据边、pure 节点运行期求值、条件分支、control 节点）需要的计划格式扩展提案见本次交接消息，不写入本文件（本文件按 §2.8 只放带日期的运行记录，不放"当前结论"之外的规格文字；规格提案是待网站与用户裁决的内容，归属 FORGE-FRAMEWORK.md §8.1/§3.2，由网站会话落笔）。
 
 ## 复跑
 
