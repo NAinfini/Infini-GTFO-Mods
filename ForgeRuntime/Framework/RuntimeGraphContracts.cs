@@ -103,7 +103,7 @@ internal static class RuntimeGraphContracts
         if (port.TryGetProperty("codes", out var codes))
         {
             RuntimeJson.Require(type == "result", "port-codes", id);
-            RuntimeJson.Require(codes.ValueKind == JsonValueKind.Array && codes.GetArrayLength() <= 2048, "port-codes", id);
+            RuntimeJson.Require(codes.ValueKind == JsonValueKind.Array, "port-codes", id);
             var items = codes.EnumerateArray().Select(c => c.ValueKind == JsonValueKind.String ? c.GetString() : null).ToArray();
             RuntimeJson.Require(items.All(c => c != null && c.Length <= DomainReasonCodeMaxLength && DomainReasonCodePattern.IsMatch(c)), "port-codes", id);
             RuntimeJson.Require(items.Distinct(StringComparer.Ordinal).Count() == items.Length, "port-codes", id);
