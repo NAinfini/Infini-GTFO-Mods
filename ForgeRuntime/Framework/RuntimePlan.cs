@@ -6,15 +6,32 @@ using System.Text.RegularExpressions;
 
 namespace ForgeRuntime.Framework;
 
-/// <summary>One resolved action input, either wired to an event output by frame slot or a plan-authored literal
-/// (J-003/D-006①). <see cref="Port"/> is the wire-side value contract used to validate the value at dispatch:
-/// the origin event port when wired (so a one→many wrap validates the raw single value before wrapping), or the
-/// literal's own value when authored as a constant. <see cref="Wrap"/> marks a non-nullable "one" output wired
-/// into a "many" input (D-006②): dispatch wraps the validated value into a one-element collection.</summary>
-internal sealed record StepInput(string Name, string? EventPort, JsonElement? Literal, bool Wrap, JsonElement Port);
-/// <summary>Promoted names are parameters whose value arrives through an input; dispatch merges and revalidates them.</summary>
-internal sealed record ResolvedStep(string NodeId, string BindingId, JsonElement Parameters, IReadOnlyList<StepInput> Inputs, IReadOnlySet<string> Promoted);
-internal sealed record ResolvedEntry(string NodeId, string BindingId, IReadOnlyList<ResolvedStep> Steps);
+/// <summary>Where one resolved step input's value comes from at dispatch: a literal, a wired trigger event output
+/// slot, or (D-017 R4-a) another `pure` step's output frame within the same entrypoint.</summary>
+internal readonly record struct StepSlotRef(int Step, int Port);
+
+/// <summary>One resolved input, exactly one of <see cref="Literal"/>, <see cref="EventPort"/> or
+/// <see cref="FromStep"/> is set. <see cref="Port"/> is the wire-side value contract used to validate the value at
+/// dispatch. <see cref="Wrap"/> marks a non-nullable "one" output wired into a "many" input (D-006②).</summary>
+internal sealed record StepInput(string Name, string? EventPort, JsonElement? Literal, StepSlotRef? FromStep, bool Wrap, JsonElement Port);
+
+/// <summary>One resolved step of a compiled entrypoint (D-017 R4-a): <see cref="NodeKind"/> is `action`, `control`
+/// or `pure`. <see cref="Successors"/> is empty for `pure` steps; for `action` it is 0 or 1 entries, for `control`
+/// exactly 2 (`then`, `otherwise`), each either a step index within the same entrypoint or null (path ends).
+/// <see cref="Contract"/> is the resolved graph (inputs/outputs) used both to validate this step's own inputs and,
+/// when this step is `pure`, to validate and address its outputs for downstream `fromStepSlot` readers.</summary>
+internal sealed record ResolvedStep(string NodeId, string NodeKind, string BindingId, JsonElement Parameters,
+    IReadOnlyList<StepInput> Inputs, IReadOnlySet<string> Promoted, IReadOnlyList<int?> Successors, JsonElement Contract);
+
+/// <summary>One compiled entrypoint: dispatch starts at <see cref="Start"/> (an index into <see cref="Steps"/>,
+/// always an `action` or `control` step) and follows `successors`; `pure` steps are read on demand, never dispatched.</summary>
+internal sealed record ResolvedEntry(string NodeId, string BindingId, int Start, IReadOnlyList<ResolvedStep> Steps)
+{
+    /// <summary>Upper bound on commands one dispatch of this entry can produce: only `action`/`control` steps are
+    /// ever placed on the walked path; `pure` steps never appear in <see cref="RuntimeKernel"/>'s command budgets.</summary>
+    internal int DispatchableStepCount => Steps.Count(s => s.NodeKind != "pure");
+}
+
 internal sealed record ResolvedPlan(string Id, string ResourceId, string ResourceRevision, string Domain, RuntimeLimits Limits,
     IReadOnlyList<ResolvedEntry> Entries, IReadOnlySet<string> Bindings, string Fingerprint, IReadOnlyList<string> Permissions);
 /// <summary>The identity a plan file resolves to before the rest of its content is validated: enough to group files by
@@ -22,13 +39,16 @@ internal sealed record ResolvedPlan(string Id, string ResourceId, string Resourc
 internal sealed record PlanIdentity(string Id, string ResourceId, string ResourceRevision);
 
 /// <summary>
-/// schemaVersion 2 plan (Runtime API 2.0.0): positional binding pins, pre-resolved slot layouts,
-/// positional constants and {slot, fromEventSlot} inputs. Every layout is re-derived from the
-/// registered contract and must match exactly; nothing in the file is trusted.
+/// schemaVersion 3 plan (Runtime API 2.0.0, D-017 R4-a): a graph of `action`/`control`/`pure` steps per entrypoint,
+/// walked from `start` along explicit `successors`. `pure` steps are read on demand by consumers via `fromStepSlot`
+/// and evaluated at most once per dispatch. Every layout, successor and slot reference is re-derived from the
+/// registered contract and must match exactly; nothing in the file is trusted. There is no v2 fallback: a file
+/// whose `schemaVersion` is not 3 is rejected outright (`plan-version`).
 /// </summary>
 internal static class RuntimePlan
 {
-    private sealed record Node(string Id, string BindingId, JsonElement Parameters, JsonElement Contract, IReadOnlySet<string> Promoted);
+    private const string BranchCapabilityId = "forge.control.flow.branch";
+    private sealed record Node(string Id, string Kind, string BindingId, JsonElement Parameters, JsonElement Contract, IReadOnlySet<string> Promoted);
 
     /// <summary>The first slice of validation, shared by <see cref="Parse"/> and <see cref="PeekIdentity"/>: shape, version,
     /// runtime lock, authority/failure policy and the planId/resource identity. A file that fails here has no identity and
@@ -37,7 +57,7 @@ internal static class RuntimePlan
     {
         var plan = RuntimeJson.Parse(json);
         RuntimeJson.Shape(plan, "schemaVersion kind planId resource runtime domain authority failurePolicy permissions dependencies limits bindings entrypoints");
-        RuntimeJson.Require(RuntimeJson.Integer(plan.GetProperty("schemaVersion")) == 2 && RuntimeJson.Text(plan, "kind") == "forge-runtime-plan", "plan-version", "Unsupported plan version.");
+        RuntimeJson.Require(RuntimeJson.Integer(plan.GetProperty("schemaVersion")) == 3 && RuntimeJson.Text(plan, "kind") == "forge-runtime-plan", "plan-version", "Unsupported plan version.");
         RuntimeJson.Require(RuntimeJson.StableText(plan.GetProperty("runtime")) == RuntimeJson.StableText(RuntimeJson.From(identity)), "runtime-lock", "Runtime/API/game build lock mismatch.");
         RuntimeJson.Require(RuntimeJson.Text(plan, "authority") == "host" && RuntimeJson.Text(plan, "failurePolicy") == "stop-entrypoint", "execution-policy", "Plans require host and stop-entrypoint.");
         var id = RuntimeJson.Text(plan, "planId"); var resource = plan.GetProperty("resource");
@@ -93,6 +113,7 @@ internal static class RuntimePlan
             RuntimeJson.Require(value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var index) && index >= 0 && index < count, code, detail);
             return value.GetInt32();
         }
+        // kind: "trigger", "action", "control" or "pure" (the last selects a selector/condition/modifier capability).
         Node Load(JsonElement row, string kind)
         {
             var nodeId = RuntimeJson.Text(row, "nodeId");
@@ -100,9 +121,21 @@ internal static class RuntimePlan
             RuntimeJson.Require(nodeIds.Add(nodeId), "duplicate-node", nodeId);
             var bindingId = pins[Slot(row.GetProperty("binding"), pins.Count, "binding-index", nodeId)]; used.Add(bindingId);
             var binding = registry.Bindings[bindingId]; var capability = registry.Capabilities[RuntimeJson.Text(binding, "capabilityId")];
-            RuntimeJson.Require(RuntimeJson.Text(capability, "kind") == kind && capability.TryGetProperty("graph", out _), "node-kind", nodeId);
+            var capabilityKind = RuntimeJson.Text(capability, "kind");
+            var expectedCapabilityKinds = kind switch
+            {
+                "trigger" => new[] { "trigger" },
+                "action" => new[] { "action" },
+                "control" => new[] { "control" },
+                "pure" => new[] { "selector", "condition", "modifier" },
+                _ => Array.Empty<string>()
+            };
+            RuntimeJson.Require(expectedCapabilityKinds.Contains(capabilityKind) && capability.TryGetProperty("graph", out _), "node-kind", nodeId);
             var graph = capability.GetProperty("graph");
-            RuntimeJson.Require(RuntimeJson.Text(graph, "execution") == "host" && RuntimeJson.Strings(graph.GetProperty("domains")).Contains(domain, StringComparer.Ordinal), "node-domain-authority", nodeId);
+            var executionAuthority = RuntimeJson.Text(graph, "execution");
+            RuntimeJson.Require(executionAuthority == (kind == "pure" ? "pure" : "host")
+                && RuntimeJson.Strings(graph.GetProperty("domains")).Contains(domain, StringComparer.Ordinal), "node-domain-authority", nodeId);
+            if (kind == "control") RuntimeJson.Require(RuntimeJson.Text(capability, "id") == BranchCapabilityId, "control-unsupported", nodeId);
             var definitions = RuntimeJson.Rows(graph, "parameters");
             RuntimeJson.Require(definitions.All(p => RuntimeJson.Text(p, "type") != "recipient-policy"), "unsupported-parameter", nodeId);
             var layout = row.GetProperty("layout");
@@ -134,83 +167,201 @@ internal static class RuntimePlan
             var inputs = RuntimeJson.Rows(contract, "inputs"); var outputs = RuntimeJson.Rows(contract, "outputs");
             var inputExecution = inputs.Where(p => RuntimeJson.Text(p, "type") == "execution").ToArray();
             var outputExecution = outputs.Where(p => RuntimeJson.Text(p, "type") == "execution").ToArray();
-            if (kind == "trigger")
-                RuntimeJson.Require(inputs.Length == 0 && definitions.Length == 0 && outputExecution.Length == 1, "trigger-shape", nodeId);
-            else
+            switch (kind)
             {
-                RuntimeJson.Require(RuntimeJson.Text(binding, "role") == "execute" && registry.Handlers.ContainsKey(bindingId), "action-handler", nodeId);
-                RuntimeJson.Require(inputExecution.Length == 1 && !RuntimeJson.Flag(inputExecution[0], "optional") && outputExecution.Length <= 1, "action-shape", nodeId);
+                case "trigger":
+                    RuntimeJson.Require(inputs.Length == 0 && definitions.Length == 0 && outputExecution.Length == 1, "trigger-shape", nodeId);
+                    break;
+                case "action":
+                    RuntimeJson.Require(RuntimeJson.Text(binding, "role") == "execute", "binding-role", nodeId);
+                    RuntimeJson.Require(registry.Handlers.ContainsKey(bindingId), "action-handler", nodeId);
+                    RuntimeJson.Require(inputExecution.Length == 1 && !RuntimeJson.Flag(inputExecution[0], "optional") && outputExecution.Length <= 1, "action-shape", nodeId);
+                    break;
+                case "control":
+                    RuntimeJson.Require(RuntimeJson.Text(binding, "role") == "execute", "binding-role", nodeId);
+                    RuntimeJson.Require(inputExecution.Length == 1 && !RuntimeJson.Flag(inputExecution[0], "optional") && outputExecution.Length == 2, "control-shape", nodeId);
+                    break;
+                case "pure":
+                    // D-017 R4-a: a pure step is read through its evaluator; a planned evaluate binding has none.
+                    RuntimeJson.Require(RuntimeJson.Text(binding, "role") == "evaluate", "binding-role", nodeId);
+                    RuntimeJson.Require(registry.Evaluators.ContainsKey(bindingId), "missing-evaluator", nodeId);
+                    RuntimeJson.Require(inputExecution.Length == 0 && outputExecution.Length == 0, "pure-shape", nodeId);
+                    RuntimeJson.Require(!inputs.Concat(outputs).Any(p => RuntimeJson.Text(p, "type") is "entity" or "resource" or "handle"), "pure-world-port", nodeId);
+                    break;
             }
-            foreach (var port in (kind == "trigger" ? outputs : inputs).Where(p => RuntimeJson.Text(p, "type") != "execution"))
+            // Every non-execution port that carries a value across this boundary must be a type this runtime
+            // validates: every step's inputs (same as v2), the trigger's own event outputs, and a `pure` step's
+            // outputs — the latter are the frames later steps read through `fromStepSlot`. An `action`'s outputs
+            // keep their v2 treatment: R4-a never reads them, so their types are not this loader's business.
+            foreach (var port in (kind == "trigger" ? outputs : kind == "pure" ? outputs : inputs).Where(p => RuntimeJson.Text(p, "type") != "execution"))
             {
                 var type = RuntimeJson.Text(port, "type");
                 RuntimeJson.Require(RuntimeGraphContracts.RuntimeValueTypes.Contains(type) && (!RuntimeGraphContracts.Many(port) || type == "entity"),
                     kind == "trigger" ? "unsupported-event-port" : "unsupported-input-port", nodeId + "." + RuntimeJson.Text(port, "id"));
             }
-            return new Node(nodeId, bindingId, parameters, contract, promoted);
+            return new Node(nodeId, kind, bindingId, parameters, contract, promoted);
+        }
+
+        // Resolves one step's `inputs` row set against its own contract's input ports. `eventPorts` are the owning
+        // entrypoint's trigger outputs; `nodes`/`stepRows` are this entrypoint's already-loaded steps, used for
+        // `fromStepSlot` bounds/kind checks (the pure-step index vs. consumer-index ordering itself is checked later).
+        List<StepInput> ResolveInputs(JsonElement stepRow, Node node, JsonElement[] eventPorts, Node[] nodes)
+        {
+            var targets = RuntimeJson.Rows(node.Contract, "inputs");
+            var inputs = new List<StepInput>(); var previous = -1;
+            foreach (var source in RuntimeJson.Rows(stepRow, "inputs", targets.Length))
+            {
+                RuntimeJson.Require(source.ValueKind == JsonValueKind.Object, "object-required", node.Id);
+                var hasLiteral = source.TryGetProperty("value", out var literalValue);
+                var hasEvent = source.TryGetProperty("fromEventSlot", out _);
+                var hasStep = source.TryGetProperty("fromStepSlot", out var fromStepValue);
+                RuntimeJson.Require((hasLiteral ? 1 : 0) + (hasEvent ? 1 : 0) + (hasStep ? 1 : 0) == 1, "literal-with-event-source", node.Id);
+                RuntimeJson.Shape(source, hasLiteral ? "slot value" : hasEvent ? "slot fromEventSlot" : "slot fromStepSlot");
+                var slot = Slot(source.GetProperty("slot"), targets.Length, "input-slot", node.Id);
+                // Sorted and strictly increasing: one driver per input, one canonical spelling per plan.
+                RuntimeJson.Require(slot > previous, "input-order", node.Id); previous = slot;
+                var target = targets[slot]; var name = RuntimeJson.Text(target, "id");
+                RuntimeJson.Require(RuntimeJson.Text(target, "type") != "execution", "execution-slot", node.Id + "." + name);
+                if (hasLiteral)
+                {
+                    // D-006①: literals never target entity/resource/handle/event/result ports (the last four are
+                    // already excluded upstream as unsupported input ports); entity is excluded here explicitly.
+                    RuntimeJson.Require(RuntimeJson.Text(target, "type") != "entity", "literal-wrong-type", node.Id + "." + name);
+                    try { RuntimeJson.ValidateValue(literalValue, target); }
+                    catch (RuntimeContractException) { throw new RuntimeContractException("literal-wrong-type", node.Id + "." + name); }
+                    inputs.Add(new StepInput(name, null, literalValue, null, false, target));
+                    continue;
+                }
+                JsonElement origin; string? eventPort = null; StepSlotRef? fromStep = null;
+                if (hasEvent)
+                {
+                    var eventSlot = Slot(source.GetProperty("fromEventSlot"), eventPorts.Length, "event-port-missing", node.Id);
+                    origin = eventPorts[eventSlot];
+                    RuntimeJson.Require(RuntimeJson.Text(origin, "type") != "execution", "execution-slot", node.Id + "." + name);
+                    eventPort = RuntimeJson.Text(origin, "id");
+                }
+                else
+                {
+                    RuntimeJson.Shape(fromStepValue, "step port");
+                    var stepField = fromStepValue.GetProperty("step");
+                    RuntimeJson.Require(stepField.ValueKind == JsonValueKind.Number && stepField.TryGetInt32(out var stepIndex)
+                        && stepIndex >= 0 && stepIndex < nodes.Length && nodes[stepIndex].Kind == "pure", "from-step-kind", node.Id);
+                    var stepIndexValue = stepField.GetInt32();
+                    var sourceOutputs = RuntimeJson.Rows(nodes[stepIndexValue].Contract, "outputs");
+                    var portField = fromStepValue.GetProperty("port");
+                    RuntimeJson.Require(portField.ValueKind == JsonValueKind.Number && portField.TryGetInt32(out var portIndex)
+                        && portIndex >= 0 && portIndex < sourceOutputs.Length, "from-step-port", node.Id);
+                    var portIndexValue = portField.GetInt32();
+                    origin = sourceOutputs[portIndexValue];
+                    RuntimeJson.Require(RuntimeJson.Text(origin, "type") != "execution", "from-step-port", node.Id);
+                    fromStep = new StepSlotRef(stepIndexValue, portIndexValue);
+                }
+                RuntimeJson.Require(RuntimeGraphContracts.ValueTypeMatches(origin, target), "port-mismatch", node.Id + "." + name);
+                // D-006②: a non-nullable "one" output may wire into a "many" input; dispatch wraps it into a
+                // one-element collection. A nullable "one" cannot feed "many", and "many" can never feed "one".
+                var wrap = !RuntimeGraphContracts.Many(origin) && RuntimeGraphContracts.Many(target) && !RuntimeJson.Flag(origin, "nullable");
+                RuntimeJson.Require(RuntimeGraphContracts.Many(origin) == RuntimeGraphContracts.Many(target) || wrap, "port-mismatch", node.Id + "." + name);
+                RuntimeJson.Require(!RuntimeJson.Flag(origin, "nullable") || RuntimeJson.Flag(target, "nullable"), "nullable-port", node.Id + "." + name);
+                RuntimeJson.Require(!RuntimeJson.Flag(origin, "optional") || RuntimeJson.Flag(target, "optional"), "optional-event-port", node.Id + "." + name);
+                inputs.Add(new StepInput(name, eventPort, null, fromStep, wrap, origin));
+            }
+            foreach (var target in targets.Where(p => RuntimeJson.Text(p, "type") != "execution" && !RuntimeJson.Flag(p, "optional")))
+                RuntimeJson.Require(inputs.Any(i => i.Name == RuntimeJson.Text(target, "id")), "missing-input", node.Id + "." + RuntimeJson.Text(target, "id"));
+            return inputs;
         }
 
         var entries = new List<ResolvedEntry>(); var total = 0;
         foreach (var entry in entryRows)
         {
-            RuntimeJson.Shape(entry, "nodeId binding layout steps");
+            RuntimeJson.Shape(entry, "nodeId binding layout start steps");
             var trigger = Load(entry, "trigger");
             var eventPorts = RuntimeJson.Rows(trigger.Contract, "outputs");
-            var steps = new List<ResolvedStep>(); var continuation = true;
-            foreach (var step in RuntimeJson.Rows(entry, "steps", ceiling.MaxStepsPerEntrypoint))
+            var stepRows = RuntimeJson.Rows(entry, "steps", ceiling.MaxStepsPerEntrypoint);
+            RuntimeJson.Require(stepRows.Length > 0, "empty-entrypoint", trigger.Id); total += stepRows.Length;
+            var nodes = new Node[stepRows.Length];
+            for (var i = 0; i < stepRows.Length; i++)
             {
-                RuntimeJson.Require(continuation, "missing-execution-output", trigger.Id);
-                RuntimeJson.Shape(step, "nodeId binding layout inputs");
-                var node = Load(step, "action");
-                continuation = RuntimeJson.Rows(node.Contract, "outputs").Any(p => RuntimeJson.Text(p, "type") == "execution");
-                var targets = RuntimeJson.Rows(node.Contract, "inputs");
-                var inputs = new List<StepInput>(); var previous = -1;
-                foreach (var source in RuntimeJson.Rows(step, "inputs", targets.Length))
-                {
-                    // The key set alone decides the source kind (J-003): a row carrying both is refused outright,
-                    // never treated as either shape. Everything else keeps the original two-field row check.
-                    RuntimeJson.Require(source.ValueKind == JsonValueKind.Object, "object-required", node.Id);
-                    var literal = source.TryGetProperty("value", out var literalValue);
-                    RuntimeJson.Require(!literal || !source.TryGetProperty("fromEventSlot", out _), "literal-with-event-source", node.Id);
-                    RuntimeJson.Shape(source, literal ? "slot value" : "slot fromEventSlot");
-                    var slot = Slot(source.GetProperty("slot"), targets.Length, "input-slot", node.Id);
-                    // Sorted and strictly increasing: one driver per input, one canonical spelling per plan.
-                    RuntimeJson.Require(slot > previous, "input-order", node.Id); previous = slot;
-                    var target = targets[slot]; var name = RuntimeJson.Text(target, "id");
-                    RuntimeJson.Require(RuntimeJson.Text(target, "type") != "execution", "execution-slot", node.Id + "." + name);
-                    if (literal)
-                    {
-                        // D-006①: literals never target entity/resource/handle/event/result ports (the last four are
-                        // already excluded upstream as unsupported input ports); entity is excluded here explicitly.
-                        RuntimeJson.Require(RuntimeJson.Text(target, "type") != "entity", "literal-wrong-type", node.Id + "." + name);
-                        try { RuntimeJson.ValidateValue(literalValue, target); }
-                        catch (RuntimeContractException) { throw new RuntimeContractException("literal-wrong-type", node.Id + "." + name); }
-                        inputs.Add(new StepInput(name, null, literalValue, false, target));
-                    }
-                    else
-                    {
-                        var eventSlot = Slot(source.GetProperty("fromEventSlot"), eventPorts.Length, "event-port-missing", node.Id);
-                        var origin = eventPorts[eventSlot];
-                        RuntimeJson.Require(RuntimeJson.Text(origin, "type") != "execution", "execution-slot", node.Id + "." + name);
-                        RuntimeJson.Require(RuntimeGraphContracts.ValueTypeMatches(origin, target), "port-mismatch", node.Id + "." + name);
-                        // D-006②: a non-nullable "one" output may wire into a "many" input; dispatch wraps it into a
-                        // one-element collection. A nullable "one" cannot feed "many", and "many" can never feed "one".
-                        var wrap = !RuntimeGraphContracts.Many(origin) && RuntimeGraphContracts.Many(target) && !RuntimeJson.Flag(origin, "nullable");
-                        RuntimeJson.Require(RuntimeGraphContracts.Many(origin) == RuntimeGraphContracts.Many(target) || wrap, "port-mismatch", node.Id + "." + name);
-                        RuntimeJson.Require(!RuntimeJson.Flag(origin, "nullable") || RuntimeJson.Flag(target, "nullable"), "nullable-port", node.Id + "." + name);
-                        RuntimeJson.Require(!RuntimeJson.Flag(origin, "optional") || RuntimeJson.Flag(target, "optional"), "optional-event-port", node.Id + "." + name);
-                        inputs.Add(new StepInput(name, RuntimeJson.Text(origin, "id"), null, wrap, origin));
-                    }
-                }
-                foreach (var target in targets.Where(p => RuntimeJson.Text(p, "type") != "execution" && !RuntimeJson.Flag(p, "optional")))
-                    RuntimeJson.Require(inputs.Any(i => i.Name == RuntimeJson.Text(target, "id")), "missing-input", node.Id + "." + RuntimeJson.Text(target, "id"));
-                steps.Add(new ResolvedStep(node.Id, node.BindingId, node.Parameters, inputs, node.Promoted));
+                var stepRow = stepRows[i];
+                RuntimeJson.Shape(stepRow, "nodeId nodeKind binding layout inputs successors");
+                var nodeKind = RuntimeJson.Text(stepRow, "nodeKind");
+                RuntimeJson.Require(nodeKind is "action" or "control" or "pure", "node-kind", RuntimeJson.Text(stepRow, "nodeId"));
+                nodes[i] = Load(stepRow, nodeKind);
             }
-            RuntimeJson.Require(steps.Count > 0, "empty-entrypoint", trigger.Id); total += steps.Count;
-            entries.Add(new ResolvedEntry(trigger.Id, trigger.BindingId, steps));
+            var successors = new int?[stepRows.Length][];
+            for (var i = 0; i < stepRows.Length; i++)
+            {
+                var node = nodes[i];
+                var expected = node.Kind == "pure" ? 0 : RuntimeJson.Rows(node.Contract, "outputs").Count(p => RuntimeJson.Text(p, "type") == "execution");
+                var raw = RuntimeJson.Rows(stepRows[i], "successors", ceiling.MaxStepsPerEntrypoint);
+                RuntimeJson.Require(raw.Length == expected, node.Kind == "pure" ? "pure-successor" : "successor-shape", node.Id);
+                var resolved = new int?[raw.Length];
+                for (var j = 0; j < raw.Length; j++)
+                {
+                    if (raw[j].ValueKind == JsonValueKind.Null) { resolved[j] = null; continue; }
+                    RuntimeJson.Require(raw[j].ValueKind == JsonValueKind.Number && raw[j].TryGetInt32(out var target)
+                        && target >= 0 && target < stepRows.Length, "successor-shape", node.Id);
+                    resolved[j] = raw[j].GetInt32();
+                }
+                successors[i] = resolved;
+            }
+            var stepInputs = new List<StepInput>[stepRows.Length];
+            for (var i = 0; i < stepRows.Length; i++) stepInputs[i] = ResolveInputs(stepRows[i], nodes[i], eventPorts, nodes);
+            // Edge direction: a successor always names a strictly later step; a pure read always names a strictly earlier one.
+            for (var i = 0; i < stepRows.Length; i++)
+                foreach (var next in successors[i])
+                    if (next is int target) RuntimeJson.Require(target > i && nodes[target].Kind is "action" or "control", "successor-index", nodes[i].Id);
+            for (var i = 0; i < stepRows.Length; i++)
+                foreach (var input in stepInputs[i])
+                    if (input.FromStep is { } from) RuntimeJson.Require(from.Step < i, "from-step-slot", nodes[i].Id);
+            // Canonical order: Kahn's algorithm over both edge kinds, ties broken by nodeId ordinal. The compiled
+            // array must equal this order exactly, item by item.
+            var indegree = new int[stepRows.Length];
+            var dependents = new List<int>[stepRows.Length];
+            for (var i = 0; i < stepRows.Length; i++) dependents[i] = new List<int>();
+            for (var i = 0; i < stepRows.Length; i++)
+                foreach (var next in successors[i]) if (next is int target) { dependents[i].Add(target); indegree[target]++; }
+            for (var i = 0; i < stepRows.Length; i++)
+                foreach (var input in stepInputs[i]) if (input.FromStep is { } from) { dependents[from.Step].Add(i); indegree[i]++; }
+            var visited = new bool[stepRows.Length];
+            for (var position = 0; position < stepRows.Length; position++)
+            {
+                var candidate = -1; string? candidateId = null;
+                for (var i = 0; i < stepRows.Length; i++)
+                {
+                    if (visited[i] || indegree[i] != 0) continue;
+                    if (candidate == -1 || string.CompareOrdinal(nodes[i].Id, candidateId) < 0) { candidate = i; candidateId = nodes[i].Id; }
+                }
+                RuntimeJson.Require(candidate != -1, "step-order", trigger.Id);
+                RuntimeJson.Require(candidate == position, "step-order", nodes[candidate].Id);
+                visited[candidate] = true;
+                foreach (var dependent in dependents[candidate]) indegree[dependent]--;
+            }
+            // Reachability: every action/control step must be reachable from `start`; every pure step must be read,
+            // directly or transitively, by some reachable step.
+            var startRaw = entry.GetProperty("start");
+            RuntimeJson.Require(startRaw.ValueKind == JsonValueKind.Number && startRaw.TryGetInt32(out var startCheck)
+                && startCheck >= 0 && startCheck < stepRows.Length && nodes[startCheck].Kind is "action" or "control", "entry-start", trigger.Id);
+            var start = startRaw.GetInt32();
+            var reachable = new bool[stepRows.Length]; reachable[start] = true;
+            bool changed;
+            do
+            {
+                changed = false;
+                for (var i = 0; i < stepRows.Length; i++)
+                {
+                    if (!reachable[i]) continue;
+                    foreach (var next in successors[i]) if (next is int target && !reachable[target]) { reachable[target] = true; changed = true; }
+                    foreach (var input in stepInputs[i]) if (input.FromStep is { } from && !reachable[from.Step]) { reachable[from.Step] = true; changed = true; }
+                }
+            } while (changed);
+            for (var i = 0; i < stepRows.Length; i++) RuntimeJson.Require(reachable[i], "unreachable-step", nodes[i].Id);
+            var steps = new List<ResolvedStep>(stepRows.Length);
+            for (var i = 0; i < stepRows.Length; i++)
+                steps.Add(new ResolvedStep(nodes[i].Id, nodes[i].Kind, nodes[i].BindingId, nodes[i].Parameters, stepInputs[i], nodes[i].Promoted, successors[i], nodes[i].Contract));
+            entries.Add(new ResolvedEntry(trigger.Id, trigger.BindingId, start, steps));
         }
         RuntimeJson.Require(entries.Count > 0 && total <= ceiling.MaxTotalSteps, "plan-step-budget", id);
-        foreach (var group in entries.GroupBy(e => e.BindingId)) RuntimeJson.Require(group.Sum(e => e.Steps.Count) <= limits.MaxCommandsPerTick, "event-command-budget", id);
+        foreach (var group in entries.GroupBy(e => e.BindingId)) RuntimeJson.Require(group.Sum(e => e.DispatchableStepCount) <= limits.MaxCommandsPerTick, "event-command-budget", id);
         var closure = registry.Closure(used);
         RuntimeJson.ExactSet(pins, closure, "binding-closure");
         RuntimeJson.ExactSet(RuntimeJson.Strings(plan.GetProperty("dependencies")), registry.Packages(closure), "dependency-lock");

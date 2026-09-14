@@ -7,5 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../Framework/**/*.cs" Exclude="../../Framework/bin/**/*.cs;../../Framework/obj/**/*.cs" Link="Framework/%(Filename)%(Extension)" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../Framework/**/*.cs" Exclude="../../Framework/bin/**/*.cs;../../Framework/obj/**/*.cs" Link="Framework/%(Filename)%(Extension)" />
+    <!-- D-017 R4-a: the frame's `compare` condition is the ForgeTrigger package's own module, so the SDK test hosts
+         the real one instead of restating its contract and its arithmetic. -->
+    <Compile Include="../../../ForgeTrigger/**/*.cs" Exclude="../../../ForgeTrigger/bin/**/*.cs;../../../ForgeTrigger/obj/**/*.cs;../../../ForgeTrigger/tests/**/*.cs;../../../ForgeTrigger/artifacts/**/*.cs" Link="ForgeTrigger/%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

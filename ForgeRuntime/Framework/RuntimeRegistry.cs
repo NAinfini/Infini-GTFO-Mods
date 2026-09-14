@@ -12,6 +12,7 @@ internal sealed class RuntimeRegistry
     internal readonly Dictionary<string, JsonElement> Capabilities = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, JsonElement> Bindings = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, CommandHandler> Handlers = new(StringComparer.Ordinal);
+    internal readonly Dictionary<string, EvaluatorHandler> Evaluators = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, BindingSupport> Support = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, (string Owner, Func<EntityReference, bool> Resolve)> Resolvers = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, string> CapabilityRegistrants = new(StringComparer.Ordinal);
@@ -25,6 +26,7 @@ internal sealed class RuntimeRegistry
         foreach (var x in source.Capabilities) Capabilities.Add(x.Key, x.Value);
         foreach (var x in source.Bindings) Bindings.Add(x.Key, x.Value);
         foreach (var x in source.Handlers) Handlers.Add(x.Key, x.Value);
+        foreach (var x in source.Evaluators) Evaluators.Add(x.Key, x.Value);
         foreach (var x in source.Support) Support.Add(x.Key, x.Value);
         foreach (var x in source.Resolvers) Resolvers.Add(x.Key, x.Value);
         foreach (var x in source.EntityObservers) EntityObservers.Add(x.Key, x.Value);
@@ -66,6 +68,18 @@ internal sealed class RuntimeRegistry
             next.Handlers.Add(id, handler!); usedHandlers.Add(handlerName);
         }
         RuntimeJson.ExactSet(suppliedHandlers.Keys, usedHandlers, "unused-handler");
+        var suppliedEvaluators = new Dictionary<string, EvaluatorHandler>(module.Evaluators, StringComparer.Ordinal);
+        var usedEvaluators = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var binding in bindings)
+        {
+            var id = RuntimeJson.Text(binding, "id");
+            if (RuntimeJson.Text(binding, "status") != "implemented" || RuntimeJson.Text(binding, "role") != "evaluate") continue;
+            RuntimeJson.Require(next.Capabilities.ContainsKey(RuntimeJson.Text(binding, "capabilityId")), "missing-capability", id);
+            var handlerName = RuntimeJson.Text(binding, "handler");
+            RuntimeJson.Require(suppliedEvaluators.TryGetValue(handlerName, out var evaluator) && evaluator != null, "missing-evaluator", id);
+            next.Evaluators.Add(id, evaluator!); usedEvaluators.Add(handlerName);
+        }
+        RuntimeJson.ExactSet(suppliedEvaluators.Keys, usedEvaluators, "unused-evaluator");
         foreach (var row in module.BindingSupport)
         {
             RuntimeJson.Require(bindings.Any(b => RuntimeJson.Text(b, "id") == row.BindingId), "support-owner", row.BindingId);
@@ -150,7 +164,10 @@ internal sealed class RuntimeRegistry
             RuntimeJson.Require(Providers.TryGetValue(providerId, out var provider) && id.StartsWith(providerId + ".", StringComparison.Ordinal), "binding-provider", id);
             RuntimeJson.Require(Capabilities.TryGetValue(RuntimeJson.Text(b, "capabilityId"), out var capability), "binding-capability", id);
             RuntimeJson.Require(RuntimeJson.Text(b, "status") is "planned" or "implemented", "binding-status", id);
-            RuntimeJson.Require(RuntimeJson.Text(b, "role") is "execute" or "observe", "binding-role", id);
+            var role = RuntimeJson.Text(b, "role");
+            RuntimeJson.Require(role is "execute" or "observe" or "evaluate", "binding-role", id);
+            if (role == "evaluate")
+                RuntimeJson.Require(RuntimeJson.Text(capability, "kind") is "selector" or "condition" or "modifier", "binding-role", id);
             RuntimeJson.Text(b, "handler"); ValidatePackages(RuntimeJson.Strings(b.GetProperty("dependencies")));
             foreach (var required in RuntimeJson.Strings(b.GetProperty("requires"))) RuntimeJson.Require(Bindings.ContainsKey(required), "required-binding", required);
             if (RuntimeJson.Text(capability, "kind") == "trigger" && RuntimeJson.Text(capability, "id").StartsWith("forge.", StringComparison.Ordinal) && RuntimeJson.Text(provider, "kind") != "native")

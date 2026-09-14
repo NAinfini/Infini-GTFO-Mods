@@ -4,6 +4,16 @@
 
 计划与状态见两仓统一框架第 6 节 U-TRIGGER（链接见[仓库 README](../README.md)）；本文只记带日期的运行记录。
 
+## D-017 R4-a：`compare` 注册为 evaluate 绑定（2026-09-14）
+
+`ModuleDefinition.Create()` 不再是空 provider。它注册能力 `forge.condition.predicate.compare`（逐字取目录行），以及 binding `forge.module.trigger.binding.compare`（`role: evaluate`，handler `trigger.condition.compare`）。evaluator 调用既有的 `PureConditions.Compare`，`compare_operator` 按成员下标对应 `ScalarComparison`。宿主 `ForgeRuntime.csproj` 链接本模块源码并注册它，`--export-manifest` 因此带出该 provider、能力与 binding。
+
+证据都在 ForgeRuntime 套件里，运行记录见 [ForgeRuntime 验证记录](../ForgeRuntime/VALIDATION.md) 的“D-017 R4-a”一节：
+- Framework 用真实 `ModuleDefinition.Create()` 跑 7 组 `(left, right, operator, tolerance, expected)`；
+- `--fixtures` 下网站 `native-branch` 计划经 compare → branch → heal 派发。
+
+本批**没有**复跑 `python ForgeTrigger/tools/validate-trigger.py --mutations`：同一时间 `Targeting/` 下有另一批空间过滤的未提交改动，完整入口的结果不能归到这次提交。可执行节点从 0 变为 1（仅 evaluate）；`publicationReady=false`、`gameVerified=false` 不变。
+
 ## 完整入口复跑：向量工具改从 logic-evaluator 导入（2026-09-14，`trigger-20260914-094748`）
 
 D-009、J-003 之后的两次复跑失败：`artifacts/trigger-20260914-093810` 的 pure、independent、spatial-fixtures 退出 1，TS 向量生成报 `previewLogicPrimitive is not a function`；`trigger-20260914-094340` 只剩 independent 的 authoring-vectors 报 `preview is not a function`。根因是网站把 `previewLogicPrimitive` 从 `site/forge/logic-preview.ts` 移到 `site/forge/logic-evaluator.ts`，而 `tools/` 下 `spatial-vectors.mjs`、`recipient-filter-vectors.mjs`、`pure-vectors.mjs`、`collection-vectors.mjs`、`acceptance-vectors.mjs` 仍从旧模块导入。五处导入改为 `logic-evaluator` 后（`24e3051`），在模组 `17b3078` 加该改动、网站 `b055a577`（工作树的未提交改动不涉及 `site/forge/`）上执行 `python ForgeTrigger/tools/validate-trigger.py --mutations`：进程退出 0，summary `status=passed`、`checksStatus=passed`；pure（C# 1697 项，23 项纯计算、293 组向量）、t1（C# 911、TypeScript 361，34 组 wire，424 基础节点、62 个 typed 作者定义、目录缺失 0）、independent（Acceptance 2557 项）、r3（1836 项）。日志里各错误实现副本的 `status: failed` 行是预期的检出，summary 的 mutation 检查整体通过。

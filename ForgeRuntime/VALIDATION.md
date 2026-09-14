@@ -251,6 +251,66 @@ python ForgeRuntime/tests/GraphContracts/verify.py --website ..\Infini-GTFO-Mode
 
 R4 完整 lowering 的四项（步骤间数据边、pure 节点运行期求值、条件分支、control 节点）需要的计划格式扩展提案见本次交接消息，不写入本文件（本文件按 §2.8 只放带日期的运行记录，不放"当前结论"之外的规格文字；规格提案是待网站与用户裁决的内容，归属 FORGE-FRAMEWORK.md §8.1/§3.2，由网站会话落笔）。
 
+## D-017 R4-a — schemaVersion 3 运行时内核（2026-09-14）
+
+按 FORGE-FRAMEWORK.md §3.2「I-PLAN schemaVersion 3（D-017 R4-a）」与 §6 U-RUNTIME 落地 v3 wire 格式：入口 `start`、步骤 `nodeKind`（`action`/`control`/`pure`）与 `successors`、`{slot, fromStepSlot}` 数据边、`evaluate` 角色与 `RuntimeModule.Evaluators`、Kahn 拓扑序校验、SDK 自有的 `forge.contract.control` 分支合同，以及 ForgeTrigger 的 `forge.condition.predicate.compare` 求值绑定。**v2 不再读取**，没有任何兼容分支。
+
+验证入口与隔离产物目录 `%TEMP%\forge-r4a-v3-20260914`，`GTFO_BEPINEX_PATH` 指向 `Forge-MapEditor-QA` profile（仅供编译引用）：
+
+```powershell
+$out = "$env:TEMP\forge-r4a-v3-20260914"
+$fx  = "..\Infini-GTFO-Model-Site\Tests\Forge\fixtures\runtime"
+dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $out --disable-build-servers -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH
+dotnet build ForgeRuntime/tests/Framework/Framework.csproj -c Release --artifacts-path $out --disable-build-servers -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH
+dotnet build ForgeRuntime/tests/GameBindings/GameBindings.csproj -c Release --artifacts-path $out --disable-build-servers -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH
+dotnet build ForgeRuntime/tests/LifecycleWork/LifecycleWork.csproj -c Release --artifacts-path $out --disable-build-servers
+dotnet build ForgeRuntime/tests/Architecture/Architecture.csproj -c Release --artifacts-path $out --disable-build-servers
+dotnet $out/bin/Framework/release/Framework.dll
+dotnet $out/bin/Framework/release/Framework.dll --fixtures $fx
+dotnet $out/bin/GameBindings/release/GameBindings.dll
+dotnet $out/bin/GameBindings/release/GameBindings.dll --fixtures $fx
+dotnet $out/bin/GameBindings/release/GameBindings.dll --bridge E:\SteamLibrary\steamapps\common\GTFO
+dotnet $out/bin/GameBindings/release/GameBindings.dll --export-manifest <scratchpad>\v3-native-manifest.json
+dotnet $out/bin/LifecycleWork/release/LifecycleWork.dll --fixtures $fx
+dotnet $out/bin/Architecture/release/Architecture.dll
+```
+
+| 套件与参数 | 结果 | 退出码 |
+| --- | --- | --- |
+| 上述五个构建（宿主 + 四个测试工程） | 均 `0 Warning(s)` / `0 Error(s)` | 0 |
+| Framework（默认） | `Framework checks: 336 passed.` | 0 |
+| Framework `--fixtures $fx` | `Framework checks: 379 passed.`（加入 `successor-pure-target` 负例后） | 0 |
+| GameBindings（默认） | PASS 39，BLOCKED 0 | 0 |
+| GameBindings `--fixtures $fx` | PASS 85，BLOCKED 0（加入 `successor-pure-target` 后；本批从「PASS 32 + 2 BLOCKED」变为全通：站内夹具已删掉 D-009 的 `grantedPermissions` 负例，本仓不再读计划内的 `validPlan` 键） | 0 |
+| GameBindings `--bridge <GTFO 根目录>` | PASS 74，BLOCKED 0 | 0 |
+| GameBindings `--export-manifest` | 导出 8499 字节；sha256 `4d6c74bb819efc36a3be5fe213670f71dd3ac4fb59c6026712875c8db612c4a9` | 0 |
+| LifecycleWork `--fixtures $fx` | `Lifecycle work: 57 assertions passed; 0 groups failed.` | 0 |
+| Architecture | `PASS 41 architecture boundary assertions.` | 0 |
+
+导出的运行期清单与站内 `Tests/Forge/fixtures/runtime/native-manifest.json` 逐字段相等（四家 provider、7 条 capability、7 条 binding、7 行 bindingSupport、permissions 与 `runtime` 身份完全一致）。这是本批最关键的一条证据：宿主 `ForgeRuntime.csproj` 现在链接 ForgeTrigger 源码并注册 `forge.module.trigger`，SDK 自己声明 `forge.contract.control`，因此真实注册表与网站编译器写出的夹具不再有偏差。
+
+本批新增/改写的负例与断言（只列 R4-a 相关的重点）：
+
+- **拒绝码单元覆盖**：`node-kind`（步骤 kind 与能力 kind 不符、control 步骤自称 pure、pure 步骤绑 action 能力）、`control-unsupported`（R4-a 只路由 `forge.control.flow.branch`）、`successor-shape`（后继帧长度/越界）、`successor-index`（后继只能向后）、`entry-start`（`start` 必须落在 action/control 步骤内）、`pure-successor`（pure 步骤没有后继）、`unreachable-step`、`from-step-kind`、`from-step-port`、`from-step-slot`、`execution-slot`、`port-mismatch`、`event-port-missing`、`missing-input`、`missing-evaluator`、`unused-evaluator`。
+- **Kahn 顺序**：正例由夹具按同一算法现算并逐项断言；`step-order` 的负例在本仓线性图里**无法手工构造**（每个 action/control 步骤恰好一个前驱，凡是边都向前且步骤全部可达的数组必然就是规范序）。该码由站内 `invalid/step-order.plan.json` 覆盖，`--fixtures` 运行会对同一段代码断言，`ForgeRuntime/tests/Framework/Program.cs` 里写明了这个取舍。
+- **分支路由派发**：`then` 命中 action 命令、`otherwise` 收敛回执且零命令，两种结果都断言，常数真/常数假求值器都过不了。
+- **真实 `compare` 求值**：Framework 用 `ForgeTrigger.ModuleDefinition.Create()` 跑 7 组 `(left, right, operator, tolerance, expected)`，覆盖容差把 `lte`/`gt` 翻转的两种方向，操作数以成员集下标上线、handler 收到成员名。断言的是命令是否真的产生，常数求值器或忽略 operator 的实现都会失败。
+- **枚举帧**：枚举端口的 `valueSet` 取 SDK 表内的声明下标；测试夹具用反射读同一张表，不再手抄集合顺序。
+
+本轮**没有**跑 HostIntegration、PluginStartup、HostConfiguration、RuntimeLog、EntityObservation、Map、Weapon 套件；`ForgeRuntime/ForgeRuntime.csproj` 新链接了 ForgeTrigger 源码，这些套件理论上不受影响，但没有实测，不在此声称。ForgeEnemy 侧同批：LifecycleFacts 52/52、ReceiverProbe 48/48、CommitAudit 68/68，退出码均 0；NativeEvidence 544/544 与其负例 22/22 只在实现批次的工作树里跑过，下面的隔离复跑没有包含。
+
+**审查修正与隔离复跑（同日）**。对照网站 `validateForgeRuntimePlan`，加载器补了两处检查：
+- 非 `null` 后继指向 `pure` 步骤记 `successor-index`。此前只查下标方向，向后指向纯步骤的计划会被加载。网站夹具新增 `invalid/successor-pure-target.plan.json` 覆盖这一条。
+- 步骤绑定角色记 `binding-role`：`action`、`control` 必须是 `execute`，`pure` 必须是 `evaluate`；`pure` 的 binding 没有已注册 evaluator（planned）记 `missing-evaluator`，`action` 缺 handler 仍记 `action-handler`。
+
+复跑方式：`git worktree add --detach` 建 HEAD 工作树，拷入本批全部未提交文件后按上面的命令构建；ForgeEnemy 三个套件另带 `-p:ForgeFrameworkAssembly=<SDK dll>`，并各自传入报告路径。结果：
+- 9 个构建全部 0 警告 0 错误；
+- 默认套件：Framework 336、GameBindings 39、Architecture 41，`--bridge` 74；
+- 导出清单 sha256 仍是 `4d6c74bb…`；
+- `--fixtures`（网站按该导出重新生成、负例 41 条的夹具）：Framework 379、GameBindings 85、LifecycleWork 57；
+- LifecycleFacts 52、ReceiverProbe 48、CommitAudit 68；
+- 退出码全部 0。
+
 ## 复跑
 
 从仓库根目录执行。宿主与 GameBindings 需要 `GTFO_BEPINEX_PATH` 或 `-p:GTFOBepInExPath=<BepInEx 目录>`。构建输出用 `--artifacts-path` 指向隔离目录，绝不写入已安装的插件目录。
@@ -262,6 +322,7 @@ dotnet run --project ForgeRuntime/tests/Architecture/Architecture.csproj -c Rele
 dotnet run --project ForgeRuntime/tests/Framework/Framework.csproj -c Release -- --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime
 dotnet run --project ForgeRuntime/tests/Framework/Framework.csproj -c Release -- --benchmark
 dotnet run --project ForgeRuntime/tests/GameBindings/GameBindings.csproj -c Release -- --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime
+dotnet run --project ForgeRuntime/tests/GameBindings/GameBindings.csproj -c Release -- --bridge <GTFO 游戏根目录>
 dotnet run --project ForgeRuntime/tests/HostIntegration -c Release
 dotnet run --project ForgeRuntime/tests/LifecycleWork/LifecycleWork.csproj -c Release -- --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime
 dotnet run --project ForgeRuntime/tests/PluginStartup -c Release
@@ -269,6 +330,8 @@ dotnet run --project ForgeRuntime/tests/HostConfiguration -c Release
 dotnet run --project ForgeRuntime/tests/HostIntegration -c Release -- --host <隔离目录>/bin/ForgeRuntime/release/ForgeRuntime.dll
 dotnet run --project ForgeRuntime/tests/RuntimeLog -c Release -- --root <仓库外的新目录>
 ```
+
+`LifecycleWork` 只从夹具目录读 `cases.json` 与它指向的 manifest（provider/binding/permission 的声明来源），计划由内核自己的注册表现造，因此 v3 加载器与 SDK 模块始终是同一份。
 
 诊断侧套件的复跑见 [Development 验证记录](../ForgeDevelopment/VALIDATION.md#复跑)。聚焦回归各有自己的 README：[宿主启动](tests/PluginStartup/README.md)、[真实配置](tests/HostConfiguration/README.md)、[已加载工作清理](tests/LifecycleWork/README.md)。
 

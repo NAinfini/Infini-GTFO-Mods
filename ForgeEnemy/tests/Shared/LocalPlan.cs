@@ -3,7 +3,7 @@ using System.Text.Json;
 using ForgeRuntime.Framework;
 
 /// <summary>
-/// Legal schemaVersion 2 plans built from the kernel's own registry export. Pins, capability and provider
+/// Legal schemaVersion 3 plans built from the kernel's own registry export. Pins, capability and provider
 /// versions, permissions, slot frames and positional constants all come from the registered contracts, so these
 /// tests follow the SDK instead of a website fixture that predates the current catalog shape.
 /// </summary>
@@ -101,12 +101,13 @@ internal static class LocalPlan
             .OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
         var json = RuntimeJson.From(new
         {
-            schemaVersion = 2, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = kernel.Identity,
+            schemaVersion = 3, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },
             bindings = pins,
-            entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, trigger), layout = Layout(trigger),
-                steps = new[] { new { nodeId = "Step", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs } } } }
+            // One action step is the whole graph; the last execution output is left unwired, so the entrypoint ends there.
+            entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, trigger), layout = Layout(trigger), start = 0,
+                steps = new[] { new { nodeId = "Step", nodeKind = "action", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs, successors = new int?[] { null } } } } }
         }).GetRawText();
         return new(json, permissions);
     }

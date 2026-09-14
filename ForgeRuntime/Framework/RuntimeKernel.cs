@@ -86,7 +86,7 @@ public sealed partial class RuntimeKernel
         StopScheduledSource(provider, null, "module-unregistered"); StopStateSource(provider, null, "module-unregistered");
         RemoveLifecycleObservers(provider, handle.Generation);
         modules.Remove(provider); registry.Providers.Remove(provider);
-        foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Support.Remove(id); }
+        foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Evaluators.Remove(id); registry.Support.Remove(id); }
         foreach (var id in ownedCaps) { registry.Capabilities.Remove(id); registry.CapabilityRegistrants.Remove(id); }
         foreach (var key in registry.Resolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.Resolvers.Remove(key);
         foreach (var key in registry.EntityObservers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
@@ -257,10 +257,10 @@ public sealed partial class RuntimeKernel
             {
                 var limit = group.Key.Plan.Limits;
                 RuntimeJson.Require(snapshot.CausalDepth <= limit.MaxCausalDepth, "causal-depth", group.Key.Plan.Id);
-                RuntimeJson.Require(group.Sum(w => w.Entry.Steps.Count) <= limit.MaxCommandsPerTick, "event-command-budget", group.Key.Plan.Id);
+                RuntimeJson.Require(group.Sum(w => w.Entry.DispatchableStepCount) <= limit.MaxCommandsPerTick, "event-command-budget", group.Key.Plan.Id);
                 RuntimeJson.Require(queue.UnorderedItems.Count(x => x.Element.Work.Any(w => ReferenceEquals(w.Plan, group.Key))) < limit.MaxQueuedEvents, "plan-queue-budget", group.Key.Plan.Id);
             }
-            RuntimeJson.Require(work.Sum(w => w.Entry.Steps.Count) <= Limits.MaxCommandsPerTick, "event-command-budget", value.EventId);
+            RuntimeJson.Require(work.Sum(w => w.Entry.DispatchableStepCount) <= Limits.MaxCommandsPerTick, "event-command-budget", value.EventId);
             RuntimeJson.Require(history.Count < MaximumEventHistory, "event-history-budget", "This world exhausted its replay ledger; old IDs are never evicted and replayed.");
             RuntimeJson.Require(queue.Count < Limits.MaxQueuedEvents, "queue-budget", value.EventId);
             history.Add(key, fingerprint);
@@ -366,23 +366,29 @@ public sealed partial class RuntimeKernel
                 if (!IsRegistered(pending.Provider, pending.Generation) || cancelled.Contains((pending.Provider, pending.Event.ScopeId)))
                 { queue.Dequeue(); events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "source-lifecycle")); continue; }
                 var active = pending.Work.Where(w => plans.TryGetValue(w.Plan.Plan.Id, out var live) && ReferenceEquals(live, w.Plan)).ToArray();
-                var count = active.Sum(w => w.Entry.Steps.Count);
+                var count = active.Sum(w => w.Entry.DispatchableStepCount);
                 if (active.Length == 0) { queue.Dequeue(); events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "plan-unloaded")); continue; }
                 var groups = active.GroupBy(w => w.Plan).ToArray();
                 if (eventsThisTick >= Limits.MaxEventsPerTick || commandsThisTick + count > Limits.MaxCommandsPerTick || groups.Any(g => {
                     planTickUsage.TryGetValue(g.Key.Plan.Id, out var used);
-                    return used.Events >= g.Key.Plan.Limits.MaxEventsPerTick || used.Commands + g.Sum(w => w.Entry.Steps.Count) > g.Key.Plan.Limits.MaxCommandsPerTick;
+                    return used.Events >= g.Key.Plan.Limits.MaxEventsPerTick || used.Commands + g.Sum(w => w.Entry.DispatchableStepCount) > g.Key.Plan.Limits.MaxCommandsPerTick;
                 })) break;
                 queue.Dequeue();
                 if (pending.Schedule != null && !AdmitPulse(pending, scheduleReports)) continue;
                 eventsThisTick++; commandsThisTick += count; processed++;
-                foreach (var group in groups) { planTickUsage.TryGetValue(group.Key.Plan.Id, out var used); planTickUsage[group.Key.Plan.Id] = (used.Events + 1, used.Commands + group.Sum(w => w.Entry.Steps.Count)); }
+                foreach (var group in groups) { planTickUsage.TryGetValue(group.Key.Plan.Id, out var used); planTickUsage[group.Key.Plan.Id] = (used.Events + 1, used.Commands + group.Sum(w => w.Entry.DispatchableStepCount)); }
                 foreach (var item in active)
                 {
-                    foreach (var step in item.Entry.Steps)
+                    // D-017 R4-a: `pure` steps are never dispatched directly; they are read on demand by whichever
+                    // action/control step's input names them via `fromStepSlot`, and memoized at most once per
+                    // dispatch of this entry (cleared with `pureCache` on every new event this entry consumes).
+                    var pureCache = new Dictionary<int, JsonElement>();
+                    int? cursor = item.Entry.Start;
+                    while (cursor is int stepIndex)
                     {
+                        var step = item.Entry.Steps[stepIndex];
                         var commandId = RuntimeJson.StableText(RuntimeJson.From(new[] { pending.Provider, pending.Event.EventId, item.Plan.Plan.Id, step.NodeId }));
-                        CommandResult? result = null; var invoked = false;
+                        CommandResult? result = null; var invoked = false; int? next = null;
                         try
                         {
                             RuntimeJson.Require(item.Plan.Modules.All(m => IsRegistered(m.Key, m.Value)), "binding-lifecycle", step.BindingId);
@@ -395,13 +401,19 @@ public sealed partial class RuntimeKernel
                             {
                                 JsonElement value;
                                 if (input.Literal is { } literal) value = literal;
+                                else if (input.FromStep is { } from)
+                                {
+                                    var frame = EvaluatePure(item.Entry, from.Step, pureCache, pending);
+                                    value = frame.GetProperty(RuntimeJson.Text(input.Port, "id"));
+                                    // D-006②: a non-nullable "one" output wired into a "many" input was validated above
+                                    // against its own (origin) cardinality; wrap it into the one-element collection the
+                                    // "many" input expects only now, after that validation has passed.
+                                    if (input.Wrap) value = RuntimeJson.From(new[] { value });
+                                }
                                 else
                                 {
                                     if (!pending.Event.Outputs.TryGetProperty(input.EventPort!, out value)) continue;
                                     RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port);
-                                    // D-006②: a non-nullable "one" output wired into a "many" input was validated above
-                                    // against its own (origin) cardinality; wrap it into the one-element collection the
-                                    // "many" input expects only now, after that validation has passed.
                                     if (input.Wrap) value = RuntimeJson.From(new[] { value });
                                 }
                                 // A promoted value stays a compiled index until the re-validation below runs on indices
@@ -418,6 +430,14 @@ public sealed partial class RuntimeKernel
                                 RuntimeJson.Parameters(parameters, capability);
                             }
                             parameters = RuntimeJson.ResolveEnumParameters(parameters, capability);
+                            if (step.NodeKind == "control")
+                            {
+                                // Branch routing is internal to the kernel (D-017 R4-a): no handler lookup, no
+                                // command receipt — only `action` steps ever produce one.
+                                var condition = inputs.TryGetValue("condition", out var conditionValue) && conditionValue.ValueKind == JsonValueKind.True;
+                                cursor = condition ? step.Successors[0] : step.Successors[1];
+                                goto continueWalk;
+                            }
                             var handler = registry.Handlers[step.BindingId];
                             currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(inputs));
                             executed++; invoked = true;
@@ -441,7 +461,10 @@ public sealed partial class RuntimeKernel
                         // partial result with an unknown commit state; a confirmed-commit partial continues.
                         if (commandResult.Status != CommandStatuses.Succeeded
                             && !(commandResult.Status == CommandStatuses.Partial && commandResult.CommitState == CommitStates.Confirmed))
-                            break;
+                        { cursor = null; goto continueWalk; }
+                        next = step.Successors.Count > 0 ? step.Successors[0] : null;
+                        cursor = next;
+                        continueWalk: ;
                     }
                 }
                 if (pending.Schedule != null && pending.Schedule.Handle.Status == "active" && pending.Schedule.Index >= pending.Schedule.TotalPulses)
@@ -451,5 +474,61 @@ public sealed partial class RuntimeKernel
         }
         finally { currentCommand = null; advancing = false; }
         return new TickResult(processed, executed, queue.Count, commands, events) { Schedules = scheduleReports.AsReadOnly(), StateLeases = leaseReports.AsReadOnly() };
+    }
+    /// <summary>D-017 R4-a: evaluates a `pure` step's frame (an object keyed by its own output port ids) on demand,
+    /// memoized in <paramref name="cache"/> at most once per dispatch of <paramref name="entry"/>. Any failure —
+    /// while resolving this step's own inputs, or thrown by the evaluator itself — is wrapped as the single outer
+    /// code `pure-evaluation-failed` carrying the original code/message, except a nested `fromStepSlot` read of an
+    /// already-failing upstream pure step, which propagates as-is rather than being wrapped a second time.</summary>
+    private JsonElement EvaluatePure(ResolvedEntry entry, int stepIndex, Dictionary<int, JsonElement> cache, Pending pending)
+    {
+        if (cache.TryGetValue(stepIndex, out var cached)) return cached;
+        var step = entry.Steps[stepIndex];
+        var upstream = new Dictionary<int, JsonElement>();
+        foreach (var input in step.Inputs)
+            if (input.FromStep is { } from && !upstream.ContainsKey(from.Step))
+                upstream[from.Step] = EvaluatePure(entry, from.Step, cache, pending);
+        JsonElement frame;
+        try
+        {
+            var inputs = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            var merged = step.Promoted.Count == 0 ? null : step.Parameters.EnumerateObject().ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
+            foreach (var input in step.Inputs)
+            {
+                JsonElement value;
+                if (input.Literal is { } literal) value = literal;
+                else if (input.FromStep is { } from)
+                {
+                    value = upstream[from.Step].GetProperty(RuntimeJson.Text(input.Port, "id"));
+                    if (input.Wrap) value = RuntimeJson.From(new[] { value });
+                }
+                else
+                {
+                    if (!pending.Event.Outputs.TryGetProperty(input.EventPort!, out value)) continue;
+                    RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port);
+                    if (input.Wrap) value = RuntimeJson.From(new[] { value });
+                }
+                if (merged != null && step.Promoted.Contains(input.Name)) merged.Add(input.Name, value);
+                else inputs.Add(input.Name, RuntimeJson.EnumPortToHandlerValue(value, input.Port));
+            }
+            var capability = registry.Capabilities[RuntimeJson.Text(registry.Bindings[step.BindingId], "capabilityId")];
+            var parameters = step.Parameters;
+            if (merged != null) { parameters = RuntimeJson.From(merged); RuntimeJson.Parameters(parameters, capability); }
+            parameters = RuntimeJson.ResolveEnumParameters(parameters, capability);
+            var evaluator = registry.Evaluators[step.BindingId];
+            var result = evaluator(new EvaluationContext(step.NodeId, parameters, RuntimeJson.From(inputs)));
+            var outputs = RuntimeJson.Rows(step.Contract, "outputs");
+            RuntimeJson.Shape(result, string.Join(" ", outputs.Select(p => RuntimeJson.Text(p, "id"))));
+            foreach (var port in outputs)
+            {
+                var value = result.GetProperty(RuntimeJson.Text(port, "id"));
+                RuntimeJson.ValidateValue(value, port); ValidateEntities(value, port);
+            }
+            frame = result;
+        }
+        catch (RuntimeContractException ex) { throw new RuntimeContractException("pure-evaluation-failed", ex.Code + ": " + ex.Message); }
+        catch (Exception ex) { throw new RuntimeContractException("pure-evaluation-failed", ex.GetType().Name + ": " + ex.Message); }
+        cache[stepIndex] = frame;
+        return frame;
     }
 }

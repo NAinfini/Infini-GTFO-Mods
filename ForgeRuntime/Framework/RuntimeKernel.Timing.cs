@@ -83,7 +83,7 @@ public sealed partial class RuntimeKernel
             RuntimeJson.Require(snapshot.CausalDepth >= 0 && snapshot.CausalDepth <= Limits.MaxCausalDepth && work.All(w => snapshot.CausalDepth <= w.Plan.Plan.Limits.MaxCausalDepth), "causal-depth", template.EventId);
             if (spec.MissedPulsePolicy == MissedPulsePolicy.CatchUp)
             {
-                foreach (var bindingId in work.SelectMany(w => w.Entry.Steps.Select(s => s.BindingId)).Append(snapshot.BindingId).Distinct(StringComparer.Ordinal))
+                foreach (var bindingId in work.SelectMany(w => w.Entry.Steps.Where(s => s.NodeKind != "pure").Select(s => s.BindingId)).Append(snapshot.BindingId).Distinct(StringComparer.Ordinal))
                 {
                     var capability = registry.Capabilities[RuntimeJson.Text(registry.Bindings[bindingId], "capabilityId")];
                     RuntimeJson.Require(capability.GetProperty("parameters").TryGetProperty("scheduleReplay", out var replay) && replay.ValueKind == JsonValueKind.String && replay.GetString() == "fixed-inputs", "schedule-history-required", bindingId);
@@ -97,10 +97,10 @@ public sealed partial class RuntimeKernel
             RuntimeJson.Require(total == 0 || queue.Count < Limits.MaxQueuedEvents, "queue-budget", snapshot.EventId);
             foreach (var group in work.GroupBy(w => w.Plan))
             {
-                RuntimeJson.Require(group.Sum(w => w.Entry.Steps.Count) <= group.Key.Plan.Limits.MaxCommandsPerTick, "event-command-budget", group.Key.Plan.Id);
+                RuntimeJson.Require(group.Sum(w => w.Entry.DispatchableStepCount) <= group.Key.Plan.Limits.MaxCommandsPerTick, "event-command-budget", group.Key.Plan.Id);
                 RuntimeJson.Require(queue.UnorderedItems.Count(x => x.Element.Work.Any(w => ReferenceEquals(w.Plan, group.Key))) < group.Key.Plan.Limits.MaxQueuedEvents, "plan-queue-budget", group.Key.Plan.Id);
             }
-            RuntimeJson.Require(work.Sum(w => w.Entry.Steps.Count) <= Limits.MaxCommandsPerTick, "event-command-budget", snapshot.EventId);
+            RuntimeJson.Require(work.Sum(w => w.Entry.DispatchableStepCount) <= Limits.MaxCommandsPerTick, "event-command-budget", snapshot.EventId);
             var handle = new RuntimeScheduleHandle(this, owner.ProviderId, snapshot.EventId, WorldEpoch);
             var identity = Fingerprint(new { provider = owner.ProviderId, generation = owner.Generation, world = WorldEpoch, source = snapshot.Source, scope = snapshot.ScopeId, schedule = snapshot.EventId });
             var job = new ScheduledJob(handle, owner.Generation, snapshot, spec, work, identity, first, end, (int)total);

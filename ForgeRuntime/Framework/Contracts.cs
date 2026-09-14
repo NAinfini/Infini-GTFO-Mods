@@ -23,6 +23,22 @@ public sealed record EntityReference(string Id, long WorldEpoch, long LifeEpoch)
 public sealed record BindingSupport(string BindingId, string Verification, IReadOnlyList<string> RequiredPermissions);
 public delegate CommandResult CommandHandler(CommandContext context);
 
+/// <summary>D-017 R4-a: the read-only boundary for an `evaluate` binding. Deliberately narrower than
+/// <see cref="CommandContext"/> — no entity, world, causal or authority information — because a pure node
+/// (selector/condition/modifier) can be re-evaluated on demand and must stay side-effect free.</summary>
+public sealed class EvaluationContext
+{
+    internal EvaluationContext(string nodeId, JsonElement parameters, JsonElement inputs)
+    { NodeId = nodeId; Parameters = parameters; Inputs = inputs; }
+    public string NodeId { get; }
+    public JsonElement Parameters { get; }
+    public JsonElement Inputs { get; }
+}
+
+/// <summary>Returns an object keyed by output port id; the kernel validates every port of the resolved contract
+/// against the returned frame before a consumer reads it (D-017 R4-a).</summary>
+public delegate JsonElement EvaluatorHandler(EvaluationContext context);
+
 /// <summary>RegistryJson is the same ForgeRegistry seed consumed by the website; handlers do not define alternative node semantics.</summary>
 public sealed record RuntimeModule(string ApiVersion, string RegistryJson,
     IReadOnlyDictionary<string, CommandHandler> Handlers, IReadOnlyList<BindingSupport> BindingSupport,
@@ -33,6 +49,10 @@ public sealed record RuntimeModule(string ApiVersion, string RegistryJson,
     /// <summary>Optional native-instance lookups, owned by the same registered entity namespace. The input is whatever
     /// native object the owning provider documents; any other object must return null rather than guess.</summary>
     public IReadOnlyDictionary<string, Func<object, EntityReference?>>? EntityInstanceResolvers { get; init; }
+    /// <summary>`evaluate` binding handlers (D-017 R4-a), keyed by handler name. Most modules register none; this
+    /// is a normal empty default, not a compatibility shim.</summary>
+    public IReadOnlyDictionary<string, EvaluatorHandler> Evaluators { get; init; } = EmptyEvaluators;
+    private static readonly IReadOnlyDictionary<string, EvaluatorHandler> EmptyEvaluators = new Dictionary<string, EvaluatorHandler>();
 }
 
 public sealed record RuntimeEvent(string EventId, string BindingId, long WorldEpoch, long SimulationTick,

@@ -47,6 +47,8 @@ internal static class GameRuntimeBridge
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, GameBuild), new RuntimeLimits(), _log, logLevel);
         Kernel.BeginWorld(_epoch);
         Kernel.RegisterModule(CombatContracts.Module());
+        Kernel.RegisterModule(ControlContracts.Module());
+        Kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create());
     }
 
     internal static void FixedTick()

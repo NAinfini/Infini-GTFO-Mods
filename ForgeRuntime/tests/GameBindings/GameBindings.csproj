@@ -12,6 +12,8 @@
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
     <Compile Include="../../GameBindings/FrameworkFiles.cs" Link="FrameworkFiles.cs" />
     <Compile Include="../../GameBindings/PlanDiscovery.cs" Link="PlanDiscovery.cs" />
+    <!-- The bridge registers the ForgeTrigger module, and the website fixtures are compiled against it. -->
+    <Compile Include="../../../ForgeTrigger/**/*.cs" Exclude="../../../ForgeTrigger/bin/**/*.cs;../../../ForgeTrigger/obj/**/*.cs;../../../ForgeTrigger/tests/**/*.cs;../../../ForgeTrigger/artifacts/**/*.cs" Link="ForgeTrigger/%(Filename)%(Extension)" />
     <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
     <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" />
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />

@@ -10,5 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Framework/ForgeRuntime.Framework.csproj" />
+    <!-- The lifecycle fixture loads a graph the SDK builds from the trigger module's own registered surface. -->
+    <ProjectReference Include="../../../ForgeTrigger/ForgeTrigger.csproj" />
   </ItemGroup>
 </Project>

@@ -20,7 +20,8 @@ var blocked = new List<(string Id, string Reason)>();
 RuntimeKernel Kernel()
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
-    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module()); return kernel;
+    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module()); kernel.RegisterModule(ControlContracts.Module());
+    kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create()); return kernel;
 }
 EnemyAgent Enemy(ushort id = 7, long pointer = 10)
 {
@@ -82,11 +83,13 @@ string LocalPlan(RuntimeKernel k, string planId, string trigger, string action, 
         .OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
     return RuntimeJson.From(new
     {
-        schemaVersion = 2, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = k.Identity,
+        schemaVersion = 3, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = k.Identity,
         domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
         limits = new { k.Limits.MaxEventsPerTick, k.Limits.MaxCommandsPerTick, k.Limits.MaxQueuedEvents, k.Limits.MaxCausalDepth }, bindings = pins,
-        entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, trigger), layout = Layout(trigger),
-            steps = new[] { new { nodeId = "Step", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs } } } }
+        // One action step: the graph is a single node, so it is trivially its own canonical order and the entrypoint
+        // ends at its single (unwired) execution output.
+        entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, trigger), layout = Layout(trigger), start = 0,
+            steps = new[] { new { nodeId = "Step", nodeKind = "action", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs, successors = new int?[] { null } } } } }
     }).GetRawText();
 }
 string DeathRecordPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.death", EnemyModule.DeathStartedBinding, RecordBinding,
@@ -427,15 +430,15 @@ if (args.Length >= 2 && args[0] == "--fixtures")
 {
     string root = Path.GetFullPath(args[1]);
     var cases = RuntimeJson.Parse(File.ReadAllText(Path.Combine(root, "cases.json")));
-    string plan = File.ReadAllText(Path.Combine(root, cases.GetProperty("validPlan").GetString()!));
     var live = Kernel(); var liveModule = new EnemyModule(live, () => true, messages.Add);
-    // The website valid plan is the end-to-end damage -> heal contract, and every invalid plan is a one-field edit of it.
-    // Pins older than this registry would make each invalid plan "fail" on binding-lock instead of its own defect,
-    // so a stale fixture set is blocked as a whole rather than run.
+    // The website plans are compiled against the runtime's own manifest, and every invalid plan is a one-field edit of
+    // a valid one. Pins older than this registry would make each invalid plan "fail" on binding-lock instead of its own
+    // defect, so a stale fixture set is blocked as a whole rather than run.
     var registry = RuntimeJson.Parse(live.ExportManifest()).GetProperty("registry");
     string Registered(string list, string id) => registry.GetProperty(list).EnumerateArray()
         .Where(r => r.GetProperty("id").GetString() == id).Select(r => r.GetProperty("version").GetString()!).DefaultIfEmpty("unregistered").First();
-    var stale = RuntimeJson.Parse(plan).GetProperty("bindings").EnumerateArray()
+    var stale = cases.GetProperty("plans").EnumerateArray()
+        .SelectMany(row => RuntimeJson.Parse(File.ReadAllText(Path.Combine(root, row.GetProperty("plan").GetString()!))).GetProperty("bindings").EnumerateArray())
         .SelectMany(pin => new[] {
             (Id: pin.GetProperty("capabilityId").GetString()!, Pinned: pin.GetProperty("capabilityVersion").GetString()!),
             (Id: pin.GetProperty("providerId").GetString()!, Pinned: pin.GetProperty("providerVersion").GetString()!) }
@@ -444,18 +447,33 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     if (stale.Length > 0)
     {
         string reason = "J-002/J-003: website fixture pins predate the registry (" + string.Join("; ", stale) + ")";
-        blocked.Add(("fixtures.valid-plan-heal-dispatch", reason));
+        blocked.Add(("fixtures.valid-plan-dispatch", reason));
         blocked.Add(("fixtures.invalid-plan-rejections", reason));
     }
     else
     {
-        var liveEnemy = Enemy(); liveModule.TrackSpawn(liveEnemy);
-        live.LoadPlan(plan);
+        // One kernel and one module for both plans: the module's own damage observation is what publishes the event
+        // the heal plan consumes, so the pair has to share a registry to prove the end-to-end contract.
+        var liveEnemy = Enemy();
+        liveModule.TrackSpawn(liveEnemy);
+        // The website plans themselves are load-validated by the Framework suite; this mode needs one dispatching
+        // graph, so it wires the damage trigger into the heal action from the same registry the fixture pins name.
+        live.LoadPlan(DamageHealPlan(live));
+        Check(live.LoadedPlans == 1, "the local damage->heal plan loads");
+        // The host is only ready to execute once the registration phase closes, exactly as the plugin's first tick
+        // does it; without this the observation path stays inert and no fact is ever published.
+        live.StartRuntime(() => { });
+        // A real loss inside the native damage window: 100 -> 40, so the observed fact is a 60 damage event and the
+        // plan's literal amount caps the heal at +5.
+        liveEnemy.Damage.Health = 100;
         var before = liveModule.BeforeDamage(liveEnemy.Damage);
         liveEnemy.Damage.Health = 40;
         liveModule.AfterDamage(liveEnemy.Damage, before);
+        // One observed damage event must commit exactly one +5 HP heal through the actual native module handler,
+        // and the next frame must not retry it.
         var tick = live.Advance(1, true);
-        Check(liveEnemy.Damage.Health == 45 && liveEnemy.Damage.Sends == 1 && tick.Commands.Count == 1, "real website plan must dispatch actual module handler once");
+        Check(liveEnemy.Damage.Health == 45 && liveEnemy.Damage.Sends == 1 && tick.Commands.Count == 1,
+            $"real website plan must dispatch actual module handler once; health={liveEnemy.Damage.Health} sends={liveEnemy.Damage.Sends} commands={tick.Commands.Count} executed={tick.CommandsExecuted} msgs={string.Join("|", messages)}");
         Check(HealRow(tick.Commands[0].Result).GetProperty("actualAmount").GetDouble() == 5, "plan receipt actual delta");
         live.Advance(1, true);
         Check(liveEnemy.Damage.Sends == 1, "same tick reentry cannot duplicate health commit");
