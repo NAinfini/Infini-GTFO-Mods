@@ -2,7 +2,7 @@
   "name": "InfiniForgeRuntime",
   "version_number": "1.2.0",
   "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
-  "description": "Unified Forge module API, offline plans and native enemy health binding; authoring diagnostics remain separate in Play mode. Development build: no game verification or bundled third-party DLLs.",
+  "description": "Forge host: module SDK, plan loading from Rundown packages and execution kernel. Game bindings ship in the Forge base packages. Development build: no game verification.",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.2"
   ]
