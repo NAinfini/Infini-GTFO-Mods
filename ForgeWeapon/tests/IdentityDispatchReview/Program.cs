@@ -222,7 +222,7 @@ sealed class Fixture : IDisposable
     private static readonly string[] PortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
     private JsonElement Graph(string kind) => RuntimeJson.Parse(Kernel.ExportManifest()).GetProperty("registry").GetProperty("capabilities")
         .EnumerateArray().Single(c => c.GetProperty("id").GetString() == Provider + "." + kind).GetProperty("graph");
-    // schemaVersion 2 slot frame written independently of the SDK; these ports carry no value set or lifetime.
+    // Dense slot frame written independently of the SDK; these ports carry no value set or lifetime.
     private static object[] Slots(JsonElement ports) => ports.EnumerateArray().Select((p, index) => (object)new
     {
         index, type = Array.IndexOf(PortTypes, p.GetProperty("type").GetString()!),
@@ -236,7 +236,7 @@ sealed class Fixture : IDisposable
         var kinds = new[] { "action", "trigger" }; var trigger = Graph("trigger"); var action = Graph("action");
         return RuntimeJson.From(new
         {
-            schemaVersion = 2, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
+            schemaVersion = 3, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
             runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = permissions ?? new[] { "fixture.dispatch.use" }, dependencies = Array.Empty<string>(),
             limits = new { maxEventsPerTick = 8, maxCommandsPerTick = 8, maxQueuedEvents = 8, maxCausalDepth = 4 },
@@ -245,9 +245,10 @@ sealed class Fixture : IDisposable
                 bindingId = Provider + ".binding." + kind, capabilityId = Provider + "." + kind,
                 capabilityVersion = "1.0.0", providerId = Provider, providerVersion = "1.0.0", handler = Provider + "." + kind
             }).ToArray(),
-            entrypoints = new[] { new { nodeId = "entry", binding = Array.IndexOf(kinds, "trigger"), layout = Layout(trigger),
-                steps = new[] { new { nodeId = "apply", binding = Array.IndexOf(kinds, "action"), layout = Layout(action),
-                    inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } } } } } }
+            entrypoints = new[] { new { nodeId = "entry", binding = Array.IndexOf(kinds, "trigger"), layout = Layout(trigger), start = 0,
+                steps = new[] { new { nodeId = "apply", nodeKind = "action", binding = Array.IndexOf(kinds, "action"), layout = Layout(action),
+                    inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } },
+                    successors = Array.Empty<int?>() } } } }
         }).GetRawText();
     }
     public void Dispose() { Dispatch.Dispose(); Session.Dispose(); Kernel.StopRuntime(); }

@@ -596,18 +596,20 @@ sealed class World : IDisposable
         var sink = Graph(Sink_);
         object Binding(string bindingId, string capabilityId, string providerId, string providerVersion, string handler)
             => new { bindingId, capabilityId, capabilityVersion = "1.0.0", providerId, providerVersion, handler };
+        // schemaVersion 3 (D-017 R4-a): the entry names its first step, and the sink step has no execution output,
+        // so its successor list is empty and the entrypoint ends after the single action.
         object Entry(string name, int binding, JsonElement trigger) => new
         {
-            nodeId = name, binding, layout = Layout(trigger),
-            steps = new[] { new { nodeId = name + "_sink", binding = 0, layout = Layout(sink), inputs = new[]
+            nodeId = name, binding, layout = Layout(trigger), start = 0,
+            steps = new[] { new { nodeId = name + "_sink", nodeKind = "action", binding = 0, layout = Layout(sink), inputs = new[]
             {
                 new { slot = Slot(sink.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "equipment") },
                 new { slot = Slot(sink.GetProperty("inputs"), "actor"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "actor") }
-            } } }
+            }, successors = Array.Empty<int?>() } }
         };
         return RuntimeJson.From(new
         {
-            schemaVersion = 2, kind = "forge-runtime-plan", planId = "fixture.weapon.plan", resource = new { id = "fixture.resource", revision = "r1" },
+            schemaVersion = 3, kind = "forge-runtime-plan", planId = "fixture.weapon.plan", resource = new { id = "fixture.resource", revision = "r1" },
             runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = new[] { RecordPermission, ModuleDefinition.WieldReadPermission }, dependencies = Array.Empty<string>(), // ordinal-sorted
             limits = new { maxEventsPerTick = 16, maxCommandsPerTick = 16, maxQueuedEvents = 16, maxCausalDepth = 4 },

@@ -70,7 +70,7 @@ sealed class TestWorld
         int Binding(string id) => Array.FindIndex(pins, p => p.bindingId == id);
         JsonElement Graph(string id) => registry.GetProperty("capabilities").EnumerateArray()
             .Single(c => c.GetProperty("id").GetString() == bindings[Binding(id)].GetProperty("capabilityId").GetString()).GetProperty("graph");
-        // schemaVersion 2 slot frame written independently of the SDK; these ports carry no value set or lifetime.
+        // Dense slot frame written independently of the SDK; these ports carry no value set or lifetime.
         string[] types = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
         object[] Slots(JsonElement ports) => ports.EnumerateArray().Select((p, index) => (object)new {
             index, type = Array.IndexOf(types, p.GetProperty("type").GetString()),
@@ -81,13 +81,16 @@ sealed class TestWorld
         int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
         var trigger = Graph(Trigger); var action = Graph(Action);
         return RuntimeJson.From(new {
-            schemaVersion = 2, kind = "forge-runtime-plan", planId = "map1.test.plan",
+            schemaVersion = 3, kind = "forge-runtime-plan", planId = "map1.test.plan",
             resource = new { id = "map1.test.shared-room", revision = "fixture-revision" }, runtime = Kernel.Identity,
             domain = "map", authority = "host", failurePolicy = "stop-entrypoint", permissions = permissions ?? new[] { Permission }, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth }, bindings = pins,
-            entrypoints = new[] { new { nodeId = "Observed", binding = Binding(Trigger), layout = Layout(trigger),
-                steps = new[] { new { nodeId = "RecordIdentity", binding = Binding(Action), layout = Layout(action),
-                    inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } } } } } }
+            // schemaVersion 3 (D-017 R4-a): the record step owns the action's single execution successor, left
+            // unwired so the entrypoint ends after it.
+            entrypoints = new[] { new { nodeId = "Observed", binding = Binding(Trigger), layout = Layout(trigger), start = 0,
+                steps = new[] { new { nodeId = "RecordIdentity", nodeKind = "action", binding = Binding(Action), layout = Layout(action),
+                    inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } },
+                    successors = new int?[] { null } } } } }
         }).GetRawText();
     }
 }
