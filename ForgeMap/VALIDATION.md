@@ -2,6 +2,35 @@
 
 **上次更新：2026-09-14**（2026-09-13 内容合并自原 MAP1-DELIVERY 与 MAP1-IDENTITY-CONTINUATION 两份交接记录）。
 
+## MAP2 原生发现（2026-09-14）
+
+按框架 §6 U-MAP-MOD 未完成项"MAP2 原生发现"与 §3.2 I-MAP-PLAN（D-013 过渡期）新增：游戏无关的 `AssemblyPlanDiscovery.cs` 发现 `BepInEx/plugins/*/forge/maps/` 并只跑 G0–G6 静态检查；原生 `Native/MapPlanDiagnostics.cs` 在插件 `Load` 注册身份后调用一次，每个计划一条有界（512 字符）诊断行。**只读、只诊断**：不生成、不改游戏状态、不注册 provider、不读网络。证据等级：**本地验证（托管发现 + 合成夹具 + 替身接线）**；没有启动游戏、没有加载 bundle、没有安装到任何 profile，通过静态检查不等于生成成功。
+
+下表命令在**工作区**运行（当时工作区另有 ForgeRuntime 在制改动），构建一律带会话临时目录的隔离 `--artifacts-path`。提交前在 HEAD `30a09d7` 的独立 worktree 只放入本节文件复验：宿主、`ForgeMap.csproj`、`ForgeMap.Native.csproj` 与三个测试工程 0 警告 0 错误；`MapPlanDiscovery` 退出码 0、`failures: []`；`MapAssemblyPlan --self-check` 退出码 0、`failures: []`；`MapNativeAdapter` `PASS 44/44`（MapNativeLayout、Identity、NativeEvidence 未在 worktree 复跑）。
+
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| `ForgeMap.csproj` 构建 | `dotnet build ForgeMap/ForgeMap.csproj -c Release` | 退出码 0，0 警告 0 错误 |
+| `Native/ForgeMap.Native.csproj` 构建 | 先构建宿主，再 `dotnet build ForgeMap/Native/ForgeMap.Native.csproj -c Release -p:ForgeRuntimeAssembly=…` | 退出码 0，0 警告 0 错误；新增类型未触发依赖方向或只读读取检查 |
+| 新测试 `tests/MapPlanDiscovery` | 构建后运行 `MapPlanDiscovery.dll` | 退出码 0，18/18（无目录、空目录、无 `forge/maps/` 的目录、缺描述符、多包、只有描述符、合法计划与 blockers、非计划文件忽略、缺/错 planId、不可解析文档、seed 越界、非规范 rotation、descriptor-lock 不符、描述符文档不可解析、重复 level layout 的 ordinal 顺序、可重复性） |
+| G0–G6 变异自检（包级改走生产发现） | `MapAssemblyPlan.dll --self-check` | 退出码 0，48/48（45 条计划变异 + 3 条包级），`failures: []` |
+| 变异语料两侧交叉 | `MapAssemblyPlan.dll --self-check --emit <临时目录>` 后分别运行 `MapAssemblyPlan.dll --fixtures <同上>` 与 `python ForgeMap/tools/verify_assembly_plan_fixtures.py --fixtures <同上>` | 两侧退出码均 0，`manifestVerified: true`；合法 1/1、非法 44/44、包级 3/3；包级用例现在走 `AssemblyPlanDiscovery`，与 Python `check_package` 同码 |
+| `tests/MapNativeAdapter` | 构建后运行 | 退出码 0，`PASS 44/44`（41 → 44：无包时不写发现日志、每个计划一行且不改注册面、包级拒绝与 512 字符上界） |
+| `tests/MapNativeLayout` | 构建后运行（输入为重建后的 `ForgeMap.dll` 与 `ForgeMap.Native.dll`） | 退出码 0，`PASS 39/39`；插件 Off 门与 `MapPluginSession::Start` 的次序断言、Hook 集合、只读调用检查仍通过 |
+| MapIdentity 回归 | Release 构建后运行 `ForgeMap.Identity.Tests.dll` | 退出码 0，134 项断言，`nativeScenariosExecuted: false`（未改） |
+| `tests/MapNativeEvidence` | 构建后运行（游戏 build 20403457） | 退出码 1，25/29：`hash/mvid.Modules-ASM.dll`、`hash/mvid.SNet_ASM.dll` 与本机 profile 的 interop 不一致；与 2026-09-14 上一批相同的环境差异，本次未改 Hook 或读回 |
+
+发现规则与合同未写明的点（本次采用的解释，需裁决方复核）：
+
+- 发现根是 `BepInEx/plugins/` 的一级子目录，只检查 `<dir>/forge/maps/` 是否存在；没有这样的目录时静默跳过（沿用 I-PACK D-009 的计划发现口径：不打开文件、不报错、不写日志）。合同只写了"恰好一个"与"多于一个全部拒绝"，**零个的语义是本次补齐的**。
+- 包内有 `forge/maps/` 但缺 `rooms.descriptors.json` 时记 `assembly.package-layout`（路径为 `plugins/<dir>/forge/maps`）。合同把 `assembly.package-layout` 只写在"多于一个目录"上；这个码与路径取自 `tools/verify_assembly_plan_fixtures.py` 与 `tests/MapAssemblyPlan` 原有的同一处理。描述符文档存在但不可读或不可解析时走委派码 `descriptor.schema`（`$descriptors`）。
+- 计划文件不是合法 JSON 或读不到时记 `assembly.schema`（`$`）：合同的 34 码里没有"文件读不到"这一条，取形状阶段的码。文档能解析但没有 `planId`、或文件名不等于 `planId + ".assembly.json"` 时记 `assembly.plan-file`（与两个检查器的宽松 planId 提取一致）。
+- 每个计划文件单独出结果，一份被拒不影响同包其他计划（沿用 I-PACK"每个文件单独出结果"的口径）；文件身份两条码（`assembly.plan-file`、`assembly.duplicate-level-layout`）在描述符与计划文档校验之前判定，`assembly.duplicate-level-layout` 记在 ordinal 靠后的那个文件上，`assembly.package-layout` 是包级拒绝且不再出计划行。同一份计划被拒时它的 `levelLayoutId` 仍占用登记，后续同 id 文件照样报重复。
+- 合同没有为 `forge/maps/` 写 I-PACK 里的链接/越界检查（`plan-path`）与单文件/合计上限（`json-size`、`plan-budget`），本次**没有实现**，等裁决方决定是否按 I-PACK 逐条补齐。
+- 诊断日志暂用 BepInEx 日志的 `map.plan-accepted` / `map.plan-rejected` / `map.package-rejected` 三行（行内 `path` 为 BepInEx 相对路径），**不是** `forge.log.v1` 记录：`plan.loaded` / `plan.rejected` 归 Runtime sink，Map 的 cfg `Logging.Level`（D-007）未落地。这三个码需要按 §2.5 补进 §3.2 I-DIAG 的包内诊断码表。
+
+**边界**：发现流程只读夹具目录并跑已有静态检查；18 项与 44 项都是合成数据与替身，不能替代实机、主客机、导航或生成验证。没有真实 Geo 包、没有网站夹具（`Tests/Forge/fixtures/map-assembly/` 仍缺 `MANIFEST.json` 与 `cases.json`），也没有 G7 生成。
+
 ## G0–G6 拼装计划静态检查（2026-09-14）
 
 按框架 §3.2 I-MAP-PLAN（r24 关闭 Q-005）新增静态检查：`tools/verify_assembly_plan_fixtures.py`（夹具仲裁检查器，描述符部分 import `verify_resource_adapter_fixtures.document(..., '$descriptors')`）、`ResourceDescriptorReader.cs`（GENERATION-SPEC §3.1 的 C# 严格解析）、`AssemblyPlanContracts.cs` / `AssemblyPlanReader.cs` / `AssemblyPlanChecks.cs`（G0–G6 与 blockers）、`tests/MapAssemblyPlan`（夹具比对与变异自检）。证据等级：**fixture-schema-only / 静态检查**；没有加载 bundle、没有调用原生、没有运行游戏，通过静态检查不等于生成成功（v1 每份合法计划恒带 `dimension-bounds-unknown`）。

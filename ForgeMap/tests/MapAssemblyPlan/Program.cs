@@ -381,40 +381,20 @@ static bool VerifyManifest(string fixtureRoot, List<string> failures)
     return true;
 }
 
-// Package-level checks (assembly.plan-file / duplicate-level-layout / package-layout). The case root stands
-// in for a `BepInEx/plugins/` directory: exactly one child may contain `forge/maps/`. Discovery itself
-// belongs to ForgeMap/Native and is not implemented here.
+// Package-level checks (assembly.plan-file / duplicate-level-layout / package-layout) come from the production
+// discovery in ForgeMap/AssemblyPlanDiscovery.cs, which the native plugin Load calls once; the case root stands
+// in for `BepInEx/plugins/` exactly like a website fixture `root` row does. Nothing is reimplemented here.
 static void CheckPackage(string caseRoot, SortedSet<string> blockers)
 {
-    var mapDirs = Directory.GetDirectories(caseRoot).OrderBy(dir => dir, StringComparer.Ordinal)
-        .Where(dir => Directory.Exists(System.IO.Path.Combine(dir, "forge", "maps"))).ToArray();
-    if (mapDirs.Length != 1) throw new AssemblyPlanException("assembly.package-layout", caseRoot);
-    var mapsDir = System.IO.Path.Combine(mapDirs[0], "forge", "maps");
-    var descriptorsPath = System.IO.Path.Combine(mapsDir, "rooms.descriptors.json");
-    if (!File.Exists(descriptorsPath)) throw new AssemblyPlanException("assembly.package-layout", mapsDir);
-    var descriptorsBytes = File.ReadAllBytes(descriptorsPath);
-    var seenLayouts = new Dictionary<long, string>();
-    var missingLevelSeen = false;
-    foreach (var planFile in Directory.GetFiles(mapsDir, "*.assembly.json").OrderBy(file => file, StringComparer.Ordinal))
+    var discovery = AssemblyPlanDiscovery.Discover(caseRoot, "plugins");
+    if (discovery.Rejection is { } rejection) throw new AssemblyPlanException(rejection.Code, rejection.Path);
+    // Runtime discovery treats a plugins root without a package as "nothing to do"; a fixture case root without
+    // one is a malformed case, which is what this harness reported before the delegation too.
+    if (discovery.PackagePath is null) throw new AssemblyPlanException("assembly.package-layout", caseRoot);
+    foreach (var plan in discovery.Plans)
     {
-        using var plan = JsonDocument.Parse(File.ReadAllBytes(planFile));
-        var planId = plan.RootElement.ValueKind == JsonValueKind.Object
-            && plan.RootElement.TryGetProperty("planId", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null;
-        if (planId is null || System.IO.Path.GetFileName(planFile) != planId + ".assembly.json")
-            throw new AssemblyPlanException("assembly.plan-file", planFile);
-        long? level = plan.RootElement.TryGetProperty("levelLayoutId", out var value) && value.ValueKind == JsonValueKind.Number
-            && value.TryGetInt64(out var parsed) ? parsed : null;
-        if (level is null)
-        {
-            if (missingLevelSeen) throw new AssemblyPlanException("assembly.duplicate-level-layout", planFile);
-            missingLevelSeen = true;
-        }
-        else
-        {
-            if (seenLayouts.ContainsKey(level.Value)) throw new AssemblyPlanException("assembly.duplicate-level-layout", planFile);
-            seenLayouts[level.Value] = System.IO.Path.GetFileName(planFile);
-        }
-        foreach (var blocker in AssemblyPlanChecks.Validate(plan.RootElement, descriptorsBytes).Blockers) blockers.Add(blocker);
+        if (!plan.Passed) throw new AssemblyPlanException(plan.Code!, plan.ErrorPath ?? plan.Path);
+        foreach (var blocker in plan.Blockers) blockers.Add(blocker);
     }
 }
 

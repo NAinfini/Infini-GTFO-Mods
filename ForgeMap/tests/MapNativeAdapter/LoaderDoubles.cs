@@ -4,6 +4,8 @@ namespace BepInEx
     public sealed class BepInPlugin : Attribute { public BepInPlugin(string id, string name, string version) { } }
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class BepInDependency : Attribute { public BepInDependency(string id, string version) { } }
+    // Only the members the production plugin reads are doubled; a missing directory is "no package".
+    public static class Paths { public static string PluginPath = ""; }
 }
 namespace BepInEx.Unity.IL2CPP
 {
@@ -16,9 +18,10 @@ namespace BepInEx.Unity.IL2CPP
     public sealed class TestLog
     {
         public bool ThrowInfo;
-        public readonly List<string> Infos = new(), Warnings = new();
+        public readonly List<string> Infos = new(), Warnings = new(), Errors = new();
         public void LogInfo(object message) { if (ThrowInfo) throw new IOException("fixture logger failure"); Infos.Add((string)message); }
         public void LogWarning(object message) => Warnings.Add((string)message);
+        public void LogError(object message) => Errors.Add((string)message);
     }
 }
 namespace HarmonyLib

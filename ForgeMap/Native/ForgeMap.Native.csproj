@@ -14,7 +14,7 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;MapPluginSession.cs;MapNativeHooks.cs;PlayerIdentityModule.cs" />
+    <Compile Include="Plugin.cs;MapPluginSession.cs;MapNativeHooks.cs;PlayerIdentityModule.cs;MapPlanDiagnostics.cs" />
     <!-- The Map provider definition comes from the game-independent ForgeMap assembly; no second provider. -->
     <ProjectReference Include="../ForgeMap.csproj" Private="false" />
     <Reference Include="ForgeRuntime" HintPath="$(ForgeRuntimeAssembly)" Private="false" />

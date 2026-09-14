@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
+using BepInEx;
 using ForgeMap;
 using ForgeMap.Native;
+using ForgeMap.TestFixtures;
 using ForgeRuntime.Framework;
 using HarmonyLib;
 using Player;
@@ -40,7 +42,7 @@ void Reset()
         typeof(MapPlugin).GetProperty("Session", BindingFlags.Static | BindingFlags.NonPublic)!.SetValue(null, null);
     }
     Harmony.Reset(); PlayerManager.Reset(); SNet.IsMaster = true;
-    Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Play; Host.Runtime = null;
+    Host.ConfiguredMode = ForgeRuntime.RuntimeMode.Play; Host.Runtime = null; Paths.PluginPath = "";
 }
 RuntimeKernel Kernel()
 {
@@ -485,6 +487,73 @@ Case("plugin.success-hooks-drive-identity-no-hot-reload", () =>
         Require(Harmony.Unpatches == 1 && !session.Module.IsRegistered, "Shutdown leaked registration.");
     }
     finally { outputs.AddRange(plugin.Log.Infos); outputs.AddRange(plugin.Log.Warnings); }
+});
+// D-013 transition: Load runs one read-only discovery pass over `plugins/*/forge/maps/` and logs one bounded
+// diagnostic per plan. Synthetic temp fixtures only; nothing is generated and no game state is touched.
+string DiscoveryRoot()
+{
+    var root = Path.Combine(Path.GetTempPath(), "map-native-discovery-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    return root;
+}
+void WritePlan(string root, string package, string name, string content) =>
+    PlanFixtures.WriteMapsFile(root, package, name, content);
+Case("discovery.no-package-logs-nothing", () =>
+{
+    var root = DiscoveryRoot();
+    try
+    {
+        Paths.PluginPath = root;
+        Host.Runtime = Kernel(); var plugin = new MapPlugin(); plugin.Load();
+        Require(plugin.Log.Infos.Count == 1 && plugin.Log.Errors.Count == 0
+            && plugin.Log.Infos[0].StartsWith("Forge Map registered", StringComparison.Ordinal),
+            "Discovery logged without a package: " + string.Join(" | ", plugin.Log.Infos));
+        outputs.AddRange(plugin.Log.Infos); outputs.AddRange(plugin.Log.Errors);
+    }
+    finally { Directory.Delete(root, true); }
+});
+Case("discovery.one-line-per-plan-and-no-registration", () =>
+{
+    var root = DiscoveryRoot();
+    try
+    {
+        WritePlan(root, "fixture-pkg", "rooms.descriptors.json", PlanFixtures.DescriptorsJson());
+        WritePlan(root, "fixture-pkg", "alpha.assembly.json", PlanFixtures.LockedPlanJson("alpha", 3788602088, 12345));
+        WritePlan(root, "fixture-pkg", "beta.assembly.json", PlanFixtures.LockedPlanJson("beta", 7, 2147483648));
+        WritePlan(root, "fixture-pkg", "notes.txt", "not a plan");
+        Paths.PluginPath = root;
+        var kernel = Host.Runtime = Kernel(); var plugin = new MapPlugin(); plugin.Load();
+        Require(plugin.Log.Infos.Count == 2 && plugin.Log.Errors.Count == 1,
+            "Plan diagnostics differ: " + string.Join(" | ", plugin.Log.Infos) + " || " + string.Join(" | ", plugin.Log.Errors));
+        Require(plugin.Log.Infos[1] == "map.plan-accepted plan=alpha path=plugins/fixture-pkg/forge/maps/alpha.assembly.json"
+            + " blockers=colliders,dimension-bounds-unknown,navigation,occlusion", "Accepted line differs: " + plugin.Log.Infos[1]);
+        Require(plugin.Log.Errors[0] == "map.plan-rejected plan=beta code=assembly.seed"
+            + " path=plugins/fixture-pkg/forge/maps/beta.assembly.json at=$.seed", "Rejected line differs: " + plugin.Log.Errors[0]);
+        using var doc = JsonDocument.Parse(kernel.ExportManifest());
+        var registry = doc.RootElement.GetProperty("registry");
+        Require(registry.GetProperty("providers").GetArrayLength() == 1 && registry.GetProperty("capabilities").GetArrayLength() == 0
+            && registry.GetProperty("bindings").GetArrayLength() == 0, "Plan diagnostics changed the registered surface.");
+        outputs.AddRange(plugin.Log.Infos); outputs.AddRange(plugin.Log.Errors);
+    }
+    finally { Directory.Delete(root, true); }
+});
+Case("discovery.package-layout-and-bounded-line", () =>
+{
+    var root = DiscoveryRoot();
+    try
+    {
+        WritePlan(root, "one", "rooms.descriptors.json", PlanFixtures.DescriptorsJson());
+        WritePlan(root, "two", "rooms.descriptors.json", PlanFixtures.DescriptorsJson());
+        Paths.PluginPath = root;
+        Host.Runtime = Kernel(); var plugin = new MapPlugin(); plugin.Load();
+        Require(plugin.Log.Errors.Count == 1 && plugin.Log.Errors[0] == "map.package-rejected code=assembly.package-layout path=plugins",
+            "Package rejection differs: " + string.Join(" | ", plugin.Log.Errors));
+        var bounded = MapPlanDiagnostics.Bound(new string('x', 4 * MapPlanDiagnostics.MaxCharacters));
+        Require(bounded.Length == MapPlanDiagnostics.MaxCharacters && bounded.EndsWith("...", StringComparison.Ordinal),
+            "Diagnostic line is not bounded: " + bounded.Length);
+        outputs.AddRange(plugin.Log.Infos); outputs.AddRange(plugin.Log.Errors);
+    }
+    finally { Directory.Delete(root, true); }
 });
 // Aggregate privacy gate over every log and warning captured above and every recorded case result.
 Case("privacy.no-account-lookup-in-any-output", () =>

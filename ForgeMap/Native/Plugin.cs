@@ -40,6 +40,8 @@ public sealed class Plugin : BasePlugin
                 }, harmony.UnpatchSelf);
             Session = created;
             Log.LogInfo("Forge Map registered gtfo.player identity; native bindings remain implementation-only.");
+            // D-013 transition: one read-only discovery pass per Load, diagnostics only.
+            MapPlanDiagnostics.Report(Log.LogInfo, Log.LogError);
         }
         catch (Exception original)
         {
