@@ -20,7 +20,7 @@ Native 插件持有 **5 个** binding 与 **5 个** Hook；Runtime 保留 4 个�
 | --- | --- | --- |
 | `damage_applied` | 观察指定原生承伤调用窗口的实际 HP 损失；未知攻击来源不反推 | `forge.trigger.combat.damage_applied` |
 | `heal` | 存活敌人的多目标治疗：每个 target 独立量化、提交前复核、实际读回；`overheal_policy` 为 clamp/discard/overheal，overheal 在 SFloat16 量化下结构性不支持，整条命令上游拒绝 | `forge.action.combat.heal` |
-| `health_changed` | 仅本 Forge 治疗实际产生的正生命变化；不宣称覆盖全部原生治疗 | `forge.trigger.combat.health_changed` |
+| `health_changed` | 两个来源：本 Forge 治疗读回的正生命变化；同一 `ProcessReceivedDamage` 调用窗口里观察到的实际 HP 损失（`value` 为调用后夹到 ≥0 的生命，`delta` 为负损失）。窗口里生命不变或上升不发布；其他模组、原生回复、`SetHealth` 等窗口外的变化不覆盖 | `forge.trigger.combat.health_changed` / `gtfo.enemy.health.read` |
 | `death_started` | 同生命的 `OnDead` 正常返回且原生状态为 dead | `forge.trigger.enemy.death_started` / `gtfo.enemy.lifecycle.read` |
 | `limb_broken` | 同生命、同 receiver 的索引部位在 `DestroyLimb` 窗口中由未破坏变为已破坏 | `forge.trigger.combat.limb_broken` / `gtfo.enemy.limbs.read`；输出 target 与 limb（可空） |
 
@@ -85,4 +85,4 @@ dotnet build ForgeEnemy/Native/ForgeEnemy.Native.csproj -c Release --artifacts-p
 
 以上全部是 **implementation-only**：源码存在、托管测试通过、原生签名与元数据已静态核对，**没有一条完成 GTFO 实机验收**。原生读取、替身、编译和元数据是不同的证据层，任何一层通过都不代表游戏或多人已通过。E1 的下一个门槛是真实游戏加载与原生 Hook 与主客机验证，不是再次创建或迁移同名 provider。
 
-E2 的出生空间要求只到离线数据与替身测试等级：运行时 NavMeshAgent、尺寸倍率效果、碰撞半径语义、空中图净空和出生阶段顺序都待游戏内核验（步骤见 [VALIDATION.md](VALIDATION.md#待游戏内核验)），Map 侧的真实求解器也未接入。E3 剩余的 damage 与 status 与击杀因果与 Boss 阶段，以及 E4–E7 都未完成。开发与发布包尚未生成；Native DLL 不能据当前构建宣称玩家发行资格。
+E2 的出生空间要求只到离线数据与替身测试等级：运行时 NavMeshAgent、尺寸倍率效果、碰撞半径语义、空中图净空和出生阶段顺序都待游戏内核验（步骤见 [VALIDATION.md](VALIDATION.md#待游戏内核验)），Map 侧的真实求解器也未接入。E3 剩余的 `limb_damaged`、`staggered`、`killed`、`hit_candidate`、`damage_preparing`、`damage_rejected`、`assist_confirmed`、`status.*` 与 Boss 阶段，以及 E4–E7 都未完成：它们要么需要 SDK 新增 canonical 合同或事件端口类型，要么没有冻结的原生 Hook 与语义证据（逐条原因见 [VALIDATION.md](VALIDATION.md#heal-联调解除与-e3-伤害与状态事件2026-09-14)）。开发与发布包尚未生成；Native DLL 不能据当前构建宣称玩家发行资格。

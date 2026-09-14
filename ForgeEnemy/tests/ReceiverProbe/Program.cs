@@ -7,8 +7,7 @@ using SNetwork;
 
 if (args.Length != 1) { Console.Error.WriteLine("Usage: ReceiverProbe <report.json>"); return 2; }
 var checks = new List<ProbeCheck>();
-var blocked = new List<(string Id, string Reason)>();
-// Each scenario owns its kernel and doubles. A throwing or blocked scenario settles only its own ids; later scenarios still run.
+// Each scenario owns its kernel and doubles. A throwing scenario settles only its own ids; later scenarios still run.
 void Scenario(string[] ids, Func<(bool Passed, string Expected, string Observed)[]> body)
 {
     try
@@ -17,7 +16,6 @@ void Scenario(string[] ids, Func<(bool Passed, string Expected, string Observed)
         if (results.Length != ids.Length) throw new InvalidOperationException($"Scenario returned {results.Length} results for {ids.Length} ids.");
         for (int i = 0; i < ids.Length; i++) checks.Add(new(ids[i], results[i].Passed, results[i].Expected, results[i].Observed));
     }
-    catch (CaseBlocked reason) { blocked.AddRange(ids.Select(id => (id, reason.Message))); }
     catch (Exception error) { checks.AddRange(ids.Select(id => new ProbeCheck(id, false, "Scenario executes without harness errors.", error.ToString()))); }
     finally { SNet.IsMaster = true; SFloat16.Preview = (value, _) => value; }
 }
@@ -41,6 +39,15 @@ EnemyAgent Enemy(long pointer = 10)
     var scene = Scene(); var records = new List<CommandContext>();
     scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add));
     LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.damage", EnemyModule.DamageBinding, LocalPlan.RecordBinding, ("target", "target")));
+    return (scene.Kernel, scene.Module, scene.Enemy, scene.Ref, records);
+}
+// health_changed -> record(target, value, delta): the only subscription, so the damage window is opened for health changes alone.
+(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref, List<CommandContext> Records) HealthScene()
+{
+    var scene = Scene(); var records = new List<CommandContext>();
+    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add));
+    LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.health", EnemyModule.HealthChangedBinding, LocalPlan.RecordBinding,
+        ("target", "target"), ("value", "value"), ("delta", "delta")));
     return (scene.Kernel, scene.Module, scene.Enemy, scene.Ref, records);
 }
 CommandResult Heal(EnemyModule module, EntityReference target, double amount = 5)
@@ -302,8 +309,64 @@ Case("identity.late-damage-after-respawn", () =>
         "A late damage callback from a destroyed life cannot publish a fact for the respawned enemy with the same GlobalID.",
         $"queued={lateQueued}; commands={lateTick.Commands.Count}; records={lateHit.Records.Count}");
 });
-// Needs a loaded damage -> heal plan dispatched by the real kernel into this receiver.
-blocked.Add(("commit.kernel-unknown-no-retry", Blockers.Heal));
+Case("commit.kernel-unknown-no-retry", () =>
+{
+    // damage_applied -> heal(targets <- target, source <- target, amount 5, clamp) dispatched by the real kernel into this receiver.
+    var unknown = Scene(); var damage = unknown.Enemy.Damage;
+    LocalPlan.Load(unknown.Kernel, LocalPlan.Heal(unknown.Kernel, "test.receiver.damage-heal", EnemyModule.DamageBinding, "target"));
+    var observation = unknown.Module.BeforeDamage(damage);
+    if (observation == null) throw new InvalidOperationException("Local heal plan did not subscribe to damage observation.");
+    damage.Health = 40; unknown.Module.AfterDamage(damage, observation);
+    damage.Commit = value => { damage.Health = value; throw new InvalidOperationException("after kernel commit"); };
+    var tick = unknown.Kernel.Advance(1, true); var retry = unknown.Kernel.Advance(2, true);
+    var result = tick.Commands.Count == 1 ? tick.Commands[0].Result : null;
+    return (result != null && result.Status == "failed" && result.CommitState == CommitStates.Unknown && result.Code == "native-commit-exception"
+        && damage.Sends == 1 && damage.Health == 45 && retry.Commands.Count == 0 && unknown.Kernel.QueuedEvents == 0,
+        "A kernel-dispatched heal whose native commit throws after writing is unknown, written once (+5 HP) and never retried.",
+        $"commands={tick.Commands.Count}; retry={retry.Commands.Count}; status={result?.Status}; commit={result?.CommitState}; code={result?.Code}; sends={damage.Sends}; health={damage.Health}; queued={unknown.Kernel.QueuedEvents}");
+});
+Case("health.damage-window-change", () =>
+{
+    var loss = HealthScene(); var damage = loss.Enemy.Damage;
+    var observation = loss.Module.BeforeDamage(damage);
+    if (observation == null) throw new InvalidOperationException("A health_changed subscription alone did not open the damage window.");
+    damage.Health = 40; loss.Module.AfterDamage(damage, observation); loss.Module.AfterDamage(damage, observation);
+    var tick = loss.Kernel.Advance(1, true);
+    var inputs = loss.Records.Count == 1 ? loss.Records[0].Inputs : default;
+    return (tick.Commands.Count == 1 && loss.Records.Count == 1 && RuntimeJson.Entity(inputs.GetProperty("target")) == loss.Ref
+        && inputs.GetProperty("value").GetDouble() == 40 && inputs.GetProperty("delta").GetDouble() == -10,
+        "One native damage window losing 10 HP publishes one health change {target, value=40, delta=-10}; a replay adds nothing.",
+        $"commands={tick.Commands.Count}; records={loss.Records.Count}; inputs={(loss.Records.Count == 1 ? inputs.ToString() : "-")}");
+});
+Case("health.damage-window-rise-not-inferred", () =>
+{
+    var rise = HealthScene(); var damage = rise.Enemy.Damage;
+    var observation = rise.Module.BeforeDamage(damage);
+    if (observation == null) throw new InvalidOperationException("A health_changed subscription alone did not open the damage window.");
+    damage.Health = 60; rise.Module.AfterDamage(damage, observation);
+    var unchanged = rise.Module.BeforeDamage(damage); rise.Module.AfterDamage(damage, unchanged);
+    return (rise.Kernel.Advance(1, true).Commands.Count == 0 && rise.Records.Count == 0 && rise.Kernel.QueuedEvents == 0,
+        "A rise or no change inside the native damage window is not published as a health change.", $"records={rise.Records.Count}");
+});
+Case("health.damage-and-change-both-once", () =>
+{
+    var both = HealthScene(); var damage = both.Enemy.Damage;
+    LocalPlan.Load(both.Kernel, LocalPlan.Build(both.Kernel, "test.receiver.damage", EnemyModule.DamageBinding, LocalPlan.RecordBinding, ("target", "target")));
+    var observation = both.Module.BeforeDamage(damage); damage.Health = 45; both.Module.AfterDamage(damage, observation);
+    var tick = both.Kernel.Advance(1, true);
+    var plans = both.Records.Select(r => r.PlanId).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+    return (tick.Commands.Count == 2 && plans.SequenceEqual(new[] { "test.receiver.damage", "test.receiver.health" }),
+        "One observed loss publishes exactly one damage_applied and one health_changed fact.", string.Join(",", plans));
+});
+Case("health.damage-window-old-life", () =>
+{
+    var late = HealthScene(); var damage = late.Enemy.Damage;
+    var observation = late.Module.BeforeDamage(damage);
+    late.Module.TrackDespawn(late.Enemy); late.Module.TrackSpawn(late.Enemy);
+    damage.Health = 40; late.Module.AfterDamage(damage, observation);
+    return (late.Kernel.QueuedEvents == 0 && late.Kernel.Advance(1, true).Commands.Count == 0 && late.Records.Count == 0,
+        "A health loss observed for a destroyed life is never published for the respawned enemy.", $"records={late.Records.Count}");
+});
 Case("damage.token-owner", () =>
 {
     var issuer = DamageScene(); var impostor = DamageScene();
@@ -394,14 +457,13 @@ int failed = checks.Count(c => !c.Passed), passed = checks.Count - failed;
 using var sdkStream = File.OpenRead(typeof(RuntimeKernel).Assembly.Location);
 using var sdkHash = System.Security.Cryptography.SHA256.Create();
 var report = new { receiverSourceSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "EnemyModule.source.cs")))),
-    scenarioRevision = "independent-scenarios-local-plans-v3", schemaVersion = 3, verification = "production-source-and-explicit-compiled-sdk-with-test-doubles", gameExecuted = false,
+    scenarioRevision = "independent-scenarios-local-plans-v4", schemaVersion = 4, verification = "production-source-and-explicit-compiled-sdk-with-test-doubles", gameExecuted = false,
     frameworkAssemblySha256 = Convert.ToHexString(sdkHash.ComputeHash(sdkStream)),
-    utc = DateTimeOffset.UtcNow, passed, failed, blocked = blocked.Select(b => new { b.Id, b.Reason }).ToArray(), checks };
+    utc = DateTimeOffset.UtcNow, passed, failed, checks };
 string reportPath = Path.GetFullPath(args[0]);
 Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
 File.WriteAllText(reportPath, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
 foreach (var check in checks.Where(c => !c.Passed)) Console.Error.WriteLine("FAIL " + check.Id + ": " + check.Observed);
-Blockers.Print(blocked);
-Console.WriteLine($"{Blockers.Verdict(failed, blocked.Count)} {passed}/{checks.Count + blocked.Count} receiver probes; failed {failed}; BLOCKED {blocked.Count}; native game execution and multiplayer are NOT exercised.");
+Console.WriteLine($"{(failed == 0 ? "PASS" : "FAIL")} {passed}/{checks.Count} receiver probes; failed {failed}; native game execution and multiplayer are NOT exercised.");
 return failed == 0 ? 0 : 1;
 internal sealed record ProbeCheck(string Id, bool Passed, string Expected, string Observed);

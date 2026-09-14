@@ -48,6 +48,12 @@ def main() -> int:
          'var entry = damage.Owner != null && _entities.TryGetValue(damage.Owner.GlobalID, out var current) ? current : null; '
          'if (entry != null) before = new DamageObservation(this, entry.Reference, before.HealthBefore, before.DamagePointer);',
          'identity.late-damage-after-respawn'),
+        # health_changed from the native damage window: the observation gate, the sign and the post-call value.
+        ('health-gate-lost', ' || _kernel.HasSubscribers(HealthChangedBinding)', '', 'health.damage-window-change'),
+        ('health-delta-unsigned', 'delta = -actualDamage', 'delta = actualDamage', 'health.damage-window-change'),
+        ('health-value-before', 'value = healthAfter,', 'value = (double)before.HealthBefore,', 'health.damage-window-change'),
+        ('health-rise-inferred', 'if (actualDamage == 0) return;',
+         'if (actualDamage == 0 && healthAfter <= before.HealthBefore) return;', 'health.damage-window-rise-not-inferred'),
     ]
     cases = [('baseline', source, None)]
     for name, old, new, expected in mutations:
@@ -75,12 +81,8 @@ def main() -> int:
         (case / 'run.log').write_text(completed.stdout + completed.stderr, encoding='utf-8')
         report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.exists() else {}
         failures = [item['Id'] for item in report.get('checks', []) if not item['Passed']]
-        blocked = [item['Id'] for item in report.get('blocked', [])]
         if expected is None:
             status = 'pass' if report and completed.returncode == 0 and report.get('failed') == 0 else 'fail'
-        elif expected in blocked:
-            # The detecting case cannot run yet, so the mutant is neither detected nor missed.
-            status = 'blocked'
         else:
             status = 'pass' if report and completed.returncode == 1 and expected in failures else 'fail'
         results.append({'case': name, 'status': status, 'exitCode': completed.returncode,
@@ -88,15 +90,15 @@ def main() -> int:
         print(f'{status.upper()} {name}: exit={completed.returncode}, failures={failures}', flush=True)
         if expected is None and status != 'pass':
             break  # Never credit mutants when the unchanged production baseline is broken.
-    counts = {s: sum(item['status'] == s for item in results) for s in ('pass', 'fail', 'blocked')}
-    summary = {'schemaVersion': 2, 'gameExecuted': False,
+    counts = {s: sum(item['status'] == s for item in results) for s in ('pass', 'fail')}
+    summary = {'schemaVersion': 3, 'gameExecuted': False,
                'receiverSourceSha256': hashlib.sha256(source.encode()).hexdigest(),
                'sdkSha256': hashlib.sha256(sdk.read_bytes()).hexdigest(),
-               'passed': counts['pass'], 'failed': counts['fail'], 'blocked': counts['blocked'], 'checks': results}
+               'passed': counts['pass'], 'failed': counts['fail'], 'checks': results}
     (output / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     complete = len(results) == len(cases)
-    verdict = 'FAIL' if counts['fail'] or not complete else 'INCOMPLETE' if counts['blocked'] else 'PASS'
-    print(f'{verdict} baseline+mutants {counts["pass"]}/{len(cases)}; failed {counts["fail"]}; BLOCKED {counts["blocked"]}', flush=True)
+    verdict = 'FAIL' if counts['fail'] or not complete else 'PASS'
+    print(f'{verdict} baseline+mutants {counts["pass"]}/{len(cases)}; failed {counts["fail"]}', flush=True)
     return 0 if complete and counts['fail'] == 0 else 1
 
 

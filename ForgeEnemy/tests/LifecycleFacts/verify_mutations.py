@@ -60,9 +60,6 @@ def main() -> int:
         (case / 'run.log').write_text(result.stdout + result.stderr, encoding='utf-8')
         report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.exists() else {}
         failed = [row['Id'] for row in report.get('checks', []) if not row['Passed']]
-        blocked = [row['Id'] for row in report.get('blocked', [])]
-        if expected is not None and expected in blocked:
-            raise ValueError(f'Mutant {name} targets blocked case {expected}; choose a runnable detector.')
         valid = bool(report) and (result.returncode == 0 and not failed if expected is None
                                   else result.returncode == 1 and expected in failed)
         results.append({'case': name, 'passed': valid, 'exitCode': result.returncode,

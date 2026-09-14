@@ -10,8 +10,10 @@ unknown/missing completion, readback changes, queue rejection, permissions and t
 Native Hook prefix/postfix adapters are invoked as managed test code, not injected.
 
 Plans are built locally from the kernel registry (fact -> QA record step); no website fixture is read.
-The two fact -> real Heal integrations (`integration.real-heal-*`) are reported as BLOCKED, not passed:
-heal takes many-valued `targets`, and no legal plan can feed them before J-003. See ../../VALIDATION.md.
+The two fact -> real Heal integrations (`integration.real-heal-*`) load a fact -> heal plan from the same registry:
+the fact's single subject wraps into heal's many-valued `targets` and is also `source`, `amount` is the literal 5 and
+`overheal_policy` is the clamp index. A limb break heals exactly +5 HP once; a death start is rejected `not-alive`
+without a native write. See ../../VALIDATION.md.
 
 Use the host build instructions in [Enemy README](../../README.md) to obtain $sdkDll.
 Run from the mod repository root with an isolated output/report directory:
@@ -23,4 +25,4 @@ dotnet "$out/bin/LifecycleFacts/release/LifecycleFacts.dll" "$out/lifecycle-resu
 python ForgeEnemy/tests/LifecycleFacts/verify_mutations.py --sdk $sdkDll --output "$out/mutations"
 ```
 
-A run with blocked cases and no failures exits 0 but prints `INCOMPLETE` and `BLOCKED n`.
+Any failed case exits 1 and prints `FAIL`; there is no blocked or skipped outcome.

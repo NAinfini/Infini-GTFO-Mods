@@ -167,7 +167,8 @@ internal sealed partial class EnemyModule : IDisposable
 
     internal DamageObservation? BeforeDamage(Dam_EnemyDamageBase damage)
     {
-        if (!CanExecute || !_kernel.HasSubscribers(DamageBinding) || damage == null || damage.Owner == null) return null;
+        if (!CanExecute || !(_kernel.HasSubscribers(DamageBinding) || _kernel.HasSubscribers(HealthChangedBinding))
+            || damage == null || damage.Owner == null) return null;
         if (!_entities.TryGetValue(damage.Owner.GlobalID, out var entry)
             || Resolve(entry.Reference) == null || entry.EnemyPointer != damage.Owner.Pointer
             || entry.Enemy.Damage == null || entry.Enemy.Damage.Pointer != damage.Pointer) return null;
@@ -183,16 +184,24 @@ internal sealed partial class EnemyModule : IDisposable
         var entry = Resolve(before.Target);
         if (entry == null || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer
             || entry.Enemy.Damage == null || entry.Enemy.Damage.Pointer != damage.Pointer || !float.IsFinite(damage.Health)) return;
-        double actualDamage = Math.Max(0, Math.Max(0, before.HealthBefore) - Math.Max(0, damage.Health));
+        double healthAfter = Math.Max(0, damage.Health);
+        double actualDamage = Math.Max(0, Math.Max(0, before.HealthBefore) - healthAfter);
+        // Only a real loss inside the native damage call is a fact; a rise in this window is not inferred as healing.
         if (actualDamage == 0) return;
+        long sequence = checked(++_eventSequence), tick = Math.Max(0, _kernel.CurrentTick);
+        string scope = "gtfo.world:" + _kernel.WorldEpoch;
         // The hook only observes health before/after; it cannot identify the attacker, damage type
         // or limb, so those fields are published as null instead of guessed.
-        var result = _registration.Publish(new RuntimeEvent(
-            "gtfo.enemy.damage:" + _kernel.WorldEpoch + ":" + checked(++_eventSequence), DamageBinding,
-            _kernel.WorldEpoch, Math.Max(0, _kernel.CurrentTick), "gtfo.world:" + _kernel.WorldEpoch,
+        var damageResult = _registration.Publish(new RuntimeEvent(
+            "gtfo.enemy.damage:" + _kernel.WorldEpoch + ":" + sequence, DamageBinding, _kernel.WorldEpoch, tick, scope,
             RuntimeJson.From(new { source = (EntityReference?)null, target = before.Target, amount = actualDamage,
                 damage_kind = (int?)null, limb = (int?)null })));
-        if (result.Status == "rejected") _report("damage fact rejected: " + result.Code);
+        if (damageResult.Status == "rejected") _report("damage fact rejected: " + damageResult.Code);
+        // The same observed loss as a health change: value is the clamped health read back after the call, delta the signed loss.
+        var healthResult = _registration.Publish(new RuntimeEvent(
+            "gtfo.enemy.health:" + _kernel.WorldEpoch + ":" + sequence, HealthChangedBinding, _kernel.WorldEpoch, tick, scope,
+            RuntimeJson.From(new { target = before.Target, value = healthAfter, delta = -actualDamage })));
+        if (healthResult.Status == "rejected") _report("health change fact rejected: " + healthResult.Code);
     }
 
     /// <summary>One row of the multi-target heal result. Field names are the wire contract; keep them stable.</summary>

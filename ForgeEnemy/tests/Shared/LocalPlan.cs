@@ -4,19 +4,22 @@ using ForgeRuntime.Framework;
 
 /// <summary>
 /// Legal schemaVersion 2 plans built from the kernel's own registry export. Pins, capability and provider
-/// versions, permissions and slot frames all come from the registered contracts, so these tests follow the
-/// SDK instead of a website fixture that predates the current catalog shape.
+/// versions, permissions, slot frames and positional constants all come from the registered contracts, so these
+/// tests follow the SDK instead of a website fixture that predates the current catalog shape.
 /// </summary>
 internal static class LocalPlan
 {
     internal const string RecordBinding = "test.enemy.binding.record";
     internal const string RecordPermission = "test.record";
+    // value/delta are optional so fact plans that only forward the subject keep their slot frames.
     private const string RecorderRegistry = """
     {"providers":[{"id":"test.enemy","kind":"extension","version":"1.0.0","dependencies":[]}],
     "capabilities":[{"id":"test.enemy.action.record","owner":"test.enemy","kind":"action",
     "label":"QA record","version":"1.0.0","parameters":{},"graph":{"domains":["enemy"],"execution":"host",
     "inputs":[{"id":"in","type":"execution"},{"id":"target","type":"entity"},
-    {"id":"limb_id","type":"integer","optional":true,"nullable":true}],
+    {"id":"limb_id","type":"integer","optional":true,"nullable":true},
+    {"id":"value","type":"number","unit":"hp","optional":true,"nullable":true},
+    {"id":"delta","type":"number","unit":"hp","optional":true,"nullable":true}],
     "outputs":[{"id":"next","type":"execution"},{"id":"result","type":"result","schema":"test.enemy.result.record"}],
     "parameters":[],"recipients":{"input":"target","target":"entity","cardinality":"one","requires":[],"result":"result"}}}],
     "bindings":[{"id":"test.enemy.binding.record","capabilityId":"test.enemy.action.record",
@@ -54,8 +57,16 @@ internal static class LocalPlan
         new Dictionary<string, CommandHandler> { ["test.record"] = context => { record(context); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
         new[] { new BindingSupport(RecordBinding, "implementation-only", new[] { RecordPermission }) });
 
-    /// <summary>One entrypoint: <paramref name="trigger"/> followed by one parameterless <paramref name="action"/> step.</summary>
+    /// <summary>One entrypoint: <paramref name="trigger"/> followed by one parameterless <paramref name="action"/> step fed only by event slots.</summary>
     internal static Plan Build(RuntimeKernel kernel, string planId, string trigger, string action, params (string EventOutput, string ActionInput)[] wires)
+        => Build(kernel, planId, trigger, action, wires, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject);
+
+    /// <summary>One entrypoint: <paramref name="trigger"/> followed by one <paramref name="action"/> step whose inputs are
+    /// event-slot wires and <c>{slot, value}</c> literals, and whose constants are <paramref name="parameters"/> laid out
+    /// positionally over the capability's parameter definitions (absent ones are null). Enum parameters must already be
+    /// member-set indexes, exactly as a compiled plan carries them.</summary>
+    internal static Plan Build(RuntimeKernel kernel, string planId, string trigger, string action,
+        (string EventOutput, string ActionInput)[] wires, (string ActionInput, object Value)[] literals, JsonElement parameters)
     {
         var manifest = RuntimeJson.Parse(kernel.ExportManifest());
         var registry = manifest.GetProperty("registry");
@@ -72,13 +83,22 @@ internal static class LocalPlan
             .Where(support => ids.Contains(support.GetProperty("bindingId").GetString()!))
             .SelectMany(support => support.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!))
             .Distinct(StringComparer.Ordinal).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        var contracts = pins.ToDictionary(p => p.bindingId, p => kernel.ResolveGraphContract(p.capabilityId, p.capabilityVersion, RuntimeJson.EmptyObject));
+        JsonElement Parameters(string id) => id == action ? parameters : RuntimeJson.EmptyObject;
+        var contracts = pins.ToDictionary(p => p.bindingId, p => kernel.ResolveGraphContract(p.capabilityId, p.capabilityVersion, Parameters(p.bindingId)));
         JsonElement Frame(string id, string side) => (JsonElement)LayoutFrame.Invoke(null, new object[] { contracts[id], side })!;
-        object Layout(string id) => new { inputs = Frame(id, "inputs"), outputs = Frame(id, "outputs"), constants = Array.Empty<object>(), promoted = Array.Empty<int>() };
+        object?[] Constants(string id)
+        {
+            var capabilityId = pins.Single(p => p.bindingId == id).capabilityId;
+            return Row("capabilities", capabilityId).GetProperty("graph").GetProperty("parameters").EnumerateArray()
+                .Select(definition => Parameters(id).TryGetProperty(definition.GetProperty("id").GetString()!, out var value) ? (object?)value : null)
+                .ToArray();
+        }
+        object Layout(string id) => new { inputs = Frame(id, "inputs"), outputs = Frame(id, "outputs"), constants = Constants(id), promoted = Array.Empty<int>() };
         int Slot(string id, string side, string port) => contracts[id].GetProperty(side).EnumerateArray()
             .Select((p, index) => (p, index)).Single(x => x.p.GetProperty("id").GetString() == port).index;
-        var inputs = wires.Select(w => new { slot = Slot(action, "inputs", w.ActionInput), fromEventSlot = Slot(trigger, "outputs", w.EventOutput) })
-            .OrderBy(x => x.slot).ToArray();
+        var inputs = wires.Select(w => (Slot: Slot(action, "inputs", w.ActionInput), Row: (object)new { slot = Slot(action, "inputs", w.ActionInput), fromEventSlot = Slot(trigger, "outputs", w.EventOutput) }))
+            .Concat(literals.Select(l => (Slot: Slot(action, "inputs", l.ActionInput), Row: (object)new { slot = Slot(action, "inputs", l.ActionInput), value = l.Value })))
+            .OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
         var json = RuntimeJson.From(new
         {
             schemaVersion = 2, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = kernel.Identity,
@@ -90,6 +110,13 @@ internal static class LocalPlan
         }).GetRawText();
         return new(json, permissions);
     }
+
+    /// <summary>fact -> forge.action.combat.heal: the fact's subject is both the single wrapped target and the source,
+    /// amount is the literal <paramref name="amount"/>, and overheal_policy is clamp (member index 0).</summary>
+    internal static Plan Heal(RuntimeKernel kernel, string planId, string trigger, string subject, double amount = 5)
+        => Build(kernel, planId, trigger, "forge.module.gtfo.enemy.binding.heal",
+            new[] { (subject, "targets"), (subject, "source") }, new[] { ("amount", (object)amount) },
+            RuntimeJson.From(new { overheal_policy = 0 }));
 
     /// <summary>Loads a plan; every rejection propagates.</summary>
     internal static void Load(RuntimeKernel kernel, Plan plan) => kernel.LoadPlan(plan.Json);

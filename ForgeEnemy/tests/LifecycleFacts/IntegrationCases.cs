@@ -45,9 +45,28 @@ internal static class IntegrationCases
             using var s = new Scene(); s.Die(); s.Module.TrackDespawn(s.Enemy); s.Enemy.Alive = true;
             s.Module.TrackSpawn(s.Enemy); s.Tick(); Check(s.Records.Count == 0, "Queued old-life fact targeted respawn.");
         });
-        // Fact -> heal against the real receiver (limb +5 HP once; death cannot revive). heal takes many-valued targets,
-        // and a fact's single entity cannot feed them until single-to-many wiring exists, so no legal plan can be built.
-        foreach (string suffix in new[] { "death_started", "limb_broken" }) Blocked("integration.real-heal-" + suffix, Blockers.Heal);
+        // Fact -> heal against the real receiver through the real kernel: the fact's single subject is wrapped into heal's
+        // many-valued targets, amount is the literal 5 and overheal_policy the clamp index.
+        Case("integration.real-heal-limb_broken", () => {
+            using var s = new Scene(load: false); LocalPlan.Load(s.Kernel, Scene.HealPlan(s.Kernel, "limb_broken"));
+            s.Break(); var tick = s.Tick(); var damage = s.Enemy.Damage;
+            Check(tick.Commands.Count == 1, $"Expected one heal command, got {tick.Commands.Count}.");
+            var result = tick.Commands[0].Result; var row = result.Outputs.GetProperty("results").EnumerateArray().Single();
+            Check(result.Status == "succeeded" && result.CommitState == CommitStates.Confirmed
+                && row.GetProperty("actualAmount").GetDouble() == 5 && damage.Health == 55 && damage.Sends == 1,
+                $"Limb fact did not heal exactly +5 HP once: status={result.Status}; commit={result.CommitState}; row={row}; health={damage.Health}; sends={damage.Sends}");
+            var later = s.Tick(2);
+            Check(later.Commands.Count == 0 && damage.Sends == 1 && damage.Health == 55, "A consumed limb fact healed again on a later tick.");
+        });
+        Case("integration.real-heal-death_started", () => {
+            using var s = new Scene(load: false); LocalPlan.Load(s.Kernel, Scene.HealPlan(s.Kernel, "death_started"));
+            s.Die(); var tick = s.Tick(); var damage = s.Enemy.Damage;
+            Check(tick.Commands.Count == 1, $"Expected one heal command, got {tick.Commands.Count}.");
+            var result = tick.Commands[0].Result;
+            Check(result.Status == "rejected" && result.CommitState == CommitStates.None && result.Code == "not-alive"
+                && damage.Sends == 0 && damage.Health == 50,
+                $"Death fact healing revived or wrote: status={result.Status}; commit={result.CommitState}; code={result.Code}; health={damage.Health}; sends={damage.Sends}");
+        });
         Case("integration.native-hooks-delegate-exactly-once", Hooks);
     }
 

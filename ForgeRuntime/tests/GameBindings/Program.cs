@@ -17,7 +17,6 @@ void Reject(Action action, string message)
 }
 // Assertions that cannot run against the current contracts. They are listed, never counted in `checks`.
 var blocked = new List<(string Id, string Reason)>();
-const string HealBlocker = "J-003: no legal heal plan exists before literal inputs and single-to-many wiring (FORGE-FRAMEWORK D-006 1-2)";
 RuntimeKernel Kernel()
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
@@ -52,12 +51,14 @@ RuntimeModule Recorder(Action<CommandContext> record) => new(RuntimeKernel.ApiVe
         role = "execute", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() } }
 }).GetRawText(), new Dictionary<string, CommandHandler> { ["test.bridge.record"] = context => { record(context); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
     new[] { new BindingSupport(RecordBinding, "implementation-only", new[] { "test.record" }) });
-// death_started -> record, with pins, permissions and slot frames taken from the kernel's own registry and graph contracts.
-(string Json, string Permissions) DeathRecordPlan(RuntimeKernel k)
+// trigger -> one action step, with pins, permissions, slot frames and positional constants taken from the kernel's own
+// registry and graph contracts. Inputs are event-slot wires and {slot, value} literals; enum constants are member indexes.
+string LocalPlan(RuntimeKernel k, string planId, string trigger, string action, (string EventOutput, string ActionInput)[] wires,
+    (string ActionInput, object Value)[] literals, JsonElement parameters)
 {
     var manifest = RuntimeJson.Parse(k.ExportManifest()); var registry = manifest.GetProperty("registry");
     JsonElement Row(string list, string id) => registry.GetProperty(list).EnumerateArray().Single(r => r.GetProperty("id").GetString() == id);
-    var ids = new[] { EnemyModule.DeathStartedBinding, RecordBinding }.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+    var ids = new[] { trigger, action }.OrderBy(id => id, StringComparer.Ordinal).ToArray();
     var pins = ids.Select(id =>
     {
         var binding = Row("bindings", id);
@@ -68,22 +69,31 @@ RuntimeModule Recorder(Action<CommandContext> record) => new(RuntimeKernel.ApiVe
     var permissions = manifest.GetProperty("bindingSupport").EnumerateArray().Where(s => ids.Contains(s.GetProperty("bindingId").GetString()!))
         .SelectMany(s => s.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!))
         .Distinct(StringComparer.Ordinal).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-    var contracts = pins.ToDictionary(p => p.bindingId, p => k.ResolveGraphContract(p.capabilityId, p.capabilityVersion, RuntimeJson.EmptyObject));
+    JsonElement Parameters(string id) => id == action ? parameters : RuntimeJson.EmptyObject;
+    var contracts = pins.ToDictionary(p => p.bindingId, p => k.ResolveGraphContract(p.capabilityId, p.capabilityVersion, Parameters(p.bindingId)));
+    object?[] Constants(string id) => Row("capabilities", pins.Single(p => p.bindingId == id).capabilityId).GetProperty("graph").GetProperty("parameters").EnumerateArray()
+        .Select(definition => Parameters(id).TryGetProperty(definition.GetProperty("id").GetString()!, out var value) ? (object?)value : null).ToArray();
     object Layout(string id) => new { inputs = RuntimeGraphContracts.Layout(contracts[id], "inputs"), outputs = RuntimeGraphContracts.Layout(contracts[id], "outputs"),
-        constants = Array.Empty<object>(), promoted = Array.Empty<int>() };
+        constants = Constants(id), promoted = Array.Empty<int>() };
     int Slot(string id, string side, string port) => contracts[id].GetProperty(side).EnumerateArray()
         .Select((p, index) => (p, index)).Single(x => x.p.GetProperty("id").GetString() == port).index;
-    string json = RuntimeJson.From(new
+    var inputs = wires.Select(w => (Slot: Slot(action, "inputs", w.ActionInput), Row: (object)new { slot = Slot(action, "inputs", w.ActionInput), fromEventSlot = Slot(trigger, "outputs", w.EventOutput) }))
+        .Concat(literals.Select(l => (Slot: Slot(action, "inputs", l.ActionInput), Row: (object)new { slot = Slot(action, "inputs", l.ActionInput), value = l.Value })))
+        .OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
+    return RuntimeJson.From(new
     {
-        schemaVersion = 2, kind = "forge-runtime-plan", planId = "test.bridge.death", resource = new { id = "test.bridge.death", revision = "1" }, runtime = k.Identity,
+        schemaVersion = 2, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = k.Identity,
         domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
         limits = new { k.Limits.MaxEventsPerTick, k.Limits.MaxCommandsPerTick, k.Limits.MaxQueuedEvents, k.Limits.MaxCausalDepth }, bindings = pins,
-        entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, EnemyModule.DeathStartedBinding), layout = Layout(EnemyModule.DeathStartedBinding),
-            steps = new[] { new { nodeId = "Record", binding = Array.IndexOf(ids, RecordBinding), layout = Layout(RecordBinding),
-                inputs = new[] { new { slot = Slot(RecordBinding, "inputs", "target"), fromEventSlot = Slot(EnemyModule.DeathStartedBinding, "outputs", "enemy") } } } } } }
+        entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, trigger), layout = Layout(trigger),
+            steps = new[] { new { nodeId = "Step", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs } } } }
     }).GetRawText();
-    return (json, string.Join(",", permissions));
 }
+string DeathRecordPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.death", EnemyModule.DeathStartedBinding, RecordBinding,
+    new[] { ("enemy", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject);
+// damage_applied -> heal(targets <- target wrapped, source <- target, amount = 5, overheal_policy = clamp index 0).
+string DamageHealPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.damage-heal", EnemyModule.DamageBinding, EnemyModule.HealBinding,
+    new[] { ("target", "targets"), ("target", "source") }, new[] { ("amount", (object)5.0) }, RuntimeJson.From(new { overheal_policy = 0 }));
 
 // The failure latch is tested across 100 further ticks, not merely a mode boolean.
 var startup = Kernel(); int attempts = 0;
@@ -285,8 +295,6 @@ if (args.Length >= 2 && args[0] == "--export-manifest")
 if (args.Length >= 4 && args[0] == "--native") checks += NativeEvidence.Verify(args[1], args[2], args[3]);
 if (args.Length >= 2 && args[0] == "--bridge")
 {
-    // A configured website damage -> heal plan committing +5 HP through the bridge cannot be expressed yet.
-    blocked.Add(("bridge.configured-heal-plan-commits-5hp", HealBlocker));
     BepInEx.Paths.GameRootPath = Path.GetFullPath(args[1]);
     string isolated = Path.Combine(Path.GetTempPath(), "forge-bridge-" + Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(isolated); BepInEx.Paths.BepInExRootPath = isolated;
@@ -337,7 +345,9 @@ if (args.Length >= 2 && args[0] == "--bridge")
         State(eGameStateName.Generating); State(eGameStateName.InLevel);
         Check(!GameRuntimeBridge.CanExecute, "state transition bypassed failed startup");
         var writeTime = File.GetLastWriteTimeUtc(manifestCollision);
-        Directory.CreateDirectory(bridgePlanDir); File.WriteAllText(Path.Combine(bridgePlanDir, "native-heal.plan.json"), DeathRecordPlan(failedKernel).Json);
+        Directory.CreateDirectory(bridgePlanDir);
+        File.WriteAllText(Path.Combine(bridgePlanDir, "death-record.plan.json"), DeathRecordPlan(failedKernel));
+        File.WriteAllText(Path.Combine(bridgePlanDir, "damage-heal.plan.json"), DamageHealPlan(failedKernel));
         for (int i = 0; i < 100; i++) Frame();
         Check(GameRuntimeBridge.Kernel!.LoadedPlans == 0 && Plugin.PluginLog.Messages.Count == logs && File.GetLastWriteTimeUtc(manifestCollision) == writeTime,
             "actual FixedTick retries failed plan or manifest IO");
@@ -353,7 +363,15 @@ if (args.Length >= 2 && args[0] == "--bridge")
         var badSub = liveOwner.ObserveLifecycle(e => { if (e.Kind == RuntimeLifecycleKind.StartupChanged) throw new InvalidOperationException("observer test failure"); }, false);
         State(eGameStateName.Generating); var actor = Enemy(); Spawn(actor);
         State(eGameStateName.InLevel); Frame(); Die(actor); Frame();
-        Check(liveKernel.LoadedPlans == 1 && records.Count == 1, "real bridge loads configured plan and dispatches");
+        Check(liveKernel.LoadedPlans == 2 && records.Count == 1, "real bridge loads both configured plans and dispatches");
+        // bridge.configured-heal-plan-commits-5hp: the discovered damage -> heal plan commits +5 HP once through the real handler.
+        var healed = Enemy(8, 30); bridgeEnemies!.TrackSpawn(healed);
+        var hit = bridgeEnemies.BeforeDamage(healed.Damage);
+        Check(hit != null, "configured damage -> heal plan did not open the damage window");
+        healed.Damage.Health = 40; bridgeEnemies.AfterDamage(healed.Damage, hit); Frame();
+        Check(healed.Damage.Health == 45 && healed.Damage.Sends == 1 && records.Count == 1, "configured bridge heal plan must commit exactly +5 HP once");
+        Frame();
+        Check(healed.Damage.Sends == 1 && healed.Damage.Health == 45, "bridge heal must not retry on a later frame");
         Check(liveKernel.StartupState == RuntimeStartupState.Ready && GameRuntimeBridge.CanExecute, "bridge readiness/phase gate not connected");
         Check(!badSub.IsActive && liveSub.IsActive && liveKernel.LifecycleFaultCount == 1, "bad observer stopped healthy gameplay");
         Check(liveStates.Count(e => e.Kind == RuntimeLifecycleKind.StartupChanged && e.Current.StartupState == RuntimeStartupState.Ready) == 1, "ready notification repeated");

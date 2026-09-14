@@ -14,12 +14,12 @@ R4（运行时枚举值端口，见下方阻塞项表）落地后，ReceiverProb
 
 | 套件 | 结果 | 口径 |
 | --- | --- | --- |
-| 生命周期事实（LifecycleFacts） | 50/52，BLOCKED 2；变体 7/7 | 死亡流程与肢体破坏；含原生 Hook 适配器；事实→Heal 联调阻塞（J-003） |
-| 接收器（ReceiverProbe） | 43/44，BLOCKED 1；变体 8/8 | 唯一现行接收器；伤害用例已随 R4 恢复执行，仅 Heal 内核用例仍阻塞（J-003） |
+| 生命周期事实（LifecycleFacts） | 52/52；变体 7/7（2026-09-14） | 死亡流程与肢体破坏；含原生 Hook 适配器；事实→真实 Heal 联调（肢体 +5 HP、死亡 `not-alive`） |
+| 接收器（ReceiverProbe） | 48/48；变体 12/12（2026-09-14） | 唯一现行接收器；含内核派发的 damage→Heal unknown 不重试，以及伤害窗口 `health_changed` 4 例 |
 | 实体观察（EntityObservation） | 66/66 | 通过实际共享 SDK |
 | 行为观察（BehaviorObservation） | 22/22 | AI、移动状态、技能的只读观察 |
 | 插件生命周期（NativePlugin） | 24/24 | 跨线程、卸载、失败清理；计划为 death_started → 记录 |
-| 提交路径审计（CommitAudit） | 68/68，BLOCKED 0 | 现行路径 32（伤害 6 项已随 R4 恢复执行）+ 迁移边界 20；20 个是同一批治疗用例在两条路径上各跑一次，不算独立机制 |
+| 提交路径审计（CommitAudit） | 68/68（2026-09-14） | 现行路径 32（伤害 6 项已随 R4 恢复执行）+ 迁移边界 20；20 个是同一批治疗用例在两条路径上各跑一次，不算独立机制 |
 | cutover 布局（NativeLayout） | 38/38 | Enemy 五 Hook、Runtime 四 Hook |
 | 原生静态审计（NativeEvidence） | 544/544；工具检错 22/22 | 127 个签名 + 7 个枚举常量 + Forge IL 用法 + 数据指针；读元数据与 PE 指令，不加载也不调用游戏方法 |
 | 出生空间要求（SpawnRequirements） | 48/48 | 离线数据合同 + Map 替身求解器 + 内容依赖 |
@@ -45,13 +45,60 @@ R4（运行时枚举值端口，见下方阻塞项表）落地后，ReceiverProb
 
 **上表三个 BLOCKED 用例本批未解除**，尽管 Runtime 侧的 J-003（字面量/单转多输入加载）本批已经落地并经 `ForgeRuntime/tests/Framework --fixtures`（27 个站内负例逐条核对）与本表 CommitAudit 验证。根因是 `ForgeEnemy/tests/Shared/Blockers.cs` 的 `Heal` 常量在 `ReceiverProbe/Program.cs`、`LifecycleFacts` 里被无条件引用为阻塞，不读取任何运行时状态，文本仍写"J-003 未实现"。真正解除需要新写用 `LocalPlan` 从内核注册表构造 事实→Heal 计划并恢复 +5HP 断言（即下表"解除条件"一栏所写的工作），属于新增测试基础设施而不是简单改名，不在本次 J-003 loader 实现范围内，留作后续修复项。
 
+## Heal 联调解除与 E3 伤害与状态事件（2026-09-14）
+
+基于 HEAD `aa2ff18` 加未提交改动，隔离构建目录 `$env:TEMP\forge-enemy-heal-e3-20260914`，`GTFO_BEPINEX_PATH` 指向 `Forge-MapEditor-QA` 配置（只作编译引用）。宿主、Native、8 个 Enemy 测试工程与 GameBindings 均 0 警告 0 错误。没有启动 GTFO，没有安装到任何 profile，没有 Git 提交。
+
+**Heal 联调解除。** `tests/Shared/LocalPlan.cs` 新增 `{slot, value}` 字面量输入，以及按 capability 参数定义排位的 `constants`（枚举取成员下标，没给的参数填 null）；参数同时传给 `ResolveGraphContract`。`LocalPlan.Heal` 构造 事实→`forge.action.combat.heal`：事实主体经单值接多值进入 `targets`，同时作为 `source`，`amount` 为字面量 5，`overheal_policy` 为下标 0（clamp）。`permissions` 取两个 binding 的并集。三个 Enemy 用例恢复真实断言：
+- `integration.real-heal-limb_broken`：一条命令，succeeded/confirmed，`actualAmount` 5，Health 50→55，Sends 1，下一 tick 不再派发。
+- `integration.real-heal-death_started`：一条命令，rejected/none，`not-alive`，Sends 0，Health 不变。
+- `commit.kernel-unknown-no-retry`：damage_applied→heal 经内核派发，提交写入后抛错，结果 failed/unknown/`native-commit-exception`，Sends 1，Health 40→45，下一 tick 0 条命令，队列清空。
+
+`Blockers.cs`、`CaseBlocked`、`T.BlockedRows`、`Audit.Blocked`、三个报告的 `blocked` 字段与两个 `verify_mutations.py` 的 blocked 分支都已删除（报告 schemaVersion 升一版）。GameBindings `--bridge` 删除 `HealBlocker`：同一测试构造器从内核注册表生成 `death-record.plan.json` 与 `damage-heal.plan.json`，写入 bridge 插件计划目录。现在断言 `LoadedPlans == 2`，并断言发现的 damage→heal 计划经真实 handler 提交 +5 HP 一次（45、Sends 1）且下一帧不重试。
+
+**E3 伤害与状态事件。** 对照站内 `catalog/capability-catalog.json` 的 `canonicalVocabulary`（enemy 域触发器）与 SDK `CombatContracts.cs`：`damage_applied`、`health_changed`、`heal` 的 graph 与目录行逐字段相等（排序键后比较）。本批唯一实现的是 **`health_changed` 覆盖扩展**：binding 与 canonical 早已存在，原来只由 Forge 治疗产生。现在同一 `Dam_EnemyDamageBase.ProcessReceivedDamage` prefix/postfix 窗口里观察到实际 HP 损失时，发布 `{target, value = max(0, 调用后 Health), delta = -损失}`。观察门槛改为 damage_applied 或 health_changed 任一有订阅。复用已冻结的 Hook 与 `Health` getter，调用仍在 `BeforeDamage`/`AfterDamage` 里，NativeEvidence 调用者集合不变。窗口内生命不变或上升不发布，也不推断为治疗。
+
+未实现，原因如下：
+
+| 事件 | 原因 |
+| --- | --- |
+| `limb_damaged` | SDK 未注册 canonical（要改 `CombatContracts.cs`，本批边界禁止）；`Dam_EnemyDamageLimb` 的承伤入口与部位 HP 不在 E2 冻结里 |
+| `staggered` | 未注册；没有冻结的硬直状态或时长 API |
+| `killed` | 未注册；`damage_kind` 非空必填，而原生窗口推不出击杀归属与伤害类型（死亡≠击杀） |
+| `hit_candidate`、`damage_preparing` | 未注册；`source` 非空必填，且需要伤害结算前可修改的窗口，没有冻结证据 |
+| `damage_rejected` | 未注册；需要非空 `source`、`outcome`、`reason`，`ProcessReceivedDamage` 返回值语义未核验 |
+| `assist_confirmed` | 未注册；游戏里没有已知的助攻概念 |
+| `status.applied`、`stack_changed`、`refreshed`、`ticked`、`variable_changed`、`timer_elapsed`、`cooldown_ready`、`event_received`、`result_received`、`state_entered`、`state_exited` | 含 `handle`/`resource`/`event`/`result` 端口，运行时拒绝为 `unsupported-event-port`；也都未注册 |
+| `status.expired`、`removed`、`resisted`、`threshold_crossed` | 端口类型可支持，但未注册；敌人状态（胶、燃烧等）没有进入 E2 冻结的原生 API |
+
+`damage_applied` 的 `source` 与 `limb` 仍发布 null：`ProcessReceivedDamage` 带有攻击者与部位参数，但语义未核验。
+
+| 套件 | 命令（`$out` 为上面的构建目录） | 结果 |
+| --- | --- | --- |
+| LifecycleFacts | `dotnet $out/bin/LifecycleFacts/release/LifecycleFacts.dll "$out/lifecycle.json"` | PASS 52/52 |
+| LifecycleFacts 变体 | `python -X utf8 ForgeEnemy/tests/LifecycleFacts/verify_mutations.py --sdk $sdkDll --output "$out/lifecycle-mutations-2"` | baseline + 6 变体 7/7 |
+| ReceiverProbe | `dotnet $out/bin/ReceiverProbe/release/ReceiverProbe.dll "$out/receiver.json"` | PASS 48/48 |
+| ReceiverProbe 变体 | `python -X utf8 ForgeEnemy/tests/ReceiverProbe/verify_mutations.py --sdk $sdkDll --output "$out/receiver-mutations-2"` | baseline + 11 变体 12/12；新增 `health-gate-lost`、`health-delta-unsigned`、`health-value-before`、`health-rise-inferred` 均被指定用例检出 |
+| CommitAudit | `dotnet $out/bin/CommitAudit/release/CommitAudit.dll "$out/commit.json"` | PASS 68/68 |
+| NativePlugin | `dotnet $out/bin/NativePlugin/release/NativePlugin.dll "$out/plugin.json"` | PASS 24/24 |
+| EntityObservation | `dotnet $out/bin/EntityObservation/release/EntityObservation.dll "$out/entity.json" $sdkDll` | PASS 66/66 |
+| BehaviorObservation | `dotnet $out/bin/BehaviorObservation/release/BehaviorObservation.dll "$out/behavior.json"` | PASS 22/22 |
+| NativeLayout | `dotnet $out/bin/NativeLayout/release/NativeLayout.dll $bepinex $hostDll $sdkDll $enemyDll cutover "$out/layout.json"` | PASS 38/38 |
+| NativeEvidence | `dotnet $out/bin/NativeEvidence/release/NativeEvidence.dll $frozen $game $enemyDll ForgeEnemy/evidence/native-api-20403457.json "$out/native.json"` | PASS 544/544；检错 22/22 |
+| GameBindings `--bridge` | `dotnet $out/bin/GameBindings/release/GameBindings.dll --bridge E:\SteamLibrary\steamapps\common\GTFO` | PASS 74，BLOCKED 0 |
+
+NativeEvidence 先用 `Forge-MapEditor-QA` 的 interop 跑，结果 FAIL 538/544：只有 Modules-ASM、GameData-ASM、SNet_ASM 三个文件的哈希与 MVID 共 6 项不符（该 profile 的 interop 于 2026-09-09 重新生成，与冻结输入不同）。随后改用只读的 `Temp` profile interop（`$frozen`，三个哈希与输入锁表一致）重跑，得到上表结果。GameAssembly.dll 哈希与输入锁一致。`--bridge` 由此前的 63 升到 74，本批只新增 4 个断言，其余差值来自两次记录之间的其他改动，未逐条归因。LifecycleFacts、ReceiverProbe、CommitAudit、NativePlugin 在 recorder 端口补 `unit: hp` 之后重建重跑；EntityObservation、BehaviorObservation、NativeLayout 不编译 `tests/Shared`，结果对应当前源码。
+
+源码哈希：`Native/EnemyModule.cs` `F09F0743…93AFC1`，`tests/Shared/LocalPlan.cs` `7B9537A6…932273`，GameBindings `Program.cs` `2AFF9CE4…7442CB`；SDK `FE629515…555F5B`。
+
 ## 阻塞项与解除条件
 
-Enemy 套件的计划全部由 `tests/Shared/LocalPlan.cs` 从内核注册表本地构造（版本、权限、槽位都读注册表），不再读网站夹具。无法在当前合同下构造或加载的用例单列为 `BLOCKED n (原因)` 并逐条列出 id，**不计入通过**。有失败时退出码为 1；没有失败、只有阻塞时退出码为 0，但结论词是 `INCOMPLETE`，尾行写出阻塞数。
+Enemy 套件的计划全部由 `tests/Shared/LocalPlan.cs` 从内核注册表本地构造（版本、权限、槽位、按参数定义排位的 constants 与 `{slot, value}` 字面量都读注册表），不再读网站夹具。2026-09-14 起 Enemy 套件**没有阻塞结果**：`Blockers.cs`、`CaseBlocked` 与报告里的 `blocked` 字段都已删除，用例只有通过或失败，有失败时退出码为 1。
+
+原 J-003 行（LifecycleFacts `integration.real-heal-*`、ReceiverProbe `commit.kernel-unknown-no-retry`、GameBindings `bridge.configured-heal-plan-commits-5hp`）已解除，见 [2026-09-14 记录](#heal-联调解除与-e3-伤害与状态事件2026-09-14)。下表只剩 Runtime 侧 GameBindings `--fixtures` 的阻塞，Enemy 套件不使用。
 
 | 阻塞原因 | 用例 | 解除条件 |
 | --- | --- | --- |
-| J-003：没有合法的 Heal 计划 | LifecycleFacts `integration.real-heal-death_started`、`integration.real-heal-limb_broken`；ReceiverProbe `commit.kernel-unknown-no-retry`；GameBindings `bridge.configured-heal-plan-commits-5hp` | D-004 后 Heal 的 `targets` 是多值实体输入，事件实体是单值输出，另有必填 `amount` 与 `overheal_policy`。要等 J-003（字面量输入、单值接多值，FORGE-FRAMEWORK §8.2 D-006 ①②）在 SDK 落地。之后 Enemy 用例用 `LocalPlan` 构造事实→Heal 计划并恢复 +5 HP 断言；GameBindings bridge 改回读取网站按 J-002 导出重新生成的 `native-heal.plan.json`。 |
 | J-002/J-003：网站夹具早于注册表 | GameBindings `fixtures.valid-plan-heal-dispatch`、`fixtures.invalid-plan-rejections` | `--fixtures` 先把网站有效计划的 capability/provider 版本与注册表逐项比对，不一致就整组阻塞（无效计划都是有效计划的单字段变体，版本不符会让它们因错误的原因被拒）。模组导出 J-002 清单、网站据此重生成夹具且 J-003 让 Heal 计划合法后，比对一致即自动恢复执行。 |
 
 R4（运行时枚举值端口）已随本次改动解除：`damage_applied` 的 `damage_kind` 输出不再以 `unsupported-event-port` 拒绝订阅，`LocalPlan.Load` 也已移除把这一种拒绝转成阻塞的特判。原先列在此处的 ReceiverProbe 7 个伤害用例、CommitAudit 6 个 `existing-path.damage.*`、以及 ReceiverProbe 的 `observation-replay`/`late-damage-retargeted` 两个变体均已恢复执行并通过，见上表。
@@ -149,7 +196,7 @@ R3 在既有 Registry 中登记了带所有权和容量校验的观察函数，�
 
 ## E3 事件的验证细节
 
-D-004 之前记录的事件套件 52/52 包含原生 Hook 适配器（作为托管测试代码调用 prefix/postfix，不注入）、真实计划 → Heal 的 +5 HP 正例，以及"死亡目标不隐式复活"的负例。D-004 把 Heal 改成多值 `targets` 后，那个 +5 HP 正例已经无法构造合法计划，现为 BLOCKED（见[阻塞项](#阻塞项与解除条件)），**不再算作通过**。事件错误变体全部被指定断言检出；**编译失败不算通过**。
+D-004 之前记录的事件套件 52/52 包含原生 Hook 适配器（作为托管测试代码调用 prefix/postfix，不注入）、真实计划 → Heal 的 +5 HP 正例，以及"死亡目标不隐式复活"的负例。D-004 把 Heal 改成多值 `targets` 后，那个 +5 HP 正例一度无法构造合法计划而列为 BLOCKED；2026-09-14 用 J-003 的单值接多值与字面量重新构造计划，正例与负例都恢复执行并通过。事件错误变体全部被指定断言检出；**编译失败不算通过**。
 
 两处初始失败保留：首次 50 项用例检出"owner ID 变化而指针相同"的缺口，补上 owner ID 校验后通过；当时的 Heal 联调最初因夹具的权限与绑定列表未按 canonical ordinal 排序被严格加载器拒绝，修正夹具排序后通过——**没有降低加载器校验**。
 
@@ -203,6 +250,6 @@ python ForgeEnemy/tests/CutoverGuard/test_guard.py
 
 ## 边界
 
-原生读取、离线数据、替身、编译和元数据是不同的证据层，任何一层通过都不代表游戏或多人已通过。GameBindings 各模式共享基础断言；D-004 后的重跑为无参 31、`--fixtures` 32 且 BLOCKED 2、`--bridge` 63 且 BLOCKED 1、`--native` 51。
+原生读取、离线数据、替身、编译和元数据是不同的证据层，任何一层通过都不代表游戏或多人已通过。GameBindings 各模式共享基础断言；D-004 后的重跑为无参 31、`--fixtures` 32 且 BLOCKED 2、`--bridge` 63 且 BLOCKED 1、`--native` 51；2026-09-14 只重跑了 `--bridge`，为 74 且 BLOCKED 0，其余模式未重跑。
 
 没有安装、发布、启动游戏、修改用户 profile、Git 提交或推送。

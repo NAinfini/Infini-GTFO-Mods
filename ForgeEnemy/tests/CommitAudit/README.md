@@ -17,7 +17,7 @@ dotnet "$out/bin/CommitAudit/release/CommitAudit.dll" "$out/report.json"
 ```
 
 Damage cases load a damage_applied -> QA record plan built from the kernel registry; no website fixture is read.
-Cases the SDK cannot load yet are listed as BLOCKED with their reason, never counted as passed.
+Every case either passes or fails; there is no blocked or skipped outcome.
 
 Stop after any failed build; never run an older executable as the result of a new build.
 The report records SDK/source hashes. Compare source hashes before and after
