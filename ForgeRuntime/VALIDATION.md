@@ -1,6 +1,6 @@
 # ForgeRuntime 验证记录
 
-**上次更新：2026-09-13**（内容合并自 R1、R2a、R2a-cleanup、R2b-1、R3a、R4a 六份交接记录与旧采集版验证记录）。
+**上次更新：2026-09-14**（内容合并自 R1、R2a、R2a-cleanup、R2b-1、R3a、R4a 六份交接记录与旧采集版验证记录）。
 
 全仓库的测试计数汇总在 [ARCHITECTURE.md 第 3 节](../ARCHITECTURE.md#3-测试计数各自独立不相加)。本文记录 Runtime 侧各次交付的实际内容、复跑命令与仍然存在的失败。
 
@@ -179,6 +179,38 @@ rebase 到 `d09d6bb` 之后的验证记录如下。构建使用 `dotnet build <�
 | HostConfiguration | 0 | `Real BepInEx configuration: 90 assertions passed; 0 scenarios failed.` |
 
 本批没有跑 GameBindings `--fixtures` / `--bridge`、EntityObservation `--probe-registration`、GraphContracts、Enemy、Map、Weapon 与 Trigger 套件，也没有检查内核或领域记录点的开销（记录点不存在）。以下仍未验证：游戏内 `ManualLogSource` 从后台线程调用、真实退出时序、进程强杀时丢失的队列与最后一行 `log.dropped`。以上都是托管替身、编译后元数据与本地原生签名证据，没有加载 GTFO，也没有安装。
+
+## J-003 与 r11：字面量/单转多输入、heal 结果聚合修正（2026-09-14）
+
+D-006①②（J-003）：schemaVersion 2 的 step 输入行只能是 `{slot, fromEventSlot}`（wired）或 `{slot, value}`（literal）二选一，两者同时出现报 `literal-with-event-source`；literal 值类型或类别（entity 一律禁止）与目标端口不符报 `literal-wrong-type`；非空的 one 输出接多输入端口时由加载器按 `RuntimeGraphContracts.ValueTypeMatches`（新拆出，忽略 cardinality）与显式 nullable 检查后原地包成一元素集合，其余端口维度不符仍按原 `port-mismatch`/`nullable-port` 拒绝。落地在 `RuntimeGraphContracts.cs`（`SameValue` 拆成精确匹配 + `ValueTypeMatches` 两个函数）、`RuntimePlan.cs`（step 输入解析改写）、`RuntimeKernel.cs`（dispatch 时按 `StepInput.Literal`/`Wrap` 取值）。
+
+r11（heal 结果聚合，кernel 级、与 provider 无关）：`Contracts.cs` 的 `CommandResultRules.TryValidate` 对 Partial 只再要求 commit 为 confirmed 或 unknown，不再要求非空 `Facts`——一个满血目标 commit 时 `actualAmount=0` 不产生 fact，与另一个被拒绝目标合并后仍是 Partial，facts 可以为空。`RuntimeKernel.cs` 的 entrypoint 派发循环相应改为只在 rejected/failed/cancelled/expired，或 partial+unknown 时停止；partial+confirmed 不再停止，后续 step 继续执行。`EnemyModule.Heal` 与 `EnemyHealthCommit.Execute` 的 21 个拒绝码改成 `CombatContracts.cs` 里已提交的 kebab-case 形式，聚合逻辑按有无 committed 行重写（不再按 `unknown==0`/`facts.Count==0` 判断），删除 `heal-no-state-change`。
+
+同批修正了两处被 r11 改变的既有断言：`ForgeRuntime/tests/Framework/ExecutionResultTests.cs` 里"partial without/with known commit"的两条旧断言（原假设 partial+confirmed/unknown 且空 facts 一定非法，现改为验证合法）与"partial stops the entrypoint after its invoked step"整段场景（confirmed-commit partial 不再停止，2 步都执行，2 条 fact 都发布排队）；`ForgeEnemy/tests/CommitAudit/CommitCases.cs` 的 `heal.multi-full-and-rejected-is-no-state-change`、`heal.multi-full-and-unknown-is-failed` 两个用例按 r11 改写为 `-is-partial-confirmed`/`-is-partial-unknown`。
+
+website `Tests/Forge/fixtures/runtime` 的 27 个非法计划（不是任务文本原先假设的 28 个）逐一核对了 sha256（未直接采信既有记录）：`cases.json` d5e355d8…、`native-heal.plan.json` 475363c2…、`native-manifest.json` 731a166f…、`MANIFEST.json` e5020919… 均与站内 `MANIFEST.json` 登记值一致；27 个 `invalid/*.plan.json` 中含 `literal-with-event-source.plan.json`、`literal-wrong-type.plan.json` 两个 J-003 专属负例。
+
+隔离构建，`Forge.Architecture.sln` 与各测试工程 0 警告 0 错误：
+
+| 套件与参数 | 结果 |
+| --- | --- |
+| Framework（默认） | 274 passed |
+| Framework `--fixtures <站内 fixtures/runtime>` | 302 passed（含 27 个非法计划逐条按预期码拒绝，native-heal.plan.json 正常加载） |
+| Framework `--benchmark` | 通过，输出合成负载数字（非 GTFO 帧率） |
+| GraphContracts `verify.py --website ..\Infini-GTFO-Model-Site`（非 `--integration`） | typescript 生成 exit 0；graph-contracts 1770 passed，0 failed；`sourceStable=true` |
+| GraphContracts `mutations.py <本次生成的 vectors.json>` | control 通过，5/5 错误实现（含 `plan-skips-expansion`）全部检出 |
+| GameBindings（默认） | PASS 39，BLOCKED 0 |
+| GameBindings `--fixtures <站内 fixtures/runtime>` | PASS 70，BLOCKED 0（此前记录的 `fixtures.valid-plan-heal-dispatch`/`fixtures.invalid-plan-rejections` 版本比对阻塞已随 J-003 解除） |
+| CommitAudit | 68/68，BLOCKED 0 |
+| ReceiverProbe | 43/44，BLOCKED 1；`verify_mutations.py` 8/8 mutants 检出 |
+| LifecycleFacts | 50/52，BLOCKED 2；`verify_mutations.py` 7/7 mutants 检出 |
+| ForgeTrigger T1（`validate-trigger.py --mutations` 的 t1 阶段） | PASS 911 C# assertions |
+
+**LifecycleWork `--fixtures` 本批未通过，退出码 1，0 assertions passed，6 组失败。** 根因不在 J-003/r11：`tests/LifecycleWork/WorkFixture.cs` 的 `Event()` 用固定 payload `{ target, actual_damage }` 构造 `damage_applied` 触发事件，但站内当前 `native-manifest.json` 里该 trigger 的输出端口是 `next/source/target/amount/damage_kind/limb` 且均非 `optional`——字段名早已不是 `actual_damage`（应为 `amount`），且缺 `source`/`damage_kind`/`limb`，命中 `RuntimeKernel.ValidateEvent` 的 `RuntimeJson.Shape` 检查报 `unknown-field`。这是独立于本批改动的既有失效夹具，本批未修改 `WorkFixture.cs`（不在 J-003/heal 合并范围内），留作后续修复项。
+
+**ReceiverProbe 的 `commit.kernel-unknown-no-retry` 与 LifecycleFacts 的 `integration.real-heal-death_started`/`integration.real-heal-limb_broken` 仍列 BLOCKED。** 根因是 `ForgeEnemy/tests/Shared/Blockers.cs` 的 `Heal` 常量与其在 `ReceiverProbe/Program.cs`、`LifecycleFacts` 里的引用是硬编码的无条件阻塞，文本仍写"J-003 未实现"——J-003 本批已经落地并经 Framework `--fixtures`/CommitAudit 验证，但这三个用例没有随之自动解除，因为阻塞判断本身没有读取任何运行时状态。解除需要新写用 `LocalPlan` 从内核注册表构造 事实→Heal 计划并恢复 +5HP 断言（README 里已写明的解除条件），属于新增测试基础设施，不在本次 J-003 loader 实现 + heal 合并的范围内，留作后续修复项。`GameBindings/Program.cs` 里同类的 `HealBlocker`/`bridge.configured-heal-plan-commits-5hp` 未见于本批 `--fixtures`/默认运行的失败或阻塞列表中（该 bridge 场景未在本次跑的两个模式里触发），未重新核实，一并留作后续检查项。
+
+`ForgeTrigger/tools/validate-trigger.py --mutations` 的 `pure` 与 `independent` 两个阶段在 TypeScript 向量生成步骤失败（`previewLogicPrimitive is not a function`、`preview is not a function`），栈顶都在站内 `site/forge` 的 TS 导出函数缺失，与本批改动的 C# 文件无关，也不是 J-003/r11 涉及的路径；只有 t1 阶段（消费共享 SDK 的 C# 断言）被跑到并通过。这个 TS 侧失败未进一步排查。
 
 ## 复跑
 

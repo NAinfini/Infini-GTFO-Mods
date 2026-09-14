@@ -46,7 +46,7 @@ internal sealed class AuditScene
         => Heal(new[] { target ?? Reference }, amount, cap, policy);
     internal CommandResult Heal(EntityReference[] targets, double amount = 5, double? cap = null, string policy = "clamp")
     {
-        if (policy == "overheal") return CommandResult.Rejected("gtfo.enemy.overheal_unsupported");
+        if (policy == "overheal") return CommandResult.Rejected("overheal-unsupported");
         if (UseManagedBoundary)
         {
             var boundary = new ForgeEnemy.Receivers.EnemyHealthCommit(() => Allowed && SNetwork.SNet.IsMaster,

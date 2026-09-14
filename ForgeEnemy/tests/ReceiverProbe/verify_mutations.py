@@ -32,16 +32,16 @@ def main() -> int:
         # The three commit-boundary mutants demote an attempted native write to a known "rejected" row, which the
         # heal aggregation reports as commitState=none: exactly the false claim each named case must catch.
         ('changed-receiver-none',
-         '{ rows.Add(Row("unknown", "gtfo.enemy.receiver_changed_during_commit", before)); commitFailed = true; }',
-         '{ rows.Add(Row("rejected", "gtfo.enemy.receiver_changed_during_commit", before)); rejected++; continue; }',
+         '{ rows.Add(Row("unknown", "receiver-changed-during-commit", before)); commitFailed = true; }',
+         '{ rows.Add(Row("rejected", "receiver-changed-during-commit", before)); rejected++; continue; }',
          'E3-001.receiver-changed-commit'),
         ('readback-none',
-         '{ rows.Add(Row("unknown", "gtfo.enemy.unexpected_health_readback", before)); commitFailed = true; }',
-         '{ rows.Add(Row("rejected", "gtfo.enemy.unexpected_health_readback", before)); rejected++; continue; }',
+         '{ rows.Add(Row("unknown", "unexpected-health-readback", before)); commitFailed = true; }',
+         '{ rows.Add(Row("rejected", "unexpected-health-readback", before)); rejected++; continue; }',
          'E3-002.invalid-readback-commit'),
         ('exception-none',
-         '{ rows.Add(Row("unknown", "gtfo.enemy.native_commit_exception", before)); commitFailed = true; }',
-         '{ rows.Add(Row("rejected", "gtfo.enemy.native_commit_exception", before)); rejected++; continue; }',
+         'catch (Exception) { rows.Add(Row("unknown", "native-commit-exception", before)); commitFailed = true; committing = false; }',
+         'catch (Exception) { rows.Add(Row("rejected", "native-commit-exception", before)); rejected++; continue; }',
          'commit.throw-after-write'),
         # A late callback re-targeted to whatever life currently holds the GlobalID (the old-life guard removed).
         ('late-damage-retargeted', 'var entry = Resolve(before.Target);',

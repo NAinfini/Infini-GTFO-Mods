@@ -77,7 +77,12 @@ internal static class RuntimeGraphContracts
     internal static bool Many(JsonElement port) => Cardinality(port) == "many";
     /// <summary>Full value contract equality, used by repeated ports and by plan input wiring.</summary>
     internal static bool SameValue(JsonElement a, JsonElement b)
-        => RuntimeJson.Text(a, "type") == RuntimeJson.Text(b, "type") && Cardinality(a) == Cardinality(b)
+        => ValueTypeMatches(a, b) && Cardinality(a) == Cardinality(b);
+    /// <summary>Value contract equality ignoring cardinality (J-003/D-006②): a wired plan input may pair a
+    /// non-nullable "one" output with a "many" input, wrapped into a one-element collection at dispatch.
+    /// Every other dimension must still match exactly.</summary>
+    internal static bool ValueTypeMatches(JsonElement a, JsonElement b)
+        => RuntimeJson.Text(a, "type") == RuntimeJson.Text(b, "type")
            && new[] { "schema", "unit", "resourceKind", "handleKind", "lifetime" }.All(key => Optional(a, key) == Optional(b, key));
 
     internal static void ValidatePort(JsonElement port, string id)

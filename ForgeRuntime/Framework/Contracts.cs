@@ -221,8 +221,9 @@ internal static class CommandResultRules
                 if (result.CommitState != CommitStates.Confirmed) { violation = "succeeded-requires-confirmed"; return false; }
                 return true;
             case CommandStatuses.Partial:
+                // r11: partial no longer requires a known commit (facts may be empty) — it branches on whether any
+                // row committed at all, not on fact count.
                 if (result.CommitState is not (CommitStates.Confirmed or CommitStates.Unknown)) { violation = "partial-commit-state"; return false; }
-                if (result.Facts.Count == 0) { violation = "partial-requires-known-commit"; return false; }
                 return true;
             case CommandStatuses.Rejected:
             case CommandStatuses.Cancelled:

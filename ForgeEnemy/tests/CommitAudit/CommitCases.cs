@@ -16,17 +16,17 @@ internal static class CommitCases
             Audit.Require(s.Actor.Damage.Health == 52 && AuditScene.Row(r).GetProperty("actualAmount").GetDouble() == 2
                 && AuditScene.Row(r).GetProperty("overflowAmount").GetDouble() == 3, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.invalid-cap-rejected", () => { var s = new AuditScene(); var r = s.Heal(cap: 0);
-            Audit.Require(r.Status == "rejected" && r.Code == "gtfo.enemy.invalid_cap" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
+            Audit.Require(r.Status == "rejected" && r.Code == "invalid-cap" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.discard-would-overheal", () => { var s = new AuditScene(); s.Actor.Damage.Health = 99;
             var r = s.Heal(policy: "discard");
-            Audit.Require(r.Status == "rejected" && r.Code == "gtfo.enemy.would_overheal" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
+            Audit.Require(r.Status == "rejected" && r.Code == "would-overheal" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.discard-fits-commits", () => { var s = new AuditScene(); s.Actor.Damage.Health = 90;
             var r = s.Heal(policy: "discard");
             Audit.Require(r.Status == "succeeded" && s.Actor.Damage.Health == 95, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.overheal-unsupported", () => { var s = new AuditScene(); var r = s.Heal(policy: "overheal");
-            Audit.Require(r.Status == "rejected" && r.Code == "gtfo.enemy.overheal_unsupported" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
+            Audit.Require(r.Status == "rejected" && r.Code == "overheal-unsupported" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.dead-no-revive", () => { var s = new AuditScene(); s.Actor.Alive = false; s.Actor.Damage.Health = 0; var r = s.Heal();
-            Audit.Require(r.Code == "gtfo.enemy.not_alive" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
+            Audit.Require(r.Code == "not-alive" && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.initial-client", () => { var s = new AuditScene(); SNet.IsMaster = false; var r = s.Heal();
             Audit.Require(r.CommitState == CommitStates.None && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
         Audit.Case("heal.removed-after-submit", () => { var s = new AuditScene(); var d = s.Actor.Damage;
@@ -52,31 +52,28 @@ internal static class CommitCases
             SFloat16.Preview = (v, _) => { s.Actor.Damage.Health = 90; return v; }; var r = s.Heal();
             Audit.Require(r.CommitState == CommitStates.None && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
 
-        // A full-health target commits with actual==0 and produces no fact; combined with a rejected target and
-        // no unknown outcome, no target's HP actually changed, so the handler must report Rejected/None with a
-        // dedicated code instead of a factless Partial (which RuntimeKernel.NormalizeInvokedResult would otherwise
-        // rewrite into a fabricated FailedUnknown("invalid-handler-result")).
-        Audit.Case("heal.multi-full-and-rejected-is-no-state-change", () =>
+        // r11: a full-health target commits with actual==0 and produces no fact; combined with a rejected target,
+        // at least one row still committed, so the handler reports Partial/Confirmed with possibly-empty facts,
+        // not Rejected/None (the deleted heal-no-state-change code no longer exists).
+        Audit.Case("heal.multi-full-and-rejected-is-partial-confirmed", () =>
         {
             var s = new AuditScene(); s.Actor.Damage.Health = 100;
             var (second, secondRef) = s.SpawnActor();
             second.Alive = false; second.Damage.Health = 0;
             var r = s.Heal(new[] { s.Reference, secondRef });
-            Audit.Require(r.Status == "rejected" && r.CommitState == CommitStates.None
-                && r.Code == "gtfo.enemy.heal_no_state_change" && r.Facts.Count == 0
-                && AuditScene.Rows(r).Length == 2, AuditScene.Describe(r, s.Actor.Damage.Sends));
+            Audit.Require(r.Status == "partial" && r.CommitState == CommitStates.Confirmed
+                && r.Facts.Count == 0 && AuditScene.Rows(r).Length == 2, AuditScene.Describe(r, s.Actor.Damage.Sends));
         });
-        // A full-health target contributes no fact; combined with a target whose commit becomes unknown, the
-        // handler must explicitly return Failed/Unknown rather than an invalid factless Partial/Unknown.
-        Audit.Case("heal.multi-full-and-unknown-is-failed", () =>
+        // r11: a full-health target contributes no fact; combined with a target whose commit becomes unknown, at
+        // least one row still committed, so the handler reports Partial/Unknown rather than Failed/Unknown.
+        Audit.Case("heal.multi-full-and-unknown-is-partial-unknown", () =>
         {
             var s = new AuditScene(); s.Actor.Damage.Health = 100;
             var (second, secondRef) = s.SpawnActor();
             second.Damage.Commit = _ => throw new IOException("synthetic commit exception");
             var r = s.Heal(new[] { s.Reference, secondRef });
-            Audit.Require(r.Status == "failed" && r.CommitState == CommitStates.Unknown
-                && r.Code == "gtfo.enemy.heal_all_unknown" && r.Facts.Count == 0
-                && AuditScene.Rows(r).Length == 2, AuditScene.Describe(r, s.Actor.Damage.Sends));
+            Audit.Require(r.Status == "partial" && r.CommitState == CommitStates.Unknown
+                && r.Facts.Count == 0 && AuditScene.Rows(r).Length == 2, AuditScene.Describe(r, s.Actor.Damage.Sends));
         });
         // Exhaustive coverage: for every combination of two targets' outcomes (full health / damageable /
         // dead-rejected / commit-throws-unknown), the raw handler result must independently satisfy

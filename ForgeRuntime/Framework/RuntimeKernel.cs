@@ -393,8 +393,17 @@ public sealed partial class RuntimeKernel
                             var merged = step.Promoted.Count == 0 ? null : step.Parameters.EnumerateObject().ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
                             foreach (var input in step.Inputs)
                             {
-                                if (!pending.Event.Outputs.TryGetProperty(input.EventPort, out var value)) continue;
-                                RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port);
+                                JsonElement value;
+                                if (input.Literal is { } literal) value = literal;
+                                else
+                                {
+                                    if (!pending.Event.Outputs.TryGetProperty(input.EventPort!, out value)) continue;
+                                    RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port);
+                                    // D-006②: a non-nullable "one" output wired into a "many" input was validated above
+                                    // against its own (origin) cardinality; wrap it into the one-element collection the
+                                    // "many" input expects only now, after that validation has passed.
+                                    if (input.Wrap) value = RuntimeJson.From(new[] { value });
+                                }
                                 // A promoted value stays a compiled index until the re-validation below runs on indices
                                 // throughout; a genuine action input has no further index-based check, so it resolves now.
                                 if (merged != null && step.Promoted.Contains(input.Name)) merged.Add(input.Name, value);
@@ -428,7 +437,11 @@ public sealed partial class RuntimeKernel
                             ? CommandResult.FailedUnknown("null-result", "Handler returned null after invocation.")
                             : CommandResult.Rejected("precondition-failed", "Precondition failed before handler invocation."));
                         commands.Add(new CommandReceipt(commandId, pending.Event.EventId, pending.Event.CauseId, pending.Event.RootEventId ?? pending.Event.EventId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, step.BindingId, WorldEpoch, simulationTick, commandResult));
-                        if (commandResult.Status != CommandStatuses.Succeeded) break;
+                        // r11: entrypoint execution only stops on rejected/failed/cancelled/expired, or on a
+                        // partial result with an unknown commit state; a confirmed-commit partial continues.
+                        if (commandResult.Status != CommandStatuses.Succeeded
+                            && !(commandResult.Status == CommandStatuses.Partial && commandResult.CommitState == CommitStates.Confirmed))
+                            break;
                     }
                 }
                 if (pending.Schedule != null && pending.Schedule.Handle.Status == "active" && pending.Schedule.Index >= pending.Schedule.TotalPulses)

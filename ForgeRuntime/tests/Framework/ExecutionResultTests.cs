@@ -46,6 +46,12 @@ internal static class ExecutionResultTests
         Check(partialUnknown.Status == CommandStatuses.Partial && partialUnknown.CommitState == CommitStates.Unknown && partialUnknown.Facts.Count == 1
             && CommandResultRules.TryValidate(partialUnknown, out _), "partial is valid with unknown completion and a known fact");
 
+        // r11: partial only requires a known commit (confirmed or unknown); facts may be empty when no row produced one.
+        var partialConfirmedNoFacts = CommandResult.Create(CommandStatuses.Partial, CommitStates.Confirmed, "test.partial", "", RuntimeJson.EmptyObject, Array.Empty<RuntimeFact>());
+        var partialUnknownNoFacts = CommandResult.Create(CommandStatuses.Partial, CommitStates.Unknown, "test.partial", "", RuntimeJson.EmptyObject, Array.Empty<RuntimeFact>());
+        Check(CommandResultRules.TryValidate(partialConfirmedNoFacts, out _), "partial with a confirmed commit may have no facts");
+        Check(CommandResultRules.TryValidate(partialUnknownNoFacts, out _), "partial with an unknown commit may have no facts");
+
         var rejected = CommandResult.Rejected("test.rejected");
         var failed = CommandResult.Failed("test.failed");
         var failedUnknown = CommandResult.FailedUnknown("test.failed_unknown");
@@ -65,8 +71,6 @@ internal static class ExecutionResultTests
         CheckInvalid(CommandStatuses.Succeeded, CommitStates.None, Array.Empty<RuntimeFact>(), "succeeded+none is invalid");
         CheckInvalid(CommandStatuses.Succeeded, CommitStates.Unknown, Array.Empty<RuntimeFact>(), "succeeded+unknown is invalid");
         CheckInvalid(CommandStatuses.Partial, CommitStates.None, new[] { fact }, "partial+none is invalid");
-        CheckInvalid(CommandStatuses.Partial, CommitStates.Confirmed, Array.Empty<RuntimeFact>(), "partial without a known commit is invalid");
-        CheckInvalid(CommandStatuses.Partial, CommitStates.Unknown, Array.Empty<RuntimeFact>(), "partial+unknown without a known commit is invalid");
         CheckInvalid(CommandStatuses.Rejected, CommitStates.Confirmed, Array.Empty<RuntimeFact>(), "rejected+confirmed is invalid");
         CheckInvalid(CommandStatuses.Rejected, CommitStates.None, new[] { fact }, "rejected facts are invalid");
         CheckInvalid(CommandStatuses.Cancelled, CommitStates.Unknown, Array.Empty<RuntimeFact>(), "cancelled+unknown is invalid");
@@ -108,11 +112,11 @@ internal static class ExecutionResultTests
             s.Plan("partial-plan", "example.alpha", steps: 2);
             a.Publish(s.Event("partial-event", "example.alpha"));
             var tick = s.Kernel.Advance(1, true);
-            Check(calls == 1 && tick.CommandsExecuted == 1 && tick.Commands.Count == 1, "partial stops the entrypoint after its invoked step");
-            var partialResult = tick.Commands[0].Result;
-            Check(partialResult.Status == CommandStatuses.Partial && partialResult.CommitState == CommitStates.Confirmed && partialResult.Facts.Count == 1,
-                "partial carries its confirmed fact evidence");
-            Check(tick.DeferredEvents == 1 && s.Kernel.QueuedEvents == 1, "partial publishes its confirmed facts before stopping");
+            // r11: a confirmed-commit partial does not stop the entrypoint, so both steps run.
+            Check(calls == 2 && tick.CommandsExecuted == 2 && tick.Commands.Count == 2, "confirmed-commit partial does not stop the entrypoint");
+            Check(tick.Commands.All(c => c.Result.Status == CommandStatuses.Partial && c.Result.CommitState == CommitStates.Confirmed && c.Result.Facts.Count == 1),
+                "each step's partial carries its confirmed fact evidence");
+            Check(tick.DeferredEvents == 2 && s.Kernel.QueuedEvents == 2, "partial publishes its confirmed facts and continues to the next step");
         }
 
         {

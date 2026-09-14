@@ -127,13 +127,13 @@ Case("health.no-revive", () =>
 {
     var dead = Scene(); dead.Enemy.Alive = false; dead.Enemy.Damage.Health = 0;
     var deadResult = Heal(dead.Module, dead.Ref);
-    return (deadResult.Code == "gtfo.enemy.not_alive" && dead.Enemy.Damage.Sends == 0, "Healing cannot implicitly revive.", deadResult.Code);
+    return (deadResult.Code == "not-alive" && dead.Enemy.Damage.Sends == 0, "Healing cannot implicitly revive.", deadResult.Code);
 });
 Case("health.missing-receiver", () =>
 {
     var missing = Scene(); missing.Enemy.Damage.IsSetup = false;
     var missingResult = Heal(missing.Module, missing.Ref);
-    return (missingResult.Code == "gtfo.enemy.missing_health_receiver" && missing.Enemy.Damage.Sends == 0,
+    return (missingResult.Code == "missing-health-receiver" && missing.Enemy.Damage.Sends == 0,
         "Uninitialized receiver is rejected without a packet.", missingResult.Code);
 });
 Case("health.quantization", () =>
@@ -147,7 +147,7 @@ Case("health.host-authority", () =>
 {
     var client = Scene(); SNet.IsMaster = false;
     var clientResult = Heal(client.Module, client.Ref);
-    return (clientResult.Code == "gtfo.enemy.authority_or_phase" && client.Enemy.Damage.Sends == 0, "A client cannot submit native healing.", clientResult.Code);
+    return (clientResult.Code == "authority-or-phase" && client.Enemy.Damage.Sends == 0, "A client cannot submit native healing.", clientResult.Code);
 });
 Case("commit.throw-before-readback", () =>
 {
@@ -326,14 +326,14 @@ Case("commit.preparation-failure", () =>
 {
     var prepare = Scene(); SFloat16.Preview = (_, _) => throw new InvalidOperationException("quantizer");
     var prepareResult = Heal(prepare.Module, prepare.Ref); SFloat16.Preview = (value, _) => value;
-    return (prepareResult.CommitState == CommitStates.None && prepareResult.Code == "gtfo.enemy.quantization_failed"
+    return (prepareResult.CommitState == CommitStates.None && prepareResult.Code == "quantization-failed"
         && prepare.Enemy.Damage.Sends == 0, "Failures before submission are known uncommitted.", prepareResult.Code);
 });
 Case("health.owner-mismatch", () =>
 {
     var wrongOwner = Scene(); wrongOwner.Enemy.Damage.Owner = Enemy(20);
     var wrongOwnerResult = Heal(wrongOwner.Module, wrongOwner.Ref);
-    return (wrongOwnerResult.Code == "gtfo.enemy.health_receiver_owner_mismatch" && wrongOwner.Enemy.Damage.Sends == 0,
+    return (wrongOwnerResult.Code == "health-receiver-owner-mismatch" && wrongOwner.Enemy.Damage.Sends == 0,
         "A mismatched receiver owner is rejected before native submission.", wrongOwnerResult.Code);
 });
 Case("commit.owner-changed", () =>

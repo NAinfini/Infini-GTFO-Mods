@@ -6,8 +6,12 @@ using System.Text.RegularExpressions;
 
 namespace ForgeRuntime.Framework;
 
-/// <summary>One wired action input. The plan names both ends by frame slot; names are resolved once at load.</summary>
-internal sealed record StepInput(string Name, string EventPort, JsonElement Port);
+/// <summary>One resolved action input, either wired to an event output by frame slot or a plan-authored literal
+/// (J-003/D-006①). <see cref="Port"/> is the wire-side value contract used to validate the value at dispatch:
+/// the origin event port when wired (so a one→many wrap validates the raw single value before wrapping), or the
+/// literal's own value when authored as a constant. <see cref="Wrap"/> marks a non-nullable "one" output wired
+/// into a "many" input (D-006②): dispatch wraps the validated value into a one-element collection.</summary>
+internal sealed record StepInput(string Name, string? EventPort, JsonElement? Literal, bool Wrap, JsonElement Port);
 /// <summary>Promoted names are parameters whose value arrives through an input; dispatch merges and revalidates them.</summary>
 internal sealed record ResolvedStep(string NodeId, string BindingId, JsonElement Parameters, IReadOnlyList<StepInput> Inputs, IReadOnlySet<string> Promoted);
 internal sealed record ResolvedEntry(string NodeId, string BindingId, IReadOnlyList<ResolvedStep> Steps);
@@ -163,17 +167,40 @@ internal static class RuntimePlan
                 var inputs = new List<StepInput>(); var previous = -1;
                 foreach (var source in RuntimeJson.Rows(step, "inputs", targets.Length))
                 {
-                    RuntimeJson.Shape(source, "slot fromEventSlot");
+                    // The key set alone decides the source kind (J-003): a row carrying both is refused outright,
+                    // never treated as either shape. Everything else keeps the original two-field row check.
+                    RuntimeJson.Require(source.ValueKind == JsonValueKind.Object, "object-required", node.Id);
+                    var literal = source.TryGetProperty("value", out var literalValue);
+                    RuntimeJson.Require(!literal || !source.TryGetProperty("fromEventSlot", out _), "literal-with-event-source", node.Id);
+                    RuntimeJson.Shape(source, literal ? "slot value" : "slot fromEventSlot");
                     var slot = Slot(source.GetProperty("slot"), targets.Length, "input-slot", node.Id);
-                    var eventSlot = Slot(source.GetProperty("fromEventSlot"), eventPorts.Length, "event-port-missing", node.Id);
                     // Sorted and strictly increasing: one driver per input, one canonical spelling per plan.
                     RuntimeJson.Require(slot > previous, "input-order", node.Id); previous = slot;
-                    var target = targets[slot]; var origin = eventPorts[eventSlot]; var name = RuntimeJson.Text(target, "id");
-                    RuntimeJson.Require(RuntimeJson.Text(target, "type") != "execution" && RuntimeJson.Text(origin, "type") != "execution", "execution-slot", node.Id + "." + name);
-                    RuntimeJson.Require(RuntimeGraphContracts.SameValue(origin, target), "port-mismatch", node.Id + "." + name);
-                    RuntimeJson.Require(!RuntimeJson.Flag(origin, "nullable") || RuntimeJson.Flag(target, "nullable"), "nullable-port", node.Id + "." + name);
-                    RuntimeJson.Require(!RuntimeJson.Flag(origin, "optional") || RuntimeJson.Flag(target, "optional"), "optional-event-port", node.Id + "." + name);
-                    inputs.Add(new StepInput(name, RuntimeJson.Text(origin, "id"), target));
+                    var target = targets[slot]; var name = RuntimeJson.Text(target, "id");
+                    RuntimeJson.Require(RuntimeJson.Text(target, "type") != "execution", "execution-slot", node.Id + "." + name);
+                    if (literal)
+                    {
+                        // D-006①: literals never target entity/resource/handle/event/result ports (the last four are
+                        // already excluded upstream as unsupported input ports); entity is excluded here explicitly.
+                        RuntimeJson.Require(RuntimeJson.Text(target, "type") != "entity", "literal-wrong-type", node.Id + "." + name);
+                        try { RuntimeJson.ValidateValue(literalValue, target); }
+                        catch (RuntimeContractException) { throw new RuntimeContractException("literal-wrong-type", node.Id + "." + name); }
+                        inputs.Add(new StepInput(name, null, literalValue, false, target));
+                    }
+                    else
+                    {
+                        var eventSlot = Slot(source.GetProperty("fromEventSlot"), eventPorts.Length, "event-port-missing", node.Id);
+                        var origin = eventPorts[eventSlot];
+                        RuntimeJson.Require(RuntimeJson.Text(origin, "type") != "execution", "execution-slot", node.Id + "." + name);
+                        RuntimeJson.Require(RuntimeGraphContracts.ValueTypeMatches(origin, target), "port-mismatch", node.Id + "." + name);
+                        // D-006②: a non-nullable "one" output may wire into a "many" input; dispatch wraps it into a
+                        // one-element collection. A nullable "one" cannot feed "many", and "many" can never feed "one".
+                        var wrap = !RuntimeGraphContracts.Many(origin) && RuntimeGraphContracts.Many(target) && !RuntimeJson.Flag(origin, "nullable");
+                        RuntimeJson.Require(RuntimeGraphContracts.Many(origin) == RuntimeGraphContracts.Many(target) || wrap, "port-mismatch", node.Id + "." + name);
+                        RuntimeJson.Require(!RuntimeJson.Flag(origin, "nullable") || RuntimeJson.Flag(target, "nullable"), "nullable-port", node.Id + "." + name);
+                        RuntimeJson.Require(!RuntimeJson.Flag(origin, "optional") || RuntimeJson.Flag(target, "optional"), "optional-event-port", node.Id + "." + name);
+                        inputs.Add(new StepInput(name, RuntimeJson.Text(origin, "id"), null, wrap, origin));
+                    }
                 }
                 foreach (var target in targets.Where(p => RuntimeJson.Text(p, "type") != "execution" && !RuntimeJson.Flag(p, "optional")))
                     RuntimeJson.Require(inputs.Any(i => i.Name == RuntimeJson.Text(target, "id")), "missing-input", node.Id + "." + RuntimeJson.Text(target, "id"));

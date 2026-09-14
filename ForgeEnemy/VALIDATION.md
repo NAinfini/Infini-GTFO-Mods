@@ -1,6 +1,6 @@
 # ForgeEnemy 验证记录
 
-**上次更新：2026-09-13**（E2 批次；本文件合并自原 E1-BOUNDARY-HANDOFF、E1-NATIVE-CUTOVER、E1-PLUGIN-LIFETIME-SAFETY、E1-R3-INTEGRATION、E2-DELIVERY、E2-OBSERVATION-HANDOFF、E23-CONTINUATION、E3-LIFECYCLE-FACTS、E3-SAFETY-HANDOFF 九份交接记录）。
+**上次更新：2026-09-14**（E2 批次；本文件合并自原 E1-BOUNDARY-HANDOFF、E1-NATIVE-CUTOVER、E1-PLUGIN-LIFETIME-SAFETY、E1-R3-INTEGRATION、E2-DELIVERY、E2-OBSERVATION-HANDOFF、E23-CONTINUATION、E3-LIFECYCLE-FACTS、E3-SAFETY-HANDOFF 九份交接记录）。
 
 ## 当前结论
 
@@ -32,6 +32,22 @@ R4（运行时枚举值端口，见下方阻塞项表）落地后，ReceiverProb
 | 架构 / Framework | 36 / 253 | **本批未重跑**，保留此前记录；属于 Runtime |
 
 `ForgeEnemy.Native` 与完整宿主的零警告结果单独记录。Trigger 的测试工程构建有 3 条 NETSDK1138 目标框架提示，0 错误；本仓库没有切换目标框架。
+
+## r11 heal 结果聚合与 21 码改名（2026-09-14）
+
+`Native/EnemyModule.cs` 的 `Heal` 与 `Receivers/EnemyHealthCommit.cs` 的 `Execute` 全部 21 个拒绝码改成 `CombatContracts.cs` 已提交的 kebab-case 形式（如 `gtfo.enemy.overheal_unsupported` → `overheal-unsupported`），删除 `heal-no-state-change`；最终聚合按"有无 committed 行"重写而不是按 `unknown==0`/`facts.Count==0`：≥1 行 committed 且存在 rejected/unknown 时报 Partial（commitState 视是否有 unknown 行取 unknown/confirmed，facts 可为空）；0 committed 只剩 rejected 时报 Rejected/None；0 committed 有 unknown 时报 Failed/Unknown。随动改了 `CommitCases.cs`（两个用例改名并重写为 `-is-partial-confirmed`/`-is-partial-unknown`）、`AuditScene.cs`、`verify_mutations.py`（三处 mutation 字符串同步改名，`exception-none` 改指向 `EnemyModule.cs` 新的第一个 catch 块）、`GameBindings/Program.cs`、`ReceiverProbe/Program.cs` 的对应码字符串断言。
+
+隔离构建，SDK 与三个测试工程 0 警告 0 错误：
+
+| 套件 | 结果 |
+| --- | --- |
+| CommitAudit | 68/68，BLOCKED 0 |
+| ReceiverProbe | 43/44，BLOCKED 1（`commit.kernel-unknown-no-retry`，见下方阻塞项表） |
+| ReceiverProbe `verify_mutations.py` | baseline + 8 个 mutant 全部按预期检出，0 failed |
+| LifecycleFacts | 50/52，BLOCKED 2（`integration.real-heal-death_started`、`integration.real-heal-limb_broken`，见下方阻塞项表） |
+| LifecycleFacts `verify_mutations.py` | baseline + 7 个 mutant 全部按预期检出 |
+
+**上表三个 BLOCKED 用例本批未解除**，尽管 Runtime 侧的 J-003（字面量/单转多输入加载）本批已经落地并经 `ForgeRuntime/tests/Framework --fixtures`（27 个站内负例逐条核对）与本表 CommitAudit 验证。根因是 `ForgeEnemy/tests/Shared/Blockers.cs` 的 `Heal` 常量在 `ReceiverProbe/Program.cs`、`LifecycleFacts` 里被无条件引用为阻塞，不读取任何运行时状态，文本仍写"J-003 未实现"。真正解除需要新写用 `LocalPlan` 从内核注册表构造 事实→Heal 计划并恢复 +5HP 断言（即下表"解除条件"一栏所写的工作），属于新增测试基础设施而不是简单改名，不在本次 J-003 loader 实现范围内，留作后续修复项。
 
 ## 阻塞项与解除条件
 

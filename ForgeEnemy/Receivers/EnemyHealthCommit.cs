@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using ForgeRuntime.Framework;
 
@@ -46,11 +47,11 @@ internal sealed class EnemyHealthCommit : EnemyThreadBoundary
     {
         CheckThread(); ArgumentNullException.ThrowIfNull(targets);
         if (!double.IsFinite(requested) || requested < MinimumAmount || requested > MaximumAmount)
-            return CommandResult.Rejected("gtfo.enemy.amount_out_of_range");
+            return CommandResult.Rejected("amount-out-of-range");
         if (cap.HasValue && (!double.IsFinite(cap.Value) || cap.Value <= 0))
-            return CommandResult.Rejected("gtfo.enemy.invalid_cap");
+            return CommandResult.Rejected("invalid-cap");
         // A fully successful heal publishes one fact per target; the command result budget caps at 128.
-        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected("gtfo.enemy.too_many_targets");
+        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected("too-many-targets");
 
         var rows = new List<HealRow>(targets.Length);
         var facts = new List<RuntimeFact>();
@@ -61,46 +62,46 @@ internal sealed class EnemyHealthCommit : EnemyThreadBoundary
             HealRow Row(string status, string code, float? before = null, float? after = null, double? actual = null, double? overflow = null)
                 => new(target, status, code, requested, actual, before, after, overflow);
 
-            if (stopCommitting) { rows.Add(Row("rejected", "gtfo.enemy.not_attempted_after_unknown_commit")); rejected++; continue; }
+            if (stopCommitting) { rows.Add(Row("rejected", "not-attempted-after-unknown-commit")); rejected++; continue; }
 
             EnemyHealthSnapshot before;
             float desired, quantized;
             double overflowAmount;
             try
             {
-                if (!_canExecute()) { rows.Add(Row("rejected", "gtfo.enemy.authority_or_phase")); rejected++; continue; }
+                if (!_canExecute()) { rows.Add(Row("rejected", "authority-or-phase")); rejected++; continue; }
                 var state = _read(target);
                 if (state == null || state.Target != target)
-                { rows.Add(Row("rejected", "gtfo.enemy.stale_or_unsupported_recipient")); rejected++; continue; }
+                { rows.Add(Row("rejected", "stale-or-unsupported-recipient")); rejected++; continue; }
                 before = state;
                 if (!before.IsSetup || before.Receiver == IntPtr.Zero)
-                { rows.Add(Row("rejected", "gtfo.enemy.missing_health_receiver", before.Health)); rejected++; continue; }
+                { rows.Add(Row("rejected", "missing-health-receiver", before.Health)); rejected++; continue; }
                 if (!float.IsFinite(before.Health) || !float.IsFinite(before.Maximum)
                     || before.Maximum <= 0 || before.Health > before.Maximum)
-                { rows.Add(Row("rejected", "gtfo.enemy.invalid_health_state", before.Health)); rejected++; continue; }
+                { rows.Add(Row("rejected", "invalid-health-state", before.Health)); rejected++; continue; }
                 if (!before.Alive || before.Health <= 0)
-                { rows.Add(Row("rejected", "gtfo.enemy.not_alive", before.Health)); rejected++; continue; }
+                { rows.Add(Row("rejected", "not-alive", before.Health)); rejected++; continue; }
                 double effectiveCap = cap.HasValue ? Math.Min(before.Maximum, cap.Value) : before.Maximum;
                 double desiredUncapped = (double)before.Health + requested;
                 overflowAmount = Math.Max(0, desiredUncapped - effectiveCap);
                 if (desiredUncapped > effectiveCap && discardOnOverflow)
-                { rows.Add(Row("rejected", "gtfo.enemy.would_overheal", before.Health, overflow: overflowAmount)); rejected++; continue; }
+                { rows.Add(Row("rejected", "would-overheal", before.Health, overflow: overflowAmount)); rejected++; continue; }
                 desired = (float)Math.Max(before.Health, Math.Min(effectiveCap, desiredUncapped));
                 quantized = _quantize(desired, before.Maximum);
                 if (!float.IsFinite(quantized) || quantized < 0 || quantized > before.Maximum)
-                { rows.Add(Row("rejected", "gtfo.enemy.invalid_native_quantization", before.Health, overflow: overflowAmount)); rejected++; continue; }
+                { rows.Add(Row("rejected", "quantization-failed", before.Health, overflow: overflowAmount)); rejected++; continue; }
                 // Quantization/native getters can re-enter other mods. Never send a stale absolute HP value.
                 if (!_canExecute())
-                { rows.Add(Row("rejected", "gtfo.enemy.authority_or_phase", before.Health, overflow: overflowAmount)); rejected++; continue; }
+                { rows.Add(Row("rejected", "authority-or-phase", before.Health, overflow: overflowAmount)); rejected++; continue; }
                 if (_read(target) != before)
-                { rows.Add(Row("rejected", "gtfo.enemy.state_changed_before_commit", before.Health, overflow: overflowAmount)); rejected++; continue; }
+                { rows.Add(Row("rejected", "state-changed-before-commit", before.Health, overflow: overflowAmount)); rejected++; continue; }
                 if (!_canExecute())
-                { rows.Add(Row("rejected", "gtfo.enemy.authority_or_phase", before.Health, overflow: overflowAmount)); rejected++; continue; }
+                { rows.Add(Row("rejected", "authority-or-phase", before.Health, overflow: overflowAmount)); rejected++; continue; }
             }
             catch (Exception)
             {
                 // No SendSetHealth call has occurred; this is known uncommitted, not an unknown commit.
-                rows.Add(Row("rejected", "gtfo.enemy.preflight_exception")); rejected++; continue;
+                rows.Add(Row("rejected", "preflight-exception")); rejected++; continue;
             }
 
             if (desired <= before.Health || quantized <= before.Health)
@@ -109,11 +110,12 @@ internal sealed class EnemyHealthCommit : EnemyThreadBoundary
                 committed++; continue;
             }
 
-            // Crossing this boundary means a packet or local mutation may already have occurred.
+            // Crossing this boundary means a packet or local mutation may already have occurred. Submission and
+            // readback failures are distinct catalog codes, so each gets its own try/catch.
             try { _submit(before, desired); }
             catch (Exception)
             {
-                rows.Add(Row("unknown", "gtfo.enemy.native_submit_exception", before.Health, overflow: overflowAmount));
+                rows.Add(Row("unknown", "native-commit-exception", before.Health, overflow: overflowAmount));
                 unknown++; stopCommitting = true; continue;
             }
             try
@@ -121,10 +123,10 @@ internal sealed class EnemyHealthCommit : EnemyThreadBoundary
                 var after = _read(target);
                 if (after == null || after.Target != target || after.Receiver != before.Receiver
                     || !after.IsSetup || !after.Alive)
-                { rows.Add(Row("unknown", "gtfo.enemy.receiver_changed_during_commit", before.Health, overflow: overflowAmount)); unknown++; stopCommitting = true; continue; }
+                { rows.Add(Row("unknown", "receiver-changed-during-commit", before.Health, overflow: overflowAmount)); unknown++; stopCommitting = true; continue; }
                 if (after.Maximum != before.Maximum || !float.IsFinite(after.Health)
                     || after.Health < before.Health || after.Health > before.Maximum)
-                { rows.Add(Row("unknown", "gtfo.enemy.unexpected_health_readback", before.Health, overflow: overflowAmount)); unknown++; stopCommitting = true; continue; }
+                { rows.Add(Row("unknown", "unexpected-health-readback", before.Health, overflow: overflowAmount)); unknown++; stopCommitting = true; continue; }
                 double actual = (double)after.Health - before.Health;
                 rows.Add(Row("committed", "committed", before.Health, after.Health, actual, overflowAmount));
                 committed++;
@@ -133,34 +135,24 @@ internal sealed class EnemyHealthCommit : EnemyThreadBoundary
             }
             catch (Exception)
             {
-                rows.Add(Row("unknown", "gtfo.enemy.readback_exception", before.Health, overflow: overflowAmount));
+                rows.Add(Row("unknown", "readback-exception", before.Health, overflow: overflowAmount));
                 unknown++; stopCommitting = true;
             }
         }
 
         var outputs = Envelope(rows);
-        // The handler must always construct a CommandResult that CommandResultRules.TryValidate accepts on its
-        // own, for every combination of per-target outcomes. In particular, a mix of rejected targets and
-        // committed-but-zero-delta targets (e.g. a target already at full health) produces no facts even though
-        // nothing was rejected due to an unknown commit; that case is Rejected/None below, not a factless Partial.
+        // r11: aggregation branches on whether any row committed, not on unknown==0/facts.Count==0. A committed
+        // row (including zero-delta) alongside a rejected or unknown row is Partial with possibly-empty facts.
         if (rejected == 0 && unknown == 0) return CommandResult.Succeeded(outputs, facts.ToArray());
+        if (committed > 0) return CommandResult.Partial(outputs, unknown > 0 ? CommitStates.Unknown : CommitStates.Confirmed, facts.ToArray());
         if (unknown == 0)
         {
-            if (facts.Count == 0)
-            {
-                // No target's HP actually changed: either every target was rejected outright, or the
-                // committed targets all landed with zero effective delta (e.g. already at full health).
-                string code = committed == 0
-                    ? (rows.Count == 1 ? rows[0].Code : "gtfo.enemy.heal_all_rejected")
-                    : "gtfo.enemy.heal_no_state_change";
-                return CommandResult.Create(CommandStatuses.Rejected, CommitStates.None, code, "", outputs);
-            }
-            return CommandResult.Partial(outputs, CommitStates.Confirmed, facts.ToArray());
+            string code = rows.Count == 1 ? rows[0].Code
+                : rows.Select(r => r.Code).Distinct().Count() == 1 ? rows[0].Code : "heal-all-rejected";
+            return CommandResult.Create(CommandStatuses.Rejected, CommitStates.None, code, "", outputs);
         }
-        if (facts.Count == 0)
-            return CommandResult.Create(CommandStatuses.Failed, CommitStates.Unknown,
-                rows.Count == 1 ? rows[0].Code : "gtfo.enemy.heal_all_unknown", "", outputs, facts.ToArray());
-        return CommandResult.Partial(outputs, CommitStates.Unknown, facts.ToArray());
+        return CommandResult.Create(CommandStatuses.Failed, CommitStates.Unknown,
+            rows.Count == 1 ? rows[0].Code : "heal-all-unknown", "", outputs, facts.ToArray());
     }
 
     private static JsonElement Envelope(IReadOnlyList<HealRow> rows) => RuntimeJson.From(new { results = rows });
