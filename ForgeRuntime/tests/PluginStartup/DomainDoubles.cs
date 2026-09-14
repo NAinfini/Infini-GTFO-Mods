@@ -6,11 +6,10 @@ namespace ForgeRuntime.GameBindings
     {
         internal static RuntimeKernel? Kernel { get; set; }
         internal static bool CanExecute => Kernel != null;
-        internal static string? Plan, Grants;
         internal static RuntimeLogLevel? LogLevel;
-        internal static void Initialize(string plan, string grants, RuntimeLogLevel logLevel)
+        internal static void Initialize(RuntimeLogLevel logLevel)
         {
-            Plan = plan; Grants = grants; LogLevel = logLevel;
+            LogLevel = logLevel;
             Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "bootstrap-double"));
             Kernel.BeginWorld(1); Probe.Call("host:init");
         }

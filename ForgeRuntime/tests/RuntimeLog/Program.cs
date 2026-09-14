@@ -278,6 +278,30 @@ Case("valid UTF-8 JSONL without BOM or CR", () => {
     Check(Text(lines[1], "message")!.Contains("test.full", StringComparison.Ordinal) && Text(lines[1], "level") == "error", "message or level text");
 });
 
+Case("plan.loaded and plan.rejected carry path and permissions", () => {
+    var directory = NewDirectory(); var (writer, _, _) = Writer(directory);
+    var kernel = Kernel(writer, RuntimeLogLevel.Info);
+    var plan = new RuntimeLogPlan { PlanId = "plan-a", ResourceId = "resource-a", ResourceRevision = "1" };
+    kernel.WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Info, Code = RuntimeLogCodes.PlanLoaded, Provider = Runtime, Tick = 1, WorldEpoch = 1,
+        Plan = plan, Path = "Team-Pack/forge/plans/plan-a.plan.json", Permissions = new[] { "gtfo.enemy.health.read", "gtfo.enemy.health.write" } });
+    kernel.WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Error, Code = RuntimeLogCodes.PlanRejected, Provider = Runtime, Tick = 2, WorldEpoch = 1,
+        Path = "Team-Pack/forge/plans/plan-b.plan.json", Result = new RuntimeLogResult { Status = "rejected", Commit = null, Reason = "plan-conflict" } });
+    writer.Dispose(); var lines = Lines(writer);
+    var loaded = lines.Single(line => Text(line, "code") == RuntimeLogCodes.PlanLoaded);
+    var rejected = lines.Single(line => Text(line, "code") == RuntimeLogCodes.PlanRejected);
+    string[] Names(JsonElement line) => line.EnumerateObject().Select(p => p.Name).ToArray();
+    Check(Names(loaded).SequenceEqual(new[] { "schema", "origin", "seq", "tick", "worldEpoch", "level", "code", "provider", "plan", "path", "permissions", "message" }),
+        "plan.loaded field order: " + string.Join(",", Names(loaded)));
+    Check(Names(rejected).SequenceEqual(new[] { "schema", "origin", "seq", "tick", "worldEpoch", "level", "code", "provider", "path", "result", "message" }),
+        "plan.rejected field order without a resolved identity: " + string.Join(",", Names(rejected)));
+    Check(Text(loaded, "path") == "Team-Pack/forge/plans/plan-a.plan.json", "plan.loaded path did not round-trip");
+    Check(loaded.GetProperty("permissions").EnumerateArray().Select(v => v.GetString()).SequenceEqual(new[] { "gtfo.enemy.health.read", "gtfo.enemy.health.write" }),
+        "plan.loaded permissions did not round-trip in order");
+    Check(Text(rejected, "path") == "Team-Pack/forge/plans/plan-b.plan.json" && Text(rejected.GetProperty("result"), "reason") == "plan-conflict",
+        "plan.rejected path or result.reason did not round-trip");
+    Check(!rejected.TryGetProperty("permissions", out _) && !rejected.TryGetProperty("plan", out _), "plan.rejected without a resolved identity leaked plan or permissions");
+});
+
 Case("privacy: no Steam64-shaped numbers", () => {
     var steam = new Regex("(?<![0-9])[0-9]{17}(?![0-9])");
     Check(steam.IsMatch("id 76561198000000000.") && !steam.IsMatch("765611980000000001"), "privacy pattern control");
@@ -286,7 +310,8 @@ Case("privacy: no Steam64-shaped numbers", () => {
     foreach (var file in files) Check(!steam.IsMatch(File.ReadAllText(file)), "Steam64-shaped number in " + file);
     lock (console) Check(console.Count > 0 && !console.Any(steam.IsMatch), "Steam64-shaped number in console mirror");
     Check(typeof(RuntimeLogRecord).GetProperties().All(p => p.PropertyType == typeof(string) || p.PropertyType == typeof(long) || p.PropertyType == typeof(long?)
-        || p.PropertyType == typeof(RuntimeLogLevel) || p.PropertyType == typeof(RuntimeLogPlan?) || p.PropertyType == typeof(RuntimeLogResult?))
+        || p.PropertyType == typeof(RuntimeLogLevel) || p.PropertyType == typeof(RuntimeLogPlan?) || p.PropertyType == typeof(RuntimeLogResult?)
+        || p.PropertyType == typeof(IReadOnlyList<string>))
         && !typeof(RuntimeLogRecord).GetProperties().Any(p => p.Name.Contains("Player", StringComparison.OrdinalIgnoreCase)
             || p.Name.Contains("Steam", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Name", StringComparison.OrdinalIgnoreCase)),
         "log record gained a player identity field");

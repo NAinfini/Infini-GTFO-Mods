@@ -14,7 +14,6 @@ void Case(string name, Action test)
 ConfigFile Config(string? mode, string? level = null)
 {
     var text = (mode == null ? "" : "[Runtime]\nMode = " + mode + "\n")
-        + "\n[Framework]\nPlanPath = content/plan.json\nAllowedPermissions = gtfo.enemy.health.read,gtfo.enemy.health.write\n"
         + (level == null ? "" : "\n[Logging]\nLevel = " + level + "\n");
     string path = Path.Combine(root, (++sequence) + ".cfg"); File.WriteAllText(path, text);
     return new ConfigFile(path, false) { SaveOnConfigSet = false };
@@ -30,9 +29,7 @@ try
             var config = Config(input); var before = File.ReadAllText(config.ConfigFilePath);
             RuntimeSettings.Bind(config);
             Check(RuntimeSettings.Mode == expected, "configured mode changed");
-            Check(RuntimeSettings.PlanPath.Value == "content/plan.json", "plan path changed");
-            Check(RuntimeSettings.AllowedPermissions.Value == "gtfo.enemy.health.read,gtfo.enemy.health.write", "grants changed");
-            Check(config.Keys.Count == 4 && config.Keys.All(k => k.Section is "Runtime" or "Framework" or "Logging"), "host bound diagnostic keys");
+            Check(config.Keys.Count == 2 && config.Keys.All(k => k.Section is "Runtime" or "Logging"), "host bound diagnostic keys");
             Check(RuntimeSettings.LogLevel == RuntimeLogLevel.Error, "absent Logging.Level did not default to error");
             Check(File.ReadAllText(config.ConfigFilePath) == before, "binding unexpectedly rewrote input fixture");
         });
@@ -64,20 +61,19 @@ try
             var reopened = new ConfigFile(config.ConfigFilePath, false) { SaveOnConfigSet = false };
             RuntimeSettings.Bind(reopened);
             Check(RuntimeSettings.Mode == expected, "saved config changed mode");
-            Check(RuntimeSettings.AllowedPermissions.Value == "gtfo.enemy.health.read,gtfo.enemy.health.write", "saved config changed permissions");
             Check(RuntimeSettings.LogLevel == RuntimeLogLevel.Info, "saved config changed log level");
-            Check(reopened.Keys.Count == 4, "saved host config includes diagnostics");
+            Check(reopened.Keys.Count == 2, "saved host config includes diagnostics");
         });
     Case("default logging level is written as error", () => {
         var config = Config("Play"); config.SaveOnConfigSet = true; RuntimeSettings.Bind(config); config.Save();
         Check(File.ReadAllText(config.ConfigFilePath).Contains("[Logging]", StringComparison.Ordinal)
             && File.ReadAllLines(config.ConfigFilePath).Any(line => line.Trim() == "Level = error"), "saved config did not record the error default");
     });
-    Case("empty plan and permissions remain empty", () => {
+    Case("bare Off config binds no extra keys", () => {
         var path = Path.Combine(root, "empty.cfg"); File.WriteAllText(path, "[Runtime]\nMode = Off\n");
         var config = new ConfigFile(path, false) { SaveOnConfigSet = false }; RuntimeSettings.Bind(config);
         Check(RuntimeSettings.Mode == RuntimeMode.Off, "Off became enabled");
-        Check(RuntimeSettings.PlanPath.Value == "" && RuntimeSettings.AllowedPermissions.Value == "", "host auto-selected plan or permissions");
+        Check(config.Keys.Count == 2, "host bound diagnostic keys");
     });
 }
 finally { Directory.Delete(root, true); }

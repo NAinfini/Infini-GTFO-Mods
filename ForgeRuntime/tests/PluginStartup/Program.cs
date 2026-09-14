@@ -64,16 +64,11 @@ Probe.Case("failed cleanup cannot expose partially loaded host", () => {
 });
 Probe.Case("configuration edits do not change frozen startup selection", () => {
     var p = Probe.Plugin(RuntimeMode.Play);
-    p.Config.Preset["Framework.PlanPath"] = "content/explicit.json";
-    p.Config.Preset["Framework.AllowedPermissions"] = "gtfo.enemy.health.read";
     p.Load();
     ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Runtime.Mode"]).Value = "Off";
-    ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Framework.PlanPath"]).Value = "other.json";
-    ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Framework.AllowedPermissions"]).Value = "gtfo.enemy.health.write";
     ((BepInEx.Configuration.ConfigEntry<string>)p.Config.Entries["Logging.Level"]).Value = "off";
     Probe.That(Plugin.ConfiguredMode == RuntimeMode.Play, "running mode silently changed");
     Probe.That(GameRuntimeBridge.LogLevel == ForgeRuntime.Framework.RuntimeLogLevel.Error, "running log level changed without restart");
-    Probe.That(GameRuntimeBridge.Plan == "content/explicit.json" && GameRuntimeBridge.Grants == "gtfo.enemy.health.read", "running plan or grants changed without restart");
 });
 Probe.Case("unwritable exception Data preserves the startup exception", () => {
     var original = new UnwritableDataException(); Probe.Faults["hook:patch"] = original;
