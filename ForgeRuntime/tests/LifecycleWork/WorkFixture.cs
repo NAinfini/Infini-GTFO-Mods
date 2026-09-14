@@ -64,7 +64,8 @@ internal sealed class WorkFixture
         }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>()));
     }
     internal RuntimeEvent Event(string id, long tick = 10) => new(id, Trigger, Kernel.WorldEpoch, tick,
-        "test.lifecycle.scope", RuntimeJson.From(new { target = Target, actual_damage = 10 }), Target);
+        "test.lifecycle.scope", RuntimeJson.From(new { source = (EntityReference?)null, target = Target, amount = 10,
+            damage_kind = (int?)null, limb = (int?)null }), Target);
     internal RuntimeScheduleHandle Schedule(string id = "test.timer")
     {
         var result = Owner.Schedule(Event(id, Math.Max(0, Kernel.CurrentTick)),
