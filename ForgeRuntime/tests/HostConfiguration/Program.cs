@@ -21,7 +21,7 @@ ConfigFile Config(string? mode, string? level = null)
 try
 {
     foreach (var (input, expected) in new (string?, RuntimeMode)[] {
-        (null, RuntimeMode.Authoring), ("Off", RuntimeMode.Off), ("Play", RuntimeMode.Play),
+        (null, RuntimeMode.Play), ("Off", RuntimeMode.Off), ("Play", RuntimeMode.Play),
         ("Authoring", RuntimeMode.Authoring), ("off", RuntimeMode.Off), ("  Play  ", RuntimeMode.Play),
         ("0", RuntimeMode.Off), ("1", RuntimeMode.Authoring), ("2", RuntimeMode.Play) })
     {

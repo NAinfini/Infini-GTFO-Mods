@@ -13,8 +13,9 @@ internal static class RuntimeSettings
     {
         Mode = RuntimeMode.Off;
         LogLevel = RuntimeLogLevel.Off;
-        // Bind raw text so ConfigFile cannot silently replace a malformed enum with Authoring.
-        var mode = config.Bind("Runtime", "Mode", "Authoring",
+        // Bind raw text so ConfigFile cannot silently replace a malformed enum with the default.
+        // Play is the default: Rundown packages ship no base-package cfg (D-011), and authors opt into Authoring.
+        var mode = config.Bind("Runtime", "Mode", "Play",
             "Play = framework and game bindings without diagnostic collectors; Authoring = Play plus authoring diagnostics; Off = no components or hooks. Restart required. No mode enables a plan automatically.");
         Mode = mode.Value.Trim().ToLowerInvariant() switch
         {

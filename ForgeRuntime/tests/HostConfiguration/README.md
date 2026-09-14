@@ -7,13 +7,13 @@ All config files are unique temporary fixtures; no installed profile is edited.
 
 Checks preserve named Off/Authoring/Play and numeric 0/1/2 values, original key
 names, the existing default, explicit plan path and grants, empty defaults and
-saved roundtrips. Malformed values must fail rather than silently select Authoring
+saved roundtrips. Malformed values must fail rather than silently select the default
 or combine enum flags. Only Runtime/Framework/Logging keys may be bound by the host binder.
 Logging.Level accepts off/error/info from raw text, defaults to error (written
 as `Level = error` on save) and rejects trace, numbers, empty and combined values.
 The mode entry is parsed from raw text to avoid the ConfigFile enum fallback.
-The default remains Authoring at this intermediate split stage; changing the final
-new-install policy is separate from preserving existing user configuration.
+The default is Play: Rundown packages ship no base-package cfg (D-011), so a
+player profile runs gameplay without authoring diagnostics unless the author sets Authoring.
 
 From the repository root, using existing legal local compile references:
 
