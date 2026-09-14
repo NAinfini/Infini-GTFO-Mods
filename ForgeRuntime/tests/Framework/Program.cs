@@ -190,17 +190,79 @@ void RejectCode(Action action, string code, string name)
     Bad(p => Step(p)["inputs"]!.AsArray().RemoveAt(1), "missing-input", "a required promoted input must be driven");
     Bad(p => Step(p)["layout"]!.AsObject().Remove("promoted"), "missing-field", "every layout names its promotions");
     {
-        // An enum literal is a valid parameter, but no enum value port exists at runtime, so its promotion is refused.
+        // Q3: an enum's wire value is a member-set index, never its name. This covers both literal shapes
+        // (a structural parameter's own inline `values`, and a directly wired event slot) plus the shared
+        // out-of-range/non-integer/string rejections and the handler-boundary conversion back to member names.
+        const string enumId = "example.enum_value";
+        var seenKind = new List<string?>(); var seenPolicy = new List<string?>();
+        var enumModule = Fixture.Module(enumId, ctx => {
+            seenKind.Add(ctx.Inputs.TryGetProperty("kind", out var kind) && kind.ValueKind != JsonValueKind.Null ? kind.GetString() : null);
+            seenPolicy.Add(ctx.Parameters.GetProperty("policy").GetString());
+            return CommandResult.Succeeded(RuntimeJson.EmptyObject);
+        });
+        var enumSeed = JsonNode.Parse(enumModule.RegistryJson)!;
+        enumSeed["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"schema\":\"compare_operator\",\"nullable\":true}"));
+        enumSeed["capabilities"]![1]!["graph"]!["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"schema\":\"compare_operator\",\"nullable\":true}"));
+        // A structural literal narrows the index basis to its own inline `values`, not the shared set.
+        enumSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"policy\",\"type\":\"enum\",\"role\":\"structural\",\"required\":true,\"values\":[\"floor\",\"ceil\",\"nearest\"]}"));
+        var enumHandle = s.Kernel.RegisterModule(enumModule with { RegistryJson = enumSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) });
+        JsonNode EnumPlan(string policyConstantJson)
+        {
+            var plan = JsonNode.Parse(Fixture.Plan(s.Kernel, "enum_value", enumId))!;
+            plan["entrypoints"]![0]!["layout"]!["outputs"]![2]!["valueSet"] = 0; // compare_operator is the first declared enum set.
+            Step(plan)["layout"]!["inputs"]![2]!["valueSet"] = 0;
+            Step(plan)["layout"]!["constants"] = JsonNode.Parse("[5," + policyConstantJson + "]");
+            Step(plan)["inputs"]!.AsArray().Add(JsonNode.Parse("{\"slot\":2,\"fromEventSlot\":2}"));
+            return plan;
+        }
+        void BadPolicy(string policyConstantJson, string name)
+            => RejectCode(() => s.Kernel.LoadPlan(EnumPlan(policyConstantJson).ToJsonString(), Fixture.Permissions), "invalid-enum", name);
+        BadPolicy("\"ceil\"", "a literal enum constant can never be the member name");
+        BadPolicy("99", "a literal enum constant respects its own inline values list, not the shared set");
+        BadPolicy("1.5", "a literal enum constant must be an integer");
+        var legalPlan = EnumPlan("1"); // "ceil"
+        s.Kernel.LoadPlan(legalPlan.ToJsonString(), Fixture.Permissions);
+        Check(s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a legal enum event slot and literal register a subscription");
+        RuntimeEvent KindEvent(string eventId, object? kind) => new(eventId, Fixture.Trigger(enumId), s.World, 1, "shared-scope",
+            RuntimeJson.From(new { target = new EntityReference(enumId + ":1", s.World, s.Life), kind }));
+        Check(enumHandle.Publish(KindEvent("kind-lt", 2)).Status == "queued", "a legal enum event index queues");
+        Check(enumHandle.Publish(KindEvent("kind-null", null)).Status == "queued", "a nullable enum event slot accepts null");
+        Check(enumHandle.Publish(KindEvent("kind-range", 99)).Code == "invalid-enum", "an out-of-range enum event index is rejected at publish");
+        Check(enumHandle.Publish(KindEvent("kind-string", "lt")).Code == "invalid-enum", "an enum member name is never accepted on the wire");
+        Check(enumHandle.Publish(KindEvent("kind-fraction", 1.5)).Code == "invalid-enum", "a non-integer enum event value is rejected");
+        s.Kernel.Advance(1, true);
+        Check(seenKind.SequenceEqual(new[] { "lt", null }), "the handler reads the wired enum input as its member name, never its index");
+        Check(seenPolicy.SequenceEqual(new[] { "ceil", "ceil" }), "the handler reads the literal enum parameter as its member name, never its index");
+    }
+    {
+        // Q3: a promoted enum parameter carries the same index representation as any other; only the handler
+        // boundary differs from a wired input in which JSON bag (Parameters, not Inputs) receives the name.
         const string enumId = "example.promote_enum";
-        var enumSeed = JsonNode.Parse(Fixture.Module(enumId).RegistryJson)!;
-        enumSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"set\":\"compare_operator\"}"));
-        s.Kernel.RegisterModule(Fixture.Module(enumId) with { RegistryJson = enumSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) });
-        var plan = JsonNode.Parse(Fixture.Plan(s.Kernel, "promote_enum", enumId))!; var layout = Step(plan)["layout"]!;
-        layout["constants"] = JsonNode.Parse("[5,null]"); layout["promoted"] = JsonNode.Parse("[1]");
-        // compare_operator is the first shared enum set, so its compiled valueSet index is 0.
-        layout["inputs"]!.AsArray().Add(JsonNode.Parse("{\"index\":2,\"type\":5,\"cardinality\":0,\"valueSet\":0,\"lifetime\":-1,\"optional\":true,\"nullable\":false}"));
-        RejectCode(() => s.Kernel.LoadPlan(plan.ToJsonString(), Fixture.Permissions), "unsupported-input-port", "an enum parameter cannot be promoted onto a runtime input");
-        Check(!s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a refused enum promotion leaves no subscription");
+        var seenOp = new List<string?>();
+        var opModule = Fixture.Module(enumId, ctx => {
+            seenOp.Add(ctx.Parameters.GetProperty("op").GetString());
+            return CommandResult.Succeeded(RuntimeJson.EmptyObject);
+        });
+        var opSeed = JsonNode.Parse(opModule.RegistryJson)!;
+        opSeed["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"schema\":\"compare_operator\"}"));
+        opSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"set\":\"compare_operator\"}"));
+        var opHandle = s.Kernel.RegisterModule(opModule with { RegistryJson = opSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) });
+        var opPlan = JsonNode.Parse(Fixture.Plan(s.Kernel, "promote_enum", enumId))!;
+        opPlan["entrypoints"]![0]!["layout"]!["outputs"]![2]!["valueSet"] = 0;
+        Step(opPlan)["layout"]!["constants"] = JsonNode.Parse("[5,null]"); Step(opPlan)["layout"]!["promoted"] = JsonNode.Parse("[1]");
+        // compare_operator is the first declared enum set, so its compiled valueSet index is 0.
+        Step(opPlan)["layout"]!["inputs"]!.AsArray().Add(JsonNode.Parse("{\"index\":2,\"type\":5,\"cardinality\":0,\"valueSet\":0,\"lifetime\":-1,\"optional\":true,\"nullable\":false}"));
+        Step(opPlan)["inputs"]!.AsArray().Add(JsonNode.Parse("{\"slot\":2,\"fromEventSlot\":2}"));
+        s.Kernel.LoadPlan(opPlan.ToJsonString(), Fixture.Permissions);
+        Check(s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a legal enum promotion registers a subscription");
+        RuntimeEvent OpEvent(string eventId, object op) => new(eventId, Fixture.Trigger(enumId), s.World, 1, "shared-scope",
+            RuntimeJson.From(new { target = new EntityReference(enumId + ":1", s.World, s.Life), op }));
+        Check(opHandle.Publish(OpEvent("op-lt", 2)).Status == "queued", "a legal promoted enum index queues");
+        Check(opHandle.Publish(OpEvent("op-range", 99)).Code == "invalid-enum", "an out-of-range promoted enum index is rejected at publish");
+        Check(opHandle.Publish(OpEvent("op-string", "eq")).Code == "invalid-enum", "a promoted enum member name is never accepted on the wire");
+        Check(opHandle.Publish(OpEvent("op-fraction", 1.5)).Code == "invalid-enum", "a non-integer promoted enum value is rejected");
+        s.Kernel.Advance(1, true);
+        Check(seenOp.SequenceEqual(new[] { "lt" }), "the handler reads the promoted enum value as its member name, never its index");
     }
     Check(!s.Kernel.HasSubscribers(Fixture.Trigger(id)), "rejected promotion plans leave no subscription");
     s.Kernel.LoadPlan(Promoted().ToJsonString(), Fixture.Permissions);
