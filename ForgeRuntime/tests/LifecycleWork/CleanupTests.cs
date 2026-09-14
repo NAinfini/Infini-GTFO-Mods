@@ -28,7 +28,7 @@ internal static class CleanupTests
     internal static void Failure()
     {
         var f = new WorkFixture(false);
-        f.Kernel.LoadPlan(f.Plan, f.Grants); f.Kernel.Advance(0, true);
+        f.Kernel.LoadPlan(f.Plan); f.Kernel.Advance(0, true);
         var timer = f.Schedule(); var lease = f.Lease();
         Probe.That(f.Owner.Publish(f.Event("pending")).Status == "queued", "pending event setup failed");
         int attempts = 0;
@@ -40,7 +40,7 @@ internal static class CleanupTests
         for (int i = 0; i < 20; i++) f.Kernel.StartRuntime(() => attempts++);
         Probe.That(attempts == 1 && f.Commits == 0, "failure retried or committed pending work");
         Probe.Denied(() => { f.Kernel.BeginWorld(2); return "accepted"; }, "runtime-not-ready");
-        Probe.Denied(() => { f.Kernel.LoadPlan(f.Plan, f.Grants); return "accepted"; }, "runtime-not-ready");
+        Probe.Denied(() => { f.Kernel.LoadPlan(f.Plan); return "accepted"; }, "runtime-not-ready");
         Probe.Denied(() => f.Owner.Publish(f.Event("retry")).Code, "runtime-not-ready");
         Probe.That(!lease.Release(), "failed startup lease disposed twice");
         Probe.That(!timer.Cancel(), "failed startup timer disposed twice");

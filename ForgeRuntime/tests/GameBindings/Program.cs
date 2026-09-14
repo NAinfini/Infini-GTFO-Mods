@@ -145,20 +145,94 @@ Check(Heal(module, nextLife).Status == "succeeded", "old pointer teardown must n
 kernel.BeginWorld(2); module.ClearWorld();
 Check(Heal(module, nextLife).Status == "rejected", "world reset invalidates recipients");
 
-string testRoot = Path.Combine(Path.GetTempPath(), "forge-game-bindings-" + Guid.NewGuid().ToString("N"));
-Directory.CreateDirectory(testRoot);
+string linkRoot = Path.Combine(Path.GetTempPath(), "forge-game-bindings-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(linkRoot);
 try
 {
-    string file = Path.Combine(testRoot, "plan.json"); File.WriteAllText(file, "{}");
-    Check(FrameworkFiles.ReadPlan(testRoot, "plan.json") == "{}", "relative offline plan read");
-    Reject(() => FrameworkFiles.ReadPlan(testRoot, "../escape.json"), "traversal allowed");
-    Reject(() => FrameworkFiles.ReadPlan(testRoot, file), "absolute path allowed");
-    File.WriteAllBytes(file, new byte[FrameworkFiles.MaximumPlanBytes + 1]);
-    Reject(() => FrameworkFiles.ReadPlan(testRoot, "plan.json"), "oversized plan allowed");
-    File.WriteAllText(file, "{}" + new string(' ', 2 * 1024 * 1024));
-    Check(FrameworkFiles.ReadPlan(testRoot, "plan.json").Length > 1024 * 1024, "website-valid plan ceiling diverges");
+    string plansDir = Path.Combine(linkRoot, "plugins", "Team-Pack", "forge", "plans");
+    Directory.CreateDirectory(plansDir);
+    string file = Path.Combine(plansDir, "a.plan.json"); File.WriteAllText(file, "{}");
+    Check(FrameworkFiles.Resolve(linkRoot, "plugins/Team-Pack/forge/plans/a.plan.json") == Path.GetFullPath(file), "relative discovery path resolves");
+    Reject(() => FrameworkFiles.Resolve(linkRoot, "../escape.json"), "traversal allowed");
+    Reject(() => FrameworkFiles.Resolve(linkRoot, file), "absolute path allowed");
 }
-finally { Directory.Delete(testRoot, true); }
+finally { Directory.Delete(linkRoot, true); }
+
+string discoveryRoot = Path.Combine(Path.GetTempPath(), "forge-discovery-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(discoveryRoot);
+try
+{
+    Check(PlanDiscovery.Scan(discoveryRoot).Count == 0, "missing plugins/ is never enumerated");
+    string teamPlans = Path.Combine(discoveryRoot, "plugins", "Team-Pack", "forge", "plans");
+    Directory.CreateDirectory(teamPlans);
+    File.WriteAllText(Path.Combine(teamPlans, "a.plan.json"), "{}");
+    File.WriteAllText(Path.Combine(teamPlans, "b.plan.json"), "{\"id\":2}");
+    File.WriteAllText(Path.Combine(teamPlans, "ignored.txt"), "not a plan");
+    Directory.CreateDirectory(Path.Combine(teamPlans, "nested"));
+    File.WriteAllText(Path.Combine(teamPlans, "nested", "c.plan.json"), "{}");
+    Directory.CreateDirectory(Path.Combine(discoveryRoot, "plugins", "OtherMod")); // no forge/plans: silently skipped
+    File.WriteAllText(Path.Combine(discoveryRoot, "plugins", "loose.plan.json"), "{}"); // directly under plugins/: not a package directory
+    var hits = PlanDiscovery.Scan(discoveryRoot);
+    Check(hits.Count == 2 && hits.All(h => !h.IsHostRejected), "non-.plan.json files, nested files and packages without forge/plans have no effect: " + hits.Count);
+    Check(hits[0].Path == "plugins/Team-Pack/forge/plans/a.plan.json" && hits[1].Path == "plugins/Team-Pack/forge/plans/b.plan.json", "ordinal path sort");
+
+    File.WriteAllBytes(Path.Combine(teamPlans, "big.plan.json"), new byte[FrameworkFiles.MaximumPlanBytes + 1]);
+    var big = PlanDiscovery.Scan(discoveryRoot).Single(h => h.Path.EndsWith("big.plan.json", StringComparison.Ordinal));
+    Check(big.IsHostRejected && big.RejectedCode == "json-size", "oversized plan file rejected as json-size");
+    File.Delete(Path.Combine(teamPlans, "big.plan.json"));
+}
+finally { Directory.Delete(discoveryRoot, true); }
+
+string budgetRoot = Path.Combine(Path.GetTempPath(), "forge-discovery-budget-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(budgetRoot);
+try
+{
+    var plansDir = Path.Combine(budgetRoot, "plugins", "Pack", "forge", "plans");
+    Directory.CreateDirectory(plansDir);
+    for (int i = 0; i < 5; i++) File.WriteAllText(Path.Combine(plansDir, $"p{i}.plan.json"), "{}"); // 2 bytes each
+    var byCount = PlanDiscovery.Scan(budgetRoot, 3, long.MaxValue);
+    Check(byCount.Count(h => !h.IsHostRejected) == 3 && byCount.Count(h => h.IsHostRejected && h.RejectedCode == "plan-budget") == 2
+        && byCount.Where(h => h.IsHostRejected).All(h => h.Path.EndsWith("p3.plan.json", StringComparison.Ordinal) || h.Path.EndsWith("p4.plan.json", StringComparison.Ordinal)),
+        "combined file-count budget rejects the tail in sort order");
+    var byBytes = PlanDiscovery.Scan(budgetRoot, 256, 3);
+    Check(byBytes.Count(h => !h.IsHostRejected) == 1 && byBytes.Count(h => h.IsHostRejected && h.RejectedCode == "plan-budget") == 4,
+        "combined byte budget rejects the tail in sort order");
+}
+finally { Directory.Delete(budgetRoot, true); }
+
+string junctionRoot = Path.Combine(Path.GetTempPath(), "forge-discovery-junction-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(junctionRoot);
+try
+{
+    var realPlans = Path.Combine(junctionRoot, "real-plans"); Directory.CreateDirectory(realPlans);
+    File.WriteAllText(Path.Combine(realPlans, "linked.plan.json"), "{}");
+    var pluginDir = Path.Combine(junctionRoot, "plugins", "Pack"); Directory.CreateDirectory(Path.Combine(pluginDir, "forge"));
+    var plansLink = Path.Combine(pluginDir, "forge", "plans");
+    if (TryJunction(plansLink, realPlans))
+    {
+        var linked = PlanDiscovery.Scan(junctionRoot);
+        Check(linked.Count == 1 && linked[0].IsHostRejected && linked[0].RejectedCode == "invalid-json", "plans/ being a junction is rejected, not followed");
+
+        var siblingTarget = Path.Combine(junctionRoot, "real-sibling"); Directory.CreateDirectory(siblingTarget);
+        TryJunction(Path.Combine(junctionRoot, "plugins", "Sibling"), siblingTarget);
+        Check(PlanDiscovery.Scan(junctionRoot).Count == 1, "a sibling package directory being a junction has no effect");
+    }
+    else
+    {
+        // This host cannot create NTFS junctions (observed here: mklink /J denied even though it succeeds when run
+        // directly from an interactive shell). Both junction-rejection assertions above are skipped rather than
+        // faked; re-run on a host that can create junctions before trusting this file's assertion count.
+        Console.Error.WriteLine("SKIPPED: host cannot create NTFS junctions (mklink /J denied) - junction-rejection assertions not exercised.");
+    }
+}
+finally { Directory.Delete(junctionRoot, true); }
+
+bool TryJunction(string link, string target)
+{
+    var mklink = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true })!;
+    mklink.WaitForExit();
+    return mklink.ExitCode == 0;
+}
 
 if (args.Length >= 2 && args[0] == "--export-manifest")
 {
@@ -174,17 +248,18 @@ if (args.Length >= 2 && args[0] == "--bridge")
     BepInEx.Paths.GameRootPath = Path.GetFullPath(args[1]);
     string isolated = Path.Combine(Path.GetTempPath(), "forge-bridge-" + Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(isolated); BepInEx.Paths.BepInExRootPath = isolated;
+    // A file at this path blocks FrameworkFiles.WriteManifest's own directory, forcing a startup failure unrelated
+    // to any plan content (D-009 plan discovery is designed to never fail startup on its own).
+    string manifestCollision = Path.Combine(isolated, "ForgeRuntime");
+    string bridgePlanDir = Path.Combine(isolated, "plugins", "NativeHeal", "forge", "plans");
     void State(eGameStateName state) { GameStateManager.CurrentStateName = state; GameRuntimeBridge.StateChanged(state); }
     void Frame() => GameRuntimeBridge.Guard(GameRuntimeBridge.FixedTick);
     EnemyModule? bridgeEnemies = null;
     var records = new List<CommandContext>(); Action? onRecord = null;
-    // Bridge kernels share one registry, so a scratch kernel with the same modules supplies the plan's grants.
-    var scratch = Kernel(); _ = new EnemyModule(scratch, () => true, _ => { }); scratch.RegisterModule(Recorder(_ => { }));
-    string grants = DeathRecordPlan(scratch).Permissions;
     void InitializeBridge()
     {
         bridgeEnemies?.Dispose();
-        GameRuntimeBridge.Initialize("missing.json", grants, RuntimeLogLevel.Error);
+        GameRuntimeBridge.Initialize(RuntimeLogLevel.Error);
         bridgeEnemies = new EnemyModule(GameRuntimeBridge.Kernel!, () => GameRuntimeBridge.CanExecute, message => Plugin.PluginLog.LogWarning(message));
         GameRuntimeBridge.Kernel!.RegisterModule(Recorder(context => { records.Add(context); onRecord?.Invoke(); }));
     }
@@ -207,6 +282,7 @@ if (args.Length >= 2 && args[0] == "--bridge")
     }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
     try
     {
+        File.WriteAllText(manifestCollision, "blocks the manifest directory");
         InitializeBridge();
         var failedKernel = GameRuntimeBridge.Kernel!;
         var failedOwner = failedKernel.RegisterModule(ProbeModule());
@@ -218,15 +294,15 @@ if (args.Length >= 2 && args[0] == "--bridge")
         Check(failedStates.Last().Current.StartupState == RuntimeStartupState.Failed, "startup failure not observed");
         State(eGameStateName.Generating); State(eGameStateName.InLevel);
         Check(!GameRuntimeBridge.CanExecute, "state transition bypassed failed startup");
-        string manifestPath = Path.Combine(isolated, "ForgeRuntime", "capabilities.json");
-        var writeTime = File.GetLastWriteTimeUtc(manifestPath);
-        File.WriteAllText(Path.Combine(isolated, "missing.json"), DeathRecordPlan(failedKernel).Json);
+        var writeTime = File.GetLastWriteTimeUtc(manifestCollision);
+        Directory.CreateDirectory(bridgePlanDir); File.WriteAllText(Path.Combine(bridgePlanDir, "native-heal.plan.json"), DeathRecordPlan(failedKernel).Json);
         for (int i = 0; i < 100; i++) Frame();
-        Check(GameRuntimeBridge.Kernel!.LoadedPlans == 0 && Plugin.PluginLog.Messages.Count == logs && File.GetLastWriteTimeUtc(manifestPath) == writeTime,
+        Check(GameRuntimeBridge.Kernel!.LoadedPlans == 0 && Plugin.PluginLog.Messages.Count == logs && File.GetLastWriteTimeUtc(manifestCollision) == writeTime,
             "actual FixedTick retries failed plan or manifest IO");
         GameRuntimeBridge.Stop(); GameRuntimeBridge.Stop();
         Check(failedKernel.StartupState == RuntimeStartupState.Stopped && !failedSub.IsActive, "failed bridge stop retained observers");
         failedOwner.Dispose();
+        File.Delete(manifestCollision);
         InitializeBridge();
         var liveKernel = GameRuntimeBridge.Kernel!;
         var liveOwner = liveKernel.RegisterModule(ProbeModule());
@@ -314,8 +390,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     else
     {
         var liveEnemy = Enemy(); liveModule.TrackSpawn(liveEnemy);
-        string[] grants = { "gtfo.enemy.health.read", "gtfo.enemy.health.write" };
-        live.LoadPlan(plan, grants);
+        live.LoadPlan(plan);
         var before = liveModule.BeforeDamage(liveEnemy.Damage);
         liveEnemy.Damage.Health = 40;
         liveModule.AfterDamage(liveEnemy.Damage, before);
@@ -326,10 +401,13 @@ if (args.Length >= 2 && args[0] == "--fixtures")
         Check(liveEnemy.Damage.Sends == 1, "same tick reentry cannot duplicate health commit");
         foreach (var invalid in cases.GetProperty("invalidPlans").EnumerateArray())
         {
+            string id = invalid.GetProperty("id").GetString()!;
             var candidate = Kernel(); _ = new EnemyModule(candidate, () => true, messages.Add);
             string bad = File.ReadAllText(Path.Combine(root, invalid.GetProperty("file").GetString()!));
-            string[] permissions = invalid.TryGetProperty("grantedPermissions", out var value) ? value.EnumerateArray().Select(x => x.GetString()!).ToArray() : grants;
-            Reject(() => candidate.LoadPlan(bad, permissions), "accepted invalid fixture " + invalid.GetProperty("id"));
+            if (invalid.TryGetProperty("grantedPermissions", out _))
+                blocked.Add(("fixtures.invalid-plan-" + id, "I-PACK D-009 removed grantedPermissions/permission-denied; this fixture case tests a retired mechanism"));
+            else
+                Reject(() => candidate.LoadPlan(bad), "accepted invalid fixture " + id);
         }
     }
     Check(messages.Count == 0, "unexpected module diagnostics: " + string.Join(";", messages));

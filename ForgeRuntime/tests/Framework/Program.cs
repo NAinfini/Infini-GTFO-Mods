@@ -127,20 +127,19 @@ void RejectCode(Action action, string code, string name)
     var s = new Scenario(); var a = s.Register("example.alpha");
     Check(!s.Kernel.HasSubscribers(Fixture.Trigger("example.alpha")) && a.Publish(s.Event("idle", "example.alpha")).Code == "no-consumer" && s.Kernel.QueuedEvents == 0, "no installed plans avoid queue work");
     var plan = Fixture.Plan(s.Kernel, "alpha", "example.alpha");
-    Reject(() => s.Kernel.LoadPlan(plan, Array.Empty<string>()), "uploaded plan does not self-grant permission");
     var bad = JsonNode.Parse(plan)!; bad["runtime"]!["gameBuild"] = "wrong-build";
-    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "game build is exactly pinned");
+    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString()), "game build is exactly pinned");
     bad = JsonNode.Parse(plan)!; bad["bindings"]![0]!["providerVersion"] = "9.0.0";
-    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "provider version is exactly pinned");
+    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString()), "provider version is exactly pinned");
     bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["steps"]![0]!["inputs"] = new JsonArray();
-    RejectCode(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "missing-input", "missing explicit recipient rejects");
+    RejectCode(() => s.Kernel.LoadPlan(bad.ToJsonString()), "missing-input", "missing explicit recipient rejects");
     bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["steps"]![0]!["layout"]!["constants"]![0] = -5;
-    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "negative effect amount rejects at plan boundary");
+    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString()), "negative effect amount rejects at plan boundary");
     bad = JsonNode.Parse(plan)!; bad["entrypoints"]![0]!["extra"] = true;
-    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString(), Fixture.Permissions), "unknown plan field rejects");
+    Reject(() => s.Kernel.LoadPlan(bad.ToJsonString()), "unknown plan field rejects");
     Reject(() => RuntimeJson.Parse("{\"schemaVersion\":1,\"schemaVersion\":2}"), "duplicate JSON keys reject");
     JsonNode Step(JsonNode node) => node["entrypoints"]![0]!["steps"]![0]!;
-    void Load(JsonNode node, string code, string name) => RejectCode(() => s.Kernel.LoadPlan(node.ToJsonString(), Fixture.Permissions), code, name);
+    void Load(JsonNode node, string code, string name) => RejectCode(() => s.Kernel.LoadPlan(node.ToJsonString()), code, name);
     bad = JsonNode.Parse(plan)!; bad["schemaVersion"] = 1;
     Load(bad, "plan-version", "schemaVersion 1 plans are not read");
     bad = JsonNode.Parse(plan)!; Step(bad)["layout"]!["inputs"]![1]!["cardinality"] = 1;
@@ -181,7 +180,7 @@ void RejectCode(Action action, string code, string name)
     void Bad(Action<JsonNode> mutate, string code, string name)
     {
         var plan = Promoted(); mutate(plan);
-        RejectCode(() => s.Kernel.LoadPlan(plan.ToJsonString(), Fixture.Permissions), code, name);
+        RejectCode(() => s.Kernel.LoadPlan(plan.ToJsonString()), code, name);
     }
     Bad(p => Step(p)["layout"]!["constants"]![0] = 5, "promoted-constant", "a promoted parameter has no constant");
     Bad(p => Step(p)["layout"]!["promoted"] = JsonNode.Parse("[0,0]"), "promotion-frame", "promoted indices are strictly increasing");
@@ -216,12 +215,12 @@ void RejectCode(Action action, string code, string name)
             return plan;
         }
         void BadPolicy(string policyConstantJson, string name)
-            => RejectCode(() => s.Kernel.LoadPlan(EnumPlan(policyConstantJson).ToJsonString(), Fixture.Permissions), "invalid-enum", name);
+            => RejectCode(() => s.Kernel.LoadPlan(EnumPlan(policyConstantJson).ToJsonString()), "invalid-enum", name);
         BadPolicy("\"ceil\"", "a literal enum constant can never be the member name");
         BadPolicy("99", "a literal enum constant respects its own inline values list, not the shared set");
         BadPolicy("1.5", "a literal enum constant must be an integer");
         var legalPlan = EnumPlan("1"); // "ceil"
-        s.Kernel.LoadPlan(legalPlan.ToJsonString(), Fixture.Permissions);
+        s.Kernel.LoadPlan(legalPlan.ToJsonString());
         Check(s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a legal enum event slot and literal register a subscription");
         RuntimeEvent KindEvent(string eventId, object? kind) => new(eventId, Fixture.Trigger(enumId), s.World, 1, "shared-scope",
             RuntimeJson.From(new { target = new EntityReference(enumId + ":1", s.World, s.Life), kind }));
@@ -253,7 +252,7 @@ void RejectCode(Action action, string code, string name)
         // compare_operator is the first declared enum set, so its compiled valueSet index is 0.
         Step(opPlan)["layout"]!["inputs"]!.AsArray().Add(JsonNode.Parse("{\"index\":2,\"type\":5,\"cardinality\":0,\"valueSet\":0,\"lifetime\":-1,\"optional\":true,\"nullable\":false}"));
         Step(opPlan)["inputs"]!.AsArray().Add(JsonNode.Parse("{\"slot\":2,\"fromEventSlot\":2}"));
-        s.Kernel.LoadPlan(opPlan.ToJsonString(), Fixture.Permissions);
+        s.Kernel.LoadPlan(opPlan.ToJsonString());
         Check(s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a legal enum promotion registers a subscription");
         RuntimeEvent OpEvent(string eventId, object op) => new(eventId, Fixture.Trigger(enumId), s.World, 1, "shared-scope",
             RuntimeJson.From(new { target = new EntityReference(enumId + ":1", s.World, s.Life), op }));
@@ -265,7 +264,7 @@ void RejectCode(Action action, string code, string name)
         Check(seenOp.SequenceEqual(new[] { "lt" }), "the handler reads the promoted enum value as its member name, never its index");
     }
     Check(!s.Kernel.HasSubscribers(Fixture.Trigger(id)), "rejected promotion plans leave no subscription");
-    s.Kernel.LoadPlan(Promoted().ToJsonString(), Fixture.Permissions);
+    s.Kernel.LoadPlan(Promoted().ToJsonString());
     RuntimeEvent Observed(string eventId, double amount) => new(eventId, Fixture.Trigger(id), s.World, 1, "shared-scope",
         RuntimeJson.From(new { target = new EntityReference(id + ":1", s.World, s.Life), amount }));
     Check(handle.Publish(Observed("in-range", 7)).Status == "queued", "promoted value event queues");
@@ -320,7 +319,7 @@ void RejectCode(Action action, string code, string name)
         json["bindings"]![0]!["capabilityId"] = Fixture.TriggerCapability("forge.contract.test");
         json["bindings"]![1]!["capabilityId"] = Fixture.ActionCapability("forge.contract.test");
         handles.Add(kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [provider] = _ => true } }));
-        kernel.LoadPlan(Fixture.Plan(kernel, provider, provider), Fixture.Permissions);
+        kernel.LoadPlan(Fixture.Plan(kernel, provider, provider));
     }
     Check(JsonDocument.Parse(kernel.ExportManifest()).RootElement.GetProperty("registry").GetProperty("capabilities").GetArrayLength() == 2, "two extension modules reuse canonical semantics without duplicate definitions");
     Reject(() => commonHandle.Dispose(), "referenced common contracts cannot unload under consumers");
@@ -365,8 +364,6 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     var directory = Path.GetFullPath(args[1]);
     var cases = RuntimeJson.Parse(File.ReadAllText(Path.Combine(directory, "cases.json")));
     var manifest = RuntimeJson.Parse(File.ReadAllText(Path.Combine(directory, cases.GetProperty("manifest").GetString()!)));
-    var options = RuntimeJson.Parse(File.ReadAllText(Path.Combine(directory, cases.GetProperty("compileOptions").GetString()!)));
-    var grants = options.GetProperty("grantedPermissions").EnumerateArray().Select(p => p.GetString()!).ToArray();
     RuntimeKernel Registered()
     {
         var kernel = new RuntimeKernel(JsonSerializer.Deserialize<RuntimeIdentity>(manifest.GetProperty("runtime"), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!);
@@ -383,13 +380,12 @@ if (args.Length >= 2 && args[0] == "--fixtures")
         }
         return kernel;
     }
-    var valid = Registered(); valid.LoadPlan(File.ReadAllText(Path.Combine(directory, cases.GetProperty("validPlan").GetString()!)), grants);
+    var valid = Registered(); valid.LoadPlan(File.ReadAllText(Path.Combine(directory, cases.GetProperty("validPlan").GetString()!)));
     Check(valid.LoadedPlans == 1, "actual TypeScript compiled native fixture consumed by C#");
     foreach (var row in cases.GetProperty("invalidPlans").EnumerateArray())
     {
         var json = File.ReadAllText(Path.Combine(directory, row.GetProperty("file").GetString()!));
-        var permissions = row.TryGetProperty("grantedPermissions", out var granted) ? granted.EnumerateArray().Select(p => p.GetString()!).ToArray() : grants;
-        Reject(() => Registered().LoadPlan(json, permissions), "shared invalid fixture " + row.GetProperty("id").GetString());
+        Reject(() => Registered().LoadPlan(json), "shared invalid fixture " + row.GetProperty("id").GetString());
     }
 }
 checks += TimingTests.Run();
@@ -438,7 +434,7 @@ sealed class Scenario
     public RuntimeModuleHandle Register(string id, CommandHandler? handler = null) => Kernel.RegisterModule(Fixture.Module(id, handler ?? (ctx => {
         Applied.Add(id + ":" + ctx.Parameters.GetProperty("amount").GetDouble()); return CommandResult.Succeeded(RuntimeJson.From(new { actual = ctx.Parameters.GetProperty("amount").GetDouble() }));
     })) with { EntityResolvers = Resolvers(id) });
-    public void Plan(string plan, string provider, int steps = 1) => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, steps), Fixture.Permissions);
+    public void Plan(string plan, string provider, int steps = 1) => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, steps));
     public RuntimeEvent Event(string id, string provider, long tick = 1) => new(id, Fixture.Trigger(provider), World, tick, "shared-scope", RuntimeJson.From(new { target = new EntityReference(provider + ":1", World, Life) }));
 }
 static class Fixture

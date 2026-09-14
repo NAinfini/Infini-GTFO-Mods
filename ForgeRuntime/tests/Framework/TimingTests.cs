@@ -390,7 +390,7 @@ sealed class TimingScenario
         var plan = JsonNode.Parse(Fixture.Plan(Kernel, id, provider, secondAction ? 2 : steps))!;
         if (secondAction) plan["entrypoints"]![0]!["steps"]![1]!["binding"] = plan["bindings"]!.AsArray().Select(b => b!["bindingId"]!.GetValue<string>()).ToList().IndexOf(provider + ".binding.unsafe");
         tweak?.Invoke(plan);
-        Kernel.LoadPlan(plan.ToJsonString(), Fixture.Permissions);
+        Kernel.LoadPlan(plan.ToJsonString());
     }
     public RuntimeModuleHandle StateContract() => StateDefinition("forge.contract.numeric", State, "numeric-contribution");
     /// <summary>Registers one isolated state definition so the value-type gate is provable without a second registry.</summary>

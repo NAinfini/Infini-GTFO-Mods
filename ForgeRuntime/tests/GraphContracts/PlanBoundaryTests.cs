@@ -20,7 +20,7 @@ internal static class PlanBoundaryTests
         {
             var kernel = Suite.Kernel();
             kernel.RegisterModule(Module(fixture.GetProperty(seed)));
-            Suite.Reject(() => kernel.LoadPlan(plan, Array.Empty<string>()), "layout-mismatch");
+            Suite.Reject(() => kernel.LoadPlan(plan), "layout-mismatch");
             Suite.Check(kernel.LoadedPlans == 0 && kernel.QueuedEvents == 0 && calls == 0,
                 name + ": rejected plan created execution or side effects.");
             Suite.Check(!kernel.HasSubscribers(Trigger), name + ": rejected plan left a subscription.");
@@ -32,7 +32,7 @@ internal static class PlanBoundaryTests
                 calls = 0;
                 var kernel = Suite.Kernel(); var handle = kernel.RegisterModule(Module(fixture.GetProperty(seed)));
                 kernel.BeginWorld(1);
-                kernel.StartRuntime(() => kernel.LoadPlan(fixture.GetProperty(plan).GetRawText(), Array.Empty<string>()));
+                kernel.StartRuntime(() => kernel.LoadPlan(fixture.GetProperty(plan).GetRawText()));
                 var evt = new RuntimeEvent(plan + "-event", Trigger, 1, 0, "test-scope",
                     RuntimeJson.From(new { target = new EntityReference(Provider + ":1", 1, 1) }));
                 Suite.Check(handle.Publish(evt).Status == "queued", plan + " could not queue.");

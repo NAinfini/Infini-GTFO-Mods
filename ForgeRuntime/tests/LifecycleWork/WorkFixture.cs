@@ -8,7 +8,6 @@ internal sealed class WorkFixture
     internal readonly RuntimeKernel Kernel;
     internal readonly RuntimeModuleHandle Owner;
     internal readonly string Plan;
-    internal readonly string[] Grants;
     internal readonly string Trigger;
     internal int Commits;
     internal Action<CommandContext>? OnCommit;
@@ -25,8 +24,6 @@ internal sealed class WorkFixture
         var plan = RuntimeJson.Parse(Plan);
         Trigger = plan.GetProperty("bindings")[plan.GetProperty("entrypoints")[0].GetProperty("binding").GetInt32()]
             .GetProperty("bindingId").GetString()!;
-        Grants = Read(cases.GetProperty("compileOptions").GetString()!).GetProperty("grantedPermissions")
-            .EnumerateArray().Select(p => p.GetString()!).ToArray();
         var registry = manifest.GetProperty("registry");
         var providers = registry.GetProperty("providers").EnumerateArray().OrderBy(p =>
             registry.GetProperty("capabilities").EnumerateArray().Any(c => c.GetProperty("owner").GetString()
@@ -53,7 +50,7 @@ internal sealed class WorkFixture
         }
         Owner = owner ?? throw new InvalidDataException("Fixture has no trigger owner.");
         RegisterState();
-        if (ready) { Kernel.StartRuntime(() => Kernel.LoadPlan(Plan, Grants)); Kernel.Advance(0, true); }
+        if (ready) { Kernel.StartRuntime(() => Kernel.LoadPlan(Plan)); Kernel.Advance(0, true); }
     }
     private static JsonElement Read(string name) => RuntimeJson.Parse(File.ReadAllText(Path.Combine(FixtureRoot, name)));
     private void RegisterState()
