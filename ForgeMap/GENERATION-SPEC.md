@@ -31,7 +31,7 @@
 | G2 | 固定 seed 的候选选择 | 计划、描述符、seed（**无预算**） | 每 zone 的候选与选择记录（稳定排序、尝试次数、拒绝原因） | Map | 无 | 计划；今天由原版 `ExpandZone` 与 LGTuner 隐式完成 |
 | G3 | 布局约束 | 选择结果、zone 边界、`LG_Dimension` 边界 | 通过或逐条违规（对象引用 + 约束名） | Map | `LG_Dimension.TryGetDimensionBounds`（metadata） | 计划；网站 `inspectNativeDesign` 只是编辑期检查 |
 | G4 | 端口类型与朝向 | 描述符 connectors（expanderType、outward、doubleSided）、配对 | 配对结果：类型不符 / 朝向不相对 / 双面门不允许 | Map | `LG_Plug.TryPair` / `Pair`、`LG_ZoneExpanderType`（metadata） | 计划；网站 `snapRoomToPortal` 只做预览吸附 |
-| G5 | 碰撞与重叠 | 变换后的 colliders（仅 `collider-component` 证据） | 重叠对或 `colliders-unknown` 阻塞 | Map | 实例化前无权威碰撞；`LG_FixColliderJob.Build`（metadata） | 计划；**renderer AABB 不能充当碰撞** |
+| G5 | 碰撞与重叠 | 变换后的 colliders（仅 `collider-component` 证据） | 重叠对或 `colliders` 阻塞 | Map | 实例化前无权威碰撞；`LG_FixColliderJob.Build`（metadata） | 计划；**renderer AABB 不能充当碰撞** |
 | G6 | 跨区连通 | 配对图、area 归属 | 可达性结果与不连通的 area 列表 | Map | `LG_LinkAIPlugJob`、`AIG_CourseNode`（metadata） | 计划 |
 | G7 | 生成阶段执行 | 已通过 G2–G6 的计划、从已加载资源取得的对象 | 实例化的 geomorph / area / plug / gate，每个带创建票据 | Map 编排，引擎执行 | `LG_Factory.InjectJob`、批次 8–11 与 45、`LG_BuildGeomorphJob` / `LG_CustomGeomorphBuildJob` / `LG_BuildAreaJob` / `LG_BuildPlugJob` / `LG_BuildGateJob`（metadata） | 计划：注入时机与合法性未验证 |
 | G8 | NavMesh 就绪与局部导航 | 生成完成事件 | `navmesh-ready` 事实，之后才做采样与路径检查 | Map 编排，引擎执行 | 批次 25 `LG_BuildUnityGraphJob.NavmeshDone`、AIGraph 批次 26–38、批次 62 `LG_GenerateNavigationInfoJob`、`NavMesh.SamplePosition` / `CalculatePath`（metadata） | 计划；Development 的采样只是诊断 |
