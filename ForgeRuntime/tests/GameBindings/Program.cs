@@ -447,7 +447,8 @@ if (args.Length >= 2 && args[0] == "--fixtures")
             var candidate = Kernel(); _ = new EnemyModule(candidate, () => true, messages.Add);
             string bad = File.ReadAllText(Path.Combine(root, invalid.GetProperty("file").GetString()!));
             if (invalid.TryGetProperty("grantedPermissions", out _))
-                blocked.Add(("fixtures.invalid-plan-" + id, "I-PACK D-009 removed grantedPermissions/permission-denied; this fixture case tests a retired mechanism"));
+                blocked.Add(("fixtures.invalid-plan-" + id, "I-PACK D-009 dropped LoadPlan's permissions override that this case exercises; " +
+                    "the website is removing the denied-permission negative and grantedPermissions from its generator in its next batch (after aeeb62f0)"));
             else
                 Reject(() => candidate.LoadPlan(bad), "accepted invalid fixture " + id);
         }

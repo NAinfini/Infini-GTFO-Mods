@@ -38,6 +38,15 @@ internal static class LocalPlan
                 { limits.MaxEventsPerTick, limits.MaxCommandsPerTick, limits.MaxQueuedEvents, limits.MaxCausalDepth }).GetRawText());
             return this with { Json = node.ToJsonString() };
         }
+
+        /// <summary>The same plan declaring a different permissions array, for cases that exercise permission-lock:
+        /// the runtime requires the declared set to exactly match the binding closure's required permissions.</summary>
+        internal Plan WithPermissions(string[] permissions)
+        {
+            var node = System.Text.Json.Nodes.JsonNode.Parse(Json)!.AsObject();
+            node["permissions"] = System.Text.Json.Nodes.JsonNode.Parse(RuntimeJson.From(permissions).GetRawText());
+            return this with { Json = node.ToJsonString(), Permissions = permissions };
+        }
     }
 
     /// <summary>A parameterless recording action; every invocation succeeds after handing its context to the test.</summary>

@@ -16,7 +16,16 @@ internal static class IntegrationCases
             Check(m.GetProperty("bindingSupport").EnumerateArray().All(x => x.GetProperty("verification").GetString()
                 == "implementation-only"), "Unverified native binding was promoted.");
         });
-        foreach (string suffix in new[] { "death_started", "limb_broken" }) Blocked("integration.permission-" + suffix, Blockers.PermissionDenied);
+        foreach (string suffix in new[] { "death_started", "limb_broken" }) Case("integration.permission-" + suffix, () => {
+            using var s = new Scene(load: false);
+            // The plan's own permissions omit the native read permission the binding closure requires (only the
+            // recorder's permission is declared); permission-lock demands an exact match, so this can never load.
+            var plan = Scene.FactPlan(s.Kernel, suffix).WithPermissions(new[] { LocalPlan.RecordPermission });
+            bool rejected = false;
+            try { LocalPlan.Load(s.Kernel, plan); }
+            catch (RuntimeContractException e) { rejected = e.Code == "permission-lock"; }
+            Check(rejected && s.Kernel.LoadedPlans == 0, "Native read permission was bypassed.");
+        });
         Case("integration.causality-remains-runtime-owned", () => {
             using var s = new Scene(); s.OnRecord = _ => { if (s.Records.Count == 1) s.Break(); };
             s.Die(); s.Tick(); Check(s.Records.Count == 2 && s.Records[1].CauseId == s.Records[0].CommandId
