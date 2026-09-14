@@ -26,7 +26,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 启动失败时先关闭玩法入口再清理：宿主停止 → unpatch → 销毁 FrameworkMonitor。每个已获取的阶段都会被尝试清理，即使其中一步或错误上报失败也继续执行后面的步骤，最后重新抛出原始启动异常。清理与上报的失败保留在 `Data["ForgeRuntime.StartupCleanupFailures"]` 的 AggregateException 里（字典不可写时不能替换原始异常）。这是对已获取阶段的尽力清理，不是任意原生副作用的回滚保证。
 
-**计划发现（I-PACK D-009）不再走单一配置路径。** `Play`/`Authoring` 下，首个固定更新在其他插件注册完成后，按包目录扫描离线计划：只看 `BepInEx/plugins` 的一级子目录，每个子目录下若存在 `forge/plans`（不存在则静默跳过，不算错误），取其中直接子文件、按 ordinal 精确匹配 `.plan.json` 后缀的文件（不递归、不识别其他扩展名）；发现顺序按 `/` 分隔的 BepInEx 相对路径以 `StringComparer.Ordinal` 排序。单文件上限 4 MiB，合并上限 256 个文件且 64 MiB，超出部分按排序尾部依次拒绝；链接/联接检查只在确认 `forge/plans` 存在后，沿 `<目录>→forge→plans` 链与文件本身进行。每个文件独立产生一条 `plan.loaded`/`plan.rejected`（带 `path`，前者还带 `permissions`）；同一 planId 出现在多个文件中全部按 `plan-conflict` 拒绝；解析后的计划总数上限仍是 128（`plan-budget`）。本次进程只扫描一次，不支持热重载。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
+**计划发现（I-PACK D-009）不再走单一配置路径。** `Play`/`Authoring` 下，首个固定更新在其他插件注册完成后，按包目录扫描离线计划：只看 `BepInEx/plugins` 的一级子目录，每个子目录下若存在 `forge/plans`（不存在则静默跳过，不算错误），取其中直接子文件、按 ordinal 精确匹配 `.plan.json` 后缀的文件（不递归、不识别其他扩展名）；发现顺序按 `/` 分隔的 BepInEx 相对路径以 `StringComparer.Ordinal` 排序。单文件超过 4 MiB 按 `json-size` 单独拒绝，且不计入下面的合并预算；其余文件按合并上限 256 个/64 MiB 做尾部优先淘汰——只要剩余集合仍超个数或字节上限，就反复剔除排序最靠后的一个文件（`plan-budget`），不是遇到第一个超限文件就停止接受后面的文件。链接/联接与转义检查只在确认 `forge/plans` 存在后，沿 `<目录>→forge→plans` 链与文件本身进行，命中按 `plan-path` 拒绝；IO 读取失败或非法 UTF-8 按 `invalid-json` 拒绝。每个文件独立产生一条 `plan.loaded`/`plan.rejected`（带 `path`，前者还带 `permissions`）；同一 planId 出现在多个文件中全部按 `plan-conflict` 拒绝，消息带上冲突组内全部相对路径；解析后的计划总数上限仍是 128（`plan-budget`）。本次进程只扫描一次，不支持热重载。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
 
 ### 执行日志（D-007 阶段 B）
 
