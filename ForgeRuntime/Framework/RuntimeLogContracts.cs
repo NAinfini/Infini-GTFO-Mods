@@ -14,6 +14,8 @@ public static class RuntimeLogCodes
 {
     public const string LogDropped = "log.dropped";
     public const string LogLevel = "log.level";
+    public const string PlanLoaded = "plan.loaded";
+    public const string PlanRejected = "plan.rejected";
 }
 
 public readonly struct RuntimeLogPlan
@@ -49,6 +51,10 @@ public readonly struct RuntimeLogRecord
     public string? CauseId { get; init; }
     public string? RootEventId { get; init; }
     public RuntimeLogPlan? Plan { get; init; }
+    /// <summary>The plan file's BepInEx-relative path, `/` separated. Carried by plan.loaded and plan.rejected.</summary>
+    public string? Path { get; init; }
+    /// <summary>Permissions the plan received, ordinal sorted. Carried by plan.loaded only.</summary>
+    public IReadOnlyList<string>? Permissions { get; init; }
     public string? Entry { get; init; }
     public string? Step { get; init; }
     public string? Binding { get; init; }

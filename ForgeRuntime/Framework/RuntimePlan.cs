@@ -12,7 +12,10 @@ internal sealed record StepInput(string Name, string EventPort, JsonElement Port
 internal sealed record ResolvedStep(string NodeId, string BindingId, JsonElement Parameters, IReadOnlyList<StepInput> Inputs, IReadOnlySet<string> Promoted);
 internal sealed record ResolvedEntry(string NodeId, string BindingId, IReadOnlyList<ResolvedStep> Steps);
 internal sealed record ResolvedPlan(string Id, string ResourceId, string ResourceRevision, string Domain, RuntimeLimits Limits,
-    IReadOnlyList<ResolvedEntry> Entries, IReadOnlySet<string> Bindings, string Fingerprint);
+    IReadOnlyList<ResolvedEntry> Entries, IReadOnlySet<string> Bindings, string Fingerprint, IReadOnlyList<string> Permissions);
+/// <summary>The identity a plan file resolves to before the rest of its content is validated: enough to group files by
+/// planId for D-009 conflict detection, or to attach `plan` to a later rejection of the same file.</summary>
+internal sealed record PlanIdentity(string Id, string ResourceId, string ResourceRevision);
 
 /// <summary>
 /// schemaVersion 2 plan (Runtime API 2.0.0): positional binding pins, pre-resolved slot layouts,
@@ -23,7 +26,10 @@ internal static class RuntimePlan
 {
     private sealed record Node(string Id, string BindingId, JsonElement Parameters, JsonElement Contract, IReadOnlySet<string> Promoted);
 
-    internal static ResolvedPlan Parse(string json, RuntimeIdentity identity, RuntimeLimits ceiling, RuntimeRegistry registry, IEnumerable<string> grantedPermissions)
+    /// <summary>The first slice of validation, shared by <see cref="Parse"/> and <see cref="PeekIdentity"/>: shape, version,
+    /// runtime lock, authority/failure policy and the planId/resource identity. A file that fails here has no identity and
+    /// (per D-009) is rejected on its own error without joining conflict-by-planId grouping.</summary>
+    private static (JsonElement Plan, PlanIdentity Identity) Identify(string json, RuntimeIdentity identity)
     {
         var plan = RuntimeJson.Parse(json);
         RuntimeJson.Shape(plan, "schemaVersion kind planId resource runtime domain authority failurePolicy permissions dependencies limits bindings entrypoints");
@@ -32,6 +38,17 @@ internal static class RuntimePlan
         RuntimeJson.Require(RuntimeJson.Text(plan, "authority") == "host" && RuntimeJson.Text(plan, "failurePolicy") == "stop-entrypoint", "execution-policy", "Plans require host and stop-entrypoint.");
         var id = RuntimeJson.Text(plan, "planId"); var resource = plan.GetProperty("resource");
         RuntimeJson.Shape(resource, "id revision"); var resourceId = RuntimeJson.Text(resource, "id"); var revision = RuntimeJson.Text(resource, "revision");
+        return (plan, new PlanIdentity(id, resourceId, revision));
+    }
+
+    /// <summary>D-009 first pass: resolve just enough identity to group a discovered file by planId, without validating the
+    /// rest of its content. Throws with the file's own error when even this much cannot be resolved.</summary>
+    internal static PlanIdentity PeekIdentity(string json, RuntimeIdentity identity) => Identify(json, identity).Identity;
+
+    internal static ResolvedPlan Parse(string json, RuntimeIdentity identity, RuntimeLimits ceiling, RuntimeRegistry registry)
+    {
+        var (plan, planIdentity) = Identify(json, identity);
+        var (id, resourceId, revision) = (planIdentity.Id, planIdentity.ResourceId, planIdentity.ResourceRevision);
         var domain = RuntimeJson.Text(plan, "domain");
         RuntimeJson.Require(RuntimeGraphContracts.Domains.Contains(domain), "plan-domain", domain);
         var budget = plan.GetProperty("limits");
@@ -172,8 +189,6 @@ internal static class RuntimePlan
         RuntimeJson.ExactSet(RuntimeJson.Strings(plan.GetProperty("dependencies")), registry.Packages(closure), "dependency-lock");
         var permissions = RuntimeJson.Strings(plan.GetProperty("permissions"));
         RuntimeJson.ExactSet(permissions, closure.SelectMany(b => registry.Support[b].RequiredPermissions), "permission-lock");
-        var granted = new HashSet<string>(grantedPermissions, StringComparer.Ordinal);
-        RuntimeJson.Require(permissions.All(granted.Contains), "permission-denied", "The host has not granted the required permissions.");
-        return new ResolvedPlan(id, resourceId, revision, domain, limits, entries, closure, RuntimeJson.StableText(plan));
+        return new ResolvedPlan(id, resourceId, revision, domain, limits, entries, closure, RuntimeJson.StableText(plan), permissions);
     }
 }

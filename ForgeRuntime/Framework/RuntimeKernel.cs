@@ -103,15 +103,104 @@ public sealed partial class RuntimeKernel
             bindingSupport = registry.Support.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => x.Value).ToArray(), limits = Limits
         }));
     }
-    public void LoadPlan(string json, IEnumerable<string> grantedPermissions)
+    /// <summary>I-PACK D-009 batch load. Every file gets its own outcome and its own plan.loaded/plan.rejected record;
+    /// one file's problem never affects another's, and the whole call never throws for a domain-level rejection.
+    /// Files are expected pre-sorted by the host (ordinal on the BepInEx-relative path); that order drives conflict-group
+    /// order, load order and which files the 128-plan cap truncates.</summary>
+    public IReadOnlyList<PlanLoadOutcome> LoadPlans(IReadOnlyList<PlanCandidate> files)
     {
-        Mutable(); AcceptRuntimeWork(true); RuntimeJson.Require(plans.Count < 128, "plan-budget", "Plan capacity reached.");
-        var plan = RuntimePlan.Parse(json, Identity, Limits, registry, grantedPermissions);
-        RuntimeJson.Require(!plans.ContainsKey(plan.Id), "plan-conflict", plan.Id);
-        var providers = plan.Bindings.Select(b => RuntimeJson.Text(registry.Bindings[b], "providerId"))
-            .Concat(plan.Bindings.Select(b => RuntimeJson.Text(registry.Capabilities[RuntimeJson.Text(registry.Bindings[b], "capabilityId")], "owner"))).Distinct(StringComparer.Ordinal);
-        plans.Add(plan.Id, new LoadedPlan(plan, providers.ToDictionary(p => p, p => modules[p], StringComparer.Ordinal)));
-        RebuildSubscriptions();
+        ArgumentNullException.ThrowIfNull(files);
+        Mutable();
+        var outcomes = new List<PlanLoadOutcome>(files.Count);
+        try { AcceptRuntimeWork(true); }
+        catch (RuntimeContractException ex) when (ex.Code == "runtime-not-ready")
+        {
+            // Discovery-triggered runtime-not-ready is reported per file as plan.rejected rather than thrown (unlike every
+            // other SDK-caller-error code), so a host that scans before the runtime is ready never crashes on it.
+            foreach (var file in files)
+            {
+                LogPlanRejected(file.Path, null, ex.Code);
+                outcomes.Add(new PlanLoadOutcome(file.Path, false, null, ex.Code, ex.Message));
+            }
+            return outcomes;
+        }
+        var identified = new List<(PlanCandidate File, PlanIdentity Identity)>();
+        foreach (var file in files)
+        {
+            if (file.IsHostRejected)
+            {
+                LogPlanRejected(file.Path, null, file.RejectedCode!);
+                outcomes.Add(new PlanLoadOutcome(file.Path, false, null, file.RejectedCode, file.RejectedDetail));
+                continue;
+            }
+            try { identified.Add((file, RuntimePlan.PeekIdentity(file.Json!, Identity))); }
+            catch (RuntimeContractException ex)
+            {
+                // A file whose planId cannot even be parsed is rejected on its own error and never joins conflict grouping.
+                LogPlanRejected(file.Path, null, ex.Code);
+                outcomes.Add(new PlanLoadOutcome(file.Path, false, null, ex.Code, ex.Message));
+            }
+        }
+        var loadedAny = false;
+        foreach (var group in identified.GroupBy(x => x.Identity.Id, StringComparer.Ordinal))
+        {
+            var members = group.ToArray();
+            if (members.Length > 1)
+            {
+                // Each conflicting file gets its own path-carrying record; collectively the group's records cover every path.
+                var paths = string.Join(", ", members.Select(m => m.File.Path));
+                foreach (var member in members)
+                {
+                    var plan = new RuntimeLogPlan { PlanId = member.Identity.Id, ResourceId = member.Identity.ResourceId, ResourceRevision = member.Identity.ResourceRevision };
+                    LogPlanRejected(member.File.Path, plan, "plan-conflict");
+                    outcomes.Add(new PlanLoadOutcome(member.File.Path, false, member.Identity.Id, "plan-conflict", paths));
+                }
+                continue;
+            }
+            var (file, identity) = members[0];
+            var identityPlan = new RuntimeLogPlan { PlanId = identity.Id, ResourceId = identity.ResourceId, ResourceRevision = identity.ResourceRevision };
+            if (plans.ContainsKey(identity.Id))
+            {
+                LogPlanRejected(file.Path, identityPlan, "plan-conflict");
+                outcomes.Add(new PlanLoadOutcome(file.Path, false, identity.Id, "plan-conflict", file.Path));
+                continue;
+            }
+            if (plans.Count >= 128)
+            {
+                LogPlanRejected(file.Path, identityPlan, "plan-budget");
+                outcomes.Add(new PlanLoadOutcome(file.Path, false, identity.Id, "plan-budget", "Plan capacity reached."));
+                continue;
+            }
+            ResolvedPlan resolved;
+            try { resolved = RuntimePlan.Parse(file.Json!, Identity, Limits, registry); }
+            catch (RuntimeContractException ex)
+            {
+                LogPlanRejected(file.Path, identityPlan, ex.Code);
+                outcomes.Add(new PlanLoadOutcome(file.Path, false, identity.Id, ex.Code, ex.Message));
+                continue;
+            }
+            var providers = resolved.Bindings.Select(b => RuntimeJson.Text(registry.Bindings[b], "providerId"))
+                .Concat(resolved.Bindings.Select(b => RuntimeJson.Text(registry.Capabilities[RuntimeJson.Text(registry.Bindings[b], "capabilityId")], "owner"))).Distinct(StringComparer.Ordinal);
+            plans.Add(resolved.Id, new LoadedPlan(resolved, providers.ToDictionary(p => p, p => modules[p], StringComparer.Ordinal)));
+            loadedAny = true;
+            LogPlanLoaded(file.Path, identityPlan, resolved.Permissions);
+            outcomes.Add(new PlanLoadOutcome(file.Path, true, identity.Id, null, null));
+        }
+        if (loadedAny) RebuildSubscriptions();
+        return outcomes;
+    }
+    private void LogPlanRejected(string path, RuntimeLogPlan? plan, string code)
+    {
+        if (logSink == null || !LogGate(Identity.Id).IsEnabled(RuntimeLogLevel.Error)) return;
+        WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Error, Code = RuntimeLogCodes.PlanRejected, Provider = Identity.Id,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, Path = path, Plan = plan,
+            Result = new RuntimeLogResult { Status = "rejected", Commit = null, Reason = code } });
+    }
+    private void LogPlanLoaded(string path, RuntimeLogPlan plan, IReadOnlyList<string> permissions)
+    {
+        if (logSink == null || !LogGate(Identity.Id).IsEnabled(RuntimeLogLevel.Info)) return;
+        WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Info, Code = RuntimeLogCodes.PlanLoaded, Provider = Identity.Id,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, Path = path, Plan = plan, Permissions = permissions });
     }
     public bool UnloadPlan(string planId)
     { Mutable(); var removed = plans.Remove(planId); if (removed) RebuildSubscriptions(); return removed; }

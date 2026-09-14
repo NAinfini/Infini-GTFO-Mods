@@ -224,6 +224,13 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
             json.WriteEndObject();
             json.WriteEndObject();
         }
+        Optional(json, "path", r.Path);
+        if (r.Permissions is { } permissions)
+        {
+            json.WriteStartArray("permissions");
+            foreach (var permission in permissions) json.WriteStringValue(permission);
+            json.WriteEndArray();
+        }
         Optional(json, "entry", r.Entry);
         Optional(json, "step", r.Step);
         Optional(json, "binding", r.Binding);
@@ -269,6 +276,7 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
         var text = new StringBuilder("Forge ").Append(r.Code).Append(" provider=").Append(r.Provider);
         Field(text, "subject", r.SubjectProvider);
         if (r.Plan is RuntimeLogPlan plan) text.Append(" plan=").Append(plan.PlanId).Append(" resource=").Append(plan.ResourceId).Append('@').Append(plan.ResourceRevision);
+        Field(text, "path", r.Path);
         Field(text, "entry", r.Entry);
         Field(text, "step", r.Step);
         Field(text, "binding", r.Binding);
