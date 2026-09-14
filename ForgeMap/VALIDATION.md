@@ -1,6 +1,28 @@
 # ForgeMap 验证记录
 
-**上次更新：2026-09-13**（内容合并自原 MAP1-DELIVERY 与 MAP1-IDENTITY-CONTINUATION 两份交接记录）。
+**上次更新：2026-09-14**（2026-09-13 内容合并自原 MAP1-DELIVERY 与 MAP1-IDENTITY-CONTINUATION 两份交接记录）。
+
+## G0–G6 拼装计划静态检查（2026-09-14）
+
+按框架 §3.2 I-MAP-PLAN（r24 关闭 Q-005）新增静态检查：`tools/verify_assembly_plan_fixtures.py`（夹具仲裁检查器，描述符部分 import `verify_resource_adapter_fixtures.document(..., '$descriptors')`）、`ResourceDescriptorReader.cs`（GENERATION-SPEC §3.1 的 C# 严格解析）、`AssemblyPlanContracts.cs` / `AssemblyPlanReader.cs` / `AssemblyPlanChecks.cs`（G0–G6 与 blockers）、`tests/MapAssemblyPlan`（夹具比对与变异自检）。证据等级：**fixture-schema-only / 静态检查**；没有加载 bundle、没有调用原生、没有运行游戏，通过静态检查不等于生成成功（v1 每份合法计划恒带 `dimension-bounds-unknown`）。
+
+全部构建使用会话临时目录的隔离 `--artifacts-path`。
+
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| 描述符检查器（重构后） | `python ForgeMap/tools/verify_resource_adapter_fixtures.py` | 退出码 0；合法 3/3、非法 21/21；与重构前对比脚本比对 24 条既有夹具：23 条错误码与文本逐字相同，1 条把 `sharedBytes[0]…` 补成 `$.sharedBytes[0]…`（本次把根路径前缀参数化，码未变） |
+| G0–G6 变异自检 | `dotnet ForgeMap/tests/MapAssemblyPlan/MapAssemblyPlan.csproj` 后运行 `MapAssemblyPlan.dll --self-check` | 构建 0 警告 0 错误；退出码 0；48/48（45 条计划单点变异 + 3 条包级） |
+| Python/C# 交叉一致 | `MapAssemblyPlan.dll --self-check --emit <临时目录>` 后分别运行 `MapAssemblyPlan.dll --fixtures <临时目录>` 与 `python ForgeMap/tools/verify_assembly_plan_fixtures.py --fixtures <临时目录>` | 两侧退出码均 0，`manifestVerified: true`；同一 48 条语料（98 个文件）：合法 1/1、非法 44/44、包级 3/3，错误码与字段路径逐字相同 |
+| 网站夹具交叉运行 | `python ForgeMap/tools/verify_assembly_plan_fixtures.py --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/map-assembly` | **未运行**：网站夹具目录当前只有 `generate.ts`，没有 `MANIFEST.json` 与 `cases.json`；退出码 1，输出 `must contain MANIFEST.json and cases.json`（夹具不完整按失败报告，不抛栈）。同一检查器已用 `--emit` 生成的合成语料跑通（上一行） |
+| MapIdentity 回归 | Release 构建后运行 `ForgeMap.Identity.Tests.dll` | 退出码 0，134 项断言，`nativeScenariosExecuted: false`（未改） |
+| MapContracts 回归 | Release 构建后运行 `MapContracts.dll` | 退出码 -532462766：未处理 `RuntimeContractException: Unsupported plan version`（并行任务正在改 `ForgeRuntime/Framework/RuntimePlan.cs`；本次改动前同样失败） |
+| 架构回归 | Release 构建后运行 `Architecture.dll` | 退出码 -532462766：`FAIL: Weapon still owns its two observed wield triggers`（并行任务正在改 `ForgeTrigger`/`ForgeWeapon` 与该测试文件；本次改动前同样失败） |
+| `Native/ForgeMap.Native.csproj` 构建 | 宿主与原生构建 | 退出码 0，0 警告 0 错误 |
+| `tests/MapNativeAdapter` | 构建后运行 | 退出码 0，`PASS 41/41` |
+| `tests/MapNativeLayout` | 构建后运行（输入包含重建后的 `ForgeMap.dll`） | 退出码 0，`PASS 39/39`；新增的静态类型没有触发依赖方向或只读读取检查 |
+| `tests/MapNativeEvidence` | 构建后运行 | 退出码 1，25/29：`hash/mvid.Modules-ASM.dll` 与 `hash/mvid.SNet_ASM.dll` 与本机 `Forge-MapEditor-QA` profile 的 interop 不一致（游戏 build 20403457、`native.hash`、`dump.hash` 均通过）；环境差异，本次未改 Native 或证据文件 |
+
+变异自检覆盖框架 §3.2 拒绝顺序的每一条：#1 用三个 `descriptor.*` 变异（`revision-mismatch`、`evidence-escalation`，以及描述符文档本身不是 JSON 时归 `descriptor.schema`，委派路径 `$descriptors`）、#2–#34 各一条、包级 3 码各一条，另有基线合法用例（blockers `colliders`、`dimension-bounds-unknown`、`navigation`、`occlusion`）。**#16 `assembly.locator-unsupported` 在当前顺序下不可达**：检查 10 已要求每个声明的 zone 是 dimension 0 / layer 0，检查 15 已要求 locator 被某个 zone 声明，因此不可能有"已声明但 dimension/layer 非 0"的 locator。自检用一条变异钉住该顺序（改 zone 与 locator 的 layer 后报的是 `assembly.zone`），并在最终报告里请裁决方确认 #16 是否保留。
 
 ## MAP5a — gtfo.player 原生实例解析（2026-09-13）
 

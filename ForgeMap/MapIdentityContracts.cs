@@ -6,6 +6,13 @@ namespace ForgeMap;
 // Domain-local staging types, NOT a new content/export schema or public SDK.
 // Only source-backed static world objects are in this batch; no player life policy.
 internal enum MapObjectKind { Zone, Geomorph, Area, Plug, Door, Terminal, Scan }
+// Field provenance under I-MAP-PLAN (FORGE-FRAMEWORK.md section 3.2), so a native adapter copies plan
+// fields instead of inventing them:
+//   LayoutId = String(plan.levelLayoutId), the main-level LevelLayoutDataBlock persistentID;
+//   LayoutRevision = the plan file's sha256, never a room descriptor revision;
+//   Dimension/Layer/LocalZoneIndex = the placement's `locator` entry;
+//   PlacementId = the plan's `placementId` (= MapRoom.id, not regenerated on export).
+// ObjectId and Kind stay local to the object the adapter actually created.
 internal sealed record MapObjectAddress(string LayoutId, string LayoutRevision,
     int Dimension, int Layer, int LocalZoneIndex, string PlacementId,
     string ObjectId, MapObjectKind Kind);

@@ -26,9 +26,9 @@
 
 | # | 步骤 | 输入 | 输出 | 归属 | 原生依赖 | 证据等级 |
 | --- | --- | --- | --- | --- | --- | --- |
-| G0 | 拼装计划接收 | 网站导出的 room 实例（ResourceReference@revision、placementId、zone / dimension / layer、Unity 空间局部变换、连接器配对、seed、预算） | 规范化计划或带字段路径的拒绝 | Map（格式由网站提供） | 无 | 计划：网站当前**不导出**实例坐标与配对 |
+| G0 | 拼装计划接收 | `forge/maps/<planId>.assembly.json` 与 `forge/maps/rooms.descriptors.json`（I-MAP-PLAN schemaVersion 1，字段见框架 §3.2）：planId、levelLayoutId、seed、descriptors 锁、zones、entry、placements、pairs 与逐 placement 的 Unity 空间局部变换和连接器配对；**显式字段，无预算字段** | 规范化计划或带字段路径的拒绝；合法计划给出去重排序的 blockers | Map（格式由 I-MAP-PLAN 定义，网站实现中） | 无 | 计划：网站导出器与夹具未完成（框架 §6 U-MAP-WEB）；模组侧 G0–G6 静态检查已实现，尚无夹具交叉运行 |
 | G1 | 资源描述 | 计划里的每个 ResourceReference | 第 3 节描述符 + generationBlockers | 资源侧 Adapter（按 profile） | 无（静态） | 本地验证：仅 fixture 形状 |
-| G2 | 固定 seed 的候选选择 | 计划、描述符、seed、预算 | 每 zone 的候选与选择记录（稳定排序、尝试次数、拒绝原因） | Map | 无 | 计划；今天由原版 `ExpandZone` 与 LGTuner 隐式完成 |
+| G2 | 固定 seed 的候选选择 | 计划、描述符、seed（**无预算**） | 每 zone 的候选与选择记录（稳定排序、尝试次数、拒绝原因） | Map | 无 | 计划；今天由原版 `ExpandZone` 与 LGTuner 隐式完成 |
 | G3 | 布局约束 | 选择结果、zone 边界、`LG_Dimension` 边界 | 通过或逐条违规（对象引用 + 约束名） | Map | `LG_Dimension.TryGetDimensionBounds`（metadata） | 计划；网站 `inspectNativeDesign` 只是编辑期检查 |
 | G4 | 端口类型与朝向 | 描述符 connectors（expanderType、outward、doubleSided）、配对 | 配对结果：类型不符 / 朝向不相对 / 双面门不允许 | Map | `LG_Plug.TryPair` / `Pair`、`LG_ZoneExpanderType`（metadata） | 计划；网站 `snapRoomToPortal` 只做预览吸附 |
 | G5 | 碰撞与重叠 | 变换后的 colliders（仅 `collider-component` 证据） | 重叠对或 `colliders-unknown` 阻塞 | Map | 实例化前无权威碰撞；`LG_FixColliderJob.Build`（metadata） | 计划；**renderer AABB 不能充当碰撞** |
@@ -37,6 +37,8 @@
 | G8 | NavMesh 就绪与局部导航 | 生成完成事件 | `navmesh-ready` 事实，之后才做采样与路径检查 | Map 编排，引擎执行 | 批次 25 `LG_BuildUnityGraphJob.NavmeshDone`、AIGraph 批次 26–38、批次 62 `LG_GenerateNavigationInfoJob`、`NavMesh.SamplePosition` / `CalculatePath`（metadata） | 计划；Development 的采样只是诊断 |
 | G9 | 合法空间发布 | 就绪的导航、area / course node、Enemy 空间需求 | 可查询的合法空间（带不足原因），供 encounter、deployable、玩家落点使用 | Map | `AIG_CourseNode`、`LG_Area.m_courseNode`（metadata） | 计划；Enemy 需求接口未交付 |
 | G10 | 实例与拓扑登记 | G7 的创建观察 | 地址 → 实体引用、拓扑图、观测缺口 | Map | 创建上下文 Hook（Development D3） | 托管部分本地验证；原生未验证 |
+
+显式计划下 G2 退化：候选就是计划里为该 zone 列出的 placement，没有可选的候选集，尝试次数恒为 1，拒绝原因只可能是 G1 的资源阻塞。I-MAP-PLAN 不设预算字段，静态上限（zones ≤ 64、placements ≤ 256、每 zone placement ≤ 32、pairs ≤ 512、描述符 ≤ 256）是 schemaVersion 1 常量，不是每计划可调参数。
 
 生成未完成时的采样成功不能记作房间可用；静态检查（G2–G6）通过不能记作生成成功。LGTuner、Zone_Randomizer、MushroomSeedFixed、ExtraDoor、DoubleSidedDoors 在新链路里**不再承担生成职责**；它们的机制语义作为 `deterministic-layout`、`extra-door-topology` 的来源证据保留，是否仍需作为依赖要逐机制在 M7 决定。按框架 D-010、D-012，近期房间只用原版 geomorph，第三方 Geo 包不接入，第 3 节资源侧 Adapter 与第 6 节 B 组暂缓；LGTuner 依赖在 ForgeMap 生成完全替代它之后删除（D-013）；MTFO 仍是内容加载器。
 
@@ -81,7 +83,7 @@ Adapter 只回答"这个资源在已加载的游戏里是什么"。一个 Adapte
 
 Adapter 不做的事：选择摆放、计算碰撞或连通、声明 NavMesh 就绪、加载或复制资源字节、执行上传的 DLL。
 
-**本批不创建 C# 类型。** 目前没有生成器消费方，也没有可在游戏里核验的 acquire 实现；按规则不写空接口或占位 Adapter。C# 形状在 MAP-ADAPTER 开始、第 6 节 B 组有结果时再定。
+**运行期 Adapter 仍不创建 C# 类型。** 目前没有生成器消费方，也没有可在游戏里核验的 acquire 实现；按规则不写空接口或占位 Adapter。C# 形状在 MAP-ADAPTER 开始、第 6 节 B 组有结果时再定。G0–G6 静态检查这一批只新增静态侧类型：`ResourceDescriptorReader.cs`（本节的严格解析与校验）与 `AssemblyPlanContracts.cs` / `AssemblyPlanReader.cs` / `AssemblyPlanChecks.cs`，它们只读 JSON，不加载资源、不调用原生、不注册 binding。
 
 ## 4. 运行期调用链
 
@@ -124,7 +126,7 @@ python "$m/tools/verify_native_api.py" "$m/evidence/map2-scope-2026-09-13/genera
 3. 在 `Geomorphs` 批次前用 `LG_Factory.InjectJob` 注入一个只写日志的 job，确认是否被执行、执行批次、是否破坏后续批次；主机与客户端各记一次。
 4. 结论决定 G7 用"注入原版批次"还是"自建阶段"，写回本文件第 2 节。
 
-**B. `gtfo.complex-resource-geomorph` profile 核验（MAP-ADAPTER 的开始条件）**
+**B. `gtfo.complex-resource-geomorph` profile 核验（MAP-ADAPTER 的开始条件；第三方 Geo 包按 D-010、D-012 暂缓，B 组保持未执行）**
 1. 装 CheeseGeos 0.5.8 + MTFO，使用引用其 geomorph 的 ComplexResourceSet。
 2. 在 `LG_LoadComplexDataSetResourcesJob.ComplexAssetBundleLoaded` 之后，按描述符 `assetPath` 取对象，记录其 file / pathId 与网站提取值是否一致。
 3. 实例化后比对 `LG_Geomorph.m_areas` / `m_plugs` 数量与描述符 `areas` / `connectors`，比对 plug 的 `m_dir` 与 `outward`。
@@ -150,9 +152,8 @@ python "$m/tools/verify_native_api.py" "$m/evidence/map2-scope-2026-09-13/genera
 
 | 提供方 | 最小需求 | 证据 |
 | --- | --- | --- |
-| 网站 | 导出拼装计划：room 实例（ResourceReference@revision、placementId、zone / dimension / layer、Unity 空间局部变换、连接器配对）、seed 与预算 | 网站导出 README 写明"具体摆放坐标不导出"；`map-native-rules.ts` 只输出 geomorph 名与 `Direction: 'Unchanged'` |
+| 网站 | 导出拼装计划与房间描述符文档（格式由 I-MAP-PLAN 定义，网站实现中） | 框架 §3.2 I-MAP-PLAN（r24 关闭 Q-005）；网站 U-MAP-WEB 尚未完成 |
 | 网站 | 按第 3.1 节输出资源描述符（提取器归网站）；native room 的 revision 规则 | `forge/resource-adapters.ts` 目前只有 pin 与预览，运行期阻塞 `native-resource-binding-unverified` |
-| 网站 | 第三位不同作者的 geometry pin（现有 CheeseGeos、ZaeroGeos 两家） | 同上 |
 | Runtime | 公开的"关卡构建开始 / 构建完成 / NavMesh 就绪"生命周期观察；现在只有 `BeginWorld(worldEpoch)` | `ForgeRuntime/Framework` 中无生成阶段相关 API |
 | Enemy | 按敌人类型的空间需求（clearance、movement、collision）只读合同，供 G9 | 框架 §6 U-MAP-MOD 的 MAP2 / MAP4 开始条件 |
 | Development D3 | 在 G7 的实例化点提供创建上下文（票据、对象、source），不借反射结果直接登记 | 框架 §6 U-DEV-MOD 的 D3 开始条件要求 Map 的创建身份 |

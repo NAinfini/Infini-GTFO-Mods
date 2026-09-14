@@ -56,9 +56,18 @@ def text(value: Any, limit: int = 2048) -> bool:
         and not any(ord(c) < 32 for c in value)
 
 
+def finite_number(value: Any) -> bool:
+    # JSON integers are arbitrary precision in Python; an int too large for a float must reject, not raise.
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def vector(value: Any, size: int) -> bool:
-    return isinstance(value, list) and len(value) == size and all(
-        isinstance(n, (int, float)) and not isinstance(n, bool) and math.isfinite(n) for n in value)
+    return isinstance(value, list) and len(value) == size and all(finite_number(n) for n in value)
 
 
 def source_object(value: Any, path: str) -> tuple[str, str]:
@@ -83,18 +92,20 @@ def transform(value: Any, path: str) -> None:
          and abs(math.hypot(*value['rotation']) - 1) <= 1e-4, 'transform', path)
 
 
-def shared_bytes(rows: Any) -> set[str]:
-    need(isinstance(rows, list), 'schema', 'sharedBytes must be a list')
+def shared_bytes(rows: Any, path: str) -> set[str]:
+    need(isinstance(rows, list), 'schema', path + ' must be a list')
     keys: set[str] = set()
     for index, row in enumerate(rows):
-        path = f'sharedBytes[{index}]'
-        need(isinstance(row, dict) and row.get('kind') in ('mesh', 'texture', 'material'), 'shared-bytes', path + '.kind')
-        fields(row, {'key', 'kind', 'sha256', 'attributes'} if row['kind'] == 'mesh' else {'key', 'kind', 'sha256'}, path)
+        row_path = f'{path}[{index}]'
+        need(isinstance(row, dict) and row.get('kind') in ('mesh', 'texture', 'material'), 'shared-bytes', row_path + '.kind')
+        fields(row, {'key', 'kind', 'sha256', 'attributes'} if row['kind'] == 'mesh' else {'key', 'kind', 'sha256'}, row_path)
         need(isinstance(row['sha256'], str) and HASH.fullmatch(row['sha256']) is not None
-             and row['key'] == row['kind'] + ':' + row['sha256'] and row['key'] not in keys, 'shared-bytes', path + '.key')
+             and row['key'] == row['kind'] + ':' + row['sha256'] and row['key'] not in keys, 'shared-bytes', row_path + '.key')
         keys.add(row['key'])
-        for a_index, attribute in enumerate(row.get('attributes', [])):
-            a_path = f'{path}.attributes[{a_index}]'
+        attributes = row.get('attributes') if row['kind'] == 'mesh' else []
+        need(isinstance(attributes, list), 'schema', row_path + '.attributes')
+        for a_index, attribute in enumerate(attributes):
+            a_path = f'{row_path}.attributes[{a_index}]'
             fields(attribute, {'semantic', 'components', 'fourthComponent'}, a_path)
             need(attribute['semantic'] in ('POSITION', 'NORMAL') and attribute['components'] in (3, 4), 'schema', a_path)
             # A fourth component is a preserved custom scalar channel: no homogeneous divide, never dropped.
@@ -232,19 +243,26 @@ def descriptor(value: Any, path: str, byte_keys: set[str]) -> list[str]:
     return blockers
 
 
-def document(value: Any) -> list[dict[str, Any]]:
-    fields(value, {'schemaVersion', 'kind', 'evidence', 'sharedBytes', 'descriptors'}, '$')
-    need(value['schemaVersion'] == 1 and value['kind'] == 'forge-map-resource-descriptors', 'schema', '$.kind')
-    need(value['evidence'] in EVIDENCE, 'evidence-escalation', '$.evidence')
-    keys = shared_bytes(value['sharedBytes'])
+def document(value: Any, path: str = '$') -> list[dict[str, Any]]:
+    """Validates one `forge-map-resource-descriptors` document and returns its per-descriptor blockers.
+
+    `path` is the root path prefix of the emitted error paths. The standalone CLI uses `$`; the
+    G0 assembly-plan checker imports this same function with `$descriptors` so both checkers stay
+    one implementation (FORGE-FRAMEWORK.md section 3.2: descriptor-document paths start at
+    `$descriptors`).
+    """
+    fields(value, {'schemaVersion', 'kind', 'evidence', 'sharedBytes', 'descriptors'}, path)
+    need(value['schemaVersion'] == 1 and value['kind'] == 'forge-map-resource-descriptors', 'schema', path + '.kind')
+    need(value['evidence'] in EVIDENCE, 'evidence-escalation', path + '.evidence')
+    keys = shared_bytes(value['sharedBytes'], path + '.sharedBytes')
     rows = value['descriptors']
-    need(isinstance(rows, list) and rows, 'schema', '$.descriptors')
+    need(isinstance(rows, list) and rows, 'schema', path + '.descriptors')
     results, identities = [], set()
     for index, row in enumerate(rows):
-        blockers = descriptor(row, f'$.descriptors[{index}]', keys)
+        blockers = descriptor(row, f'{path}.descriptors[{index}]', keys)
         identity = row['reference']['id'] + '@' + row['reference']['revision']
         # Shared bytes may be deduplicated; resource identity, authorization and instances never are.
-        need(identity not in identities, 'duplicate-resource', f'$.descriptors[{index}].reference')
+        need(identity not in identities, 'duplicate-resource', f'{path}.descriptors[{index}].reference')
         identities.add(identity)
         results.append({'reference': identity, 'generationBlockers': blockers})
     return results
