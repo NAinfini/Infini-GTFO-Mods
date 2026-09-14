@@ -231,6 +231,18 @@ void RejectCode(Action action, string code, string name)
     Bad(g => g["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"source\",\"type\":\"entity\",\"optional\":true}")), "context-role-port", "context role inputs are explicit");
     Bad(g => g["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"values\":[\"a\"]}")), "parameter-set", "promotable enums name a shared set");
     Bad(g => g["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"target\",\"type\":\"number\",\"role\":\"value\",\"required\":false}")), "parameter-collision", "value parameters cannot shadow an input");
+    // Result-port reason codes (GraphPort.codes), mirrored from the website's port() field.
+    Bad(g => g["outputs"]![0]!["codes"] = JsonNode.Parse("[\"ok-code\"]"), "port-codes", "codes on a nonresult port rejects");
+    Bad(g => g["outputs"]![1]!["codes"] = "not-an-array", "port-codes", "codes must be an array");
+    Bad(g => g["outputs"]![1]!["codes"] = JsonNode.Parse("[\"Bad_Code\"]"), "port-codes", "codes must match the reason-code pattern");
+    Bad(g => g["outputs"]![1]!["codes"] = JsonNode.Parse("[\"dup\",\"dup\"]"), "port-codes", "codes cannot repeat");
+    {
+        var module = Fixture.Module("example.contract_codes"); var json = JsonNode.Parse(module.RegistryJson)!;
+        json["capabilities"]![1]!["graph"]!["outputs"]![1]!["codes"] = JsonNode.Parse("[\"first-code\",\"second-code\"]");
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        var handle = kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() });
+        Check(handle.IsRegistered, "a valid result-port codes array registers");
+    }
 }
 {
     var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);

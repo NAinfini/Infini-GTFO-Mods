@@ -98,6 +98,22 @@ if (grouped) {
         registration('invalid:' + name, definition, false);
     }
 }
+// Result-port reason codes (GraphPort.codes): heal already declares a valid, non-empty set,
+// so only the rejection paths need dedicated vectors here.
+const heal = logic.capabilities.find(d => d.id === 'forge.action.combat.heal');
+assert.ok(heal, 'forge.action.combat.heal not found in logicPrimitiveSeed');
+const resultPort = g => g.outputs.find(p => p.type === 'result');
+const nonResultPort = g => g.outputs.find(p => p.type !== 'result');
+const codesMutations = {
+    'codes-on-nonresult-port': g => {nonResultPort(g).codes = ['some-code'];},
+    'codes-not-array': g => {resultPort(g).codes = 'overheal-unsupported';},
+    'codes-duplicate': g => {const codes = resultPort(g).codes; resultPort(g).codes = [...codes, codes[0]];},
+    'codes-invalid-pattern': g => {resultPort(g).codes = [...resultPort(g).codes, 'Bad_Code'];},
+};
+for (const [name, change] of Object.entries(codesMutations)) {
+    const definition = structuredClone(heal); change(definition.graph);
+    registration('invalid:' + name, definition, false);
+}
 {
     const spec = count(base.graph);
     for (const size of [spec.minimum + 1, Math.floor((spec.minimum + spec.maximum) / 2), spec.maximum - 1]) {
