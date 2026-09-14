@@ -59,7 +59,7 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 **SDK 不支持 variadic 也已解除。** `RuntimeRegistry` 曾把 `graph.variadic` 当未知字段拒绝，导致 T1 的 C# 注册在 `RuntimeJson.Shape → RuntimeRegistry.Validate` 处失败。Runtime 的 R4a 能校验该元数据并按精确 revision 解析端口；U-RUNTIME 的 plan v2 加载器会按注册合同展开 variadic/portGroups，但 T1 的作者定义没有运行绑定，**元数据可登记不等于图已可执行**。
 
-历史失败日志全部保留在各自的 `artifacts/` 目录里，不用后来的绿色结果覆盖它们。
+`artifacts/` 只保留本文仍引用的批次目录（`trigger-20260914-*`、`align-*-m`、`align-t1-final`、`trigger-20260913-100541`、`trigger-20260913-101425`）；更早的批次已于 2026-09-14 删除，它们的结论以本文记录为准，不用后来的绿色结果改写这些记录。
 
 ## 复跑
 
