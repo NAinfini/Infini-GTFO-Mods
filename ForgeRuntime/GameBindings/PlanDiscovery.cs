@@ -41,21 +41,38 @@ internal static class PlanDiscovery
             }
         }
         hits.Sort((a, b) => string.CompareOrdinal(a.Relative, b.Relative));
-        var candidates = new List<PlanCandidate>(hits.Count);
-        long acceptedBytes = 0; int acceptedCount = 0;
-        foreach (var (relative, length) in hits)
+
+        // Per-file cap first: an oversized file is rejected on its own and never counts toward the combined budget below.
+        var underBudget = new List<int>(hits.Count);
+        for (int i = 0; i < hits.Count; i++)
+            if (hits[i].Length <= FrameworkFiles.MaximumPlanBytes) underBudget.Add(i);
+
+        // Combined budget is tail-first: while the remaining set still exceeds the file-count or byte cap, drop the
+        // ordinally-last remaining file and recheck. A file that survives this pass is never displaced by a later,
+        // smaller one — unlike a forward greedy scan, which could accept a later file after an earlier one overflowed.
+        long combinedBytes = 0; foreach (var index in underBudget) combinedBytes += hits[index].Length;
+        var overBudget = new HashSet<int>();
+        int survivingCount = underBudget.Count;
+        while (survivingCount > maximumFileCount || combinedBytes > maximumCombinedBytes)
         {
-            if (acceptedCount >= maximumFileCount || acceptedBytes + length > maximumCombinedBytes)
-            {
-                // Excess is whatever does not fit once earlier, lower-sorted files have claimed the budget; each
-                // rejected file still gets its own plan.rejected record.
-                candidates.Add(PlanCandidate.Rejected(relative, "plan-budget", "Combined discovery budget (256 files / 64 MiB) exceeded."));
-                continue;
-            }
-            acceptedCount++; acceptedBytes += length;
+            survivingCount--;
+            int index = underBudget[survivingCount];
+            combinedBytes -= hits[index].Length;
+            overBudget.Add(index);
+        }
+
+        var candidates = new List<PlanCandidate>(hits.Count);
+        for (int i = 0; i < hits.Count; i++)
+        {
+            var (relative, length) = hits[i];
             if (length > FrameworkFiles.MaximumPlanBytes)
             {
                 candidates.Add(PlanCandidate.Rejected(relative, "json-size", "Plan file exceeds 4 MiB."));
+                continue;
+            }
+            if (overBudget.Contains(i))
+            {
+                candidates.Add(PlanCandidate.Rejected(relative, "plan-budget", "Combined discovery budget (256 files / 64 MiB) exceeded."));
                 continue;
             }
             string absolute;
@@ -63,7 +80,7 @@ internal static class PlanDiscovery
             catch (InvalidDataException ex)
             {
                 // Link/escape checks only run once the plans/ chain is known to exist, and only on this chain and file.
-                candidates.Add(PlanCandidate.Rejected(relative, "invalid-json", ex.Message));
+                candidates.Add(PlanCandidate.Rejected(relative, "plan-path", ex.Message));
                 continue;
             }
             try

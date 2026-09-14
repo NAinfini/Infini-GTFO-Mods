@@ -200,6 +200,31 @@ try
 }
 finally { Directory.Delete(budgetRoot, true); }
 
+string middleOverflowRoot = Path.Combine(Path.GetTempPath(), "forge-discovery-middle-overflow-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(middleOverflowRoot);
+try
+{
+    // p2 sits in the ordinal middle and is the file that pushes the combined total over budget; a forward-greedy scan
+    // would reject only p2 (it doesn't fit under the running total) and then let the smaller p3/p4 back in afterwards.
+    // Tail-first eviction must instead keep evicting from the end - p4, then p3, then p2 itself - until the survivors
+    // fit, so p2 and everything ordinally after it are rejected, not just p2 alone.
+    var plansDir = Path.Combine(middleOverflowRoot, "plugins", "Pack", "forge", "plans");
+    Directory.CreateDirectory(plansDir);
+    File.WriteAllText(Path.Combine(plansDir, "p0.plan.json"), "{}");           // 2 bytes
+    File.WriteAllText(Path.Combine(plansDir, "p1.plan.json"), "{}");           // 2 bytes
+    File.WriteAllText(Path.Combine(plansDir, "p2.plan.json"), new string('a', 100)); // 100 bytes: the overflow cause
+    File.WriteAllText(Path.Combine(plansDir, "p3.plan.json"), "{}");           // 2 bytes
+    File.WriteAllText(Path.Combine(plansDir, "p4.plan.json"), "{}");           // 2 bytes
+    var byName = PlanDiscovery.Scan(middleOverflowRoot, 256, 50).ToDictionary(h => Path.GetFileName(h.Path));
+    Check(!byName["p0.plan.json"].IsHostRejected && !byName["p1.plan.json"].IsHostRejected,
+        "files before the overflowing middle file survive tail-first eviction");
+    Check(byName["p2.plan.json"].IsHostRejected && byName["p2.plan.json"].RejectedCode == "plan-budget"
+        && byName["p3.plan.json"].IsHostRejected && byName["p3.plan.json"].RejectedCode == "plan-budget"
+        && byName["p4.plan.json"].IsHostRejected && byName["p4.plan.json"].RejectedCode == "plan-budget",
+        "the overflowing middle file and every file ordinally after it are rejected as plan-budget, not just the middle file");
+}
+finally { Directory.Delete(middleOverflowRoot, true); }
+
 string junctionRoot = Path.Combine(Path.GetTempPath(), "forge-discovery-junction-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(junctionRoot);
 try
@@ -211,7 +236,7 @@ try
     if (TryJunction(plansLink, realPlans))
     {
         var linked = PlanDiscovery.Scan(junctionRoot);
-        Check(linked.Count == 1 && linked[0].IsHostRejected && linked[0].RejectedCode == "invalid-json", "plans/ being a junction is rejected, not followed");
+        Check(linked.Count == 1 && linked[0].IsHostRejected && linked[0].RejectedCode == "plan-path", "plans/ being a junction is rejected, not followed");
 
         var siblingTarget = Path.Combine(junctionRoot, "real-sibling"); Directory.CreateDirectory(siblingTarget);
         TryJunction(Path.Combine(junctionRoot, "plugins", "Sibling"), siblingTarget);
@@ -219,19 +244,36 @@ try
     }
     else
     {
-        // This host cannot create NTFS junctions (observed here: mklink /J denied even though it succeeds when run
-        // directly from an interactive shell). Both junction-rejection assertions above are skipped rather than
-        // faked; re-run on a host that can create junctions before trusting this file's assertion count.
-        Console.Error.WriteLine("SKIPPED: host cannot create NTFS junctions (mklink /J denied) - junction-rejection assertions not exercised.");
+        // This host denies junction creation both from a child cmd.exe/mklink and from a child powershell.exe/New-Item
+        // process. A skip must not look green: both assertions are reported as blocked (INCOMPLETE), never silently
+        // passed or hidden on stderr; re-run on a host that can create junctions before trusting this file's count.
+        const string reason = "host denies NTFS junction creation from a child process (mklink /J and New-Item -ItemType Junction both refused)";
+        blocked.Add(("discovery.junction-plans-rejected-not-followed", reason));
+        blocked.Add(("discovery.junction-sibling-package-no-effect", reason));
     }
 }
-finally { Directory.Delete(junctionRoot, true); }
+finally { UnlinkReparsePoints(junctionRoot); Directory.Delete(junctionRoot, true); }
+
+// Directory.Delete(path, recursive: true) throws Access-Denied on this host once the tree contains a junction -
+// a non-recursive delete on the junction's own path removes just the reparse point, leaving its target untouched,
+// so every junction created for this test must be unlinked before the recursive delete of junctionRoot runs.
+void UnlinkReparsePoints(string root)
+{
+    if (!Directory.Exists(root)) return;
+    foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories))
+        if (new DirectoryInfo(dir).Attributes.HasFlag(FileAttributes.ReparsePoint)) Directory.Delete(dir, false);
+}
 
 bool TryJunction(string link, string target)
 {
     var mklink = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true })!;
     mklink.WaitForExit();
-    return mklink.ExitCode == 0;
+    if (mklink.ExitCode == 0 && Directory.Exists(link)) return true;
+    var newItem = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("powershell.exe",
+        $"-NoProfile -NonInteractive -Command \"$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path '{link}' -Target '{target}' | Out-Null\"")
+    { UseShellExecute = false, CreateNoWindow = true })!;
+    newItem.WaitForExit();
+    return newItem.ExitCode == 0 && Directory.Exists(link);
 }
 
 if (args.Length >= 2 && args[0] == "--export-manifest")
