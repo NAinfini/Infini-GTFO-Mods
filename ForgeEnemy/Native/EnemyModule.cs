@@ -191,7 +191,7 @@ internal sealed partial class EnemyModule : IDisposable
             "gtfo.enemy.damage:" + _kernel.WorldEpoch + ":" + checked(++_eventSequence), DamageBinding,
             _kernel.WorldEpoch, Math.Max(0, _kernel.CurrentTick), "gtfo.world:" + _kernel.WorldEpoch,
             RuntimeJson.From(new { source = (EntityReference?)null, target = before.Target, amount = actualDamage,
-                damage_kind = (string?)null, limb = (int?)null })));
+                damage_kind = (int?)null, limb = (int?)null })));
         if (result.Status == "rejected") _report("damage fact rejected: " + result.Code);
     }
 

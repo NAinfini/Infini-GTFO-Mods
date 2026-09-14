@@ -82,11 +82,7 @@ internal static class LocalPlan
         return new(json, permissions);
     }
 
-    /// <summary>Loads a plan, turning the one known SDK blocker into <see cref="CaseBlocked"/>; every other rejection propagates.</summary>
+    /// <summary>Loads a plan; every rejection propagates.</summary>
     internal static void Load(RuntimeKernel kernel, Plan plan, IEnumerable<string>? grants = null)
-    {
-        try { kernel.LoadPlan(plan.Json, grants ?? plan.Permissions); }
-        catch (RuntimeContractException error) when (error.Code == "unsupported-event-port" && error.Message.EndsWith(".damage_kind", StringComparison.Ordinal))
-        { throw new CaseBlocked(Blockers.EnumEventPort); }
-    }
+        => kernel.LoadPlan(plan.Json, grants ?? plan.Permissions);
 }
