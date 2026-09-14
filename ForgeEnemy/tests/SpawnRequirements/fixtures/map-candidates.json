@@ -1,0 +1,29 @@
+{
+  "note": "Enemy-side fixtures for a Map solver stand-in. Candidate shapes are test inputs, not room evidence; rejection itself belongs to ForgeMap MAP2.",
+  "candidates": [
+    { "id": "ground-humanoid-walkable", "navMeshAgentTypes": [0], "requiredAreaMask": 1, "airGraph": false, "clearanceLimited": false, "arenaDimensions": [] },
+    { "id": "ground-path-through-jump-area", "navMeshAgentTypes": [0], "requiredAreaMask": 5, "airGraph": false, "clearanceLimited": false, "arenaDimensions": [] },
+    { "id": "ground-tank-agent-only", "navMeshAgentTypes": [-1372625422], "requiredAreaMask": 1, "airGraph": false, "clearanceLimited": false, "arenaDimensions": [] },
+    { "id": "air-graph-only", "navMeshAgentTypes": [], "requiredAreaMask": 0, "airGraph": true, "clearanceLimited": false, "arenaDimensions": [] },
+    { "id": "clearance-limited-vent", "navMeshAgentTypes": [0], "requiredAreaMask": 1, "airGraph": true, "clearanceLimited": true, "arenaDimensions": [] },
+    { "id": "ground-with-arena-14", "navMeshAgentTypes": [0], "requiredAreaMask": 1, "airGraph": false, "clearanceLimited": false, "arenaDimensions": [14] }
+  ],
+  "expectations": [
+    { "enemy": 13, "candidate": "ground-humanoid-walkable", "result": "accepted" },
+    { "enemy": 13, "candidate": "ground-path-through-jump-area", "result": "accepted" },
+    { "enemy": 13, "candidate": "air-graph-only", "result": "navigation-profile-unsupported" },
+    { "enemy": 13, "candidate": "ground-tank-agent-only", "result": "navigation-profile-unsupported" },
+    { "enemy": 13, "candidate": "clearance-limited-vent", "result": "clearance-unverified" },
+    { "enemy": 42, "candidate": "ground-humanoid-walkable", "result": "movement-unsupported" },
+    { "enemy": 42, "candidate": "air-graph-only", "result": "accepted" },
+    { "enemy": 42, "candidate": "clearance-limited-vent", "result": "clearance-unverified" },
+    { "enemy": 55, "candidate": "ground-humanoid-walkable", "result": "accepted" },
+    { "enemy": 55, "candidate": "ground-path-through-jump-area", "result": "area-mask" },
+    { "enemy": 55, "candidate": "clearance-limited-vent", "result": "clearance-unverified" },
+    { "enemy": 22, "candidate": "ground-humanoid-walkable", "result": "requirement-unresolved" },
+    { "enemy": 44, "candidate": "air-graph-only", "result": "requirement-unresolved" },
+    { "enemy": 61, "candidate": "ground-humanoid-walkable", "result": "requirement-unresolved" },
+    { "enemy": 46, "candidate": "ground-humanoid-walkable", "result": "arena-dimension" },
+    { "enemy": 46, "candidate": "ground-with-arena-14", "result": "accepted" }
+  ]
+}

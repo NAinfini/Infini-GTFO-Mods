@@ -11,5 +11,6 @@
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
     <Compile Include="../../Native/*.cs;../../Native/Observation/*.cs" />
     <Compile Include="../NativePlugin/GameDoubles.cs;../NativePlugin/LoaderDoubles.cs" />
+    <Compile Include="../Shared/*.cs" />
   </ItemGroup>
 </Project>

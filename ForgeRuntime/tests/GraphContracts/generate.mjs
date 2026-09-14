@@ -10,7 +10,7 @@ process.chdir(site);
 await import(pathToFileURL(path.join(site, 'Tools/register-typescript.ts')).href);
 const load = name => import(pathToFileURL(path.join(site, 'site/forge', name + '.ts')).href);
 const {logicPrimitiveSeed} = await load('logic-primitives');
-const {validateGraphMetadata, resolveGraphContract} = await load('graph-schema');
+const {validateGraphMetadata, resolveGraphContract, normalizePortGroups} = await load('graph-schema');
 const {ForgeRegistry} = await load('registry');
 const logic = logicPrimitiveSeed();
 const registrations = [], resolutions = [];
@@ -26,48 +26,55 @@ for (const definition of logic.capabilities) {
     validateGraphMetadata(definition.graph, definition.id);
     registration('actual:' + definition.id, definition, true);
 }
-const variable = logic.capabilities.filter(d => d.graph.variadic);
-assert.equal(variable.length, 9, 'Re-review new variable definitions before updating this fixture');
+// Every repeat form the website declares (whole-side variadic and port groups), with its own version and bounds.
+const variable = logic.capabilities.filter(d => normalizePortGroups(d.graph).length > 0);
+assert.ok(variable.length > 0, 'The website declares no variable port definitions');
 for (const definition of variable) {
-    assert.equal(definition.version, '1.1.0');
-    const name = definition.id, spec = definition.graph.variadic;
-    for (const count of [undefined, ...Array.from({length: 31}, (_, i) => i + 2), 0, 1, 33, -1, 2.5, null, '3', true]) {
-        const parameters = count === undefined ? {} : {[spec.parameter]: count};
-        const accepted = count === undefined || typeof count === 'number' && Number.isInteger(count) && count >= 2 && count <= 32;
-        let expected = null;
-        if (accepted) expected = resolveGraphContract(definition.graph, parameters);
-        else assert.throws(() => resolveGraphContract(definition.graph, parameters));
-        resolutions.push({name: name + ':' + String(count), seed: seedFor(definition),
-            id: name, version: definition.version, parameters, accepted, expected});
+    for (const group of normalizePortGroups(definition.graph)) {
+        const {parameter, minimum, maximum} = group;
+        const valid = Array.from({length: maximum - minimum + 1}, (_, i) => minimum + i);
+        for (const count of [undefined, ...valid, minimum - 2, minimum - 1, maximum + 1, -1, minimum + 0.5, null, String(minimum + 1), true]) {
+            const parameters = count === undefined ? {} : {[parameter]: count};
+            const accepted = count === undefined || Number.isInteger(count) && count >= minimum && count <= maximum;
+            let expected = null;
+            if (accepted) expected = resolveGraphContract(definition.graph, parameters);
+            else assert.throws(() => resolveGraphContract(definition.graph, parameters));
+            resolutions.push({name: definition.id + ':' + parameter + ':' + String(count), seed: seedFor(definition),
+                id: definition.id, version: definition.version, parameters, accepted, expected});
+        }
     }
 }
-const base = variable.find(d => d.id === 'forge.modifier.value.add');
+// Whole-side mutations start from a pure numeric variadic; group mutations from a declared port group.
+const base = variable.find(d => d.graph.execution === 'pure' && d.graph.variadic?.side === 'inputs' && d.graph.variadic.port.type === 'number');
+assert.ok(base, 'No pure numeric input variadic to mutate');
+const count = g => g.parameters.find(p => p.id === g.variadic.parameter);
+const other = type => type === 'boolean' ? 'number' : 'boolean';
 const mutations = {
     'unknown-side': g => {g.variadic.side = 'either';},
     'null-spec': g => {g.variadic = null;},
     'unknown-field': g => {g.variadic.default = 3;},
     'unknown-parameter': g => {g.variadic.parameter = 'missing';},
-    'required-count': g => {g.parameters[0].required = true;},
-    'value-role-count': g => {g.parameters[0].role = 'value';},
-    'number-count': g => {g.parameters[0].type = 'number';},
-    'missing-min': g => {delete g.parameters[0].minimum;},
-    'missing-max': g => {delete g.parameters[0].maximum;},
-    'wrong-min': g => {g.parameters[0].minimum = 3;},
-    'max-is-base': g => {g.parameters[0].maximum = 2;},
-    'max-over-budget': g => {g.parameters[0].maximum = 33;},
-    'fractional-max': g => {g.parameters[0].maximum = 3.5;},
+    'required-count': g => {count(g).required = true;},
+    'value-role-count': g => {count(g).role = 'value';},
+    'number-count': g => {count(g).type = 'number';},
+    'missing-min': g => {delete count(g).minimum;},
+    'missing-max': g => {delete count(g).maximum;},
+    'wrong-min': g => {count(g).minimum = g.inputs.length + 1;},
+    'max-is-base': g => {count(g).maximum = g.inputs.length;},
+    'max-over-budget': g => {count(g).maximum += 1;},
+    'fractional-max': g => {count(g).maximum -= 0.5;},
     'optional-template': g => {g.variadic.port.optional = true;},
     'nullable-template': g => {g.variadic.port.nullable = true;},
     'invalid-template-name': g => {g.variadic.port.id = '1bad';},
-    'wrong-template-type': g => {g.variadic.port.type = 'boolean';},
+    'wrong-template-type': g => {g.variadic.port.type = other(g.variadic.port.type);},
     'unit-mismatch': g => {g.variadic.port.unit = 'HP';},
     'schema-mismatch': g => {g.variadic.port.schema = 'other';},
-    'base-type-mismatch': g => {g.inputs[1].type = 'boolean';},
+    'base-type-mismatch': g => {g.inputs[1].type = other(g.inputs[1].type);},
     'base-optional': g => {g.inputs[1].optional = true;},
     'base-nullable': g => {g.inputs[1].nullable = true;},
-    'collision': g => {g.inputs[0].id = 'input_3';},
+    'collision': g => {g.inputs[0].id = g.variadic.port.id + '_' + (g.inputs.length + 1);},
     'duplicate-base-id': g => {g.inputs[1].id = g.inputs[0].id;},
-    'too-small-base': g => {g.inputs.pop(); g.parameters[0].minimum = 1;},
+    'too-small-base': g => {g.inputs.length = 1; count(g).minimum = 1;},
     'pure-execution-template': g => {g.variadic.port.type = 'execution';},
     'unknown-template-field': g => {g.variadic.port.default = 1;},
 };
@@ -75,14 +82,33 @@ for (const [name, change] of Object.entries(mutations)) {
     const definition = structuredClone(base); change(definition.graph);
     registration('invalid:' + name, definition, false);
 }
-for (const count of [3, 7, 31]) {
-    const definition = structuredClone(base), g = definition.graph;
-    g.inputs = Array.from({length: count}, (_, i) => ({id: 'base_' + i, type: 'number'}));
-    g.parameters[0].minimum = count; g.parameters[0].maximum = 32;
-    registration('larger-base:' + count, definition, true);
-    resolutions.push({name:'larger-base:' + count, seed:seedFor(definition), id:definition.id,
-        version:definition.version, parameters:{input_count:32}, accepted:true,
-        expected:resolveGraphContract(g, {input_count:32})});
+const grouped = variable.find(d => d.graph.portGroups);
+if (grouped) {
+    const first = g => g.portGroups[0];
+    const groupMutations = {
+        'group-minimum-mismatch': g => {first(g).minimum += 1;},
+        'group-maximum-mismatch': g => {first(g).maximum -= 1;},
+        'group-unknown-parameter': g => {first(g).parameter = 'missing';},
+        'group-unknown-field': g => {first(g).default = 3;},
+        'group-empty-slots': g => {first(g).slots = [];},
+        'group-base-renamed': g => {g[first(g).side].find(p => p.id === first(g).slots[0].id + '_1').id = 'renamed';},
+    };
+    for (const [name, change] of Object.entries(groupMutations)) {
+        const definition = structuredClone(grouped); change(definition.graph);
+        registration('invalid:' + name, definition, false);
+    }
+}
+{
+    const spec = count(base.graph);
+    for (const size of [spec.minimum + 1, Math.floor((spec.minimum + spec.maximum) / 2), spec.maximum - 1]) {
+        const definition = structuredClone(base), g = definition.graph;
+        g.inputs = Array.from({length: size}, (_, i) => ({id: 'base_' + i, type: g.variadic.port.type}));
+        count(g).minimum = size;
+        registration('larger-base:' + size, definition, true);
+        const parameters = {[g.variadic.parameter]: spec.maximum};
+        resolutions.push({name:'larger-base:' + size, seed:seedFor(definition), id:definition.id,
+            version:definition.version, parameters, accepted:true, expected:resolveGraphContract(g, parameters)});
+    }
 }
 const {compileForgeRuntimePlan, validateForgeRuntimePlan} = await load('runtime-compiler');
 const {forgeRuntimeApiVersion} = await load('runtime-contracts');
@@ -137,7 +163,7 @@ const sourceFiles = fs.readdirSync(path.join(site,'site/forge')).filter(f=>f.end
 const hashes = Object.fromEntries(sourceFiles.map(f=>[f,
     createHash('sha256').update(fs.readFileSync(path.join(site,f))).digest('hex')]));
 fs.writeFileSync(destination,JSON.stringify({schemaVersion:2,kind:'test-only-graph-contract-vectors',
-    gameVerified:false,sourceHashes:hashes,registrations,resolutions,
-    plans:{fixedSeed,variableSeed,fixedPlan,variablePlan}},null,2)+'\n');
+    gameVerified:false,sourceHashes:hashes,variableDefinitions:variable.map(d=>d.id+'@'+d.version),
+    registrations,resolutions,plans:{fixedSeed,variableSeed,fixedPlan,variablePlan}},null,2)+'\n');
 console.log(JSON.stringify({registrations:registrations.length,resolutions:resolutions.length,
-    websiteLayoutRefusals:2,sourceFiles:sourceFiles.length,gameVerified:false}));
+    variableDefinitions:variable.length,websiteLayoutRefusals:2,sourceFiles:sourceFiles.length,gameVerified:false}));

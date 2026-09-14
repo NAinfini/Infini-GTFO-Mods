@@ -11,5 +11,6 @@
     <Compile Include="../../Native/Plugin.cs;../../Native/EnemyPluginSession.cs;../../Native/EnemyNativeHooks.cs;../../Native/EnemyLifecycleHooks.cs;../../Native/Observation/*.cs" />
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+    <Compile Include="../Shared/*.cs" />
   </ItemGroup>
 </Project>

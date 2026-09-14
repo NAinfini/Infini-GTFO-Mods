@@ -13,11 +13,14 @@ $out = Join-Path $env:TEMP ('forge-commit-audit-' + [guid]::NewGuid().ToString('
 dotnet build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj -c Release --artifacts-path $out
 $sdk = Join-Path $out 'bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll'
 dotnet build ForgeEnemy/tests/CommitAudit/CommitAudit.csproj -c Release --artifacts-path $out "-p:ForgeFrameworkAssembly=$sdk"
-dotnet "$out/bin/CommitAudit/release/CommitAudit.dll" ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime "$out/report.json"
+dotnet "$out/bin/CommitAudit/release/CommitAudit.dll" "$out/report.json"
 ```
 
+Damage cases load a damage_applied -> QA record plan built from the kernel registry; no website fixture is read.
+Cases the SDK cannot load yet are listed as BLOCKED with their reason, never counted as passed.
+
 Stop after any failed build; never run an older executable as the result of a new build.
-The report records SDK/source/fixture hashes. Compare source hashes before and after
+The report records SDK/source hashes. Compare source hashes before and after
 building in an active workspace; a changed source means the report is version-specific,
 not proof of the latest file. Source copies in build output are test evidence only.
 

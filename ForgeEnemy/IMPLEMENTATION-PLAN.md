@@ -20,11 +20,23 @@ Enemy 包拥有敌人实例、健康与战斗接收器、AI 与感知与移动�
 
 逐项冻结敌人健康、AI 状态、感知、移动、攻击与弹丸、部位与死亡、材质与动画 API 的精确 build 与 hash、签名、调用阶段和权威证据，未知保持未知。完善 GlobalID、指针与完整 world/life 的关联与失效——对象池复用、同 ID 重生、销毁后的迟到回调和 world 变化都不能复用旧引用或多次生成同一生命。从已核验的资源与原生配置声明尺寸与 clearance、移动类型、导航与碰撞、环境需求，用公开 DTO 与资源合同交给 Map，**不把原生 `EnemyAgent` 塞进 JSON**。区分外观-only 的内容与需要 Enemy 行为能力的内容依赖；模型属于资源库，不因换皮就自动强制加载全部 Enemy 能力。
 
-已有的元数据证据是 10 个审计领域、92 个精确方法签名（含重载、声明程序集和 static/virtual/public 标记）；这是 metadata-only 等级，方法数不是已支持的能力数。
-
 **当前 Position 快照、模型包围盒或骨骼预览都不是碰撞或导航证据。** 合法空间求解归 Map。
 
 退出验收：同资源多实例、对象池复用、超大或特殊移动单位被不合法空间拒绝、外观包依赖按实际引用计算。
+
+### E2 状态（2026-09-13，离线与替身等级，未进游戏）
+
+已交付：
+- **API 冻结 v2**：`evidence/native-api-20403457.json` 共 127 个签名、11 个领域，其中 metadata 125、static-native 2（只有 `SendSetHealth` 与 `ReceiveSetHealth` 的指令形状）。另有 7 个枚举常量。审计器从 Native DLL 的 IL 读出 Forge 实际的 5 个 Hook 与 29 个调用入口，并要求它们全部冻结；原生调用阶段一律 `unknown`。审计时发现 BehaviorObservation 与 EntityObservation 用到的 12 个游戏 API 此前未冻结，现已补齐。
+- **出生空间要求合同 v1** 与内容依赖计算，见 [README](README.md#出生空间要求合同e2离线数据等级)。
+- **身份替身用例**：ReceiverProbe 新增同资源多实例、池化指针换 ID 后旧 ID 再被占用、world 变化后重放出生只得一个生命、销毁并同 ID 重生后的迟到伤害回调，共 4 项。
+
+退出验收的对应：
+- 同资源多实例、对象池复用：由 ReceiverProbe 替身覆盖。
+- 超大或特殊移动单位被拒：**拒绝本身归 Map**。Enemy 只交付要求与 `tests/SpawnRequirements/fixtures/map-candidates.json` 夹具，由测试替身求解器验证合同足以拒绝；真实 MAP2 求解器未接入。
+- 外观包依赖：按计划 binding 实际计算。
+
+未完成：全部游戏内核验（见 [VALIDATION](VALIDATION.md#待游戏内核验)）、Map 侧消费者。若需要跨包共享的类型化记录而非 JSON 合同，要由 U-RUNTIME 在 SDK 中提供。
 
 ## E3 — 健康、伤害、治疗与部位结果
 

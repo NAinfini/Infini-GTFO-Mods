@@ -155,7 +155,9 @@
     {
       "id": "16-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 7.5,
         "b": 2.25
@@ -165,7 +167,9 @@
     {
       "id": "17-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": -2,
         "b": 3
@@ -175,7 +179,9 @@
     {
       "id": "18-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 0,
         "b": 1
@@ -185,7 +191,9 @@
     {
       "id": "19-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 1,
         "b": -1
@@ -195,7 +203,9 @@
     {
       "id": "20-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 1e-100,
         "b": 2
@@ -307,8 +317,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 3
+        "value": 2,
+        "exponent": 3
       },
       "outcome": "value"
     },
@@ -317,8 +327,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 9,
-        "b": 0.5
+        "value": 9,
+        "exponent": 0.5
       },
       "outcome": "value"
     },
@@ -327,8 +337,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": -2,
-        "b": 3
+        "value": -2,
+        "exponent": 3
       },
       "outcome": "value"
     },
@@ -337,8 +347,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": -2,
-        "b": 4
+        "value": -2,
+        "exponent": 4
       },
       "outcome": "value"
     },
@@ -347,8 +357,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "value": 0,
+        "exponent": 0
       },
       "outcome": "value"
     },
@@ -357,8 +367,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 4,
-        "b": -0.5
+        "value": 4,
+        "exponent": -0.5
       },
       "outcome": "value"
     },
@@ -367,8 +377,8 @@
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": -1074
+        "value": 2,
+        "exponent": -1074
       },
       "outcome": "value"
     },
@@ -387,7 +397,7 @@
       "capabilityId": "forge.modifier.value.absolute",
       "parameters": {},
       "inputs": {
-        "input": 0
+        "value": 0
       },
       "outcome": "value",
       "golden": 0
@@ -396,21 +406,21 @@
       "id": "40-constant",
       "capabilityId": "forge.modifier.value.constant",
       "parameters": {
-        "value": -0.0
+        "value": 0
       },
       "inputs": {},
       "outcome": "value",
-      "golden": -0.0
+      "golden": 0
     },
     {
       "id": "41-absolute",
       "capabilityId": "forge.modifier.value.absolute",
       "parameters": {},
       "inputs": {
-        "input": -0.0
+        "value": 0
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "42-constant",
@@ -427,7 +437,7 @@
       "capabilityId": "forge.modifier.value.absolute",
       "parameters": {},
       "inputs": {
-        "input": 1e-300
+        "value": 1e-300
       },
       "outcome": "value",
       "golden": 1e-300
@@ -447,7 +457,7 @@
       "capabilityId": "forge.modifier.value.absolute",
       "parameters": {},
       "inputs": {
-        "input": -3.5
+        "value": -3.5
       },
       "outcome": "value",
       "golden": 3.5
@@ -467,7 +477,7 @@
       "capabilityId": "forge.modifier.value.absolute",
       "parameters": {},
       "inputs": {
-        "input": 1.7976931348623157e+308
+        "value": 1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": 1.7976931348623157e+308
@@ -475,12 +485,11 @@
     {
       "id": "48-clamp",
       "capabilityId": "forge.modifier.value.clamp",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
+        "value": -2,
         "minimum": -1,
         "maximum": 1
-      },
-      "inputs": {
-        "value": -2
       },
       "outcome": "value",
       "golden": -1
@@ -488,12 +497,11 @@
     {
       "id": "49-clamp",
       "capabilityId": "forge.modifier.value.clamp",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
+        "value": -1,
         "minimum": -1,
         "maximum": 1
-      },
-      "inputs": {
-        "value": -1
       },
       "outcome": "value",
       "golden": -1
@@ -501,12 +509,11 @@
     {
       "id": "50-clamp",
       "capabilityId": "forge.modifier.value.clamp",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
+        "value": 0,
         "minimum": -1,
         "maximum": 1
-      },
-      "inputs": {
-        "value": 0
       },
       "outcome": "value",
       "golden": 0
@@ -514,12 +521,11 @@
     {
       "id": "51-clamp",
       "capabilityId": "forge.modifier.value.clamp",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
+        "value": 1,
         "minimum": -1,
         "maximum": 1
-      },
-      "inputs": {
-        "value": 1
       },
       "outcome": "value",
       "golden": 1
@@ -527,12 +533,11 @@
     {
       "id": "52-clamp",
       "capabilityId": "forge.modifier.value.clamp",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
+        "value": 2,
         "minimum": -1,
         "maximum": 1
-      },
-      "inputs": {
-        "value": 2
       },
       "outcome": "value",
       "golden": 1
@@ -544,10 +549,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": -2.5
+        "value": -2.5
       },
       "outcome": "value",
-      "golden": -3.0
+      "golden": -3
     },
     {
       "id": "54-round",
@@ -556,10 +561,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": -1.5
+        "value": -1.5
       },
       "outcome": "value",
-      "golden": -2.0
+      "golden": -2
     },
     {
       "id": "55-round",
@@ -568,10 +573,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": -0.5
+        "value": -0.5
       },
       "outcome": "value",
-      "golden": -1.0
+      "golden": -1
     },
     {
       "id": "56-round",
@@ -580,10 +585,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": -0.1
+        "value": -0.1
       },
       "outcome": "value",
-      "golden": -1.0
+      "golden": -1
     },
     {
       "id": "57-round",
@@ -592,10 +597,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 0
+        "value": 0
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "58-round",
@@ -604,10 +609,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 0.1
+        "value": 0.1
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "59-round",
@@ -616,10 +621,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 0.5
+        "value": 0.5
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "60-round",
@@ -628,10 +633,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 1.5
+        "value": 1.5
       },
       "outcome": "value",
-      "golden": 1.0
+      "golden": 1
     },
     {
       "id": "61-round",
@@ -640,10 +645,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 2.5
+        "value": 2.5
       },
       "outcome": "value",
-      "golden": 2.0
+      "golden": 2
     },
     {
       "id": "62-round",
@@ -652,10 +657,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 4503599627370495
+        "value": 4503599627370495
       },
       "outcome": "value",
-      "golden": 4503599627370495.0
+      "golden": 4503599627370495
     },
     {
       "id": "63-round",
@@ -664,10 +669,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 4503599627370496
+        "value": 4503599627370496
       },
       "outcome": "value",
-      "golden": 4503599627370496.0
+      "golden": 4503599627370496
     },
     {
       "id": "64-round",
@@ -676,10 +681,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 9007199254740991
+        "value": 9007199254740991
       },
       "outcome": "value",
-      "golden": 9007199254740991.0
+      "golden": 9007199254740991
     },
     {
       "id": "65-round",
@@ -688,10 +693,10 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": -9007199254740991
+        "value": -9007199254740991
       },
       "outcome": "value",
-      "golden": -9007199254740991.0
+      "golden": -9007199254740991
     },
     {
       "id": "66-round",
@@ -700,7 +705,7 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": 1.7976931348623157e+308
+        "value": 1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": 1.7976931348623157e+308
@@ -712,7 +717,7 @@
         "mode": "floor"
       },
       "inputs": {
-        "input": -1.7976931348623157e+308
+        "value": -1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": -1.7976931348623157e+308
@@ -724,10 +729,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": -2.5
+        "value": -2.5
       },
       "outcome": "value",
-      "golden": -2.0
+      "golden": -2
     },
     {
       "id": "69-round",
@@ -736,10 +741,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": -1.5
+        "value": -1.5
       },
       "outcome": "value",
-      "golden": -1.0
+      "golden": -1
     },
     {
       "id": "70-round",
@@ -748,10 +753,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": -0.5
+        "value": -0.5
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "71-round",
@@ -760,10 +765,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": -0.1
+        "value": -0.1
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "72-round",
@@ -772,10 +777,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 0
+        "value": 0
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "73-round",
@@ -784,10 +789,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 0.1
+        "value": 0.1
       },
       "outcome": "value",
-      "golden": 1.0
+      "golden": 1
     },
     {
       "id": "74-round",
@@ -796,10 +801,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 0.5
+        "value": 0.5
       },
       "outcome": "value",
-      "golden": 1.0
+      "golden": 1
     },
     {
       "id": "75-round",
@@ -808,10 +813,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 1.5
+        "value": 1.5
       },
       "outcome": "value",
-      "golden": 2.0
+      "golden": 2
     },
     {
       "id": "76-round",
@@ -820,10 +825,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 2.5
+        "value": 2.5
       },
       "outcome": "value",
-      "golden": 3.0
+      "golden": 3
     },
     {
       "id": "77-round",
@@ -832,10 +837,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 4503599627370495
+        "value": 4503599627370495
       },
       "outcome": "value",
-      "golden": 4503599627370495.0
+      "golden": 4503599627370495
     },
     {
       "id": "78-round",
@@ -844,10 +849,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 4503599627370496
+        "value": 4503599627370496
       },
       "outcome": "value",
-      "golden": 4503599627370496.0
+      "golden": 4503599627370496
     },
     {
       "id": "79-round",
@@ -856,10 +861,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 9007199254740991
+        "value": 9007199254740991
       },
       "outcome": "value",
-      "golden": 9007199254740991.0
+      "golden": 9007199254740991
     },
     {
       "id": "80-round",
@@ -868,10 +873,10 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": -9007199254740991
+        "value": -9007199254740991
       },
       "outcome": "value",
-      "golden": -9007199254740991.0
+      "golden": -9007199254740991
     },
     {
       "id": "81-round",
@@ -880,7 +885,7 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": 1.7976931348623157e+308
+        "value": 1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": 1.7976931348623157e+308
@@ -892,7 +897,7 @@
         "mode": "ceil"
       },
       "inputs": {
-        "input": -1.7976931348623157e+308
+        "value": -1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": -1.7976931348623157e+308
@@ -904,10 +909,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": -2.5
+        "value": -2.5
       },
       "outcome": "value",
-      "golden": -2.0
+      "golden": -2
     },
     {
       "id": "84-round",
@@ -916,10 +921,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": -1.5
+        "value": -1.5
       },
       "outcome": "value",
-      "golden": -1.0
+      "golden": -1
     },
     {
       "id": "85-round",
@@ -928,10 +933,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": -0.5
+        "value": -0.5
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "86-round",
@@ -940,10 +945,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": -0.1
+        "value": -0.1
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "87-round",
@@ -952,10 +957,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 0
+        "value": 0
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "88-round",
@@ -964,10 +969,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 0.1
+        "value": 0.1
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "89-round",
@@ -976,10 +981,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 0.5
+        "value": 0.5
       },
       "outcome": "value",
-      "golden": 1.0
+      "golden": 1
     },
     {
       "id": "90-round",
@@ -988,10 +993,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 1.5
+        "value": 1.5
       },
       "outcome": "value",
-      "golden": 2.0
+      "golden": 2
     },
     {
       "id": "91-round",
@@ -1000,10 +1005,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 2.5
+        "value": 2.5
       },
       "outcome": "value",
-      "golden": 3.0
+      "golden": 3
     },
     {
       "id": "92-round",
@@ -1012,10 +1017,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 4503599627370495
+        "value": 4503599627370495
       },
       "outcome": "value",
-      "golden": 4503599627370495.0
+      "golden": 4503599627370495
     },
     {
       "id": "93-round",
@@ -1024,10 +1029,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 4503599627370496
+        "value": 4503599627370496
       },
       "outcome": "value",
-      "golden": 4503599627370496.0
+      "golden": 4503599627370496
     },
     {
       "id": "94-round",
@@ -1036,10 +1041,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 9007199254740991
+        "value": 9007199254740991
       },
       "outcome": "value",
-      "golden": 9007199254740991.0
+      "golden": 9007199254740991
     },
     {
       "id": "95-round",
@@ -1048,10 +1053,10 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": -9007199254740991
+        "value": -9007199254740991
       },
       "outcome": "value",
-      "golden": -9007199254740991.0
+      "golden": -9007199254740991
     },
     {
       "id": "96-round",
@@ -1060,7 +1065,7 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": 1.7976931348623157e+308
+        "value": 1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": 1.7976931348623157e+308
@@ -1072,7 +1077,7 @@
         "mode": "nearest"
       },
       "inputs": {
-        "input": -1.7976931348623157e+308
+        "value": -1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": -1.7976931348623157e+308
@@ -1084,10 +1089,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": -2.5
+        "value": -2.5
       },
       "outcome": "value",
-      "golden": -2.0
+      "golden": -2
     },
     {
       "id": "99-round",
@@ -1096,10 +1101,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": -1.5
+        "value": -1.5
       },
       "outcome": "value",
-      "golden": -1.0
+      "golden": -1
     },
     {
       "id": "100-round",
@@ -1108,10 +1113,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": -0.5
+        "value": -0.5
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "101-round",
@@ -1120,10 +1125,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": -0.1
+        "value": -0.1
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "102-round",
@@ -1132,10 +1137,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 0
+        "value": 0
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "103-round",
@@ -1144,10 +1149,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 0.1
+        "value": 0.1
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "104-round",
@@ -1156,10 +1161,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 0.5
+        "value": 0.5
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "105-round",
@@ -1168,10 +1173,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 1.5
+        "value": 1.5
       },
       "outcome": "value",
-      "golden": 1.0
+      "golden": 1
     },
     {
       "id": "106-round",
@@ -1180,10 +1185,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 2.5
+        "value": 2.5
       },
       "outcome": "value",
-      "golden": 2.0
+      "golden": 2
     },
     {
       "id": "107-round",
@@ -1192,10 +1197,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 4503599627370495
+        "value": 4503599627370495
       },
       "outcome": "value",
-      "golden": 4503599627370495.0
+      "golden": 4503599627370495
     },
     {
       "id": "108-round",
@@ -1204,10 +1209,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 4503599627370496
+        "value": 4503599627370496
       },
       "outcome": "value",
-      "golden": 4503599627370496.0
+      "golden": 4503599627370496
     },
     {
       "id": "109-round",
@@ -1216,10 +1221,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 9007199254740991
+        "value": 9007199254740991
       },
       "outcome": "value",
-      "golden": 9007199254740991.0
+      "golden": 9007199254740991
     },
     {
       "id": "110-round",
@@ -1228,10 +1233,10 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": -9007199254740991
+        "value": -9007199254740991
       },
       "outcome": "value",
-      "golden": -9007199254740991.0
+      "golden": -9007199254740991
     },
     {
       "id": "111-round",
@@ -1240,7 +1245,7 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": 1.7976931348623157e+308
+        "value": 1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": 1.7976931348623157e+308
@@ -1252,7 +1257,7 @@
         "mode": "truncate"
       },
       "inputs": {
-        "input": -1.7976931348623157e+308
+        "value": -1.7976931348623157e+308
       },
       "outcome": "value",
       "golden": -1.7976931348623157e+308
@@ -1262,9 +1267,9 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -10,
-        "b": 10,
-        "weight": 0
+        "from": -10,
+        "to": 10,
+        "factor": 0
       },
       "outcome": "value",
       "golden": -10
@@ -1274,9 +1279,9 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -1e+308,
-        "b": 1e+308,
-        "weight": 0
+        "from": -1e+308,
+        "to": 1e+308,
+        "factor": 0
       },
       "outcome": "value"
     },
@@ -1285,21 +1290,21 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -10,
-        "b": 10,
-        "weight": 0.25
+        "from": -10,
+        "to": 10,
+        "factor": 0.25
       },
       "outcome": "value",
-      "golden": -5.0
+      "golden": -5
     },
     {
       "id": "116-lerp",
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -1e+308,
-        "b": 1e+308,
-        "weight": 0.25
+        "from": -1e+308,
+        "to": 1e+308,
+        "factor": 0.25
       },
       "outcome": "value"
     },
@@ -1308,21 +1313,21 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -10,
-        "b": 10,
-        "weight": 0.5
+        "from": -10,
+        "to": 10,
+        "factor": 0.5
       },
       "outcome": "value",
-      "golden": 0.0
+      "golden": 0
     },
     {
       "id": "118-lerp",
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -1e+308,
-        "b": 1e+308,
-        "weight": 0.5
+        "from": -1e+308,
+        "to": 1e+308,
+        "factor": 0.5
       },
       "outcome": "value"
     },
@@ -1331,9 +1336,9 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -10,
-        "b": 10,
-        "weight": 1
+        "from": -10,
+        "to": 10,
+        "factor": 1
       },
       "outcome": "value",
       "golden": 10
@@ -1343,9 +1348,9 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": -1e+308,
-        "b": 1e+308,
-        "weight": 1
+        "from": -1e+308,
+        "to": 1e+308,
+        "factor": 1
       },
       "outcome": "value"
     },
@@ -1376,12 +1381,12 @@
     {
       "id": "123-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "eq"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "left": 0,
+        "right": 0,
+        "operator": "eq",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1389,12 +1394,12 @@
     {
       "id": "124-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "eq"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2
+        "left": 1,
+        "right": 2,
+        "operator": "eq",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1402,12 +1407,12 @@
     {
       "id": "125-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "eq"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 1
+        "left": 2,
+        "right": 1,
+        "operator": "eq",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1415,12 +1420,12 @@
     {
       "id": "126-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "eq"
-      },
+      "parameters": {},
       "inputs": {
-        "a": -3,
-        "b": -2
+        "left": -3,
+        "right": -2,
+        "operator": "eq",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1428,12 +1433,12 @@
     {
       "id": "127-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "eq"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1.7976931348623157e+308,
-        "b": -1.7976931348623157e+308
+        "left": 1.7976931348623157e+308,
+        "right": -1.7976931348623157e+308,
+        "operator": "eq",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1441,12 +1446,12 @@
     {
       "id": "128-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "ne"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "left": 0,
+        "right": 0,
+        "operator": "ne",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1454,12 +1459,12 @@
     {
       "id": "129-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "ne"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2
+        "left": 1,
+        "right": 2,
+        "operator": "ne",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1467,12 +1472,12 @@
     {
       "id": "130-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "ne"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 1
+        "left": 2,
+        "right": 1,
+        "operator": "ne",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1480,12 +1485,12 @@
     {
       "id": "131-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "ne"
-      },
+      "parameters": {},
       "inputs": {
-        "a": -3,
-        "b": -2
+        "left": -3,
+        "right": -2,
+        "operator": "ne",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1493,12 +1498,12 @@
     {
       "id": "132-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "ne"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1.7976931348623157e+308,
-        "b": -1.7976931348623157e+308
+        "left": 1.7976931348623157e+308,
+        "right": -1.7976931348623157e+308,
+        "operator": "ne",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1506,12 +1511,12 @@
     {
       "id": "133-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "left": 0,
+        "right": 0,
+        "operator": "lt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1519,12 +1524,12 @@
     {
       "id": "134-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2
+        "left": 1,
+        "right": 2,
+        "operator": "lt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1532,12 +1537,12 @@
     {
       "id": "135-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 1
+        "left": 2,
+        "right": 1,
+        "operator": "lt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1545,12 +1550,12 @@
     {
       "id": "136-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": -3,
-        "b": -2
+        "left": -3,
+        "right": -2,
+        "operator": "lt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1558,12 +1563,12 @@
     {
       "id": "137-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1.7976931348623157e+308,
-        "b": -1.7976931348623157e+308
+        "left": 1.7976931348623157e+308,
+        "right": -1.7976931348623157e+308,
+        "operator": "lt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1571,12 +1576,12 @@
     {
       "id": "138-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "left": 0,
+        "right": 0,
+        "operator": "lte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1584,12 +1589,12 @@
     {
       "id": "139-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2
+        "left": 1,
+        "right": 2,
+        "operator": "lte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1597,12 +1602,12 @@
     {
       "id": "140-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 1
+        "left": 2,
+        "right": 1,
+        "operator": "lte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1610,12 +1615,12 @@
     {
       "id": "141-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": -3,
-        "b": -2
+        "left": -3,
+        "right": -2,
+        "operator": "lte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1623,12 +1628,12 @@
     {
       "id": "142-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "lte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1.7976931348623157e+308,
-        "b": -1.7976931348623157e+308
+        "left": 1.7976931348623157e+308,
+        "right": -1.7976931348623157e+308,
+        "operator": "lte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1636,12 +1641,12 @@
     {
       "id": "143-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "left": 0,
+        "right": 0,
+        "operator": "gt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1649,12 +1654,12 @@
     {
       "id": "144-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2
+        "left": 1,
+        "right": 2,
+        "operator": "gt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1662,12 +1667,12 @@
     {
       "id": "145-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 1
+        "left": 2,
+        "right": 1,
+        "operator": "gt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1675,12 +1680,12 @@
     {
       "id": "146-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": -3,
-        "b": -2
+        "left": -3,
+        "right": -2,
+        "operator": "gt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1688,12 +1693,12 @@
     {
       "id": "147-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gt"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1.7976931348623157e+308,
-        "b": -1.7976931348623157e+308
+        "left": 1.7976931348623157e+308,
+        "right": -1.7976931348623157e+308,
+        "operator": "gt",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1701,12 +1706,12 @@
     {
       "id": "148-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": 0
+        "left": 0,
+        "right": 0,
+        "operator": "gte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1714,12 +1719,12 @@
     {
       "id": "149-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2
+        "left": 1,
+        "right": 2,
+        "operator": "gte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1727,12 +1732,12 @@
     {
       "id": "150-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 2,
-        "b": 1
+        "left": 2,
+        "right": 1,
+        "operator": "gte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1740,12 +1745,12 @@
     {
       "id": "151-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": -3,
-        "b": -2
+        "left": -3,
+        "right": -2,
+        "operator": "gte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": false
@@ -1753,12 +1758,12 @@
     {
       "id": "152-compare",
       "capabilityId": "forge.condition.predicate.compare",
-      "parameters": {
-        "operator": "gte"
-      },
+      "parameters": {},
       "inputs": {
-        "a": 1.7976931348623157e+308,
-        "b": -1.7976931348623157e+308
+        "left": 1.7976931348623157e+308,
+        "right": -1.7976931348623157e+308,
+        "operator": "gte",
+        "tolerance": 0
       },
       "outcome": "value",
       "golden": true
@@ -1767,12 +1772,12 @@
       "id": "153-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": -1
+        "value": -1,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -1781,12 +1786,12 @@
       "id": "154-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": 0
+        "value": 0,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": true
@@ -1795,12 +1800,12 @@
       "id": "155-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": 0.5
+        "value": 0.5,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": true
@@ -1809,12 +1814,12 @@
       "id": "156-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": 1
+        "value": 1,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": true
@@ -1823,12 +1828,12 @@
       "id": "157-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": 2
+        "value": 2,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -1837,12 +1842,12 @@
       "id": "158-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 1,
-        "maximum": 1,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": 1
+        "value": 1,
+        "minimum": 1,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": true
@@ -1851,12 +1856,12 @@
       "id": "159-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "exclusive"
       },
       "inputs": {
-        "value": -1
+        "value": -1,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -1865,12 +1870,12 @@
       "id": "160-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "exclusive"
       },
       "inputs": {
-        "value": 0
+        "value": 0,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -1879,12 +1884,12 @@
       "id": "161-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "exclusive"
       },
       "inputs": {
-        "value": 0.5
+        "value": 0.5,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": true
@@ -1893,12 +1898,12 @@
       "id": "162-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "exclusive"
       },
       "inputs": {
-        "value": 1
+        "value": 1,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -1907,12 +1912,12 @@
       "id": "163-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 0,
-        "maximum": 1,
         "boundary": "exclusive"
       },
       "inputs": {
-        "value": 2
+        "value": 2,
+        "minimum": 0,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -1921,12 +1926,12 @@
       "id": "164-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 1,
-        "maximum": 1,
         "boundary": "exclusive"
       },
       "inputs": {
-        "value": 1
+        "value": 1,
+        "minimum": 1,
+        "maximum": 1
       },
       "outcome": "value",
       "golden": false
@@ -2042,614 +2047,614 @@
     {
       "id": "175-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 0,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "176-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 0,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "177-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 0,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "178-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 0,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "179-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 0,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "180-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 0,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "181-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 0,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "182-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 0,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 0
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "183-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 1,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "184-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 1,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "185-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 1,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "186-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 1,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "187-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 1,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "188-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 1,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "189-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 1,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "190-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 1,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 1
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "191-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "192-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "193-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "194-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "195-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "196-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "197-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "198-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 2
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "199-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 42,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "200-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 42,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "201-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 42,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "202-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 42,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "203-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 42,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "204-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 42,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "205-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 42,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "206-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 42,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 42
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "207-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483647,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "208-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483647,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "209-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483647,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "210-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483647,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "211-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483647,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "212-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483647,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "213-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483647,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "214-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483647,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 2147483647
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "215-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483648,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "216-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483648,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "217-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483648,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "218-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 2147483648,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "219-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483648,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "220-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483648,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "221-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483648,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "222-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 2147483648,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 2147483648
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "223-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 4294967295,
-        "probability": 0
+      "parameters": {},
+      "inputs": {
+        "probability": 0,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value",
       "golden": false
     },
     {
       "id": "224-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 4294967295,
-        "probability": 0.25
+      "parameters": {},
+      "inputs": {
+        "probability": 0.25,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "225-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 4294967295,
-        "probability": 0.5
+      "parameters": {},
+      "inputs": {
+        "probability": 0.5,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "226-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
-        "seed": 4294967295,
-        "probability": 1
+      "parameters": {},
+      "inputs": {
+        "probability": 1,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value",
       "golden": true
     },
     {
       "id": "227-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 4294967295,
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
-        "maximum": 1
+        "maximum": 1,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "228-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 4294967295,
+      "parameters": {},
+      "inputs": {
         "minimum": -10,
-        "maximum": 10
+        "maximum": 10,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "229-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 4294967295,
+      "parameters": {},
+      "inputs": {
         "minimum": 5,
-        "maximum": 5
+        "maximum": 5,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "230-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
-        "seed": 4294967295,
+      "parameters": {},
+      "inputs": {
         "minimum": -1e+308,
-        "maximum": 1e+308
+        "maximum": 1e+308,
+        "seed": 4294967295
       },
-      "inputs": {},
       "outcome": "value"
     },
     {
       "id": "231-vector_compose",
       "capabilityId": "forge.modifier.value.vector_compose",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "x": 0,
         "y": 0,
         "z": 0
       },
-      "inputs": {},
       "outcome": "value",
       "golden": [
         0,
@@ -2685,7 +2690,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           0,
           0,
           0
@@ -2704,7 +2709,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           0,
           0,
           0
@@ -2723,7 +2728,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           0,
           0,
           0
@@ -2740,12 +2745,12 @@
     {
       "id": "236-vector_compose",
       "capabilityId": "forge.modifier.value.vector_compose",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "x": 1,
         "y": 2,
         "z": 3
       },
-      "inputs": {},
       "outcome": "value",
       "golden": [
         1,
@@ -2781,7 +2786,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           1,
           2,
           3
@@ -2800,7 +2805,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           1,
           2,
           3
@@ -2819,7 +2824,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           1,
           2,
           3
@@ -2836,12 +2841,12 @@
     {
       "id": "241-vector_compose",
       "capabilityId": "forge.modifier.value.vector_compose",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "x": -1e+100,
         "y": 1e-100,
         "z": 0
       },
-      "inputs": {},
       "outcome": "value",
       "golden": [
         -1e+100,
@@ -2868,7 +2873,7 @@
       "outcome": "value",
       "golden": [
         -1e+100,
-        2.0,
+        2,
         1
       ]
     },
@@ -2877,7 +2882,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           -1e+100,
           1e-100,
           0
@@ -2886,8 +2891,8 @@
       },
       "outcome": "value",
       "golden": [
-        -0.0,
-        0.0,
+        0,
+        0,
         0
       ]
     },
@@ -2896,7 +2901,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           -1e+100,
           1e-100,
           0
@@ -2915,7 +2920,7 @@
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           -1e+100,
           1e-100,
           0
@@ -2932,7 +2937,9 @@
     {
       "id": "246-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 1,
         "b": 0
@@ -2944,10 +2951,12 @@
     {
       "id": "247-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 1,
-        "b": -0.0
+        "b": 0
       },
       "outcome": "rejected",
       "expectedCode": "pure-division-by-zero",
@@ -2963,7 +2972,7 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "249-subtract",
@@ -2975,7 +2984,7 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "250-multiply",
@@ -2987,65 +2996,66 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "251-divide",
       "capabilityId": "forge.modifier.value.divide",
-      "parameters": {},
+      "parameters": {
+        "zero_policy": "reject"
+      },
       "inputs": {
         "a": 1e+308,
         "b": 1e-308
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "252-power",
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": -2,
-        "b": 0.5
+        "value": -2,
+        "exponent": 0.5
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "253-power",
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 0,
-        "b": -1
+        "value": 0,
+        "exponent": -1
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "254-power",
       "capabilityId": "forge.modifier.value.power",
       "parameters": {},
       "inputs": {
-        "a": 1e+308,
-        "b": 2
+        "value": 1e+308,
+        "exponent": 2
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "must be finite"
+      "errorPattern": "Invalid numeric input: preview value value$"
     },
     {
       "id": "255-clamp",
       "capabilityId": "forge.modifier.value.clamp",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
+        "value": 0,
         "minimum": 1,
         "maximum": 0
-      },
-      "inputs": {
-        "value": 0
       },
       "outcome": "rejected",
       "expectedCode": "pure-reversed-range",
@@ -3055,12 +3065,12 @@
       "id": "256-range",
       "capabilityId": "forge.condition.predicate.range",
       "parameters": {
-        "minimum": 1,
-        "maximum": 0,
         "boundary": "inclusive"
       },
       "inputs": {
-        "value": 0
+        "value": 0,
+        "minimum": 1,
+        "maximum": 0
       },
       "outcome": "rejected",
       "expectedCode": "pure-reversed-range",
@@ -3069,12 +3079,12 @@
     {
       "id": "257-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "minimum": 1,
         "maximum": 0,
         "seed": 1
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-reversed-range",
       "errorPattern": "Reversed preview interval"
@@ -3084,119 +3094,119 @@
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2,
-        "weight": -0.1
+        "from": 1,
+        "to": 2,
+        "factor": -0.1
       },
       "outcome": "rejected",
       "expectedCode": "pure-weight-range",
-      "errorPattern": "Interpolation weight"
+      "errorPattern": "Interpolation factor must be in 0…1"
     },
     {
       "id": "259-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "probability": -0.1,
         "seed": 1
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-weight-range",
-      "errorPattern": "Parameter outside bounds"
+      "errorPattern": "Probability must be in 0…1"
     },
     {
       "id": "260-lerp",
       "capabilityId": "forge.modifier.value.lerp",
       "parameters": {},
       "inputs": {
-        "a": 1,
-        "b": 2,
-        "weight": 1.1
+        "from": 1,
+        "to": 2,
+        "factor": 1.1
       },
       "outcome": "rejected",
       "expectedCode": "pure-weight-range",
-      "errorPattern": "Interpolation weight"
+      "errorPattern": "Interpolation factor must be in 0…1"
     },
     {
       "id": "261-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "probability": 1.1,
         "seed": 1
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-weight-range",
-      "errorPattern": "Parameter outside bounds"
+      "errorPattern": "Probability must be in 0…1"
     },
     {
       "id": "262-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "probability": 0.5,
         "seed": -1
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-seed",
-      "errorPattern": "Parameter outside bounds"
+      "errorPattern": "seed is outside 0…4294967295"
     },
     {
       "id": "263-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
         "maximum": 1,
         "seed": -1
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-seed",
-      "errorPattern": "Parameter outside bounds"
+      "errorPattern": "seed is outside 0…4294967295"
     },
     {
       "id": "264-chance",
       "capabilityId": "forge.condition.predicate.chance",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "probability": 0.5,
         "seed": 4294967296
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-seed",
-      "errorPattern": "Parameter outside bounds"
+      "errorPattern": "seed is outside 0…4294967295"
     },
     {
       "id": "265-random_range",
       "capabilityId": "forge.modifier.value.random_range",
-      "parameters": {
+      "parameters": {},
+      "inputs": {
         "minimum": 0,
         "maximum": 1,
         "seed": 4294967296
       },
-      "inputs": {},
       "outcome": "rejected",
       "expectedCode": "pure-seed",
-      "errorPattern": "Parameter outside bounds"
+      "errorPattern": "seed is outside 0…4294967295"
     },
     {
       "id": "266-vector_scale",
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [],
+        "a": [],
         "factor": 1
       },
       "outcome": "rejected",
       "expectedCode": "pure-vector-shape",
-      "errorPattern": "finite vector"
+      "errorPattern": "Invalid vector input: preview value a$"
     },
     {
       "id": "267-vector_scale",
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           1,
           2
         ],
@@ -3204,14 +3214,14 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-vector-shape",
-      "errorPattern": "finite vector"
+      "errorPattern": "Invalid vector input: preview value a$"
     },
     {
       "id": "268-vector_scale",
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           1,
           2,
           3,
@@ -3221,7 +3231,7 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-vector-shape",
-      "errorPattern": "finite vector"
+      "errorPattern": "Invalid vector input: preview value a$"
     },
     {
       "id": "269-vector_add",
@@ -3241,14 +3251,14 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "finite vector"
+      "errorPattern": "Invalid vector input: preview value value$"
     },
     {
       "id": "270-vector_scale",
       "capabilityId": "forge.modifier.value.vector_scale",
       "parameters": {},
       "inputs": {
-        "vector": [
+        "a": [
           1e+308,
           0,
           0
@@ -3257,7 +3267,285 @@
       },
       "outcome": "rejected",
       "expectedCode": "pure-nonfinite-result",
-      "errorPattern": "finite vector"
+      "errorPattern": "Invalid vector input: preview value value$"
+    },
+    {
+      "id": "271-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1.25,
+        "operator": "eq",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "272-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 2,
+        "operator": "eq",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "273-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 0.75,
+        "operator": "eq",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "274-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1.25,
+        "operator": "ne",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "275-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 2,
+        "operator": "ne",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "276-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 0.75,
+        "operator": "ne",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "277-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1.25,
+        "operator": "lt",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "278-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 2,
+        "operator": "lt",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "279-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 0.75,
+        "operator": "lt",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "280-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1.25,
+        "operator": "lte",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "281-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 2,
+        "operator": "lte",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "282-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 0.75,
+        "operator": "lte",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "283-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1.25,
+        "operator": "gt",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "284-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 2,
+        "operator": "gt",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "285-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 0.75,
+        "operator": "gt",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "286-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1.25,
+        "operator": "gte",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "287-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 2,
+        "operator": "gte",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "288-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 0.75,
+        "operator": "gte",
+        "tolerance": 0.5
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "289-compare",
+      "capabilityId": "forge.condition.predicate.compare",
+      "parameters": {},
+      "inputs": {
+        "left": 1,
+        "right": 1,
+        "operator": "eq",
+        "tolerance": -0.1
+      },
+      "outcome": "rejected",
+      "expectedCode": "pure-tolerance-range",
+      "errorPattern": "Comparison tolerance must not be negative"
+    },
+    {
+      "id": "290-divide",
+      "capabilityId": "forge.modifier.value.divide",
+      "parameters": {
+        "zero_policy": "zero"
+      },
+      "inputs": {
+        "a": 5,
+        "b": 0
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "291-divide",
+      "capabilityId": "forge.modifier.value.divide",
+      "parameters": {
+        "zero_policy": "passthrough"
+      },
+      "inputs": {
+        "a": 5,
+        "b": 0
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "292-divide",
+      "capabilityId": "forge.modifier.value.divide",
+      "parameters": {
+        "zero_policy": "passthrough"
+      },
+      "inputs": {
+        "a": 6,
+        "b": 3
+      },
+      "outcome": "value"
+    },
+    {
+      "id": "293-divide",
+      "capabilityId": "forge.modifier.value.divide",
+      "parameters": {
+        "zero_policy": "zero"
+      },
+      "inputs": {
+        "a": 6,
+        "b": 3
+      },
+      "outcome": "value"
     }
   ]
 }

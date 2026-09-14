@@ -57,7 +57,9 @@ internal sealed partial class EnemyModule
             || enemy.GlobalID != entry.Enemy.GlobalID || enemy.Alive) return;
         if (!CanObserveFacts || Resolve(before.Target) != entry || enemy.Pointer != before.EnemyPointer
             || enemy.Alive) return;
-        PublishLifecycleFact(DeathStartedBinding, before.Target, RuntimeJson.From(new { target = before.Target }));
+        // OnDead carries no verifiable killer, so the nullable source stays unknown instead of guessed.
+        PublishLifecycleFact(DeathStartedBinding, before.Target,
+            RuntimeJson.From(new { enemy = before.Target, source = (EntityReference?)null }));
     }
 
     internal LifecycleObservation? BeforeLimbBreak(Dam_EnemyDamageLimb limb)
@@ -94,7 +96,7 @@ internal sealed partial class EnemyModule
             entry.LimbObservations.Remove(before.LimbId); return;
         }
         PublishLifecycleFact(LimbBrokenBinding, before.Target,
-            RuntimeJson.From(new { target = before.Target, limb_id = before.LimbId }));
+            RuntimeJson.From(new { target = before.Target, limb = before.LimbId }));
     }
 
     private bool MatchesLimb(Entry entry, Dam_EnemyDamageLimb limb, LifecycleObservation observation)

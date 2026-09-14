@@ -1,11 +1,9 @@
-using System.Text.Json.Nodes;
 using Enemies;
 using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 
 internal sealed class Scene : IDisposable
 {
-    internal static string Fixtures = "";
     internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     internal readonly RuntimeModuleHandle Sink;
@@ -20,10 +18,7 @@ internal sealed class Scene : IDisposable
     {
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module());
         Module = new(Kernel, () => Allowed, Messages.Add);
-        Sink = Kernel.RegisterModule(new(RuntimeKernel.ApiVersion, Fixture.SinkRegistry,
-            new Dictionary<string, CommandHandler> { ["test.record"] = c =>
-            { Records.Add(c); OnRecord?.Invoke(c); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
-            new[] { new BindingSupport("test.lifecycle.binding.record", "implementation-only", new[] { "test.record" }) }));
+        Sink = Kernel.RegisterModule(LocalPlan.Recorder(c => { Records.Add(c); OnRecord?.Invoke(c); }));
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);
         if (load) { Load("death_started"); Load("limb_broken"); }
         if (start) Kernel.StartRuntime(() => { });
@@ -36,10 +31,14 @@ internal sealed class Scene : IDisposable
             { m_base = actor.Damage, m_limbID = i, Pointer = new(pointer + 200 + i) }).ToArray();
         return actor;
     }
-    internal void Load(string suffix, IEnumerable<string>? grants = null)
+    /// <summary>Fact -> record plan. death_started names its subject "enemy"; limb_broken keeps "target" and forwards the limb index.</summary>
+    internal static LocalPlan.Plan FactPlan(RuntimeKernel kernel, string suffix) => suffix == "death_started"
+        ? LocalPlan.Build(kernel, "test.lifecycle.death_started", EnemyModule.DeathStartedBinding, LocalPlan.RecordBinding, ("enemy", "target"))
+        : LocalPlan.Build(kernel, "test.lifecycle.limb_broken", EnemyModule.LimbBrokenBinding, LocalPlan.RecordBinding, ("target", "target"), ("limb", "limb_id"));
+    internal void Load(string suffix, IEnumerable<string>? grants = null, RuntimeLimits? budget = null)
     {
-        var json = Fixture.Plan(Kernel, Fixtures, suffix);
-        Kernel.LoadPlan(json, grants ?? new[] { "gtfo.enemy.lifecycle.read", "gtfo.enemy.limbs.read", "test.record" });
+        var plan = FactPlan(Kernel, suffix);
+        LocalPlan.Load(Kernel, budget == null ? plan : plan.WithLimits(budget), grants);
     }
     internal void Die(EnemyAgent? actor = null)
     {

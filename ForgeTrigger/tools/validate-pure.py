@@ -97,7 +97,8 @@ def main() -> int:
                 ('midpoint-ties-to-even', ('Pure/ScalarNodes.cs', 'value - lower < 0.5d ? lower : lower + 1d', 'Math.Round(value)')),
                 ('wrong-subtraction', ('Pure/ScalarNodes.cs', 'ScalarOperation.Subtract => a - b,', 'ScalarOperation.Subtract => a + b,')),
                 ('fixed-seed', ('Pure/SeededStream.cs', 'state = (uint)seed;', 'state = 0u;')),
-                ('silent-zero-division', ('Pure/ScalarNodes.cs', '? throw new RuntimeContractException("pure-division-by-zero", "The divisor must not be zero.") : a / b', '? 0d : a / b')),
+                ('silent-zero-division', ('Pure/ScalarNodes.cs', 'DivisionZeroPolicy.Reject => throw new RuntimeContractException("pure-division-by-zero", "The divisor must not be zero."),', 'DivisionZeroPolicy.Reject => 0d,')),
+                ('tolerance-ignored', ('Pure/ScalarNodes.cs', 'ScalarComparison.Equal => Math.Abs(left - right) <= tolerance,', 'ScalarComparison.Equal => left == right,')),
             ]
             mutation_results = []
             for name, change in mutations:

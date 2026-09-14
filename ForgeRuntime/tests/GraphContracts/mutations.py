@@ -20,7 +20,7 @@ changes = [
      'ports.Add(Port(spec.GetProperty("port"), i)); ports = ports.OrderBy(p => RuntimeJson.Text(p, "id"), StringComparer.Ordinal).ToList();'),
     ('raised-count-ceiling', 'RuntimeGraphContracts.cs', 'MaximumVariadicPorts = 32;', 'MaximumVariadicPorts = 33;'),
     ('missing-collision-check', 'RuntimeGraphContracts.cs', '!ids.Contains(added)', 'true'),
-    ('plan-skips-expansion', 'RuntimePlan.cs', 'var contract = RuntimeGraphContracts.Resolve(graph, parameters);',
+    ('plan-skips-expansion', 'RuntimePlan.cs', 'var contract = RuntimeGraphContracts.Resolve(graph, parameters, promoted);',
      'var contract = graph;')]
 results = []
 print('EVIDENCE=' + str(out), flush=True)

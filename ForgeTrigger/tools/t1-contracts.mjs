@@ -93,15 +93,20 @@ for (const definition of logic.capabilities) {
 }
 const canonical = read(path.join(output, 'sdk-canonical-manifest.json'));
 write('authoring-registration-cases.json', auditAuthoringContracts(logic, canonical, check, {validateGraphMetadata, resolveGraphContract}));
+const versionOf = id => logic.capabilities.find(c => c.id === id).version;
 const constantGraph = structuredClone(suite.validGraphs[0].graph);
-constantGraph.nodes.push({id:'Constant', capabilityId:'forge.modifier.value.constant', capabilityVersion:'1.0.0', bindingId:'', parameters:{value:5}});
+constantGraph.nodes.push({id:'Constant', capabilityId:'forge.modifier.value.constant', capabilityVersion:versionOf('forge.modifier.value.constant'), bindingId:'', parameters:{value:5}});
 constantGraph.edges.find(e => e.to.port === 'value').from = {node:'Constant', port:'value'};
 check(validateForgeAuthoringGraph(constantGraph, authoringRegistry).kind === 'validated-authoring-ir', 'real canonical constant authors in the existing IR');
 rejects(() => validateForgeGraph(constantGraph, authoringRegistry), 'Binding/capability mismatch', 'authoring constant does not become a runtime binding');
 const constant = logic.capabilities.find(c => c.id === 'forge.modifier.value.constant');
 rejects(() => validateGraphParameters({value: Infinity}, constant.graph.parameters, 'constant'), 'numeric parameter', 'non-finite authoring parameter rejected');
 const branchGraph = structuredClone(suite.invalidGraphs.find(r => r.id === 'control-needs-r4').graph);
-Object.assign(branchGraph.nodes.find(n => n.id === 'Branch'), {capabilityId:'forge.control.flow.branch', bindingId:''});
+Object.assign(branchGraph.nodes.find(n => n.id === 'Branch'), {capabilityId:'forge.control.flow.branch', capabilityVersion:versionOf('forge.control.flow.branch'), bindingId:''});
+// The synthetic branch names its outputs differently; map them by position onto the canonical outputs.
+const testBranchOutputs = manifest.registry.capabilities.find(c => c.id === 'test.trigger.branch').graph.outputs.map(p => p.id);
+const canonicalBranchOutputs = logic.capabilities.find(c => c.id === 'forge.control.flow.branch').graph.outputs.map(p => p.id);
+for (const edge of branchGraph.edges.filter(e => e.from.node === 'Branch')) edge.from.port = canonicalBranchOutputs[testBranchOutputs.indexOf(edge.from.port)];
 check(validateForgeAuthoringGraph(branchGraph, authoringRegistry).kind === 'validated-authoring-ir', 'real canonical branch authors without inventing bindings');
 rejects(() => validateForgeGraph(branchGraph, authoringRegistry), 'Binding/capability mismatch', 'canonical branch remains unbound');
 write('canonical-authoring.graph-cases.json', [constantGraph, branchGraph]);
@@ -120,11 +125,27 @@ const rows = catalog.canonicalVocabulary.filter(r => r.category !== 'action').ma
         plannedStatus:row.runtimeStatus, triggerRuntimeBinding:null, requiredPrimitives:prerequisites[row.category],
         authoring:match ? {source:match.source,index:match.index,version:definition.version,evidence:match.evidence,graph:definition.graph} : null,
         domainDifference:definition?.graph ? {catalogOnly:row.domains.filter(d=>!definition.graph.domains.includes(d)),typedOnly:definition.graph.domains.filter(d=>!row.domains.includes(d))} : null,
-        lifecycle:'No new executable Trigger binding; see T1-CONTRACT-MAP.md for owner/scope/epoch requirements'};
+        lifecycle:'No new executable Trigger binding; see VALIDATION.md for owner/scope/epoch requirements'};
 });
 const counts = {};
 for (const row of rows) counts[row.category] = (counts[row.category] ?? 0) + 1;
 check(new Set(catalog.canonicalVocabulary.map(r=>r.id)).size === catalog.canonicalVocabulary.length, 'catalog canonical IDs unique');
+// D-004: the catalog row owns every shared contract's whole graph. C# repeats it field for field; domains compare as a set.
+const graphMismatches = canonical.registry.capabilities.filter(c => {
+    const row = catalog.canonicalVocabulary.find(r => r.id === c.id);
+    if (!row?.graph) return true;
+    const {domains: actualDomains, ...actual} = c.graph, {domains: expectedDomains, ...expected} = row.graph;
+    try { assert.deepStrictEqual(actual, expected); } catch { return true; }
+    return actualDomains.length !== expectedDomains.length || !actualDomains.every(d => expectedDomains.includes(d));
+}).map(c => c.id);
+check(graphMismatches.length === 0, 'shared contract graphs equal their catalog rows' + (graphMismatches.length ? ': ' + graphMismatches.join(', ') : ''));
+// The catalog row is also the only source of kind, label and description; C# may not hand-write them.
+const metadataMismatches = canonical.registry.capabilities.filter(c => {
+    const row = catalog.canonicalVocabulary.find(r => r.id === c.id);
+    return !row || c.kind !== row.category || c.label !== row.labelZh || c.parameters?.description !== row.descriptionZh;
+}).map(c => c.id);
+check(metadataMismatches.length === 0, 'shared contract kind/label/description equal their catalog rows' + (metadataMismatches.length ? ': ' + metadataMismatches.join(', ') : ''));
+console.log('D-004 shared capabilities audited: ' + canonical.registry.capabilities.map(c => c.id + '@' + c.version).join(', '));
 check(rows.length + catalog.canonicalVocabulary.filter(r=>r.category === 'action').length === catalog.canonicalVocabulary.length, 'complete base vocabulary mapping, actions separately retained');
 const sha256 = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const missingFromCatalog = logic.capabilities.filter(c=>!catalog.canonicalVocabulary.some(r=>r.id===c.id)).map(c=>c.id);

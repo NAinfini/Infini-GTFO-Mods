@@ -10,17 +10,15 @@ from xml.sax.saxutils import escape
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sdk', type=Path, required=True)
-    parser.add_argument('--fixtures', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     sdk = args.sdk.resolve(strict=True)
-    fixtures = args.fixtures.resolve(strict=True)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     root = Path(__file__).resolve().parents[3]
     native = root / 'ForgeEnemy/Native'
     files = list(native.glob('*.cs')) + list((native / 'Observation').glob('*.cs'))
-    files += list(Path(__file__).parent.glob('*.cs'))
+    files += list(Path(__file__).parent.glob('*.cs')) + list((root / 'ForgeEnemy/tests/Shared').glob('*.cs'))
     files += [root / ('ForgeEnemy/tests/NativePlugin/' + name) for name in ['GameDoubles.cs', 'LoaderDoubles.cs']]
     snapshots = {p.name: p.read_bytes() for p in files}
     if len(snapshots) != len(files):
@@ -56,13 +54,15 @@ def main() -> int:
         (case / 'EnemyModule.LifecycleFacts.cs').write_text(text, encoding='utf-8')
         (case / 'Probe.csproj').write_text(project, encoding='utf-8')
         report_path = case / 'result.json'
-        command = ['dotnet', 'run', '--project', str(case / 'Probe.csproj'), '-c', 'Release',
-                   '--', str(fixtures), str(report_path)]
+        command = ['dotnet', 'run', '--project', str(case / 'Probe.csproj'), '-c', 'Release', '--', str(report_path)]
         result = subprocess.run(command, capture_output=True, text=True, encoding='utf-8',
-                                errors='replace', timeout=120, check=False)
+                                errors='replace', timeout=180, check=False)
         (case / 'run.log').write_text(result.stdout + result.stderr, encoding='utf-8')
         report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.exists() else {}
         failed = [row['Id'] for row in report.get('checks', []) if not row['Passed']]
+        blocked = [row['Id'] for row in report.get('blocked', [])]
+        if expected is not None and expected in blocked:
+            raise ValueError(f'Mutant {name} targets blocked case {expected}; choose a runnable detector.')
         valid = bool(report) and (result.returncode == 0 and not failed if expected is None
                                   else result.returncode == 1 and expected in failed)
         results.append({'case': name, 'passed': valid, 'exitCode': result.returncode,
@@ -75,7 +75,9 @@ def main() -> int:
                'sdkSha256': hashlib.sha256(sdk.read_bytes()).hexdigest(),
                'passed': sum(r['passed'] for r in results), 'failed': sum(not r['passed'] for r in results)}
     (output / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
-    return 0 if len(results) == len(cases) and all(r['passed'] for r in results) else 1
+    ok = len(results) == len(cases) and all(r['passed'] for r in results)
+    print(f'{"PASS" if ok else "FAIL"} baseline+mutants {summary["passed"]}/{len(cases)}', flush=True)
+    return 0 if ok else 1
 
 
 if __name__ == '__main__':

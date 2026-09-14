@@ -1,0 +1,28 @@
+/// <summary>
+/// Cases that cannot run against the current contracts. A blocked case is reported by id and reason, never
+/// counted as passed; unblock conditions are recorded in ForgeEnemy/VALIDATION.md.
+/// </summary>
+internal static class Blockers
+{
+    /// <summary>heal takes many-valued targets; no event output can feed them until single-to-many wiring and literal inputs ship.</summary>
+    internal const string Heal = "J-003: no legal heal plan exists before literal inputs and single-to-many wiring (FORGE-FRAMEWORK D-006 1-2)";
+    /// <summary>Raised by <see cref="LocalPlan.Load"/> from the SDK's own rejection, so the block lifts by itself with R4.</summary>
+    internal const string EnumEventPort = "R4: runtime enum value ports are disabled; damage_applied output damage_kind is rejected as unsupported-event-port";
+
+    /// <summary>Blocked cases are not passes: a run with blocks but no failures is incomplete, not green.</summary>
+    internal static string Verdict(int failed, int blocked) => failed > 0 ? "FAIL" : blocked > 0 ? "INCOMPLETE" : "PASS";
+
+    internal static void Print(IEnumerable<(string Id, string Reason)> rows)
+    {
+        foreach (var group in rows.GroupBy(row => row.Reason, StringComparer.Ordinal))
+        {
+            Console.WriteLine($"BLOCKED {group.Count()} ({group.Key})");
+            foreach (var row in group) Console.WriteLine("  " + row.Id);
+        }
+    }
+}
+
+internal sealed class CaseBlocked : Exception
+{
+    internal CaseBlocked(string reason) : base(reason) { }
+}

@@ -8,7 +8,7 @@
 
 `ForgeEnemy/Native/ForgeEnemy.Native.csproj` 是真实插件，标记 `[BepInPlugin("NAinfini.ForgeEnemy", "Infini Forge Enemy", "1.0.0")]` 与 `[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]`。它只引用宿主与唯一 SDK，不附带第二份 SDK，通过公开的 `Plugin.Runtime` 注册同一个内核。唯一生产接收器是 `Native/EnemyModule.cs`；Runtime 不再创建 Enemy provider，也不再编译 Enemy Hook。
 
-`ForgeEnemy/ForgeEnemy.csproj` 是托管辅助工程（`Receivers/` 下的身份表、治疗提交、伤害观察窗口、线程边界），**不是另一个游戏插件，不应当作玩家发行包**。`ModuleDefinition.cs` 现在只保留包身份常量 `ProviderId` 与 `Version`，`Create()` 方法已删除——因此不可能与 Native 的真实 provider 重复注册。
+`ForgeEnemy/ForgeEnemy.csproj` 是托管辅助工程：`Receivers/` 只剩提交路径审计使用的治疗提交与线程边界；`Spawn/` 是交给 Map 的出生空间要求合同与内容依赖计算。它**不是另一个游戏插件，不应当作玩家发行包**。原来 `Receivers/` 下未被任何工程引用的身份表与伤害观察窗口是 `EnemyModule` 的重复实现，已删除。`ModuleDefinition.cs` 现在只保留包身份常量 `ProviderId` 与 `Version`，`Create()` 方法已删除——因此不可能与 Native 的真实 provider 重复注册。
 
 Off 模式下插件不注册也不打 Hook。Load 是单次尝试，失败后必须重启进程；原生 IL2CPP Hook 是进程级的，热重载没有已验证的恢复合同，`Unload()` 返回 false。
 
@@ -19,10 +19,10 @@ Native 插件持有 **5 个** binding 与 **5 个** Hook；Runtime 保留 4 个�
 | binding | 已实现范围 | canonical / 权限 |
 | --- | --- | --- |
 | `damage_applied` | 观察指定原生承伤调用窗口的实际 HP 损失；未知攻击来源不反推 | `forge.trigger.combat.damage_applied` |
-| `heal` | 存活敌人的显式目标治疗：量化、提交前复核、实际读回、unknown 结果 | `forge.action.combat.heal` |
+| `heal` | 存活敌人的多目标治疗：每个 target 独立量化、提交前复核、实际读回；`overheal_policy` 为 clamp/discard/overheal，overheal 在 SFloat16 量化下结构性不支持，整条命令上游拒绝 | `forge.action.combat.heal` |
 | `health_changed` | 仅本 Forge 治疗实际产生的正生命变化；不宣称覆盖全部原生治疗 | `forge.trigger.combat.health_changed` |
 | `death_started` | 同生命的 `OnDead` 正常返回且原生状态为 dead | `forge.trigger.enemy.death_started` / `gtfo.enemy.lifecycle.read` |
-| `limb_broken` | 同生命、同 receiver 的索引部位在 `DestroyLimb` 窗口中由未破坏变为已破坏 | `forge.trigger.combat.limb_broken` / `gtfo.enemy.limbs.read`；输出 target 与 limb_id |
+| `limb_broken` | 同生命、同 receiver 的索引部位在 `DestroyLimb` 窗口中由未破坏变为已破坏 | `forge.trigger.combat.limb_broken` / `gtfo.enemy.limbs.read`；输出 target 与 limb（可空） |
 
 治疗使用已核验的 GTFO Steam build `20403457` 的 `SendSetHealth`，预检原生 `SFloat16` 精度并同步读回报告实际变化。小于精度的正治疗不能倒扣血；满血或零有效量不发送变化事实。未知攻击者不推断；玩家治疗与普通伤害命令尚未实现。
 
@@ -35,6 +35,28 @@ root 与 cause 由 Runtime 原有的 Publish 调用链维护，native 外部入�
 ## 原生实体观察
 
 Native 观察返回精确引用、位置、生命状态，以及有效的 `health.heal` 接收能力。**阵营保持 unknown，标签为空**——未知字段不从种类、名称或当前 AI 目标填补。坐标是当前 `EnemyAgent.Position` 值：这不是碰撞净空、出生适配性、历史成员资格、LOS 证据或作者到世界的变换。查询完整性只覆盖显式引用，从不代表枚举了全部敌人或某个空间区域内的全部对象。观察受 provider 现有的玩法门槛限制。
+
+## 出生空间要求合同（E2，离线数据等级）
+
+Enemy 只声明需要什么空间，**合法空间求解归 Map**。合同文件是 [`evidence/e2-spawn-space-20403457/spawn-requirements.json`](evidence/e2-spawn-space-20403457/spawn-requirements.json)（`format = gtfo-forge-enemy-spawn-requirements`，`version = 1`），由 `Spawn/EnemySpawnRequirements.cs` 从同目录的离线证据确定性生成，并校验与证据一致。JSON 里没有原生 `EnemyAgent`、指针或运行时对象；Map 不引用 Enemy 私有程序集，按 JSON 合同读取。
+
+证据由 `tests/SpawnSpaceEvidence/extract_spawn_space.py` 只读提取：Steam build、UnityPy 版本、四个游戏数据文件与三个 DataBlock TextAsset 都有哈希锁，任一不符即拒绝。**Position 快照、模型包围盒、骨骼预览都没有被用作碰撞或导航证据。**
+
+| 字段 | 来源（全部 data 等级，除非另注） |
+| --- | --- |
+| `navMeshAgentTypes` / `navMeshAreas` | `globalgamemanagers` 的 NavMeshProjectSettings |
+| `enemyDataBlockId` / `name` | `EnemyDataBlock` |
+| `movement` | `EnemyMovementDataBlock.LocomotionPathMove`（`ES_StateEnum` 的 PathMove=2 / PathMoveFlyer=28 由 metadata 核对）与基础 prefab 上 NavMeshAgent / 空中图代理组件是否存在，两者一致才给 `ground` 或 `flying`，否则 `unresolved` 并写原因 |
+| `groundNavigation` | 基础 prefab（`sharedassets43.assets`，Enemies_S1 分片场景）上 NavMeshAgent 的序列化字段：agentTypeID、radius、height、walkableMask、autoTraverseOffMeshLink |
+| `ladderDescent` | `EnemyMovementDataBlock.AllowClimbDownLadders` |
+| `collisionRadius` / `canBePushed` | `EnemyBalancingDataBlock`；数值为数据，**语义未知** |
+| `modelSizeRanges` | `EnemyDataBlock.ModelDatas[].SizeRange`；**对导航或碰撞的影响未知** |
+| `arenaDimensions` | `EnemyDataBlock.ArenaDimensions` |
+| `unverified` | 每条都至少含 `spawn-clearance`、`base-prefab-resolution`、`datablock-overrides`、`size-multiplier-effect`，按字段再加对应代码 |
+
+39 个启用的敌人块：地面 32、飞行 4（42、43、45、58）、未决 3——22 没有移动块，44 与 61 用 PathMove 移动块却挂在空中图基础 prefab 上，保持未决不猜。所有地面敌人的 prefab NavMeshAgent 半径都是 0.2（包括尺寸 6.0 的 MegaMother），因此合同**不输出单一净空尺寸**，`spawn-clearance` 永远是未核验；Map 在净空受限的候选空间里不能把它当作已适配。自定义 rundown 的 DataBlock 覆盖会使这些离线值失效。
+
+`Spawn/EnemyContentDependencies.cs` 按计划里实际的 binding 计算内容依赖：只有 provider 为 `forge.module.gtfo.enemy` 的 binding 才要求 Enemy 包，只引用模型或资源的外观内容不带入 Enemy 能力；计划的 `domain` 标签不算依赖。
 
 ## 接收器与插件的安全边界
 
@@ -57,10 +79,10 @@ dotnet build ForgeEnemy/Native/ForgeEnemy.Native.csproj -c Release --artifacts-p
   "-p:ForgeRuntimeAssembly=$hostDll" "-p:ForgeFrameworkAssembly=$sdkDll"
 ```
 
-各测试套件的命令与边界见 [VALIDATION.md](VALIDATION.md) 和各测试目录的 README：[提交路径审计](tests/CommitAudit/README.md)、[实体观察](tests/EntityObservation/README.md)、[生命周期事实](tests/LifecycleFacts/README.md)。可复用的示例计划见 [断肢后 +5 HP](examples/limb-broken-heal.plan.json)——它由通过的实际 Runtime→Heal 联调用例导出，**不在游戏里自动加载**，仍需明确的计划路径、权限和实机验收。
+各测试套件的命令与边界见 [VALIDATION.md](VALIDATION.md) 和各测试目录的 README：[提交路径审计](tests/CommitAudit/README.md)、[实体观察](tests/EntityObservation/README.md)、[生命周期事实](tests/LifecycleFacts/README.md)。
 
 ## 边界
 
 以上全部是 **implementation-only**：源码存在、托管测试通过、原生签名与元数据已静态核对，**没有一条完成 GTFO 实机验收**。原生读取、替身、编译和元数据是不同的证据层，任何一层通过都不代表游戏或多人已通过。E1 的下一个门槛是真实游戏加载与原生 Hook 与主客机验证，不是再次创建或迁移同名 provider。
 
-E2 的碰撞、导航、出生空间，E3 剩余的 damage 与 status 与击杀因果与 Boss 阶段，以及 E4–E7 都未完成。开发与发布包尚未生成；Native DLL 不能据当前构建宣称玩家发行资格。
+E2 的出生空间要求只到离线数据与替身测试等级：运行时 NavMeshAgent、尺寸倍率效果、碰撞半径语义、空中图净空和出生阶段顺序都待游戏内核验（步骤见 [VALIDATION.md](VALIDATION.md#待游戏内核验)），Map 侧的真实求解器也未接入。E3 剩余的 damage 与 status 与击杀因果与 Boss 阶段，以及 E4–E7 都未完成。开发与发布包尚未生成；Native DLL 不能据当前构建宣称玩家发行资格。

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "batch": "E2 identity, spawn requirements and native inventory",
+  "date": "2026-09-13",
+  "gameExecuted": false,
+  "environment": {
+    "OUT": "%TEMP%/claude/<session>/scratchpad/e2",
+    "BEPINEX": "r2modmanPlus-local/GTFO/profiles/Temp/BepInEx (read-only)",
+    "GAME": "E:/SteamLibrary/steamapps/common/GTFO (read-only, build 20403457)",
+    "FIXTURES": "Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime"
+  },
+  "assemblies": {
+    "ForgeRuntime.dll": "1804024aafcb03f58d518d9e936e61928a73099ff3a44b39e23a6256356ad2fe",
+    "ForgeRuntime.Framework.dll": "b63d37af91390808afb8aed26823ac34e0292bb5e49e10384bbb7d679613e773",
+    "ForgeEnemy.Native.dll": "1b5e1bd0008f77cb562e1d8894bdadefadc8b7f1e746a3b46251e029a0ad09d1"
+  },
+  "outputs": {
+    "spawn-space-evidence.json": "926954d04322cedd441d6e44b4bcd73d6ad33cc4e1310b4eb26f587d4755cb88",
+    "spawn-requirements.json": "7e474b0ea78dcf7e1ec8bbfe9028b666e9a55bbb1aae2e92a1970b72e8bbf9bf",
+    "../native-api-20403457.json": "8df8614e761489495592866e2ab9bd367949a40c454eb16bfa1d68df367684dc"
+  },
+  "resultsScope": "assemblies above = sources before the concurrent D-004 contract rename; commands below were recorded against them",
+  "concurrentChangeReruns": [
+    { "time": "13:14", "assemblies": { "ForgeRuntime.dll": "46adda4a924d8afdddfee25196698dc689ea53a882b9014ae3e0955615025ead", "ForgeRuntime.Framework.dll": "60ee238099eb2b3aa5d8b8b01d3531e58809d94c6a5c34adbfdd5645bf062181", "ForgeEnemy.Native.dll": "cf07aa6bad1cfae0b25f264231eb1eb7f22bc8fb8001a0eada9f49b0de1a0de6" }, "failing": { "LifecycleFacts": "exit 1, FAIL 3/52 (fixture expected the enemy port before the contract was renamed); mutations baseline exit 1" }, "unchanged": "all other suites, NativeEvidence 544/544 and negatives 22/22 included" },
+    { "time": "13:24", "assemblies": { "ForgeRuntime.dll": "4e950322bfe21999a28d78c0b7a3dee91cbab62e7a288da6eabd0252d2bb7c86", "ForgeRuntime.Framework.dll": "84c7916e700e445f3fe0ab4c013f7a8f2302075f01ce0b956cb0d108d787194c", "ForgeEnemy.Native.dll": "6ca9a30a2c7887d7d6ac862343a40aa1f84b7d3592165eb6e750dada7a340ff3" }, "failing": { "LifecycleFacts": "exit 1, FAIL 2/52", "ReceiverProbe": "exit 1, FAIL 8/9 (RuntimeContractException: DamageObserved.outputs at plan load)", "CommitAudit": "exit 1, FAIL 46/52 (same exception)", "NativePlugin": "exit 1, FAIL 22/24" }, "unchanged": "EntityObservation 66/66, BehaviorObservation 22/22, NativeLayout 38/38, CutoverGuard OK, SpawnRequirements 48/48, NativeEvidence 544/544, negatives 22/22", "note": "test plans still use pre-D-004 port names; migrating them belongs to D-004 and was not done in E2" }
+  ],
+  "commands": [
+    { "command": "dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $OUT/final -p:GTFOBepInExPath=$BEPINEX", "exitCode": 0, "result": "0 Warning(s) 0 Error(s)" },
+    { "command": "dotnet build ForgeEnemy/Native/ForgeEnemy.Native.csproj -c Release --artifacts-path $OUT/final -p:GTFOBepInExPath=$BEPINEX -p:ForgeRuntimeAssembly=... -p:ForgeFrameworkAssembly=...", "exitCode": 0, "result": "0 Warning(s) 0 Error(s)" },
+    { "command": "dotnet build ForgeEnemy/ForgeEnemy.csproj -c Release --artifacts-path $OUT/final", "exitCode": 0, "result": "0 Warning(s) 0 Error(s)" },
+    { "command": "python ForgeEnemy/tests/SpawnSpaceEvidence/extract_spawn_space.py --game $GAME --unitypy <UnityPy 1.25.3> --output $OUT/reg/spawn-space-evidence.json", "exitCode": 0, "result": "PASS 39 enemy blocks, 10 base prefabs; sha256=926954d04322cedd441d6e44b4bcd73d6ad33cc4e1310b4eb26f587d4755cb88; game NOT executed.", "note": "byte-identical to the checked-in evidence" },
+    { "command": "python ForgeEnemy/tests/SpawnSpaceEvidence/verify_negative_cases.py --game $GAME --unitypy <UnityPy 1.25.3> --output $OUT/reg/spawn-space-negative", "exitCode": 0, "result": "PASS 8/8 extractor pin checks; game NOT executed." },
+    { "command": "dotnet SpawnRequirements.dll generate ForgeEnemy ForgeEnemy/evidence/e2-spawn-space-20403457/spawn-requirements.json", "exitCode": 0, "result": "Wrote 39 requirements from evidence 926954d04322cedd441d6e44b4bcd73d6ad33cc4e1310b4eb26f587d4755cb88" },
+    { "command": "dotnet SpawnRequirements.dll check ForgeEnemy $OUT/reg/SpawnRequirements/report.json", "exitCode": 0, "result": "PASS 48/48 spawn requirement checks; Map solver is a test stand-in; game NOT executed." },
+    { "command": "dotnet NativeEvidence.dll $BEPINEX $GAME ForgeEnemy.Native.dll ForgeEnemy/evidence/native-api-20403457.json $OUT/nativeevidence/report.json", "exitCode": 0, "result": "PASS 544/544 static evidence checks; enum-constants=7, evidence:metadata=125, evidence:static-native=2, use:forge-call=29, use:forge-hook=5, use:inventory=93; game execution and multiplayer NOT tested." },
+    { "command": "python ForgeEnemy/tests/NativeEvidence/verify_negative_cases.py NativeEvidence.dll $BEPINEX $GAME ForgeEnemy.Native.dll ForgeEnemy/evidence/native-api-20403457.json $OUT/reg/native-negative", "exitCode": 0, "result": "PASS 22/22 auditor negative-case checks; game NOT executed." },
+    { "command": "dotnet ReceiverProbe.dll $FIXTURES report.json", "exitCode": 0, "result": "PASS 44/44 receiver probes; native game execution and multiplayer are NOT exercised." },
+    { "command": "python ForgeEnemy/tests/ReceiverProbe/verify_mutations.py --sdk ForgeRuntime.Framework.dll --fixtures $FIXTURES --output $OUT/reg/ReceiverProbe-mutations", "exitCode": 0, "result": "8 passed, 0 failed (baseline + 7 mutants)", "note": "the first late-callback mutant (id lookup only) survived because Runtime Publish rejects the stale target; it was replaced by a mutant that also re-targets the new life, which identity.late-damage-after-respawn detects" },
+    { "command": "dotnet LifecycleFacts.dll $FIXTURES report.json", "exitCode": 0, "result": "PASS 52/52 lifecycle fact cases; no GTFO execution." },
+    { "command": "python ForgeEnemy/tests/LifecycleFacts/verify_mutations.py --sdk ... --fixtures $FIXTURES --output ...", "exitCode": 0, "result": "7 passed, 0 failed" },
+    { "command": "dotnet CommitAudit.dll $FIXTURES report.json", "exitCode": 0, "result": "PASS 52/52 independent Enemy commit/identity/damage cases. Not executed in GTFO.", "note": "existing-path 32 + migration-boundary 20" },
+    { "command": "dotnet EntityObservation.dll report.json ForgeRuntime.Framework.dll", "exitCode": 0, "result": "PASS 66/66 Enemy entity observation cases; no GTFO execution." },
+    { "command": "dotnet BehaviorObservation.dll report.json", "exitCode": 0, "result": "PASS 22/22 Enemy behavior observation cases; no GTFO execution." },
+    { "command": "dotnet NativePlugin.dll $FIXTURES report.json", "exitCode": 0, "result": "PASS 24/24 Native plugin integration cases; no GTFO execution." },
+    { "command": "dotnet NativeLayout.dll $BEPINEX ForgeRuntime.dll ForgeRuntime.Framework.dll ForgeEnemy.Native.dll cutover report.json", "exitCode": 0, "result": "PASS 38/38 native module layout checks (cutover); no GTFO execution." },
+    { "command": "python ForgeEnemy/tests/CutoverGuard/test_guard.py", "exitCode": 0, "result": "Ran 16 tests ... OK" }
+  ]
+}

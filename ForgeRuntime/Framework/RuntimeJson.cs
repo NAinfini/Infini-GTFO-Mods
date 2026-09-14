@@ -153,7 +153,8 @@ public static class RuntimeJson
             var type = Text(definition, "type");
             if (type == "enum")
             {
-                var members = definition.TryGetProperty("set", out var set) ? RuntimeGraphContracts.EnumSets[Text(set)] : Strings(definition.GetProperty("values"));
+                // Inline values narrow a named set, so they win when both are present.
+                var members = definition.TryGetProperty("values", out var inline) ? Strings(inline) : RuntimeGraphContracts.EnumSets[Text(definition, "set")];
                 Require(value.ValueKind == JsonValueKind.String && members.Contains(value.GetString(), StringComparer.Ordinal), "invalid-enum", Text(definition, "id"));
             }
             else { Require(type != "recipient-policy", "unsupported-parameter", "The runtime cannot evaluate recipient-policy."); ValidateValue(value, definition); }

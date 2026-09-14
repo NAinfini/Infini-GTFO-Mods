@@ -7,6 +7,8 @@ public enum ScalarOperation { Add, Subtract, Multiply, Divide, Minimum, Maximum,
 public enum ScalarComparison { Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual }
 public enum IntervalBoundary { Inclusive, Exclusive }
 public enum ScalarRounding { Floor, Ceiling, Nearest, Truncate }
+/// <summary>The website divide node's structural zero_policy.</summary>
+public enum DivisionZeroPolicy { Reject, Zero, Passthrough }
 
 /// <summary>Stateless, dimensionless arithmetic. Graph units, domains and bindings belong to the public Runtime boundary.</summary>
 public static class ScalarNodes
@@ -21,14 +23,27 @@ public static class ScalarNodes
             ScalarOperation.Add => a + b,
             ScalarOperation.Subtract => a - b,
             ScalarOperation.Multiply => a * b,
-            ScalarOperation.Divide => b == 0d
-                ? throw new RuntimeContractException("pure-division-by-zero", "The divisor must not be zero.") : a / b,
+            ScalarOperation.Divide => Divide(a, b, DivisionZeroPolicy.Reject),
             ScalarOperation.Minimum => Math.Min(a, b),
             ScalarOperation.Maximum => Math.Max(a, b),
             ScalarOperation.Power => Math.Pow(a, b),
             _ => throw new RuntimeContractException("pure-operation", "Unknown scalar operation.")
         };
         return PureNumbers.Result(value);
+    }
+
+    public static double Divide(double a, double b, DivisionZeroPolicy policy)
+    {
+        PureNumbers.Input(a); PureNumbers.Input(b);
+        if (b != 0d) return PureNumbers.Result(a / b);
+        return policy switch
+        {
+            DivisionZeroPolicy.Reject => throw new RuntimeContractException("pure-division-by-zero", "The divisor must not be zero."),
+            DivisionZeroPolicy.Zero => 0d,
+            // The dividend passes through unchanged.
+            DivisionZeroPolicy.Passthrough => PureNumbers.Result(a),
+            _ => throw new RuntimeContractException("pure-operation", "Unknown division zero policy.")
+        };
     }
 
     public static double Clamp(double value, double minimum, double maximum)
@@ -76,17 +91,20 @@ public static class ScalarNodes
 /// <summary>Pure predicates; never reads an entity, infers a missing actor or mutates state.</summary>
 public static class PureConditions
 {
-    public static bool Compare(double a, double b, ScalarComparison operation)
+    /// <summary>Website compare: tolerance widens equality and shifts the ordered comparisons towards acceptance.</summary>
+    public static bool Compare(double left, double right, ScalarComparison operation, double tolerance)
     {
-        PureNumbers.Input(a); PureNumbers.Input(b);
+        PureNumbers.Input(left); PureNumbers.Input(right); PureNumbers.Input(tolerance);
+        if (tolerance < 0d)
+            throw new RuntimeContractException("pure-tolerance-range", "Comparison tolerance must not be negative.");
         return operation switch
         {
-            ScalarComparison.Equal => a == b,
-            ScalarComparison.NotEqual => a != b,
-            ScalarComparison.Less => a < b,
-            ScalarComparison.LessOrEqual => a <= b,
-            ScalarComparison.Greater => a > b,
-            ScalarComparison.GreaterOrEqual => a >= b,
+            ScalarComparison.Equal => Math.Abs(left - right) <= tolerance,
+            ScalarComparison.NotEqual => Math.Abs(left - right) > tolerance,
+            ScalarComparison.Less => left < right - tolerance,
+            ScalarComparison.LessOrEqual => left <= right + tolerance,
+            ScalarComparison.Greater => left > right + tolerance,
+            ScalarComparison.GreaterOrEqual => left >= right - tolerance,
             _ => throw new RuntimeContractException("pure-operation", "Unknown comparison operation.")
         };
     }

@@ -23,21 +23,18 @@ public static class CombatContracts
           "id": "forge.trigger.combat.damage_applied",
           "owner": "forge.contract.combat",
           "kind": "trigger",
-          "label": "实际伤害已提交",
+          "label": "实际伤害提交完成",
           "version": "1.0.0",
           "parameters": {
-            "description": "已经提交的实际伤害事实，目标身份明确；来源无法核实时保留未知。",
-            "amountUnit": "hp"
+            "description": "伤害真的打上去了，数字是实际值。"
           },
           "graph": {
             "domains": [
-              "map",
-              "room",
               "enemy",
               "weapon",
               "tool",
               "consumable",
-              "logic"
+              "player"
             ],
             "execution": "host",
             "inputs": [],
@@ -47,13 +44,29 @@ public static class CombatContracts
                 "type": "execution"
               },
               {
+                "id": "source",
+                "type": "entity",
+                "nullable": true
+              },
+              {
                 "id": "target",
                 "type": "entity"
               },
               {
-                "id": "actual_damage",
+                "id": "amount",
                 "type": "number",
                 "unit": "hp"
+              },
+              {
+                "id": "damage_kind",
+                "type": "enum",
+                "schema": "damage_kind",
+                "nullable": true
+              },
+              {
+                "id": "limb",
+                "type": "integer",
+                "nullable": true
               }
             ],
             "parameters": []
@@ -63,11 +76,11 @@ public static class CombatContracts
           "id": "forge.action.combat.heal",
           "owner": "forge.contract.combat",
           "kind": "action",
-          "label": "恢复生命",
-          "version": "1.0.0",
+          "label": "恢复生命并限制溢出",
+          "version": "2.0.0",
           "parameters": {
-            "description": "通过显式接收目标恢复绝对HP，阵营关系独立；当前值封顶最大生命，不隐式复活。实际支持由所选Binding明确。",
-            "amountUnit": "hp"
+            "description": "给你选中的目标回血。溢出规则：截断只回到上限；丢弃是会溢出就整次不治疗；溢出允许超过上限，做不到的目标会拒绝。",
+            "support": "authoring-contract-only"
           },
           "graph": {
             "domains": [
@@ -77,7 +90,7 @@ public static class CombatContracts
               "weapon",
               "tool",
               "consumable",
-              "logic"
+              "player"
             ],
             "execution": "host",
             "inputs": [
@@ -86,8 +99,24 @@ public static class CombatContracts
                 "type": "execution"
               },
               {
-                "id": "target",
+                "id": "targets",
+                "type": "entity",
+                "cardinality": "many"
+              },
+              {
+                "id": "source",
                 "type": "entity"
+              },
+              {
+                "id": "amount",
+                "type": "number",
+                "unit": "hp"
+              },
+              {
+                "id": "cap",
+                "type": "number",
+                "unit": "hp",
+                "optional": true
               }
             ],
             "outputs": [
@@ -98,23 +127,26 @@ public static class CombatContracts
               {
                 "id": "result",
                 "type": "result",
-                "schema": "forge.result.heal"
+                "schema": "forge.result.combat.heal"
               }
             ],
             "parameters": [
               {
-                "id": "amount",
-                "type": "number",
-                "role": "value",
+                "id": "overheal_policy",
+                "type": "enum",
+                "role": "structural",
                 "required": true,
-                "minimum": 0.000001,
-                "maximum": 1000000
+                "values": [
+                  "clamp",
+                  "discard",
+                  "overheal"
+                ]
               }
             ],
             "recipients": {
-              "input": "target",
+              "input": "targets",
               "target": "entity",
-              "cardinality": "one",
+              "cardinality": "many",
               "requires": [
                 "health.heal"
               ],
@@ -126,91 +158,10 @@ public static class CombatContracts
           "id": "forge.trigger.combat.health_changed",
           "owner": "forge.contract.combat",
           "kind": "trigger",
-          "label": "实际生命变化",
+          "label": "生命值变化",
           "version": "1.0.0",
           "parameters": {
-            "description": "已经提交的生命变化，包含变化前后绝对HP与有符号差值；每个Binding声明自己的观察来源。",
-            "amountUnit": "hp"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "enemy",
-              "weapon",
-              "tool",
-              "consumable",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "target",
-                "type": "entity"
-              },
-              {
-                "id": "health_before",
-                "type": "number",
-                "unit": "hp"
-              },
-              {
-                "id": "health_after",
-                "type": "number",
-                "unit": "hp"
-              },
-              {
-                "id": "delta",
-                "type": "number",
-                "unit": "hp"
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
-          "id": "forge.trigger.enemy.death_started",
-          "owner": "forge.contract.combat",
-          "kind": "trigger",
-          "label": "死亡流程开始",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "OnDead正常返回且同生命状态为死亡的流程事实；不是击杀归因、奖励或尸体清理证明。"
-          },
-          "graph": {
-            "domains": [
-              "enemy",
-              "map",
-              "room",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "target",
-                "type": "entity"
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
-          "id": "forge.trigger.combat.limb_broken",
-          "owner": "forge.contract.combat",
-          "kind": "trigger",
-          "label": "部位破坏完成",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "同一完整实体生命、健康接收器和已索引部位在原生窗口中由未破坏变为已破坏；不推断攻击者或击杀。"
+            "description": "生命值变了。"
           },
           "graph": {
             "domains": [
@@ -232,8 +183,87 @@ public static class CombatContracts
                 "type": "entity"
               },
               {
-                "id": "limb_id",
-                "type": "integer"
+                "id": "value",
+                "type": "number",
+                "unit": "hp"
+              },
+              {
+                "id": "delta",
+                "type": "number",
+                "unit": "hp"
+              }
+            ],
+            "parameters": []
+          }
+        },
+        {
+          "id": "forge.trigger.enemy.death_started",
+          "owner": "forge.contract.combat",
+          "kind": "trigger",
+          "label": "死亡流程开始",
+          "version": "1.0.0",
+          "parameters": {
+            "description": "敌人的死亡流程开始。"
+          },
+          "graph": {
+            "domains": [
+              "map",
+              "room",
+              "enemy",
+              "logic"
+            ],
+            "execution": "host",
+            "inputs": [],
+            "outputs": [
+              {
+                "id": "next",
+                "type": "execution"
+              },
+              {
+                "id": "enemy",
+                "type": "entity"
+              },
+              {
+                "id": "source",
+                "type": "entity",
+                "nullable": true
+              }
+            ],
+            "parameters": []
+          }
+        },
+        {
+          "id": "forge.trigger.combat.limb_broken",
+          "owner": "forge.contract.combat",
+          "kind": "trigger",
+          "label": "可破坏部位破坏完成",
+          "version": "1.0.0",
+          "parameters": {
+            "description": "某个可破坏部位被打断了。"
+          },
+          "graph": {
+            "domains": [
+              "enemy",
+              "weapon",
+              "tool",
+              "consumable",
+              "player"
+            ],
+            "execution": "host",
+            "inputs": [],
+            "outputs": [
+              {
+                "id": "next",
+                "type": "execution"
+              },
+              {
+                "id": "target",
+                "type": "entity"
+              },
+              {
+                "id": "limb",
+                "type": "integer",
+                "nullable": true
               }
             ],
             "parameters": []

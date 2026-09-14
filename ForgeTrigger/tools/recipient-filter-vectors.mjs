@@ -12,7 +12,7 @@ const {previewLogicPrimitive}=await import(pathToFileURL(path.join(site,'site/fo
 const {logicPrimitiveDefinitions}=await import(pathToFileURL(path.join(site,'site/forge/logic-primitives.ts')).href);
 const canonicalId='forge.selector.target.filter';
 const definition=logicPrimitiveDefinitions.find(row=>row.id===canonicalId);
-assert.equal(definition?.version,'1.0.0'); assert.equal(definition.graph.execution,'pure');
+assert.equal(definition?.graph.execution,'pure');
 const ref=id=>({id:'test.recipient:'+id,worldEpoch:1,lifeEpoch:1});
 const entity=(id,kind,faction,position,lifeState='alive',tags=[],receives=['test.receiver.health'])=>
     ({ref:ref(id),kind,faction,position,lifeState,tags,receives});
@@ -70,7 +70,7 @@ for(let offset=0;offset<all.length;offset++){
     for(const sort of ['stable-id','nearest','farthest'])add('duplicates-permutation',{sort},rotated);
 }
 const capped={...base,maxTargets:1};
-assert.throws(()=>previewLogicPrimitive(canonicalId,{policy:capped},{targets:combat},world),/truncated/);assertions++;
+assert.throws(()=>previewLogicPrimitive(canonicalId,{empty:'emit-empty'},{candidates:combat,filter:capped},world),/truncated/);assertions++;
 cases.push({id:'limit-rejection',policy:capped,candidates:combat,receivers:[],outcome:'rejected',expectedCode:'recipient-target-limit'});
 for(const change of [{schemaVersion:2},{maxTargets:0},{maxTargets:257},{maxTargets:1.5},{kinds:[]},
     {relations:['friend']},{relations:['ally','ally']},{lifeStates:['sleeping']},{anchor:'attacker'},

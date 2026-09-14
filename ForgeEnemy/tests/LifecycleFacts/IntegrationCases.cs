@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text.Json;
 using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 using static T;
@@ -29,7 +28,9 @@ internal static class IntegrationCases
                 && s.Records[1].RootEventId == s.Records[0].RootEventId, "Canonical cause/root propagation was lost.");
         });
         Case("integration.queue-rejection-does-not-reopen-fact", () => {
-            using var s = new Scene(); Enemies.EnemyAgent? last = null;
+            using var s = new Scene(load: false); Enemies.EnemyAgent? last = null;
+            // The per-plan budget, not the kernel ceiling, bounds this plan: 16 queued, at most 4 dispatched per tick.
+            s.Load("death_started", budget: new RuntimeLimits { MaxEventsPerTick = 4, MaxCommandsPerTick = 8, MaxQueuedEvents = 16, MaxCausalDepth = 2 });
             for (int i = 0; i < 17; i++) { last = Scene.NewEnemy((ushort)(100 + i), 1000 + i);
                 s.Module.TrackSpawn(last); s.Die(last); }
             for (int i = 1; i <= 8; i++) s.Tick(i);
@@ -40,38 +41,9 @@ internal static class IntegrationCases
             using var s = new Scene(); s.Die(); s.Module.TrackDespawn(s.Enemy); s.Enemy.Alive = true;
             s.Module.TrackSpawn(s.Enemy); s.Tick(); Check(s.Records.Count == 0, "Queued old-life fact targeted respawn.");
         });
-        foreach (string suffix in new[] { "death_started", "limb_broken" }) Case("integration.real-heal-" + suffix, () => {
-            using var s = new Scene(load: false);
-            var plan = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(Scene.Fixtures, "native-heal.plan.json")))!;
-            string id = suffix == "death_started" ? EnemyModule.DeathStartedBinding : EnemyModule.LimbBrokenBinding;
-            string cap = suffix == "death_started" ? "forge.trigger.enemy.death_started" : "forge.trigger.combat.limb_broken";
-            var entry = plan["entrypoints"]![0]!; var step = entry["steps"]![0]!;
-            var trigger = plan["bindings"]![entry["binding"]!.GetValue<int>()]!;
-            string heal = plan["bindings"]![step["binding"]!.GetValue<int>()]!["bindingId"]!.GetValue<string>();
-            trigger["bindingId"] = id; trigger["capabilityId"] = cap; trigger["handler"] = "gtfo.enemy." + suffix;
-            plan["planId"] = "forge.example.enemy_" + suffix + "_heal";
-            plan["resource"]!["id"] = "forge.example.enemy_" + suffix + "_heal";
-            string read = suffix == "death_started" ? "gtfo.enemy.lifecycle.read" : "gtfo.enemy.limbs.read";
-            plan["permissions"] = JsonSerializer.SerializeToNode(new[] { read, "gtfo.enemy.health.write" }.OrderBy(x => x, StringComparer.Ordinal).ToArray());
-            var pins = plan["bindings"]!.AsArray()
-                .Select(x => System.Text.Json.Nodes.JsonNode.Parse(x!.ToJsonString())!)
-                .OrderBy(x => x["bindingId"]!.GetValue<string>(), StringComparer.Ordinal).ToList();
-            plan["bindings"] = new System.Text.Json.Nodes.JsonArray(pins.ToArray());
-            int Index(string binding) => pins.FindIndex(x => x["bindingId"]!.GetValue<string>() == binding);
-            // Pins are positional: the swapped trigger can move, and its event frame differs from damage_applied.
-            entry["binding"] = Index(id); entry["layout"] = Fixture.Layout(s.Kernel, id); step["binding"] = Index(heal);
-            step["inputs"]![0]!["fromEventSlot"] = Fixture.Slot(s.Kernel, id, "outputs", "target");
-            step["inputs"]![0]!["slot"] = Fixture.Slot(s.Kernel, heal, "inputs", "target");
-            s.Kernel.LoadPlan(plan.ToJsonString(), new[] { read, "gtfo.enemy.health.write" });
-            if (suffix == "death_started") s.Die(); else s.Break();
-            var result = s.Tick().Commands.Single().Result;
-            Check(suffix == "death_started" ? result.Code == "gtfo.enemy.not_alive" && s.Enemy.Damage.Sends == 0
-                : result.Status == "succeeded" && result.Outputs.GetProperty("actualAmount").GetDouble() == 5
-                    && s.Enemy.Damage.Health == 55 && s.Enemy.Damage.Sends == 1,
-                "Event did not reach the real receiver or implicitly revived a dead enemy.");
-            if (suffix == "limb_broken") File.WriteAllText(Path.Combine(T.OutputDirectory, "limb-broken-heal.plan.json"),
-                plan.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        });
+        // Fact -> heal against the real receiver (limb +5 HP once; death cannot revive). heal takes many-valued targets,
+        // and a fact's single entity cannot feed them until single-to-many wiring exists, so no legal plan can be built.
+        foreach (string suffix in new[] { "death_started", "limb_broken" }) Blocked("integration.real-heal-" + suffix, Blockers.Heal);
         Case("integration.native-hooks-delegate-exactly-once", Hooks);
     }
 
@@ -81,13 +53,9 @@ internal static class IntegrationCases
         k.BeginWorld(1); k.RegisterModule(CombatContracts.Module());
         using var session = EnemyPluginSession.Start(k, () => true, _ => { }, () => { }, () => { });
         var rows = new List<CommandContext>();
-        using var sink = k.RegisterModule(new(RuntimeKernel.ApiVersion, Fixture.SinkRegistry,
-            new Dictionary<string, CommandHandler> { ["test.record"] = c =>
-                { rows.Add(c); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
-            new[] { new BindingSupport("test.lifecycle.binding.record", "implementation-only", new[] { "test.record" }) }));
+        using var sink = k.RegisterModule(LocalPlan.Recorder(rows.Add));
         var actor = Scene.NewEnemy(); session.Module.TrackSpawn(actor);
-        foreach (var suffix in new[] { "death_started", "limb_broken" })
-            k.LoadPlan(Fixture.Plan(k, Scene.Fixtures, suffix), new[] { "gtfo.enemy.lifecycle.read", "gtfo.enemy.limbs.read", "test.record" });
+        foreach (var suffix in new[] { "death_started", "limb_broken" }) LocalPlan.Load(k, Scene.FactPlan(k, suffix));
         k.StartRuntime(() => { });
         var sessionProperty = typeof(ForgeEnemy.Native.Plugin).GetProperty("Session", BindingFlags.Static | BindingFlags.NonPublic)!;
         sessionProperty.SetValue(null, session);

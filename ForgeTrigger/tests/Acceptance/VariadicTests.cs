@@ -8,18 +8,23 @@ internal sealed class VariadicTests : IAcceptanceGroup
     public void Run(string directory, Action<bool,string> check)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory,"variadic-reference.json")));
+        using var registrations = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory,"authoring-registration-cases.json")));
+        // The exact version is whatever the website catalog row declares, recorded once by the authoring audit.
+        // Metadata cases repeat an id; every row for one id must still name one version.
+        var versions = registrations.RootElement.GetProperty("cases").EnumerateArray()
+            .GroupBy(row=>row.GetProperty("id").GetString()!)
+            .ToDictionary(group=>group.Key, group=>group.Select(row=>row.GetProperty("version").GetString()!).Distinct().ToArray());
         var data = document.RootElement;
         check(data.GetProperty("kind").GetString()=="test-only-variadic-values", "variadic fixture provenance");
         var index = 0;
         foreach (var row in data.GetProperty("cases").EnumerateArray())
         {
-            check(row.GetProperty("capabilityVersion").GetString()=="1.1.0", "variadic exact version");
+            var id = row.GetProperty("capabilityId").GetString()!;
+            check(versions.TryGetValue(id,out var version) && version.Length==1 && row.GetProperty("capabilityVersion").GetString()==version[0], "variadic exact version "+id);
             try
             {
                 var expected = row.GetProperty("expected"); var value = Evaluate(row);
-                bool Equal(object output) => output is bool flag ? flag==expected.GetBoolean()
-                    : output is double number ? number==expected.GetDouble()
-                    : ((IReadOnlyList<EntityReference>)output).SequenceEqual(expected.EnumerateArray().Select(RuntimeJson.Entity));
+                bool Equal(object output) => output is bool flag ? flag==expected.GetBoolean() : (double)output==expected.GetDouble();
                 check(Equal(value), "variadic shared result "+index);
                 check(Equal(Evaluate(row)), "variadic deterministic repeat "+index);
             }
@@ -35,8 +40,6 @@ internal sealed class VariadicTests : IAcceptanceGroup
         {
             "all" => VariadicNodes.All(values.EnumerateArray().Select(v=>v.GetBoolean()).ToArray()),
             "any" => VariadicNodes.Any(values.EnumerateArray().Select(v=>v.GetBoolean()).ToArray()),
-            "union" => VariadicNodes.Union(Lists(values)),
-            "intersection" => VariadicNodes.Intersection(Lists(values)),
             var name => VariadicNodes.Reduce(name switch
             {
                 "add"=>ScalarOperation.Add, "multiply"=>ScalarOperation.Multiply,
@@ -45,8 +48,6 @@ internal sealed class VariadicTests : IAcceptanceGroup
             },values.EnumerateArray().Select(v=>v.GetDouble()).ToArray())
         };
     }
-    private static IReadOnlyList<EntityReference>[] Lists(JsonElement values)
-        => values.EnumerateArray().Select(list=>(IReadOnlyList<EntityReference>)list.EnumerateArray().Select(RuntimeJson.Entity).ToArray()).ToArray();
     private static void Boundaries(Action<bool,string> check)
     {
         void Reject(string code, Action action)
@@ -63,18 +64,11 @@ internal sealed class VariadicTests : IAcceptanceGroup
         Reject("pure-variadic-operation",()=>VariadicNodes.Reduce(ScalarOperation.Divide,new[] {1d,2d}));
         Reject("pure-invalid-number",()=>VariadicNodes.Reduce(ScalarOperation.Multiply,new[] {0d,1d,double.NaN}));
         Reject("pure-nonfinite-result",()=>VariadicNodes.Reduce(ScalarOperation.Add,new[] {double.MaxValue,double.MaxValue}));
-        Reject("pure-variadic-null",()=>VariadicNodes.Union(null!));
-        var a = new EntityReference("test.variadic:a",1,1);
-        Reject("pure-collection-null",()=>VariadicNodes.Intersection(new IReadOnlyList<EntityReference>[] {Array.Empty<EntityReference>(),new[] {a},null!}));
         var original = new[] {1d,2d,3d}; var before = original.ToArray();
         check(VariadicNodes.Reduce(ScalarOperation.Add,original)==6 && original.SequenceEqual(before),"variadic input not mutated");
         check(VariadicNodes.Reduce(ScalarOperation.Add,new[] {1e16,1,-1e16})==0,"ordered reduction does not reassociate");
         check(VariadicNodes.Reduce(ScalarOperation.Add,new[] {1e16,-1e16,1})==1,"different author order is preserved");
-        var life = a with {LifeEpoch=2};
-        var lists = new IReadOnlyList<EntityReference>[] {new[] {a,life},new[] {life},new[] {a,life}};
-        check(VariadicNodes.Intersection(lists).SequenceEqual(new[] {life}),"intersection includes every input and full life identity");
-        var large = Enumerable.Range(0,4096).Select(i=>a with {Id="test.variadic:"+i}).ToArray();
-        Reject("pure-collection-output-budget",()=>VariadicNodes.Union(new IReadOnlyList<EntityReference>[] {large,new[] {a}}));
+        check(!VariadicNodes.Any(new[] {false,false,false}) && VariadicNodes.Any(new[] {false,false,true}),"any reads its last input");
         check(ForgeTrigger.ModuleDefinition.Create().Handlers.Count==0,"pure variadic methods do not install runtime handlers");
     }
 }

@@ -74,8 +74,11 @@ foreach (var invalid in new[] { double.NaN, double.PositiveInfinity, double.Nega
         ("lerp-weight", () => ScalarNodes.Lerp(0, 1, invalid)),
         ("select-unselected-true", () => ScalarNodes.SelectValue(false, invalid, 1)),
         ("select-unselected-false", () => ScalarNodes.SelectValue(true, 1, invalid)),
-        ("compare-a", () => PureConditions.Compare(invalid, 1, ScalarComparison.Equal)),
-        ("compare-b", () => PureConditions.Compare(1, invalid, ScalarComparison.Equal)),
+        ("compare-a", () => PureConditions.Compare(invalid, 1, ScalarComparison.Equal, 0)),
+        ("compare-b", () => PureConditions.Compare(1, invalid, ScalarComparison.Equal, 0)),
+        ("compare-tolerance", () => PureConditions.Compare(1, 1, ScalarComparison.Equal, invalid)),
+        ("divide-a", () => ScalarNodes.Divide(invalid, 1, DivisionZeroPolicy.Passthrough)),
+        ("divide-b", () => ScalarNodes.Divide(1, invalid, DivisionZeroPolicy.Zero)),
         ("range-value", () => PureConditions.InRange(invalid, 0, 1, IntervalBoundary.Inclusive)),
         ("range-min", () => PureConditions.InRange(0, invalid, 1, IntervalBoundary.Inclusive)),
         ("range-max", () => PureConditions.InRange(0, 0, invalid, IntervalBoundary.Inclusive)),
@@ -93,7 +96,8 @@ foreach (var invalid in new[] { double.NaN, double.PositiveInfinity, double.Nega
 }
 Reject("unknown binary", "pure-operation", () => ScalarNodes.Binary((ScalarOperation)999, 1, 1));
 Reject("unknown rounding", "pure-operation", () => ScalarNodes.Round(0, (ScalarRounding)999));
-Reject("unknown comparison", "pure-operation", () => PureConditions.Compare(0, 0, (ScalarComparison)999));
+Reject("unknown comparison", "pure-operation", () => PureConditions.Compare(0, 0, (ScalarComparison)999, 0));
+Reject("unknown zero policy", "pure-operation", () => ScalarNodes.Divide(1, 0, (DivisionZeroPolicy)999));
 Reject("unknown interval boundary", "pure-operation", () => PureConditions.InRange(0, 0, 1, (IntervalBoundary)999));
 Reject("minimum long seed", "pure-seed", () => SeededNodes.Uniform(0, 1, long.MinValue));
 Reject("maximum long seed", "pure-seed", () => SeededNodes.Uniform(0, 1, long.MaxValue));

@@ -6,7 +6,7 @@ using HarmonyLib;
 using Host = ForgeRuntime.Plugin;
 using NativePlugin = ForgeEnemy.Native.Plugin;
 
-if (args.Length != 2) { Console.Error.WriteLine("Usage: NativePlugin <fixtures> <report.json>"); return 2; }
+if (args.Length != 1) { Console.Error.WriteLine("Usage: NativePlugin <report.json>"); return 2; }
 var checks = new List<object>(); int passed = 0, failed = 0;
 void Case(string name, Action test)
 {
@@ -25,6 +25,9 @@ EnemyAgent Enemy()
 {
     var actor = new EnemyAgent(); actor.Damage = new() { Owner = actor }; return actor;
 }
+// death_started -> record: exercises real plan loading and dispatch through the session without a heal step.
+LocalPlan.Plan DeathPlan(RuntimeKernel kernel)
+    => LocalPlan.Build(kernel, "test.plugin.death", EnemyModule.DeathStartedBinding, LocalPlan.RecordBinding, ("enemy", "target"));
 RuntimeModule Dependency(string id) => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
 {
     providers = new[] { new { id, kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
@@ -76,16 +79,17 @@ Case("session.callback-and-reporter-fault", () =>
 });
 Case("session.real-plan-and-world-cleanup", () =>
 {
-    var kernel = Kernel(); int removed = 0;
+    var kernel = Kernel(); int removed = 0; var records = new List<CommandContext>();
     var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
+    kernel.RegisterModule(LocalPlan.Recorder(records.Add));
+    var plan = DeathPlan(kernel);
     var actor = Enemy(); var reference = session.Module.TrackSpawn(actor);
-    kernel.StartRuntime(() => kernel.LoadPlan(File.ReadAllText(Path.Combine(args[0], "native-heal.plan.json")),
-        new[] { "gtfo.enemy.health.read", "gtfo.enemy.health.write" }));
-    var observed = session.Module.BeforeDamage(actor.Damage); actor.Damage.Health = 40;
-    session.Module.AfterDamage(actor.Damage, observed); session.Module.AfterDamage(actor.Damage, observed);
+    kernel.StartRuntime(() => LocalPlan.Load(kernel, plan));
+    var observed = session.Module.BeforeDeath(actor); actor.Alive = false;
+    session.Module.AfterDeath(actor, observed); session.Module.AfterDeath(actor, observed);
     var tick = kernel.Advance(1, true);
-    Require(tick.Commands.Count == 1 && actor.Damage.Health == 45 && actor.Damage.Sends == 1, "Plan was not executed exactly once.");
-    kernel.BeginWorld(2); var next = session.Module.TrackSpawn(actor);
+    Require(observed != null && tick.Commands.Count == 1 && records.Count == 1, $"Plan was not executed exactly once: commands={tick.Commands.Count}; records={records.Count}.");
+    kernel.BeginWorld(2); actor.Alive = true; var next = session.Module.TrackSpawn(actor);
     Require(next.WorldEpoch == 2 && next.LifeEpoch != reference.LifeEpoch, "World lifecycle did not retire the old life.");
     kernel.StopRuntime(); int called = 0; session.Guard(_ => called++);
     session.Dispose(); session.Dispose();
@@ -161,18 +165,19 @@ Case("session.wrong-thread-dispose-keeps-ownership", () =>
 });
 Case("session.dispatch-dispose-rejects-before-unpatch", () =>
 {
-    var kernel = Kernel(); int removed = 0;
-    var session = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
+    var kernel = Kernel(); int removed = 0; Exception? rejection = null; EnemyPluginSession? dispatching = null;
+    // The dispatched step tries to tear the session down from inside the kernel's dispatch.
+    kernel.RegisterModule(LocalPlan.Recorder(_ => { try { dispatching!.Dispose(); } catch (Exception error) { rejection = error; } }));
+    var session = dispatching = EnemyPluginSession.Start(kernel, () => true, _ => { }, () => { }, () => removed++);
     try
     {
+        var plan = DeathPlan(kernel);
         var actor = Enemy(); session.Module.TrackSpawn(actor);
-        kernel.StartRuntime(() => kernel.LoadPlan(File.ReadAllText(Path.Combine(args[0], "native-heal.plan.json")),
-            new[] { "gtfo.enemy.health.read", "gtfo.enemy.health.write" }));
-        var hit = session.Module.BeforeDamage(actor.Damage); actor.Damage.Health = 40; session.Module.AfterDamage(actor.Damage, hit);
-        actor.Damage.Commit = value => { actor.Damage.Health = value; session.Dispose(); };
+        kernel.StartRuntime(() => LocalPlan.Load(kernel, plan));
+        var death = session.Module.BeforeDeath(actor); actor.Alive = false; session.Module.AfterDeath(actor, death);
         var tick = kernel.Advance(1, true);
-        Require(removed == 0 && !session.Faulted && session.Module.IsRegistered && tick.Commands.Count == 1
-            && tick.Commands[0].Result.CommitState == CommitStates.Unknown, "In-dispatch Dispose changed hook ownership or claimed a known commit.");
+        Require(tick.Commands.Count == 1 && rejection is RuntimeContractException && removed == 0 && !session.Faulted && session.Module.IsRegistered,
+            $"In-dispatch Dispose was not rejected before unpatching: commands={tick.Commands.Count}; rejection={rejection?.GetType().Name}; removed={removed}; faulted={session.Faulted}.");
         session.Dispose(); Require(removed == 1 && !session.Module.IsRegistered, "Post-dispatch cleanup failed.");
     }
     finally { session.Module.Dispose(); session.Dispose(); }
@@ -274,7 +279,7 @@ Case("plugin.success-single-load-no-hot-reload", () =>
 });
 var result = new { verification = "production-plugin-session-and-receiver-source-with-loader-game-doubles",
     gameExecuted = false, multiplayerExecuted = false, passed, failed, checks };
-string output = Path.GetFullPath(args[1]); Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+string output = Path.GetFullPath(args[0]); Directory.CreateDirectory(Path.GetDirectoryName(output)!);
 File.WriteAllText(output, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
 Console.WriteLine($"{(failed == 0 ? "PASS" : "FAIL")} {passed}/{passed + failed} Native plugin integration cases; no GTFO execution.");
 return failed == 0 ? 0 : 1;

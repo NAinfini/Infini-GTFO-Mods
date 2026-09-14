@@ -87,23 +87,31 @@ internal static class CollectionTests
         var id = row.GetProperty("capabilityId").GetString()!;
         var p = row.GetProperty("parameters"); var inputs = row.GetProperty("inputs");
         EntityReference[] Refs(string name) => inputs.GetProperty(name).EnumerateArray().Select(RuntimeJson.Entity).ToArray();
-        return id.Split('.')[^1] switch
-        {
-            "distinct" => ReferenceCollections.Distinct(Refs("targets")),
-            "union" => ReferenceCollections.Union(Refs("a"), Refs("b")),
-            "intersection" => ReferenceCollections.Intersection(Refs("a"), Refs("b")),
-            "difference" => ReferenceCollections.Difference(Refs("a"), Refs("b")),
-            "limit" => ReferenceCollections.Limit(Refs("targets"), p.GetProperty("count").GetInt32()).Selected,
-            "shuffle" => ReferenceCollections.Shuffle(Refs("targets"), p.GetProperty("seed").GetInt64()),
-            "random" => ReferenceCollections.Random(Refs("targets"), p.GetProperty("seed").GetInt64(), p.GetProperty("count").GetInt32()).Selected,
-            "count" => ReferenceCollections.CountMatches(Refs("targets"), p.GetProperty("operator").GetString() switch
+        int MaxTargets() => inputs.GetProperty("max_targets").GetInt32();
+        long Seed() => inputs.GetProperty("seed").GetInt64();
+        if (id.EndsWith(".count", StringComparison.Ordinal))
+            return ReferenceCollections.CountMatches(Refs("candidates"), inputs.GetProperty("operator").GetString() switch
             {
                 "eq" => ScalarComparison.Equal, "ne" => ScalarComparison.NotEqual,
                 "lt" => ScalarComparison.Less, "lte" => ScalarComparison.LessOrEqual,
                 "gt" => ScalarComparison.Greater, "gte" => ScalarComparison.GreaterOrEqual,
                 _ => throw new InvalidOperationException("Unknown fixture comparison")
-            }, p.GetProperty("count").GetInt32()),
+            }, inputs.GetProperty("value").GetInt64());
+        var selected = id.Split('.')[^1] switch
+        {
+            "distinct" => ReferenceCollections.Distinct(Refs("candidates")),
+            "union" => ReferenceCollections.Union(Refs("a"), Refs("b")),
+            "intersection" => ReferenceCollections.Intersection(Refs("a"), Refs("b")),
+            "difference" => ReferenceCollections.Difference(Refs("a"), Refs("b")),
+            "limit" => ReferenceCollections.Limit(Refs("candidates"), MaxTargets()).Selected,
+            "shuffle" => ReferenceCollections.Shuffle(Refs("candidates"), Seed()),
+            "random" => ReferenceCollections.Random(Refs("candidates"), Seed(), MaxTargets()).Selected,
             _ => throw new InvalidOperationException("Unknown collection fixture")
         };
+        return ReferenceCollections.ApplyEmptyPolicy(selected, p.GetProperty("empty").GetString() switch
+        {
+            "emit-empty" => EmptySelectionPolicy.EmitEmpty, "skip" => EmptySelectionPolicy.Skip, "fail" => EmptySelectionPolicy.Fail,
+            _ => throw new InvalidOperationException("Unknown fixture empty policy")
+        });
     }
 }

@@ -28,7 +28,7 @@ internal static class RuntimeGraphContracts
         "expedition", "session" };
     /// <summary>Declaration order is the compiled valueSet index of an enum port.</summary>
     private static readonly (string Name, string[] Members)[] EnumSetTable = {
-        ("compare_operator", new[] { "eq", "ne", "lt", "lte", "gt", "gte", "in", "contains" }),
+        ("compare_operator", new[] { "eq", "ne", "lt", "lte", "gt", "gte" }),
         ("boundary_mode", new[] { "inclusive", "exclusive" }),
         ("rounding_mode", new[] { "floor", "ceil", "nearest", "truncate" }),
         ("command_phase", new[] { "requested", "accepted", "committed", "rejected", "cancelled" }),
@@ -49,6 +49,9 @@ internal static class RuntimeGraphContracts
         ("recipient_anchor", new[] { "self", "source", "owner", "instigator", "event-target" }),
         ("recipient_relation", new[] { "self", "ally", "hostile", "neutral", "unknown" }),
         ("recipient_life_state", new[] { "alive", "downed", "dead" }),
+        ("value_operation", new[] { "set", "add", "subtract", "multiply", "minimum", "maximum" }),
+        ("coordinate_space", new[] { "world", "local", "view" }),
+        ("pulse_start", new[] { "immediate", "after_interval" }),
     };
     internal static readonly IReadOnlyDictionary<string, string[]> EnumSets =
         EnumSetTable.ToDictionary(x => x.Name, x => x.Members, StringComparer.Ordinal);
@@ -166,13 +169,24 @@ internal static class RuntimeGraphContracts
             RuntimeJson.Require(minimum.GetDouble() <= maximum.GetDouble(), "parameter-bounds", id);
         var hasValues = parameter.TryGetProperty("values", out var values); var set = Optional(parameter, "set");
         if (type != "enum") RuntimeJson.Require(!hasValues && set == null, "parameter-values", id);
-        // A promotable enum names a shared set; only a structural enum may inline its members.
-        else if (role == "value") RuntimeJson.Require(!hasValues && set != null && EnumSets.ContainsKey(set), "parameter-set", id);
         else
         {
-            RuntimeJson.Require(set == null && hasValues, "enum-values", id);
-            var members = RuntimeJson.Strings(values);
-            RuntimeJson.Require(members.Length > 0 && members.All(m => Regex.IsMatch(m, @"^[a-z][a-z0-9_-]*$", RegexOptions.CultureInvariant)), "enum-values", id);
+            // A promotable enum names a whole shared set (a promoted port carries the set, not a subset).
+            // A structural enum inlines its members, names a whole set, or narrows one to a proper subset in set order.
+            RuntimeJson.Require(set == null ? role == "structural" : EnumSets.ContainsKey(set), "parameter-set", id);
+            RuntimeJson.Require(!hasValues || role == "structural", "parameter-set", id);
+            if (hasValues)
+            {
+                var members = RuntimeJson.Strings(values);
+                RuntimeJson.Require(members.Length > 0 && members.Distinct(StringComparer.Ordinal).Count() == members.Length
+                    && members.All(m => Regex.IsMatch(m, @"^[a-z][a-z0-9_-]*$", RegexOptions.CultureInvariant)), "enum-values", id);
+                if (set != null)
+                {
+                    var positions = members.Select(m => Array.IndexOf(EnumSets[set], m)).ToArray();
+                    RuntimeJson.Require(positions.All(p => p >= 0) && positions.Zip(positions.Skip(1)).All(p => p.First < p.Second)
+                        && positions.Length < EnumSets[set].Length, "enum-values", id);
+                }
+            }
         }
         if (parameter.TryGetProperty("unit", out var unit))
         { RuntimeJson.Text(unit); RuntimeJson.Require(type is "integer" or "number" or "vector3", "parameter-unit", id); }

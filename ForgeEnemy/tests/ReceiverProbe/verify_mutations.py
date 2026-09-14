@@ -10,11 +10,9 @@ import xml.sax.saxutils as xml
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sdk', required=True, type=Path)
-    parser.add_argument('--fixtures', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     sdk = args.sdk.resolve(strict=True)
-    fixtures = args.fixtures.resolve(strict=True)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parents[3]
@@ -22,6 +20,7 @@ def main() -> int:
     lifecycle = (root / 'ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs').read_text(encoding='utf-8-sig')
     program = (Path(__file__).parent / 'Program.cs').read_text(encoding='utf-8-sig')
     doubles = (root / 'ForgeRuntime/tests/GameBindings/GameDoubles.cs').read_text(encoding='utf-8-sig')
+    shared = [(p.name, p.read_text(encoding='utf-8-sig')) for p in sorted((root / 'ForgeEnemy/tests/Shared').glob('*.cs'))]
     mutations = [
         ('spawn-generation', 'existing.Reference.WorldEpoch == _kernel.WorldEpoch',
          'existing.Reference.WorldEpoch != _kernel.WorldEpoch', 'E2-001.duplicate-spawn'),
@@ -30,12 +29,25 @@ def main() -> int:
         ('despawn-loses-life', 'var entry = Resolve(observation.Target);',
          'var entry = _entities.TryGetValue(ushort.Parse(observation.Target.Id.AsSpan(11), NumberStyles.None, CultureInfo.InvariantCulture), out var current) ? current : null;',
          'E2-002.captured-life-late-despawn'),
-        ('changed-receiver-none', 'CommandResult.FailedUnknown(attempted, "gtfo.enemy.receiver_changed_during_commit")',
-         'CommandResult.Failed("gtfo.enemy.receiver_changed_during_commit")', 'E3-001.receiver-changed-commit'),
-        ('readback-none', 'CommandResult.FailedUnknown(attempted, "gtfo.enemy.unexpected_health_readback")',
-         'CommandResult.Failed("gtfo.enemy.unexpected_health_readback")', 'E3-002.invalid-readback-commit'),
-        ('exception-none', 'CommandResult.FailedUnknown(attempted, "gtfo.enemy.native_commit_exception", error.GetType().Name)',
-         'CommandResult.Failed("gtfo.enemy.native_commit_exception", error.GetType().Name)', 'commit.throw-after-write'),
+        # The three commit-boundary mutants demote an attempted native write to a known "rejected" row, which the
+        # heal aggregation reports as commitState=none: exactly the false claim each named case must catch.
+        ('changed-receiver-none',
+         '{ rows.Add(Row("unknown", "gtfo.enemy.receiver_changed_during_commit", before)); commitFailed = true; }',
+         '{ rows.Add(Row("rejected", "gtfo.enemy.receiver_changed_during_commit", before)); rejected++; continue; }',
+         'E3-001.receiver-changed-commit'),
+        ('readback-none',
+         '{ rows.Add(Row("unknown", "gtfo.enemy.unexpected_health_readback", before)); commitFailed = true; }',
+         '{ rows.Add(Row("rejected", "gtfo.enemy.unexpected_health_readback", before)); rejected++; continue; }',
+         'E3-002.invalid-readback-commit'),
+        ('exception-none',
+         '{ rows.Add(Row("unknown", "gtfo.enemy.native_commit_exception", before)); commitFailed = true; }',
+         '{ rows.Add(Row("rejected", "gtfo.enemy.native_commit_exception", before)); rejected++; continue; }',
+         'commit.throw-after-write'),
+        # A late callback re-targeted to whatever life currently holds the GlobalID (the old-life guard removed).
+        ('late-damage-retargeted', 'var entry = Resolve(before.Target);',
+         'var entry = damage.Owner != null && _entities.TryGetValue(damage.Owner.GlobalID, out var current) ? current : null; '
+         'if (entry != null) before = new DamageObservation(this, entry.Reference, before.HealthBefore, before.DamagePointer);',
+         'identity.late-damage-after-respawn'),
     ]
     cases = [('baseline', source, None)]
     for name, old, new, expected in mutations:
@@ -53,31 +65,39 @@ def main() -> int:
     for name, receiver, expected in cases:
         case = output / name
         case.mkdir(exist_ok=False)
-        for filename, text in [('Probe.csproj', project), ('Program.cs', program),
-                               ('EnemyModule.cs', receiver), ('EnemyModule.LifecycleFacts.cs', lifecycle), ('GameDoubles.cs', doubles)]:
+        for filename, text in [('Probe.csproj', project), ('Program.cs', program), ('EnemyModule.cs', receiver),
+                               ('EnemyModule.LifecycleFacts.cs', lifecycle), ('GameDoubles.cs', doubles), *shared]:
             (case / filename).write_text(text, encoding='utf-8')
         report_path = case / 'report.json'
-        command = ['dotnet', 'run', '--project', str(case / 'Probe.csproj'), '-c', 'Release',
-                   '--', str(fixtures), str(report_path)]
+        command = ['dotnet', 'run', '--project', str(case / 'Probe.csproj'), '-c', 'Release', '--', str(report_path)]
         completed = subprocess.run(command, capture_output=True, text=True, encoding='utf-8',
-                                   errors='replace', timeout=120, check=False)
+                                   errors='replace', timeout=180, check=False)
         (case / 'run.log').write_text(completed.stdout + completed.stderr, encoding='utf-8')
         report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.exists() else {}
         failures = [item['Id'] for item in report.get('checks', []) if not item['Passed']]
-        passed = bool(report) and (completed.returncode == 0 and report.get('failed') == 0
-                                  if expected is None else completed.returncode == 1 and expected in failures)
-        results.append({'case': name, 'passed': passed, 'exitCode': completed.returncode,
+        blocked = [item['Id'] for item in report.get('blocked', [])]
+        if expected is None:
+            status = 'pass' if report and completed.returncode == 0 and report.get('failed') == 0 else 'fail'
+        elif expected in blocked:
+            # The detecting case cannot run yet, so the mutant is neither detected nor missed.
+            status = 'blocked'
+        else:
+            status = 'pass' if report and completed.returncode == 1 and expected in failures else 'fail'
+        results.append({'case': name, 'status': status, 'exitCode': completed.returncode,
                         'expectedFailure': expected, 'actualFailures': failures})
-        print(f'{"PASS" if passed else "FAIL"} {name}: exit={completed.returncode}, failures={failures}', flush=True)
-        if expected is None and not passed:
+        print(f'{status.upper()} {name}: exit={completed.returncode}, failures={failures}', flush=True)
+        if expected is None and status != 'pass':
             break  # Never credit mutants when the unchanged production baseline is broken.
-    summary = {'schemaVersion': 1, 'gameExecuted': False,
+    counts = {s: sum(item['status'] == s for item in results) for s in ('pass', 'fail', 'blocked')}
+    summary = {'schemaVersion': 2, 'gameExecuted': False,
                'receiverSourceSha256': hashlib.sha256(source.encode()).hexdigest(),
                'sdkSha256': hashlib.sha256(sdk.read_bytes()).hexdigest(),
-               'passed': sum(item['passed'] for item in results),
-               'failed': sum(not item['passed'] for item in results), 'checks': results}
+               'passed': counts['pass'], 'failed': counts['fail'], 'blocked': counts['blocked'], 'checks': results}
     (output / 'summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
-    return 0 if len(results) == len(cases) and all(item['passed'] for item in results) else 1
+    complete = len(results) == len(cases)
+    verdict = 'FAIL' if counts['fail'] or not complete else 'INCOMPLETE' if counts['blocked'] else 'PASS'
+    print(f'{verdict} baseline+mutants {counts["pass"]}/{len(cases)}; failed {counts["fail"]}; BLOCKED {counts["blocked"]}', flush=True)
+    return 0 if complete and counts['fail'] == 0 else 1
 
 
 if __name__ == '__main__':

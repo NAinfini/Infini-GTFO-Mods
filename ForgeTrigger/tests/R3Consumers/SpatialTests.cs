@@ -11,25 +11,43 @@ internal static class SpatialTests
         check(data.GetProperty("kind").GetString() == "test-only-spatial-vectors", "spatial fixture provenance");
         check(!data.GetProperty("gameVerified").GetBoolean(), "spatial fixtures are not game evidence");
         var cases = data.GetProperty("cases");
-        check(cases.GetArrayLength() == 78, "all 78 existing website spatial cases are exercised");
+        check(cases.GetArrayLength() > 0 && cases.GetArrayLength() == data.GetProperty("caseCount").GetInt32(), "every website spatial case is exercised");
+        // Website shapes the C# observed volume does not implement are listed, never evaluated as passing.
+        foreach (var gap in data.GetProperty("unimplemented").EnumerateArray())
+        {
+            var shape = gap.GetProperty("parameters").GetProperty("shape").GetString()!;
+            check(!Enum.GetNames<ObservedVolumeShape>().Any(name => string.Equals(name, shape, StringComparison.OrdinalIgnoreCase)),
+                "listed spatial gap is still unimplemented: " + shape);
+        }
         var index = 0;
         foreach (var row in cases.EnumerateArray())
         {
             using var world = ObservationWorld.FromJson(data.GetProperty("world"));
             var input = row.GetProperty("inputs"); var p = row.GetProperty("parameters");
-            var candidates = input.GetProperty("targets").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
+            var name = row.GetProperty("name").GetString();
+            // shape_overlap queries the whole world sample; C# needs that set supplied explicitly and marked complete.
+            var candidates = (name == "shape_overlap" ? data.GetProperty("world").GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("ref"))
+                : input.GetProperty("candidates").EnumerateArray()).Select(RuntimeJson.Entity).ToArray();
             var original = candidates.ToArray();
             var expected = row.GetProperty("expected").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
-            double[] Center() => input.GetProperty("center").EnumerateArray().Select(v => v.GetDouble()).ToArray();
-            IReadOnlyList<EntityReference> Evaluate() => row.GetProperty("name").GetString() switch
+            double[] Vector(string key) => input.GetProperty(key).EnumerateArray().Select(v => v.GetDouble()).ToArray();
+            // C# ranks around a point; the website anchor entity is resolved through the same R3 observation first.
+            double[] Anchor() => ObservedEntityNodes.Entity(world.Kernel, RuntimeJson.Entity(input.GetProperty("anchor"))).Position.ToArray();
+            int MaxTargets() => input.GetProperty("max_targets").GetInt32();
+            check(p.GetProperty("empty").GetString() == "emit-empty", "spatial fixture uses the identity empty policy " + index);
+            IReadOnlyList<EntityReference> Evaluate() => name switch
             {
-                "shape_overlap" => ObservedSpatialNodes.Overlap(world.Kernel, candidates, Center(),
-                    p.GetProperty("shape").GetString() == "sphere" ? ObservedVolumeShape.Sphere : ObservedVolumeShape.Cylinder,
-                    p.GetProperty("radius").GetDouble(), p.GetProperty("height").GetDouble(), input.GetProperty("complete").GetBoolean()),
-                "nearest" => ObservedSpatialNodes.Nearest(world.Kernel, candidates, Center(), p.GetProperty("count").GetInt32()).Selected,
-                "farthest" => ObservedSpatialNodes.Farthest(world.Kernel, candidates, Center(), p.GetProperty("count").GetInt32()).Selected,
-                "chain" => ObservedSpatialNodes.Chain(world.Kernel, candidates, RuntimeJson.Entity(input.GetProperty("start")),
-                    p.GetProperty("max_hops").GetInt32(), p.GetProperty("radius").GetDouble()).Selected,
+                "shape_overlap" => ObservedSpatialNodes.Overlap(world.Kernel, candidates, Vector("center"),
+                    p.GetProperty("shape").GetString() switch
+                    {
+                        "sphere" => ObservedVolumeShape.Sphere, "cylinder" => ObservedVolumeShape.Cylinder,
+                        var shape => throw new InvalidOperationException("Unimplemented spatial shape " + shape)
+                    },
+                    input.GetProperty("radius").GetDouble(), input.GetProperty("height").GetDouble(), true),
+                "nearest" => ObservedSpatialNodes.Nearest(world.Kernel, candidates, Anchor(), MaxTargets()).Selected,
+                "farthest" => ObservedSpatialNodes.Farthest(world.Kernel, candidates, Anchor(), MaxTargets()).Selected,
+                "chain" => ObservedSpatialNodes.Chain(world.Kernel, candidates, RuntimeJson.Entity(input.GetProperty("origin")),
+                    input.GetProperty("hops").GetInt32(), input.GetProperty("radius").GetDouble()).Selected,
                 _ => throw new InvalidOperationException("Unknown spatial fixture")
             };
             try

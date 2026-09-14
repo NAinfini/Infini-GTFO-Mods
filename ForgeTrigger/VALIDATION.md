@@ -8,9 +8,9 @@
 python ForgeTrigger/tools/validate-trigger.py --mutations
 ```
 
-**2026-09-13 Runtime 提升参数落地后执行**（`artifacts/trigger-20260913-101425`），进程退出 0，summary `status=passed`：pure（C# 1613 项，10 种错误实现全部检出）、t1（C# 928、TypeScript 392，`metadataReady=true`）、independent（Acceptance 2625 项，77 组可变端口与 300 组权重样例，6 种新错误实现全部检出）、r3（1561 项，14 种错误实现全部检出）。
+**2026-09-13 对齐网站 d0091834 的 2.0.0 目录行后执行**（`artifacts/align-trigger-m`，主干 d09d6bb 加未提交改动），进程退出 0，summary `status=passed`：pure（C# 1697 项，11 种错误实现全部检出）、t1（C# 911、TypeScript 361）、independent（Acceptance 2557 项，61 组可变端口与 300 组权重样例，6 种错误实现全部检出）、r3（1836 项，14 种错误实现全部检出）。版本、标签、说明与图合同全部取自网站目录行，不再保留 1.1.0 期望。
 
-同日较早的 `artifacts/trigger-20260913-100541` 在 t1 C# 失败：网站工作树的计划 layout 已带 `promoted` 字段，当时的 SDK 按未知字段拒绝。Runtime 实现提升参数后重跑即上面的通过记录；失败记录保留。
+更早的 `artifacts/trigger-20260913-101425`（1.1.0 期望）与 `trigger-20260913-100541`（t1 因 `promoted` 字段失败）记录保留，但已不对应当前合同。
 
 **通过不等于可执行或可发布**：`runtimeReady=false`、`publicationReady=false`，T1 的 domain 差异门槛仍未过，全部证据都没有加载 GTFO。
 
@@ -20,16 +20,16 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 | 套件 | 最后记录 | 口径 |
 | --- | --- | --- |
-| 纯计算与集合（C#） | 1613 项断言 | 23 项纯计算 + 8 项集合；含正例重复验证与边界断言 |
-| 纯计算跨端样例 | TypeScript 1264、C# 878、270 组共享输入 | 245 正例 + 25 预期拒绝 |
-| 集合跨端样例 | 255 组 | 覆盖八项定义 |
-| R3 角色 / 空间 / 筛选 | 1529 项 | 含既有 417 项与新增筛选断言 |
+| 纯计算与集合（C#） | 1697 项断言 | 23 项纯计算 + 8 项集合；含正例重复验证与边界断言 |
+| 纯计算跨端样例 | TypeScript 1355、293 组共享输入 | 含 compare 容差、divide `zero_policy` 新样例 |
+| 集合跨端样例 | 272 组 814 项 | 覆盖八项 2.0.0 定义与 `empty` 策略 |
+| R3 角色 / 空间 / 筛选 | 1836 项 | 含空间与筛选跨端消费 |
 | 筛选跨端样例 | 164 组 628 项 | 151 值正例 + 13 预期拒绝 |
-| 空间跨端样例 | 78 组 237 项 | 已由 C# SpatialTests 实际消费，不再只是 TypeScript 预览 |
-| T1 跨语言 | TypeScript 125、C# 75 | 27 个共享计划：3 接受、24 按预期理由在两种语言里拒绝 |
-| T1 目录审计 | 424 基础节点跨 8 类；56 个 typed 作者定义 | 190 个 Action 留在领域侧；56 个 ID 都在目录中且 0 个运行绑定 |
-| Acceptance（可变端口与权重） | 2625 项断言 | 77 组可变端口样例、300 组权重样例 |
-| 作者元数据审计 | 52 个可登记元数据、9 个 variadic 精确拒绝、1 个共享 canonical 逐字段对照 | `runtimeReady=false`；52 个可登记元数据不等于 52 个可执行节点 |
+| 空间跨端样例 | 117 组 360 项 | C# 消费 sphere/cylinder、nearest/farthest（anchor）、chain；capsule/box 2 组列为 C# 未实现，不计通过 |
+| T1 跨语言 | TypeScript 361、C# 911 | 34 组 wire 样例 |
+| T1 目录审计 | 424 基础节点；62 个 typed 作者定义 | D-004 共享：heal@2.0.0 与 4 个战斗/死亡 trigger 逐字段对照目录行 |
+| Acceptance（可变端口与权重） | 2557 项断言 | 61 组可变端口样例、300 组权重样例 |
+| 作者元数据审计 | 62 个可登记元数据、15 个非法元数据精确拒绝、1 个共享 canonical（heal）逐字段对照 | `runtimeReady=false`；可登记元数据不等于可执行节点 |
 
 只有 `Pow` 使用 1e-14 相对误差，其余共享数值、向量与布尔输出精确匹配。**这不是任意平台任意输入的位级一致保证。**
 
@@ -37,15 +37,15 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 
 每一批都先验证原样隔离副本通过，再验证故意写错的副本能被具体断言检出。**编译失败不计作检错成功**，全部错误版本都先构建成功。
 
-纯计算与集合的 10 种错误实现全部被检出，其中最初四种分别产生：ties-to-even 舍入 4 项失败、减法变加法 6 项失败、忽略显式种子 23 项失败、除零返回零 2 项失败。R3、空间与筛选的 14 种错误实现全部被检出：7 种覆盖原有的角色与空间边界（owner 回退、忽略 receiver、反向关系、unknown 变 false、球边界排除、连锁重复访问、平局排序不稳定），7 种覆盖新的筛选边界。
+纯计算与集合的 11 种错误实现全部被检出，其中：ties-to-even 舍入 4 项失败、减法变加法 6 项失败、忽略显式种子 163 项失败、reject 策略除零返回零 2 项失败、compare 忽略容差 2 项失败。R3、空间与筛选的 14 种错误实现全部被检出：7 种覆盖原有的角色与空间边界（owner 回退、忽略 receiver、反向关系、unknown 变 false、球边界排除、连锁重复访问、平局排序不稳定），7 种覆盖新的筛选边界。
 
-可变端口与权重抽样的 6 种错误实现由 `tools/validate-independent.py --mutations` 执行：先把 hash 校验过的源码复制成原样副本（2625 项全部通过），再逐个注入错误、构建并用原样运行导出的参考向量检查，要求退出码 1、失败清单非空且两组检查都实际执行。结果：variadic 只取尾部 26 项失败、全部取尾部 14 项、并集配对 12 项；weighted 忽略质量 162 项、总是替换 176 项、忽略熵预算 2 项。运行前后源码 hash 一致。
+可变端口与权重抽样的 6 种错误实现由 `tools/validate-independent.py --mutations` 执行：先把 hash 校验过的源码复制成原样副本（2557 项全部通过），再逐个注入错误、构建并用原样运行导出的参考向量检查，要求退出码 1、失败清单非空且两组检查都实际执行。结果：variadic 只取尾部 26 项失败、all 取尾部 14 项、any 取尾部 15 项（2.0.0 的并集/交集是二元合同，原并集配对错误已不适用）；weighted 忽略质量 162 项、总是替换 176 项、忽略熵预算 2 项。运行前后源码 hash 一致。
 
 ## 已经解决的历史阻塞
 
 **R3 观察器登记缺口已解除。** 曾经的阻塞是 `RuntimeRegistry.WithModule` 只登记 EntityResolvers 而不读取 `module.EntityObservers`，`RuntimeKernel.InspectEntity` 因此返回 `entity-observer-unavailable`，整个查询变成 `entity-query-incomplete`；`Unregister` 也只清理 resolver。这些已由 Runtime 的 R3a 在共享 SDK 中实际接通，见 [Runtime 验证记录](../ForgeRuntime/VALIDATION.md)。
 
-**生命周期订阅注销保护也已合入。** 曾经 417 项中剩余 2 项失败（`entity observer disposed lifecycle subscription`、`subscription remains intact`），根因是 `RemoveLifecycleObserver` 允许实体观察回调注销生命周期订阅。现在只在实体观察期间禁止该入口，普通清理、停止后清理与生命周期回调自注销都保留。`handoff/` 下的隔离补丁提案（`r3-observer-candidate.*`、`r3-observer-followup.*`）已经无效，不要再应用。
+**生命周期订阅注销保护也已合入。** 曾经 417 项中剩余 2 项失败（`entity observer disposed lifecycle subscription`、`subscription remains intact`），根因是 `RemoveLifecycleObserver` 允许实体观察回调注销生命周期订阅。现在只在实体观察期间禁止该入口，普通清理、停止后清理与生命周期回调自注销都保留。当时的隔离补丁提案已被合入的实现取代，已从 `handoff/` 删除。
 
 **independent 缺失的 mutation 覆盖已补上。** 早先 runner 半成品曾放在 `handoff/validate-independent.incomplete.txt`，完整入口因此记为 blocked；现在由 `validate-independent.py` 实际执行，半成品已删除。
 

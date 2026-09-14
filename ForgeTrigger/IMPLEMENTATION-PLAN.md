@@ -48,7 +48,7 @@
 
 **权重抽样的正式作者合同。** `forge.selector.target.weighted` 仍是规划目录项。需要网站给出正式的参数与端口合同，本包再接图绑定。`WithReplacement` 的结果是明确的 occurrence 列表，**不能直接伪装成禁止重复的 Runtime `entity`（`cardinality: many`）端口**。
 
-**可变端口的图接入。** 网站已把 all/any、add/multiply/minimum/maximum、union/intersection、sequence 升级为 1.1.0 并加上 variadic 元数据（重复输入用 `input_count`，sequence 用 `step_count`，作者参数范围 2…32），Runtime 的 Plan v2 加载器已能按参数展开这些元数据，但只执行 trigger→action 线性步骤，纯节点与控制节点没有 lowering。本包等 R4 的完整 lowering 落地后再实现对应版本的计算、集合与控制接入。**不能删掉 variadic 字段、忽略版本断言、把新定义降级成旧定义，或把 Selector/Condition 包装成 Action 来制造通过结果。** 历史回归确需 1.0.0 时必须显式锁定并消费该版本的真实定义，与 1.1.0 的支持状态分开记录；生产导出不能自动降级。
+**可变端口的图接入。** 网站目录行当前把 all/any、add/multiply/minimum/maximum、sequence 定为 2.0.0 的 variadic（重复输入用 `input_count`，sequence 用 `step_count`），random_branch 用 portGroups（`branch_count`），作者参数范围由目录行给出；union/intersection 已改为二元合同。Runtime 的 Plan v2 加载器已能按参数展开这些元数据，但只执行 trigger→action 线性步骤，纯节点与控制节点没有 lowering。本包等 R4 的完整 lowering 落地后再实现对应版本的计算、集合与控制接入。**不能删掉 variadic 字段、忽略版本断言、把新定义降级成旧定义，或把 Selector/Condition 包装成 Action 来制造通过结果。** 版本只取自目录行，不保留旧版本的双轨期望；生产导出不能自动降级。
 
 **原生查询与提交前重验证。** LOS、碰撞、导航可达性都还没有；领域提交前的重新核验链路未接通。
 

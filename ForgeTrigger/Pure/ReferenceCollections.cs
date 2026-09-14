@@ -5,6 +5,8 @@ using ForgeRuntime.Framework;
 
 namespace ForgeTrigger.Pure;
 
+public enum EmptySelectionPolicy { EmitEmpty, Skip, Fail }
+
 /// <summary>A bounded slice of supplied references; not world coverage or a gameplay receipt.</summary>
 public sealed class ReferenceSelection
 {
@@ -51,11 +53,22 @@ public static class ReferenceCollections
         SelectionCount(count); var snapshot = Snapshot(candidates);
         return Slice(Permuted(snapshot, seed), snapshot.Length, count);
     }
-    public static bool CountMatches(IReadOnlyList<EntityReference> candidates, ScalarComparison operation, int count)
+    /// <summary>Website count: the distinct candidate count compared with an integer value, without tolerance.</summary>
+    public static bool CountMatches(IReadOnlyList<EntityReference> candidates, ScalarComparison operation, long value)
+        => PureConditions.Compare(Unique(Snapshot(candidates)).Count, value, operation, 0d);
+    /// <summary>The website selector's structural empty policy. Fail rejects an empty result; skip only tells a
+    /// downstream scheduler to skip work, so the selected value itself stays empty.</summary>
+    public static IReadOnlyList<EntityReference> ApplyEmptyPolicy(IReadOnlyList<EntityReference> selected, EmptySelectionPolicy policy)
     {
-        if (count < 0 || count > MaximumCandidates)
-            throw new RuntimeContractException("pure-count-range", "Expected count must be in [0, 4096].");
-        return PureConditions.Compare(Unique(Snapshot(candidates)).Count, count, operation);
+        if (selected is null)
+            throw new RuntimeContractException("pure-collection-null", "Selection must not be null.");
+        return policy switch
+        {
+            EmptySelectionPolicy.EmitEmpty or EmptySelectionPolicy.Skip => selected,
+            EmptySelectionPolicy.Fail => selected.Count == 0
+                ? throw new RuntimeContractException("pure-empty-selection", "Empty selection rejected by its empty policy.") : selected,
+            _ => throw new RuntimeContractException("pure-operation", "Unknown empty selection policy.")
+        };
     }
     private static IReadOnlyList<EntityReference> SetOperation(IReadOnlyList<EntityReference> a,
         IReadOnlyList<EntityReference> b, bool intersection)

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MUTATIONS = [
     ('variadic-tail', 'Pure/VariadicNodes.cs', 'foreach (var value in values)\n            result =', 'foreach (var value in values[..^1])\n            result =', 'variadic'),
     ('variadic-all-tail', 'Pure/VariadicNodes.cs', 'foreach (var value in values) if (!value) return false;', 'foreach (var value in values[..^1]) if (!value) return false;', 'variadic'),
-    ('variadic-union-pair', 'Pure/VariadicNodes.cs', 'i < snapshots.Length; i++) result = ReferenceCollections.Union', 'i < 2; i++) result = ReferenceCollections.Union', 'variadic'),
+    ('variadic-any-tail', 'Pure/VariadicNodes.cs', 'foreach (var value in values) if (value) return true;', 'foreach (var value in values[..^1]) if (value) return true;', 'variadic'),
     ('weighted-ignore-mass', 'Pure/WeightedSampling.cs', 'var mass = Mass(candidate.Weight);', 'var mass = BigInteger.One;', 'weighted'),
     ('weighted-always-replace', 'Pure/WeightedSampling.cs', 'if (mode == WeightedSamplingMode.WithoutReplacement)', 'if (false)', 'weighted'),
     ('weighted-ignore-budget', 'Pure/WeightedSampling.cs', 'if (++used > budget)', 'if (++used > MaximumEntropyWords)', 'weighted'),

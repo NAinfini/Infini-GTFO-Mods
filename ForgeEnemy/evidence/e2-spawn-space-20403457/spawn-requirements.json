@@ -1,0 +1,1211 @@
+{
+  "format": "gtfo-forge-enemy-spawn-requirements",
+  "version": 1,
+  "gameBuild": "20403457",
+  "evidenceSha256": "926954d04322cedd441d6e44b4bcd73d6ad33cc4e1310b4eb26f587d4755cb88",
+  "navMeshAgentTypes": [
+    {
+      "agentTypeId": 0,
+      "radius": 0.5,
+      "height": 2,
+      "maxSlope": 60,
+      "stepHeight": 0.75
+    },
+    {
+      "agentTypeId": -1372625422,
+      "radius": 1,
+      "height": 3,
+      "maxSlope": 45,
+      "stepHeight": 0.75
+    },
+    {
+      "agentTypeId": -334000983,
+      "radius": 2,
+      "height": 4,
+      "maxSlope": 45,
+      "stepHeight": 0.75
+    }
+  ],
+  "navMeshAreas": [
+    {
+      "index": 0,
+      "name": "Walkable"
+    },
+    {
+      "index": 1,
+      "name": "Not Walkable"
+    },
+    {
+      "index": 2,
+      "name": "Jump"
+    }
+  ],
+  "requirements": [
+    {
+      "enemyDataBlockId": 11,
+      "name": "Shooter_Wave",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.4,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.05,
+          "max": 1.15
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 13,
+      "name": "Striker_Wave",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.45,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.9,
+          "max": 1.1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 16,
+      "name": "Striker_Big_Wave",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.8,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 18,
+      "name": "Shooter_Big",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.75,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.9,
+          "max": 1.9
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 19,
+      "name": "Striker_Boss",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.8,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 2.8,
+          "max": 2.8
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 20,
+      "name": "Scout",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.5,
+          "max": 1.5
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 21,
+      "name": "Shadow",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.5,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.9,
+          "max": 1.1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 22,
+      "name": "Cocoon",
+      "movement": "unresolved",
+      "unresolvedReason": "movement-datablock-absent",
+      "groundNavigation": null,
+      "ladderDescent": null,
+      "collisionRadius": null,
+      "canBePushed": null,
+      "modelSizeRanges": [
+        {
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 24,
+      "name": "Striker_Hibernate",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.45,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.9,
+          "max": 1.1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 26,
+      "name": "Shooter_Hibernate",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.4,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.05,
+          "max": 1.15
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 28,
+      "name": "Striker_Big_Hibernate",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.8,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 29,
+      "name": "Tank",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.8,
+          "max": 1.8
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 30,
+      "name": "Striker_Bullrush",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.4,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.2,
+          "max": 1.25
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 31,
+      "name": "Striker_Wave_Fast",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.45,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.9,
+          "max": 1.1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 32,
+      "name": "Striker_Patrol",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.45,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.9,
+          "max": 1.1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 33,
+      "name": "Shooter_Big_RapidFire",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.75,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 34,
+      "name": "Shooter_Big_Infection",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.75,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.9,
+          "max": 1.9
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 35,
+      "name": "Striker_Big_Shadow",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.8,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 36,
+      "name": "Birther",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 2.2,
+          "max": 2.2
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 37,
+      "name": "Birther_Boss",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 3,
+        "autoTraverseOffMeshLink": false
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 3.3,
+          "max": 3.3
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 38,
+      "name": "Striker_Child",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.2,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.55,
+          "max": 0.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 39,
+      "name": "Striker_Big_Bullrush",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.8,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.9
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 40,
+      "name": "Scout_Shadow",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.6,
+          "max": 1.8
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 41,
+      "name": "Scout_Bullrush",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 1,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.5,
+          "max": 1.5
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 42,
+      "name": "Flyer",
+      "movement": "flying",
+      "unresolvedReason": null,
+      "groundNavigation": null,
+      "ladderDescent": false,
+      "collisionRadius": 0.2,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.6,
+          "max": 0.8
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "air-graph-clearance",
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 43,
+      "name": "Squidward",
+      "movement": "flying",
+      "unresolvedReason": null,
+      "groundNavigation": null,
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 0.9,
+          "max": 1.1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "air-graph-clearance",
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 44,
+      "name": "SquidBoss_Big",
+      "movement": "unresolved",
+      "unresolvedReason": "locomotion-navigation-conflict",
+      "groundNavigation": null,
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 45,
+      "name": "Flyer_Big",
+      "movement": "flying",
+      "unresolvedReason": null,
+      "groundNavigation": null,
+      "ladderDescent": false,
+      "collisionRadius": 0.2,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.8,
+          "max": 1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "air-graph-clearance",
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 46,
+      "name": "Pouncer",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1.4,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.1,
+          "max": 1.2
+        }
+      ],
+      "arenaDimensions": [
+        14
+      ],
+      "unverified": [
+        "arena-dimension-requirement",
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 47,
+      "name": "Tank_Boss",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.4,
+          "max": 1.4
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 52,
+      "name": "Shooter_Spread",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.4,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.95,
+          "max": 1.05
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 53,
+      "name": "Striker_Berserk",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.45,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.1,
+          "max": 1.2
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 54,
+      "name": "Scout_zoomer",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 1.45,
+          "max": 1.55
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 55,
+      "name": "MegaMother",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 3,
+        "autoTraverseOffMeshLink": false
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 6,
+          "max": 6
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 56,
+      "name": "Scout_nightmare",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 1,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 58,
+      "name": "SquidBoss_Big_Complex",
+      "movement": "flying",
+      "unresolvedReason": null,
+      "groundNavigation": null,
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "air-graph-clearance",
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 61,
+      "name": "SquidBoss_VS",
+      "movement": "unresolved",
+      "unresolvedReason": "locomotion-navigation-conflict",
+      "groundNavigation": null,
+      "ladderDescent": false,
+      "collisionRadius": 1.5,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 62,
+      "name": "Striker_Big_nightmare",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": false,
+      "collisionRadius": 0.8,
+      "canBePushed": false,
+      "modelSizeRanges": [
+        {
+          "min": 1.7,
+          "max": 1.7
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    },
+    {
+      "enemyDataBlockId": 63,
+      "name": "Striker_Child_Nightmare",
+      "movement": "ground",
+      "unresolvedReason": null,
+      "groundNavigation": {
+        "agentTypeId": 0,
+        "agentRadius": 0.20000000298023224,
+        "agentHeight": 2,
+        "walkableAreaMask": 4294967295,
+        "autoTraverseOffMeshLink": true
+      },
+      "ladderDescent": true,
+      "collisionRadius": 0.2,
+      "canBePushed": true,
+      "modelSizeRanges": [
+        {
+          "min": 0.5,
+          "max": 0.6
+        }
+      ],
+      "arenaDimensions": [],
+      "unverified": [
+        "base-prefab-resolution",
+        "collision-radius-semantics",
+        "datablock-overrides",
+        "runtime-navmesh-agent-profile",
+        "size-multiplier-effect",
+        "spawn-clearance"
+      ]
+    }
+  ]
+}

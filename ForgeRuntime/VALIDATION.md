@@ -98,7 +98,7 @@ handler 不感知提升：dispatch 把事件送来的值并回 Parameters，再�
 | GraphContracts | 1911，0 失败；verify.py 通过 |
 | GameBindings | 默认 31；`--fixtures` 64 |
 | 宿主 | Architecture 36；HostIntegration 默认 42、`--host` 51（`2a20d18` 删除原型探针时去掉 2 项）；PluginStartup 35；HostConfiguration 66；LifecycleWork `--fixtures` 57；EntityObservation 75、`--probe-registration` 76 |
-| Enemy | LifecycleFacts 52/52（生成的计划与 `examples/limb-broken-heal.plan.json` 一致）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
+| Enemy | LifecycleFacts 52/52（生成的计划与当时的 `examples/limb-broken-heal.plan.json` 一致；该示例已在 D-004 批次随 heal 2.0.0 删除）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
 | Map / Weapon | MapContracts 通过；IdentityDispatchReview 20/20 |
 | Trigger | 完整入口通过，见 [Trigger 验证记录](../ForgeTrigger/VALIDATION.md) |
 

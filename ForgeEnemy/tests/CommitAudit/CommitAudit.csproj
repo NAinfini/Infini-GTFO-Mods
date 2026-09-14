@@ -16,6 +16,7 @@
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
     <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
     <Compile Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.cs" />
+    <Compile Include="../Shared/*.cs" />
     <None Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.source.txt" CopyToOutputDirectory="Always" />
     <None Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.source.txt" CopyToOutputDirectory="Always" />
   </ItemGroup>

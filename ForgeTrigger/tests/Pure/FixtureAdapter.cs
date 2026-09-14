@@ -11,6 +11,7 @@ internal static class FixtureAdapter
         var p = row.GetProperty("parameters"); var input = row.GetProperty("inputs");
         double N(string key) => p.GetProperty(key).GetDouble();
         double V(string key) => input.GetProperty(key).GetDouble();
+        long Seed() => input.GetProperty("seed").GetInt64();
         string S(string key) => p.GetProperty(key).GetString()!;
         double[] Vector(string key) => input.GetProperty(key).EnumerateArray().Select(v => v.GetDouble()).ToArray();
         return id switch
@@ -19,32 +20,36 @@ internal static class FixtureAdapter
             "forge.modifier.value.add" => ScalarNodes.Binary(ScalarOperation.Add, V("a"), V("b")),
             "forge.modifier.value.subtract" => ScalarNodes.Binary(ScalarOperation.Subtract, V("a"), V("b")),
             "forge.modifier.value.multiply" => ScalarNodes.Binary(ScalarOperation.Multiply, V("a"), V("b")),
-            "forge.modifier.value.divide" => ScalarNodes.Binary(ScalarOperation.Divide, V("a"), V("b")),
+            "forge.modifier.value.divide" => ScalarNodes.Divide(V("a"), V("b"), S("zero_policy") switch
+            {
+                "reject" => DivisionZeroPolicy.Reject, "zero" => DivisionZeroPolicy.Zero, "passthrough" => DivisionZeroPolicy.Passthrough,
+                _ => throw new Exception("Fixture has unknown zero policy.")
+            }),
             "forge.modifier.value.minimum" => ScalarNodes.Binary(ScalarOperation.Minimum, V("a"), V("b")),
             "forge.modifier.value.maximum" => ScalarNodes.Binary(ScalarOperation.Maximum, V("a"), V("b")),
-            "forge.modifier.value.power" => ScalarNodes.Binary(ScalarOperation.Power, V("a"), V("b")),
-            "forge.modifier.value.clamp" => ScalarNodes.Clamp(V("value"), N("minimum"), N("maximum")),
-            "forge.modifier.value.absolute" => ScalarNodes.Absolute(V("input")),
-            "forge.modifier.value.round" => ScalarNodes.Round(V("input"), S("mode") switch
+            "forge.modifier.value.power" => ScalarNodes.Binary(ScalarOperation.Power, V("value"), V("exponent")),
+            "forge.modifier.value.clamp" => ScalarNodes.Clamp(V("value"), V("minimum"), V("maximum")),
+            "forge.modifier.value.absolute" => ScalarNodes.Absolute(V("value")),
+            "forge.modifier.value.round" => ScalarNodes.Round(V("value"), S("mode") switch
             {
                 "floor" => ScalarRounding.Floor, "ceil" => ScalarRounding.Ceiling,
                 "nearest" => ScalarRounding.Nearest, "truncate" => ScalarRounding.Truncate,
                 _ => throw new Exception("Fixture has unknown rounding mode.")
             }),
-            "forge.modifier.value.lerp" => ScalarNodes.Lerp(V("a"), V("b"), V("weight")),
+            "forge.modifier.value.lerp" => ScalarNodes.Lerp(V("from"), V("to"), V("factor")),
             "forge.modifier.value.select_value" => ScalarNodes.SelectValue(input.GetProperty("condition").GetBoolean(), V("when_true"), V("when_false")),
-            "forge.modifier.value.random_range" => SeededNodes.Uniform(N("minimum"), N("maximum"), p.GetProperty("seed").GetInt64()),
-            "forge.modifier.value.vector_compose" => VectorNodes.ComposeMetres(N("x"), N("y"), N("z")),
+            "forge.modifier.value.random_range" => SeededNodes.Uniform(V("minimum"), V("maximum"), Seed()),
+            "forge.modifier.value.vector_compose" => VectorNodes.ComposeMetres(V("x"), V("y"), V("z")),
             "forge.modifier.value.vector_add" => VectorNodes.AddMetres(Vector("a"), Vector("b")),
-            "forge.modifier.value.vector_scale" => VectorNodes.ScaleMetres(Vector("vector"), V("factor")),
-            "forge.condition.predicate.compare" => PureConditions.Compare(V("a"), V("b"), S("operator") switch
+            "forge.modifier.value.vector_scale" => VectorNodes.ScaleMetres(Vector("a"), V("factor")),
+            "forge.condition.predicate.compare" => PureConditions.Compare(V("left"), V("right"), input.GetProperty("operator").GetString() switch
             {
                 "eq" => ScalarComparison.Equal, "ne" => ScalarComparison.NotEqual,
                 "lt" => ScalarComparison.Less, "lte" => ScalarComparison.LessOrEqual,
                 "gt" => ScalarComparison.Greater, "gte" => ScalarComparison.GreaterOrEqual,
                 _ => throw new Exception("Fixture has unknown comparison mode.")
-            }),
-            "forge.condition.predicate.range" => PureConditions.InRange(V("value"), N("minimum"), N("maximum"), S("boundary") switch
+            }, V("tolerance")),
+            "forge.condition.predicate.range" => PureConditions.InRange(V("value"), V("minimum"), V("maximum"), S("boundary") switch
             {
                 "inclusive" => IntervalBoundary.Inclusive, "exclusive" => IntervalBoundary.Exclusive,
                 _ => throw new Exception("Fixture has unknown boundary mode.")
@@ -52,7 +57,7 @@ internal static class FixtureAdapter
             "forge.condition.predicate.all" => PureConditions.All(input.GetProperty("a").GetBoolean(), input.GetProperty("b").GetBoolean()),
             "forge.condition.predicate.any" => PureConditions.Any(input.GetProperty("a").GetBoolean(), input.GetProperty("b").GetBoolean()),
             "forge.condition.predicate.not" => PureConditions.Not(input.GetProperty("input").GetBoolean()),
-            "forge.condition.predicate.chance" => SeededNodes.Chance(N("probability"), p.GetProperty("seed").GetInt64()),
+            "forge.condition.predicate.chance" => SeededNodes.Chance(V("probability"), Seed()),
             _ => throw new Exception("Unknown fixture canonical ID: " + id)
         };
     }

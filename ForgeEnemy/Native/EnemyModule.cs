@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Enemies;
 using ForgeRuntime.Framework;
 using SNetwork;
@@ -184,95 +185,156 @@ internal sealed partial class EnemyModule : IDisposable
             || entry.Enemy.Damage == null || entry.Enemy.Damage.Pointer != damage.Pointer || !float.IsFinite(damage.Health)) return;
         double actualDamage = Math.Max(0, Math.Max(0, before.HealthBefore) - Math.Max(0, damage.Health));
         if (actualDamage == 0) return;
+        // The hook only observes health before/after; it cannot identify the attacker, damage type
+        // or limb, so those fields are published as null instead of guessed.
         var result = _registration.Publish(new RuntimeEvent(
             "gtfo.enemy.damage:" + _kernel.WorldEpoch + ":" + checked(++_eventSequence), DamageBinding,
             _kernel.WorldEpoch, Math.Max(0, _kernel.CurrentTick), "gtfo.world:" + _kernel.WorldEpoch,
-            RuntimeJson.From(new { target = before.Target, actual_damage = actualDamage })));
+            RuntimeJson.From(new { source = (EntityReference?)null, target = before.Target, amount = actualDamage,
+                damage_kind = (string?)null, limb = (int?)null })));
         if (result.Status == "rejected") _report("damage fact rejected: " + result.Code);
     }
+
+    /// <summary>One row of the multi-target heal result. Field names are the wire contract; keep them stable.</summary>
+    private sealed record HealRow(EntityReference Target, string Status, string Code, double RequestedAmount,
+        double? ActualAmount, float? HealthBefore, float? HealthAfter, double? OverflowAmount);
 
     private CommandResult Heal(CommandContext context)
     {
         if (!CanExecute) return CommandResult.Rejected("gtfo.enemy.authority_or_phase");
-        var target = context.GetEntityInput("target");
-        var entry = Resolve(target);
-        if (entry == null) return CommandResult.Rejected("gtfo.enemy.stale_or_unsupported_recipient");
-        var enemy = entry.Enemy;
-        var damage = enemy.Damage;
-        if (damage == null || !damage.IsSetup || damage.Pointer == IntPtr.Zero) return CommandResult.Rejected("gtfo.enemy.missing_health_receiver");
-        var receiverPointer = damage.Pointer;
-        if (damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
-            return CommandResult.Rejected("gtfo.enemy.health_receiver_owner_mismatch");
-        if (!enemy.Alive || !(damage.Health > 0)) return CommandResult.Rejected("gtfo.enemy.not_alive");
-        double requested = context.Parameters.GetProperty("amount").GetDouble();
+        // Source carries no faction or targeting restriction (teammate/hostile/self are all valid);
+        // it is still a required, kernel-validated recipient reference.
+        _ = context.GetEntityInput("source");
+        var policy = context.Parameters.GetProperty("overheal_policy").GetString();
+        if (policy == "overheal")
+            // GTFO health is quantized against HealthMax via SFloat16; there is no representable value
+            // beyond that ceiling, so the whole command is rejected up front instead of silently clamping.
+            return CommandResult.Rejected("gtfo.enemy.overheal_unsupported");
+        double requested = context.Inputs.GetProperty("amount").GetDouble();
         if (!double.IsFinite(requested) || requested < MinimumAmount || requested > MaximumAmount)
             return CommandResult.Rejected("gtfo.enemy.amount_out_of_range");
-        float before = damage.Health, maximum = damage.HealthMax;
-        if (!float.IsFinite(before) || !float.IsFinite(maximum) || maximum <= 0 || before > maximum)
-            return CommandResult.Rejected("gtfo.enemy.invalid_health_state");
-        double desired = Math.Min(maximum, before + requested);
-        float quantized;
-        try
+        double? cap = null;
+        if (context.Inputs.TryGetProperty("cap", out var capElement))
         {
-            var encoded = new SFloat16();
-            encoded.Set((float)desired, maximum);
-            quantized = encoded.Get(maximum);
+            double capValue = capElement.GetDouble();
+            if (!double.IsFinite(capValue) || capValue <= 0) return CommandResult.Rejected("gtfo.enemy.invalid_cap");
+            cap = capValue;
         }
-        catch (Exception error)
+        var targets = context.Inputs.GetProperty("targets").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
+        // A fully successful heal publishes one fact per target; the command result budget caps at 128.
+        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected("gtfo.enemy.too_many_targets");
+
+        var rows = new List<HealRow>(targets.Length);
+        var facts = new List<RuntimeFact>();
+        int committed = 0, rejected = 0, unknown = 0;
+        bool stopCommitting = false;
+        foreach (var target in targets)
         {
-            // No SendSetHealth call has occurred; unlike commit exceptions this is known uncommitted.
-            return CommandResult.Failed("gtfo.enemy.quantization_failed", error.GetType().Name);
-        }
-        if (!float.IsFinite(quantized) || quantized < 0 || quantized > maximum)
-            return CommandResult.Rejected("gtfo.enemy.invalid_native_quantization");
-        // Native preview/getters can re-enter other mods. Revalidate even a no-op completion;
-        // otherwise an absolute HP value computed from an old snapshot could damage the recipient.
-        try
-        {
-            if (!CanExecute)
-                return CommandResult.Rejected("gtfo.enemy.authority_or_phase");
-            if (Resolve(target) != entry || enemy.Damage == null || enemy.Damage.Pointer != receiverPointer
-                || damage.Pointer != receiverPointer
-                || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer
-                || !damage.IsSetup || !enemy.Alive || damage.Health != before || damage.HealthMax != maximum)
-                return CommandResult.Rejected("gtfo.enemy.state_changed_before_commit");
-            if (!CanExecute)
-                return CommandResult.Rejected("gtfo.enemy.authority_or_phase");
-        }
-        catch (Exception error)
-        {
-            return CommandResult.Failed("gtfo.enemy.preflight_exception", error.GetType().Name);
-        }
-        float after = before;
-        if (desired > before && quantized > before)
-        {
-            // Crossing the native call boundary may have sent a packet even when the call throws.
-            var attempted = RuntimeJson.From(new { target, requestedAmount = requested, healthBefore = before,
-                nativeSubmissionAttempted = true });
+            HealRow Row(string status, string code, float? before = null, float? after = null, double? actual = null, double? overflow = null)
+                => new(target, status, code, requested, actual, before, after, overflow);
+
+            if (stopCommitting) { rows.Add(Row("rejected", "gtfo.enemy.not_attempted_after_unknown_commit")); rejected++; continue; }
+            var entry = Resolve(target);
+            if (entry == null) { rows.Add(Row("rejected", "gtfo.enemy.stale_or_unsupported_recipient")); rejected++; continue; }
+            var enemy = entry.Enemy;
+            var damage = enemy.Damage;
+            if (damage == null || !damage.IsSetup || damage.Pointer == IntPtr.Zero)
+            { rows.Add(Row("rejected", "gtfo.enemy.missing_health_receiver")); rejected++; continue; }
+            var receiverPointer = damage.Pointer;
+            if (damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
+            { rows.Add(Row("rejected", "gtfo.enemy.health_receiver_owner_mismatch")); rejected++; continue; }
+            if (!enemy.Alive || !(damage.Health > 0)) { rows.Add(Row("rejected", "gtfo.enemy.not_alive")); rejected++; continue; }
+            float before = damage.Health, maximum = damage.HealthMax;
+            if (!float.IsFinite(before) || !float.IsFinite(maximum) || maximum <= 0 || before > maximum)
+            { rows.Add(Row("rejected", "gtfo.enemy.invalid_health_state")); rejected++; continue; }
+            double effectiveCap = cap.HasValue ? Math.Min(maximum, cap.Value) : maximum;
+            double desiredUncapped = before + requested;
+            double overflowAmount = Math.Max(0, desiredUncapped - effectiveCap);
+            if (desiredUncapped > effectiveCap && policy == "discard")
+            { rows.Add(Row("rejected", "gtfo.enemy.would_overheal", before, overflow: overflowAmount)); rejected++; continue; }
+            double desired = Math.Max(before, Math.Min(effectiveCap, desiredUncapped));
+            float quantized;
             try
             {
-                damage.SendSetHealth((float)desired);
-                if (!CanExecute || Resolve(target) == null
-                    || enemy.Damage == null || enemy.Damage.Pointer != receiverPointer || damage.Pointer != receiverPointer
-                    || !damage.IsSetup || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
-                    return CommandResult.FailedUnknown(attempted, "gtfo.enemy.receiver_changed_during_commit");
-                after = damage.Health;
-                if (!enemy.Alive || damage.HealthMax != maximum || !float.IsFinite(after) || after < before || after > maximum)
-                    return CommandResult.FailedUnknown(attempted, "gtfo.enemy.unexpected_health_readback");
+                var encoded = new SFloat16();
+                encoded.Set((float)desired, maximum);
+                quantized = encoded.Get(maximum);
             }
-            catch (Exception error)
+            catch (Exception)
             {
-                return CommandResult.FailedUnknown(attempted, "gtfo.enemy.native_commit_exception", error.GetType().Name);
+                // No SendSetHealth call has occurred; unlike commit exceptions this is known uncommitted.
+                rows.Add(Row("rejected", "gtfo.enemy.quantization_failed", before, overflow: overflowAmount)); rejected++; continue;
             }
+            if (!float.IsFinite(quantized) || quantized < 0 || quantized > maximum)
+            { rows.Add(Row("rejected", "gtfo.enemy.invalid_native_quantization", before, overflow: overflowAmount)); rejected++; continue; }
+            // Native preview/getters can re-enter other mods. Revalidate even a no-op completion;
+            // otherwise an absolute HP value computed from an old snapshot could damage the recipient.
+            try
+            {
+                if (!CanExecute) { rows.Add(Row("rejected", "gtfo.enemy.authority_or_phase", before)); rejected++; continue; }
+                if (Resolve(target) != entry || enemy.Damage == null || enemy.Damage.Pointer != receiverPointer
+                    || damage.Pointer != receiverPointer
+                    || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer
+                    || !damage.IsSetup || !enemy.Alive || damage.Health != before || damage.HealthMax != maximum)
+                { rows.Add(Row("rejected", "gtfo.enemy.state_changed_before_commit", before)); rejected++; continue; }
+                if (!CanExecute) { rows.Add(Row("rejected", "gtfo.enemy.authority_or_phase", before)); rejected++; continue; }
+            }
+            catch (Exception)
+            { rows.Add(Row("rejected", "gtfo.enemy.preflight_exception", before)); rejected++; continue; }
+
+            float after = before;
+            bool commitFailed = false;
+            if (desired > before && quantized > before)
+            {
+                // Crossing the native call boundary may have sent a packet even when the call throws.
+                try
+                {
+                    damage.SendSetHealth((float)desired);
+                    if (!CanExecute || Resolve(target) == null
+                        || enemy.Damage == null || enemy.Damage.Pointer != receiverPointer || damage.Pointer != receiverPointer
+                        || !damage.IsSetup || damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
+                    { rows.Add(Row("unknown", "gtfo.enemy.receiver_changed_during_commit", before)); commitFailed = true; }
+                    else
+                    {
+                        after = damage.Health;
+                        if (!enemy.Alive || damage.HealthMax != maximum || !float.IsFinite(after) || after < before || after > maximum)
+                        { rows.Add(Row("unknown", "gtfo.enemy.unexpected_health_readback", before)); commitFailed = true; }
+                    }
+                }
+                catch (Exception)
+                { rows.Add(Row("unknown", "gtfo.enemy.native_commit_exception", before)); commitFailed = true; }
+            }
+            if (commitFailed) { unknown++; stopCommitting = true; continue; }
+            double actual = (double)after - before;
+            rows.Add(Row("committed", "committed", before, after, actual, overflowAmount));
+            committed++;
+            // Zero effective healing is a valid result, but is never published as a health-change fact.
+            if (actual > 0) facts.Add(new RuntimeFact(HealthChangedBinding, RuntimeJson.From(new { target, value = after, delta = actual })));
         }
-        double actual = (double)after - before;
-        var output = RuntimeJson.From(new { target, requestedAmount = requested, actualAmount = actual,
-            healthBefore = before, healthAfter = after, overflowAmount = Math.Max(0, before + requested - maximum) });
-        // Zero effective healing is a valid result, but is never published as a health-change fact.
-        return actual > 0
-            ? CommandResult.Succeeded(output, new RuntimeFact(HealthChangedBinding,
-                RuntimeJson.From(new { target, health_before = before, health_after = after, delta = actual })))
-            : CommandResult.Succeeded(output);
+
+        var outputs = RuntimeJson.From(new { results = rows });
+        // The handler must always construct a CommandResult that CommandResultRules.TryValidate accepts on its
+        // own, for every combination of per-target outcomes. In particular, a mix of rejected targets and
+        // committed-but-zero-delta targets (e.g. a target already at full health) produces no facts even though
+        // nothing was rejected due to an unknown commit; that case is Rejected/None below, not a factless Partial.
+        if (rejected == 0 && unknown == 0) return CommandResult.Succeeded(outputs, facts.ToArray());
+        if (unknown == 0)
+        {
+            if (facts.Count == 0)
+            {
+                // No target's HP actually changed: either every target was rejected outright, or the
+                // committed targets all landed with zero effective delta (e.g. already at full health).
+                string code = committed == 0
+                    ? (rows.Count == 1 ? rows[0].Code : "gtfo.enemy.heal_all_rejected")
+                    : "gtfo.enemy.heal_no_state_change";
+                return CommandResult.Create(CommandStatuses.Rejected, CommitStates.None, code, "", outputs);
+            }
+            return CommandResult.Partial(outputs, CommitStates.Confirmed, facts.ToArray());
+        }
+        if (facts.Count == 0)
+            return CommandResult.Create(CommandStatuses.Failed, CommitStates.Unknown,
+                rows.Count == 1 ? rows[0].Code : "gtfo.enemy.heal_all_unknown", "", outputs, facts.ToArray());
+        return CommandResult.Partial(outputs, CommitStates.Unknown, facts.ToArray());
     }
 
     internal const string RegistryJson = """

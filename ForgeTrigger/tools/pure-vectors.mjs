@@ -16,9 +16,8 @@ const check = (value, name) => { if (!value) throw Error('FAIL: ' + name); asser
 const ids = [...new Set(fixture.cases.map(row => row.capabilityId))].sort();
 const definitions = ids.map(id => {
     const definition = logicPrimitiveDefinitions.find(row => row.id === id);
-    const revised = new Set(['forge.condition.predicate.all','forge.condition.predicate.any','forge.modifier.value.add','forge.modifier.value.multiply','forge.modifier.value.minimum','forge.modifier.value.maximum']);
-    const expectedVersion = revised.has(id) ? '1.1.0' : '1.0.0';
-    check(definition && definition.version === expectedVersion && definition.graph.execution === 'pure', 'exact reviewed pure contract: ' + id + '@' + expectedVersion);
+    // The version comes from the website definition; pure-authoring-definitions.json records exactly what was consumed.
+    check(definition && definition.graph.execution === 'pure', 'website pure contract: ' + id + '@' + definition?.version);
     check(['condition', 'modifier'].includes(definition.kind), 'no object/control query: ' + id);
     return definition;
 });
