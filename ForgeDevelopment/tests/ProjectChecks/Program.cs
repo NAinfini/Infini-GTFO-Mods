@@ -130,7 +130,7 @@ object ValidManifest(string projectId) => new
         authoringSha256 = new string('a', 64),
         dependencies
     },
-    requiredPlugins = new[] { new { guid = "mod.present", minimumVersion = "1.1.0" } },
+    requiredPlugins = new[] { new { guid = "mod.present", version = "1.2.0" } },
     sources = new[] { new { path = "config/source.cfg", sha256 = sourceHash, kind = "DataBlock" } },
     objectReferences = new object[] { Zone("expedition-a", "zone-author", 10, 1) }
 };
@@ -167,7 +167,7 @@ try
         Check(Metadata(document, "experiment:authoringSha256") == new string('a', 64), "experiment.authoringSha256 is published");
         Check(Metadata(document, "experiment:dependencies") == dependencies, "the exporter's dependency revision string is published verbatim");
         Check(HasCheck(document, "project_manifest", "parsed", "configuration"), "an accepted manifest reports parsed");
-        Check(HasCheck(document, "dependency_version", "version_satisfied", "mod.present"), "minimum plugin version accepts a newer installed version");
+        Check(HasCheck(document, "dependency_version", "version_satisfied", "mod.present"), "an installed plugin exactly matching the required version is satisfied");
         Check(HasCheck(document, "source_verification", "matched", "config/source.cfg"), "a declared source that matches its authored hash is matched");
         var receipt = References(document);
         Check(receipt.GetProperty("worldEpoch").GetInt64() == 7, "the reference receipt carries the caller world epoch");
@@ -211,6 +211,24 @@ try
     WaitForSources();
     using (var json = Export(missing, "missing-plugin"))
         Check(HasCheck(json.RootElement, "dependency_version", "failed", "mod.present"), "a missing required plugin fails explicitly");
+
+    // I-RELEASE precise versions (D-018): a plan pins an exact base-package version, so an
+    // installed plugin newer than the requirement must fail, not be treated as "satisfies a
+    // minimum". Otherwise the site would report the dependency met while the Runtime's own plan
+    // lock still rejects the plan for that exact same version mismatch.
+    ResetEnvironment();
+    IL2CPPChainloader.Instance.Plugins["mod.present"] = new PluginInfo
+    {
+        Metadata = new() { GUID = "mod.present", Name = "Present Mod", Version = new SemanticVersioning.Version("1.2.0") }
+    };
+    WriteSourceOnlyManifest("newer-installed.json", "newer-installed", Array.Empty<object>(),
+        requiredPlugins: new object[] { new { guid = "mod.present", version = "1.1.0" } });
+    var newerInstalled = new DiagnosticsReport("newer-installed");
+    ProjectChecks.Load(newerInstalled, 7, null);
+    WaitForSources();
+    using (var json = Export(newerInstalled, "newer-installed"))
+        Check(HasCheck(json.RootElement, "dependency_version", "failed", "mod.present"),
+            "an installed plugin newer than the required exact version fails instead of being treated as satisfied");
 
     // Legacy and unknown shapes are rejected as a whole, never migrated.
     var rejects = new (string Name, string Text, string Why)[]
@@ -387,8 +405,8 @@ try
     var longGuid = new string('g', 128);
     WriteSourceOnlyManifest("guid-limit.json", "guid-limit", Array.Empty<object>(), requiredPlugins: new object[]
     {
-        new { guid = longGuid, minimumVersion = "1.0.0" },
-        new { guid = new string('h', 129), minimumVersion = "1.0.0" }
+        new { guid = longGuid, version = "1.0.0" },
+        new { guid = new string('h', 129), version = "1.0.0" }
     });
     var guidLimit = new DiagnosticsReport("guid-limit");
     ProjectChecks.Load(guidLimit, 7, null);
@@ -406,7 +424,7 @@ try
     {
         ResetEnvironment();
         WriteSourceOnlyManifest(name + ".json", "versions", Array.Empty<object>(),
-            requiredPlugins: new object[] { new { guid = "mod.present", minimumVersion = version } });
+            requiredPlugins: new object[] { new { guid = "mod.present", version = version } });
         var report = new DiagnosticsReport(name);
         ProjectChecks.Load(report, 7, null);
         using var json = Export(report, name);
@@ -415,7 +433,7 @@ try
 
     ResetEnvironment();
     WriteSourceOnlyManifest("plugin-count.json", "plugin-count", Array.Empty<object>(), requiredPlugins:
-        Enumerable.Range(0, 129).Select(index => (object)new { guid = "mod." + index, minimumVersion = "1.0.0" }).ToArray());
+        Enumerable.Range(0, 129).Select(index => (object)new { guid = "mod." + index, version = "1.0.0" }).ToArray());
     var pluginCount = new DiagnosticsReport("plugin-count");
     ProjectChecks.Load(pluginCount, 7, null);
     using (var json = Export(pluginCount, "plugin-count"))

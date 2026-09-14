@@ -48,7 +48,7 @@ F9 请求性能快照，F10 导出当前生成报告，F11 开关战斗采样。
 
 项目清单的根对象必须包含 `format`、`projectId`、`experiment`、`requiredPlugins`、`sources`、`objectReferences`，不接受额外或重复字段。`format` 固定为 `gtfo-forge-project`；**不接受 `schemaVersion` 或 `expectedObjects`，不做旧格式 fallback**。
 
-`experiment` 必须包含 `packageVersion`、`authoringSha256`、`dependencies`，dependencies 是字符串可以为空。`requiredPlugins` 条目是 guid 与 minimumVersion；`sources` 是 path、sha256、kind，kind 只接受 DataBlock / LGTuner / ModConfig；hash 是小写 SHA-256。
+`experiment` 必须包含 `packageVersion`、`authoringSha256`、`dependencies`，dependencies 是字符串可以为空。`requiredPlugins` 条目是 guid 与 version（精确版本，按相等判定，I-RELEASE D-018）；`sources` 是 path、sha256、kind，kind 只接受 DataBlock / LGTuner / ModConfig；hash 是小写 SHA-256。
 
 对象声明只支持 zone 与 room。Zone locator 明确 layoutId、dimension、layer、localIndex；room locator 是 unique-geomorph-in-zone，明确 zoneAuthorId、room 的 id 与 revision 和完整的 `Assets/` 来源身份。**显示名称、Hierarchy 路径、预览模型都不代替创建证据。**
 

@@ -39,7 +39,7 @@ internal static class ProjectChecks
     private static readonly JsonDocumentOptions DocumentOptions = new() { MaxDepth = 32 };
 
     private sealed record DeclaredSource(string FullPath, string RelativePath, string Sha256, string Kind);
-    private sealed record Dependency(string Guid, SemanticVersioning.Version MinimumVersion);
+    private sealed record Dependency(string Guid, SemanticVersioning.Version Version);
     private sealed record Manifest(string ProjectId, IReadOnlyList<(string Key, string Value)> Experiment,
         IReadOnlyList<Dependency> Dependencies, IReadOnlyList<DeclaredSource> Sources, IReadOnlyList<ProjectObjectDeclaration> References);
 
@@ -140,9 +140,9 @@ internal static class ProjectChecks
         {
             var installed = IL2CPPChainloader.Instance.Plugins.TryGetValue(dependency.Guid, out var plugin);
             var version = installed ? plugin!.Metadata.Version : null;
-            var satisfied = version != null && version.CompareTo(dependency.MinimumVersion) >= 0;
+            var satisfied = version != null && version.CompareTo(dependency.Version) == 0;
             report.Check("dependency_version", dependency.Guid, satisfied ? "version_satisfied" : "failed",
-                "Required >= " + dependency.MinimumVersion + "; installed " + (version?.ToString() ?? "none") +
+                "Required exactly " + dependency.Version + "; installed " + (version?.ToString() ?? "none") +
                 ". Version satisfaction does not prove behavior compatibility.");
         }
         BeginSourceSnapshot(report, scan, manifest.Sources, simulationTick);
@@ -263,12 +263,12 @@ internal static class ProjectChecks
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in required.EnumerateArray())
         {
-            Require(entry, "guid", "minimumVersion");
+            Require(entry, "guid", "version");
             var guid = ProjectObjectReferences.ReadText(entry.GetProperty("guid"), MaximumGuidChars, MaximumGuidChars * 4);
             if (string.IsNullOrWhiteSpace(guid)) throw new InvalidDataException("A required plugin GUID must not be blank.");
-            var minimum = ProjectObjectReferences.ReadText(entry.GetProperty("minimumVersion"), 64, 64);
+            var version = ProjectObjectReferences.ReadText(entry.GetProperty("version"), 64, 64);
             if (!seen.Add(guid)) throw new InvalidDataException("Duplicate required plugin: " + guid + ".");
-            result.Add(new Dependency(guid, StrictVersion(minimum)));
+            result.Add(new Dependency(guid, StrictVersion(version)));
         }
         return result.AsReadOnly();
     }

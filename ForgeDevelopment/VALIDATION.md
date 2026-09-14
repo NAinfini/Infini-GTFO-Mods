@@ -2,6 +2,23 @@
 
 **上次更新：2026-09-14**（补记 D2 全量运行记录；D2 切换后重写于 2026-09-13；D1 部分合并自原 CONTINUATION-STATUS、D1-CONTINUATION、D1-INTEGRATION-REVIEW、D1-SNAPSHOT-DELIVERY、D1-VALIDATION 五份交接记录）。
 
+## 运行记录 2026-09-14 — I-RELEASE 精确版本（D-018）ProjectChecks
+
+- 范围：`Native/ProjectChecks.cs` 的 `requiredPlugins` 读取字段由 `minimumVersion` 改为 `version`，判定由 `>=` 改为精确相等（`SemanticVersioning.Version.CompareTo(...)==0`）；诊断消息由 `Required >= X` 改为 `Required exactly X`。与网站 `site/map-package.ts`／`site/map-balance-report.ts` 同批（U-MAP-WEB、U-DEV-MOD，随 D-018）。
+- 测试：`tests/ProjectChecks/Program.cs` 全部 `minimumVersion` 字段改名为 `version`；原“较新安装版本视为满足最低版本”用例改为验证“安装版本与要求精确相等才算满足”，并新增一条用例验证安装版本比要求更新时现在判 `failed`（此前会误判满足，这正是 D-018 要修的矛盾）。
+- 命令（仓库根目录，`Forge-MapEditor-QA` profile 只作编译引用）：
+
+  ```powershell
+  $env:GTFO_BEPINEX_PATH="$env:APPDATA\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx"
+  python ForgeDevelopment/scripts/verify-diagnostics.py --bepinex "$env:GTFO_BEPINEX_PATH" --output "$env:TEMP\forge-dev-i-release-verify-20260914T105954"
+  ```
+
+- 结果：脚本整体退出码 1（`summary.json` 的 `passed:false`）——但失败只来自 `host-build`／`development-build`／`development-native-build`／`native-layout`，全部因为 `ForgeRuntime/Framework/RuntimePlan.cs` 当时正由并行的 I-PLAN schemaVersion 3 改动编辑、尚未提交，存在编译错误（`CS0165 Use of unassigned local variable 'portIndex'/'start'`），不是本次改动引入。
+- `ProjectChecks` 本身：`project-checks-build`、`project-checks` 均退出 0，`project-checks.log`：**`Forge Runtime project checks: 204/204 passed`**（VALIDATION 基线为 202/202；本次新增 1 条“更新版本不再满足精确锁”回归用例，另 1 条差异来自 D2 基线记录之后、本任务改动之前已存在的仓库变化，未逐一溯源，因与本任务无关）。
+- 其余不依赖 `ForgeRuntime` 编译的套件全部退出 0：`plugin-startup`、`reports`、`inspection`、`snapshots`、`shutdown`、`scene-inventory`、`telemetry`、`samples`、`python-tools`。
+- 证据：`C:\Users\nainf\AppData\Local\Temp\forge-dev-i-release-verify-20260914T105954\`（`summary.json`、各步 `*.log`，未入库，临时目录）。
+- 未验证：`ForgeRuntime` 恢复可编译后的端到端 `native-layout`／完整 `verify-diagnostics.py` 全绿复跑；未启动游戏，未安装到任何 profile。
+
 ## 运行记录 2026-09-14 — `verify-diagnostics.py` 全量
 
 - 提交：`dac0bdb501fc93eaeda5c68c08e24ada23e8fabc`（运行前后相同）；工作区只有与本包无关的未跟踪文件 `ForgeMap/tests/fixtures/resource-adapter/SHA256SUMS`
