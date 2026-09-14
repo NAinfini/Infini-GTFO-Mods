@@ -1,5 +1,5 @@
 {
-  "name": "InfiniForgeRuntime",
+  "name": "ForgeRuntime",
   "version_number": "1.2.0",
   "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
   "description": "Forge host: module SDK, plan loading from Rundown packages and execution kernel. Game bindings ship in the Forge base packages. Development build: no game verification.",
