@@ -7,7 +7,7 @@ if(args.length!==2) throw Error('Usage: spatial-vectors.mjs <website> <output>')
 const [site,output]=args.map(value=>path.resolve(value));
 process.chdir(site);
 await import(pathToFileURL(path.join(site,'Tools/register-typescript.ts')).href);
-const {previewLogicPrimitive:preview}=await import(pathToFileURL(path.join(site,'site/forge/logic-preview.ts')).href);
+const {previewLogicPrimitive:preview}=await import(pathToFileURL(path.join(site,'site/forge/logic-evaluator.ts')).href);
 const {logicPrimitiveDefinitions}=await import(pathToFileURL(path.join(site,'site/forge/logic-primitives.ts')).href);
 const ref=id=>({id:'test.spatial:'+id,worldEpoch:1,lifeEpoch:1});
 const positions={origin:[0,0,0],a:[1,0,0],b:[-1,0,0],c:[3,0,0],d:[5,0,0],v:[0,3,0],diagonal:[3,4,0]};

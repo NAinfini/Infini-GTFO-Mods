@@ -10,7 +10,7 @@ process.chdir(site);
 await import(pathToFileURL(path.join(site,'Tools/register-typescript.ts')).href);
 const load = name => import(pathToFileURL(path.join(site,'site/forge',name+'.ts')).href);
 const {logicPrimitiveSeed} = await load('logic-primitives');
-const {previewLogicPrimitive:preview} = await load('logic-preview');
+const {previewLogicPrimitive:preview} = await load('logic-evaluator');
 const {resolveGraphContract,validateGraphMetadata} = await load('graph-schema');
 const seed = logicPrimitiveSeed(); let assertions = 0;
 const check = (value,name) => {assert.ok(value,name); assertions++;};

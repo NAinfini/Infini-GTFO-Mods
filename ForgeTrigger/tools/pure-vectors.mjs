@@ -7,7 +7,7 @@ const [root, site, output] = process.argv.slice(2).map(value => path.resolve(val
 if (!root || !site || !output) throw Error('Usage: node pure-vectors.mjs <ForgeTrigger> <website> <output>');
 process.chdir(site);
 await import(pathToFileURL(path.join(site, 'Tools/register-typescript.ts')).href);
-const {previewLogicPrimitive} = await import(pathToFileURL(path.join(site, 'site/forge/logic-preview.ts')).href);
+const {previewLogicPrimitive} = await import(pathToFileURL(path.join(site, 'site/forge/logic-evaluator.ts')).href);
 const {logicPrimitiveDefinitions} = await import(pathToFileURL(path.join(site, 'site/forge/logic-primitives.ts')).href);
 const fixture = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/pure/cases.json'), 'utf8'));
 if (fixture.kind !== 'test-only-pure-inputs' || fixture.schemaVersion !== 1) throw Error('Unexpected test fixture');

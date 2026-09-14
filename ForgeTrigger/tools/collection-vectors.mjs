@@ -8,7 +8,7 @@ if (args.length !== 2) throw Error('Usage: collection-vectors.mjs <website> <out
 const [site, output] = args.map(value => path.resolve(value));
 process.chdir(site);
 await import(pathToFileURL(path.join(site, 'Tools/register-typescript.ts')).href);
-const {previewLogicPrimitive: preview} = await import(pathToFileURL(path.join(site, 'site/forge/logic-preview.ts')).href);
+const {previewLogicPrimitive: preview} = await import(pathToFileURL(path.join(site, 'site/forge/logic-evaluator.ts')).href);
 const {logicPrimitiveDefinitions} = await import(pathToFileURL(path.join(site, 'site/forge/logic-primitives.ts')).href);
 const rows = []; let assertions = 0;
 function check(value, name) { assert.ok(value, name); assertions++; }

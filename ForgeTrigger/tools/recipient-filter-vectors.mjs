@@ -8,7 +8,7 @@ const [site,output]=args.map(value=>path.resolve(value));
 process.chdir(site);
 await import(pathToFileURL(path.join(site,'Tools/register-typescript.ts')).href);
 const {selectEffectRecipients}=await import(pathToFileURL(path.join(site,'site/forge/targeting.ts')).href);
-const {previewLogicPrimitive}=await import(pathToFileURL(path.join(site,'site/forge/logic-preview.ts')).href);
+const {previewLogicPrimitive}=await import(pathToFileURL(path.join(site,'site/forge/logic-evaluator.ts')).href);
 const {logicPrimitiveDefinitions}=await import(pathToFileURL(path.join(site,'site/forge/logic-primitives.ts')).href);
 const canonicalId='forge.selector.target.filter';
 const definition=logicPrimitiveDefinitions.find(row=>row.id===canonicalId);
