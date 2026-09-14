@@ -12,38 +12,38 @@
   "assemblies": [
     {
       "file": "interop/Modules-ASM.dll",
-      "sha256": "a31af38fac3f96f1130cf7cdfcd10ae436e0d553eda7163b9a9ff82392907943",
+      "sha256": "e499b9c0eb1fa4f1c4194b13163ce1932355ad20c04c424fe4661f8eef736d63",
       "name": "Modules-ASM",
       "version": "0.0.0.0",
-      "mvid": "2875668a-4ea7-42ad-b126-73590ea1c926"
+      "mvid": "6d066008-28db-4edf-9c0e-df9db732560d"
     },
     {
       "file": "interop/GameData-ASM.dll",
-      "sha256": "3a74e6656cda3a563290bbe71b70578e1e8d0745a5ecddd05c894934a7a8cc7b",
+      "sha256": "dee523620186887a95a8e940ff1ddb0cdb94e395840f12c823cc26ae4f5e7106",
       "name": "GameData-ASM",
       "version": "0.0.0.0",
-      "mvid": "7a8e1e7b-7ae1-4846-a83c-a8b6f8635f3d"
+      "mvid": "10c226b4-0ffe-41dc-8e66-7c049afdb4d9"
     },
     {
       "file": "interop/SNet_ASM.dll",
-      "sha256": "99175a1ef40454c1c8dd45d86d9eb9d3df4d24891fb26ed649835ba25e7360b2",
+      "sha256": "6dad116887a975508b6db3843c0beca31874e4f7afb7c3d6e65d1be3edcf9b2c",
       "name": "SNet_ASM",
       "version": "0.0.0.0",
-      "mvid": "63a2b9c8-7187-45a4-9d66-1761e79748c5"
+      "mvid": "143acd09-f561-44d0-9455-a78706262fb5"
     },
     {
       "file": "interop/UnityEngine.CoreModule.dll",
-      "sha256": "13ddfa5aac3b1046dcbb9c073f6ece05c34a85e7c1544a1d8c16e89ffa8295a5",
+      "sha256": "cb14ff813fc6fd4f3e19bbafce3a8b6b02052c1ea9f76b2843717dc4a071c06c",
       "name": "UnityEngine.CoreModule",
       "version": "0.0.0.0",
-      "mvid": "e399b830-e314-4f0c-a261-8c7bcd386fe3"
+      "mvid": "4f2d5da5-2462-491d-8c3b-a0b262e0f576"
     },
     {
       "file": "interop/UnityEngine.AIModule.dll",
-      "sha256": "46ec77eafe86441c98e76a90b91535010637aaaab501ff72cb48f558a90ff693",
+      "sha256": "b6952b1d2a5758e8cd3055653db31337707790c818d8e4dfcfc21b4354a2bf59",
       "name": "UnityEngine.AIModule",
       "version": "0.0.0.0",
-      "mvid": "dc1f21c6-1c04-4a16-a8be-9ec02632c562"
+      "mvid": "a9a309aa-fe5d-49fa-8dc1-655bdf053814"
     },
     {
       "file": "core/BepInEx.Core.dll",

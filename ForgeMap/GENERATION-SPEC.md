@@ -110,7 +110,7 @@ python ForgeMap/tools/verify_resource_adapter_fixtures.py
 ```powershell
 $m = (Resolve-Path ForgeMap).Path
 $out = "$m/bin/generation-api-$([Guid]::NewGuid().ToString('N')).json"
-& "$m/tools/Capture-NativeApi.ps1" -BepInExRoot "$env:APPDATA/r2modmanPlus-local/GTFO/profiles/Temp/BepInEx" -GameRoot 'E:/SteamLibrary/steamapps/common/GTFO' -OutFile $out -TargetsFile "$m/tools/generation-api-targets.json"
+& "$m/tools/Capture-NativeApi.ps1" -BepInExRoot "$env:APPDATA/r2modmanPlus-local/GTFO/profiles/Forge-MapEditor-QA/BepInEx" -GameRoot 'E:/SteamLibrary/steamapps/common/GTFO' -OutFile $out -TargetsFile "$m/tools/generation-api-targets.json"
 python "$m/tools/verify_native_api.py" "$m/evidence/map2-scope-2026-09-13/generation-api.json" $out --self-test
 ```
 

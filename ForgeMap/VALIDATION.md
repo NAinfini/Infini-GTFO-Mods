@@ -27,7 +27,23 @@
 | `tests/MapNativeEvidence` 运行 | 见 [README](README.md#复跑) | QA interop 输入：退出码 0，`PASS 29/29` |
 | `tests/MapNativeLayout` 运行 | 同一证据文件与 QA interop | 退出码 0，`PASS 39/39` |
 
-仍然指向 `Temp` 的 interop 冻结输入（本批未改，等裁决方决定是否统一）：`evidence/map1-2026-09-12/native-api.json`、`evidence/map1-2026-09-12/native-api-recheck.json`、`evidence/map2-scope-2026-09-13/generation-api.json` 里的 5 个 interop 程序集身份（另 4 条 `core/*.dll` 两个 profile 字节相同）。它们的复采命令写在本文档"复跑"一节与 [GENERATION-SPEC.md](GENERATION-SPEC.md)，只改锁会让 `verify_native_api.py` 按新来源报出差异，必须同时改那两处。`evidence/map1-2026-09-12/native-regions-recheck.json` 锁的是 `GameAssembly.dll` 的区段，与 profile 无关。
+本批续做（2026-09-14），把最后三份仍锁 `Temp` 的冻结输入也统一到同一来源：`evidence/map1-2026-09-12/native-api.json`、`evidence/map1-2026-09-12/native-api-recheck.json`、`evidence/map2-scope-2026-09-13/generation-api.json` 的 5 个 `interop/*.dll` 身份换成 `Forge-MapEditor-QA` 副本的 sha256 与 mvid。改动只有这 30 行（3 个文件 × 5 个程序集 × 2 个字段）：4 条 `core/*.dll` 两个 profile 字节相同、未动；`types`、`targetsSha256`、`game.*` 未动；`evidence/map1-2026-09-12/native-regions-recheck.json` 锁的是 `GameAssembly.dll` 的区段、与 profile 无关，未动；`*-result.json`、`*.log`、`solution-build-result.json` 等历史运行记录未动。`tools/verify_native_api.py` 从命令行取 capture 路径、不硬编码 profile，因此没有可改之处；复采命令的 profile 路径同步改成 QA：本文档"复跑"一节的 `$bep` 与 [GENERATION-SPEC.md](GENERATION-SPEC.md) 第 5 节。换锁后按"复跑"一节从 QA profile 复采比对：MAP1 targets 采集 32 类型 / 110 方法、`missing: 0`、build 20403457，`native-api.json` 与 `native-api-recheck.json` 各自 `verify_native_api.py --self-test` 退出码 0、`matched: true`、0 差异、自检 17 项；MAP2 targets 采集 27 类型 / 59 方法、`missing: 0`，`generation-api.json` 同样退出码 0、`matched: true`、0 差异；`verify_native_regions.py` 退出码 0、`matched: true`。
+
+| 程序集 | sha256 旧 → 新 | mvid 旧 → 新 |
+| --- | --- | --- |
+| Modules-ASM.dll | `A31AF38F…7943` → `E499B9C0…6D63` | `2875668a-…c926` → `6d066008-28db-4edf-9c0e-df9db732560d` |
+| GameData-ASM.dll | `3A74E665…CC7B` → `DEE52362…7106` | `7a8e1e7b-…5f3d` → `10c226b4-0ffe-41dc-8e66-7c049afdb4d9` |
+| SNet_ASM.dll | `99175A1E…60B2` → `6DAD1168…9B2C` | `63a2b9c8-…48c5` → `143acd09-f561-44d0-9455-a78706262fb5` |
+| UnityEngine.CoreModule.dll | `13DDFA5A…95A5` → `CB14FF81…C06C` | `e399b830-…6fe3` → `4f2d5da5-2462-491d-8c3b-a0b262e0f576` |
+| UnityEngine.AIModule.dll | `46EC77EA…F693` → `B6952B1D…BF59` | `dc1f21c6-…c562` → `a9a309aa-fe5d-49fa-8dc1-655bdf053814` |
+
+换锁前的签名等价证明（`$env:TEMP` 下的临时 Cecil 工具，只在临时目录运行，仓库零改动）：
+
+| 证明 | 结果 |
+| --- | --- |
+| 5 个 interop 程序集逐类型/字段/属性/方法/参数/事件投影 | Temp 与 QA 副本的投影文件逐字节相同；投影覆盖参数名、`isOut`、`isOptional`、常量、属性读写访问器与枚举字面量，MVID 不在投影内。规模：Modules-ASM 4283 类型 / 57776 字段 / 27357 属性 / 80710 方法 / 46256 参数；GameData-ASM 102 / 8179 / 8078 / 16459 / 8179；SNet_ASM 301 / 2620 / 805 / 3143 / 2046；UnityEngine.CoreModule 2815 / 8356 / 1854 / 13191 / 18461；UnityEngine.AIModule 142 / 419 / 117 / 678 / 980 |
+| 两个 profile 的 interop 同源 | 两侧 `BepInEx/interop/assembly-hash.txt` 同为 `565871abd714937729d0e74520563bec`；`GameAssembly.dll` 仍是锁定的 `C6A5C3CD…BF55`（app 493520 / build 20403457） |
+| Modules-ASM、SNet_ASM 新锁值与已统一的 MAP5a 锁 | 与 `evidence/map5a-player-hooks.json` 的 sha256/MVID 一致 |
 
 ## MAP2 原生发现（2026-09-14）
 
@@ -201,7 +217,7 @@ dotnet "$artifacts/bin/MapContracts/release/MapContracts.dll"
 ```powershell
 $m = (Resolve-Path ForgeMap).Path
 $site = (Resolve-Path ../Infini-GTFO-Model-Site).Path
-$bep = "$env:APPDATA/r2modmanPlus-local/GTFO/profiles/Temp/BepInEx"
+$bep = "$env:APPDATA/r2modmanPlus-local/GTFO/profiles/Forge-MapEditor-QA/BepInEx"
 $game = 'E:/SteamLibrary/steamapps/common/GTFO'
 $out = "$m/bin/native-api-$([Guid]::NewGuid().ToString('N')).json"
 & "$m/tools/Capture-NativeApi.ps1" -BepInExRoot $bep -GameRoot $game -OutFile $out
