@@ -58,13 +58,18 @@ internal static class RuntimeGraphContracts
     };
     internal static readonly IReadOnlyDictionary<string, string[]> EnumSets =
         EnumSetTable.ToDictionary(x => x.Name, x => x.Members, StringComparer.Ordinal);
+    /// <summary>Q3: an enum's runtime/wire value is a member-set index, never its name. A structural parameter's
+    /// inline `values` narrows the index basis to that list; everything else (promoted parameters, ports) indexes
+    /// the full named set.</summary>
+    internal static string[] EnumMembers(JsonElement enumDefinition) => enumDefinition.TryGetProperty("values", out var inline)
+        ? RuntimeJson.Strings(inline) : EnumSets[RuntimeJson.Text(enumDefinition, enumDefinition.TryGetProperty("set", out _) ? "set" : "schema")];
     internal static readonly string[] Domains = { "map", "room", "enemy", "weapon", "tool", "consumable", "player", "session", "logic", "editor" };
     /// <summary>No implicit source/owner fallback: a declared context role input is always explicit.</summary>
     private static readonly string[] ContextRolePorts = { "self", "source", "owner", "instigator", "event_target" };
     private static readonly string[] ParameterTypes = { "boolean", "integer", "number", "string", "enum", "vector3", "recipient-policy" };
     private static readonly string[] RecipientTargets = { "entity", "resource", "handle" };
     /// <summary>Value types with an implemented runtime validator. "many" is entity-only (the former entity-list).</summary>
-    internal static readonly string[] RuntimeValueTypes = { "boolean", "integer", "number", "string", "vector3", "entity" };
+    internal static readonly string[] RuntimeValueTypes = { "boolean", "integer", "number", "string", "vector3", "entity", "enum" };
 
     private static bool IsName(string value) => Regex.IsMatch(value, @"^[a-z][a-z0-9_]*$", RegexOptions.CultureInvariant);
     private static string? Optional(JsonElement value, string key) => value.TryGetProperty(key, out var field) ? field.GetString() : null;

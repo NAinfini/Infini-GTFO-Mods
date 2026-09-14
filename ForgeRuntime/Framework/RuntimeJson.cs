@@ -139,6 +139,12 @@ public static class RuntimeJson
             case "string": Require(value.ValueKind == JsonValueKind.String && value.GetString()!.Length <= 4096, "invalid-string", "Expected bounded string."); break;
             case "vector3":
                 Require(value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 3 && value.EnumerateArray().All(v => v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var n) && double.IsFinite(n)), "invalid-vector", "Expected finite vector3."); break;
+            case "enum":
+                // Q3: the wire value is a member-set index, never the member name. A port always indexes its
+                // whole named set (ports carry no inline subset), so the port's own schema is the index basis.
+                var count = RuntimeGraphContracts.EnumSets[Text(port, "schema")].Length;
+                Require(value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var member) && double.IsFinite(member)
+                    && member == Math.Truncate(member) && member >= 0 && member < count, "invalid-enum", "Expected enum member index."); break;
                         default: throw new RuntimeContractException("unsupported-port", type);
         }
     }
@@ -153,9 +159,11 @@ public static class RuntimeJson
             var type = Text(definition, "type");
             if (type == "enum")
             {
-                // Inline values narrow a named set, so they win when both are present.
-                var members = definition.TryGetProperty("values", out var inline) ? Strings(inline) : RuntimeGraphContracts.EnumSets[Text(definition, "set")];
-                Require(value.ValueKind == JsonValueKind.String && members.Contains(value.GetString(), StringComparer.Ordinal), "invalid-enum", Text(definition, "id"));
+                // Q3: the compiled/wire value is a member-set index, never the member name. Inline `values`
+                // narrow the index basis to that list; a promotable enum always names a whole set instead.
+                var members = RuntimeGraphContracts.EnumMembers(definition);
+                Require(value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var index) && double.IsFinite(index)
+                    && index == Math.Truncate(index) && index >= 0 && index < members.Length, "invalid-enum", Text(definition, "id"));
             }
             else { Require(type != "recipient-policy", "unsupported-parameter", "The runtime cannot evaluate recipient-policy."); ValidateValue(value, definition); }
             if (value.ValueKind != JsonValueKind.Number) continue;
@@ -163,5 +171,27 @@ public static class RuntimeJson
             if (definition.TryGetProperty("minimum", out var min)) Require(number >= min.GetDouble(), "parameter-minimum", Text(definition, "id"));
             if (definition.TryGetProperty("maximum", out var max)) Require(number <= max.GetDouble(), "parameter-maximum", Text(definition, "id"));
         }
+    }
+    /// <summary>Handler boundary (Q3): a wired value already validated against `port` keeps its compiled index
+    /// representation everywhere in the kernel; only here, right before a handler reads it, an enum index is
+    /// resolved to its member name so existing handlers keep comparing strings.</summary>
+    internal static JsonElement EnumPortToHandlerValue(JsonElement value, JsonElement port)
+        => Text(port, "type") == "enum" && value.ValueKind == JsonValueKind.Number
+            ? From(RuntimeGraphContracts.EnumSets[Text(port, "schema")][(int)value.GetDouble()]) : value;
+    /// <summary>Handler boundary (Q3) for parameters: every enum-typed definition on `capability` (constants and,
+    /// once merged back in, promoted values alike) is resolved from its compiled index to its member name.
+    /// Called once, after every other parameter validation for this dispatch has already run on the indices.</summary>
+    internal static JsonElement ResolveEnumParameters(JsonElement parameters, JsonElement capability)
+    {
+        var definitions = Rows(capability.GetProperty("graph"), "parameters").Where(p => Text(p, "type") == "enum").ToArray();
+        if (definitions.Length == 0) return parameters;
+        var fields = parameters.EnumerateObject().ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
+        foreach (var definition in definitions)
+        {
+            var name = Text(definition, "id");
+            if (fields.TryGetValue(name, out var value) && value.ValueKind == JsonValueKind.Number)
+                fields[name] = From(RuntimeGraphContracts.EnumMembers(definition)[(int)value.GetDouble()]);
+        }
+        return From(fields);
     }
 }

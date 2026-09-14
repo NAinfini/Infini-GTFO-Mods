@@ -317,15 +317,20 @@ public sealed partial class RuntimeKernel
                             {
                                 if (!pending.Event.Outputs.TryGetProperty(input.EventPort, out var value)) continue;
                                 RuntimeJson.ValidateValue(value, input.Port); ValidateEntities(value, input.Port);
-                                if (merged != null && step.Promoted.Contains(input.Name)) merged.Add(input.Name, value); else inputs.Add(input.Name, value);
+                                // A promoted value stays a compiled index until the re-validation below runs on indices
+                                // throughout; a genuine action input has no further index-based check, so it resolves now.
+                                if (merged != null && step.Promoted.Contains(input.Name)) merged.Add(input.Name, value);
+                                else inputs.Add(input.Name, RuntimeJson.EnumPortToHandlerValue(value, input.Port));
                             }
+                            var capability = registry.Capabilities[RuntimeJson.Text(registry.Bindings[step.BindingId], "capabilityId")];
                             var parameters = step.Parameters;
                             if (merged != null)
                             {
                                 // A computed value meets the bounds and members of the literal it replaced: rejected, never clamped.
                                 parameters = RuntimeJson.From(merged);
-                                RuntimeJson.Parameters(parameters, registry.Capabilities[RuntimeJson.Text(registry.Bindings[step.BindingId], "capabilityId")]);
+                                RuntimeJson.Parameters(parameters, capability);
                             }
+                            parameters = RuntimeJson.ResolveEnumParameters(parameters, capability);
                             var handler = registry.Handlers[step.BindingId];
                             currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(inputs));
                             executed++; invoked = true;
