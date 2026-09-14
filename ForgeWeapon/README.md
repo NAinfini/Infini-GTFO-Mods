@@ -112,7 +112,7 @@ python ForgeWeapon/tools/test-identity-mutations.py
 
 第一条是统一入口（`--architecture` 附带跨模块架构断言），后三条是并发任务编写的独立套件与变异检查。**`verify-w1.py` 不包含原生接线的套件。** 原生接线的套件直接用 dotnet 构建与运行，输出放到仓库外的隔离目录：
 
-`$bep` 为只读 BepInEx 目录，`$game` 为 GTFO 根目录，`$dump` 为同 build 的 dump.cs。原生插件需要同一 artifacts 里的宿主 `ForgeRuntime.dll`；NativeLayout 还读取 ForgeMap 原生插件，核对依赖的 id 与版本：
+`$bep` 为只读的 `Forge-MapEditor-QA` profile 的 BepInEx 目录（`%APPDATA%\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx`），与证据文件冻结的 interop 是同一份副本；`$game` 为 GTFO 根目录，`$dump` 为同 build 的 dump.cs。原生插件需要同一 artifacts 里的宿主 `ForgeRuntime.dll`；NativeLayout 还读取 ForgeMap 原生插件，核对依赖的 id 与版本：
 
 ```powershell
 $a = '<new-empty-artifacts-dir>'

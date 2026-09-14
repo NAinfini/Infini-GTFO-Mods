@@ -10,7 +10,7 @@
 - `weapon.equipment-life-started` 行末增加 `location=Inventory|Deployed`；同一生命的部署状态变化另写 `weapon.equipment-location`；`Record` 对非 Inventory 位置不发布 equipped/unequipped，因此部署与回收只产生观察变化，不补造持有事实。
 - 证据文件 `w1-native-hooks.json`：8 个 Hook、32 条直接调用边（新增 15 条）。
 
-interop 目录：调研用 r2modman `Forge-MapEditor-QA` profile 的 `BepInEx/interop`（`Modules-ASM.dll` sha256 `E499B9C0…36D63`，mvid `6d066008-28db-4edf-9c0e-df9db732560d`；`GameData-ASM.dll` `DEE52362…E7106`；`SNet_ASM.dll` `6DAD1168…CF9B2C`）。`w1-native-hooks.json` 与 `w1-native-contract.json` 里冻结的文件锁指向 `Temp` profile 的旧副本（`A31AF38F…07943`，mvid `2875668a-…`），两份副本的 MVID 与文件字节不同，但逐类型/字段/属性/方法签名的 Cecil 指纹完全一致（`Modules-ASM.dll` rows=170126 `7E7665E8…C8B`，`GameData-ASM.dll` rows=32818 `1870F20A…CB6`，`SNet_ASM.dll` rows=6869 `83B16D5D…F83`），所以没有改写冻结的锁，`NativeEvidence` 仍指向 `Temp` 副本运行。
+interop 目录：调研与冻结锁统一用 r2modman `Forge-MapEditor-QA` profile 的 `BepInEx/interop`（`Modules-ASM.dll` sha256 `E499B9C0…36D63`，mvid `6d066008-28db-4edf-9c0e-df9db732560d`；`GameData-ASM.dll` `DEE52362…E7106`；`SNet_ASM.dll` `6DAD1168…CF9B2C`）。本节记录时 `w1-native-hooks.json` 与 `w1-native-contract.json` 的冻结文件锁还指向 `Temp` profile 的旧副本（`A31AF38F…07943`，mvid `2875668a-…`），当天稍后已按指纹等价与 RVA 复检结果统一到 `Forge-MapEditor-QA`，见 [下文](#nativeevidence-冻结输入统一到-forge-mapeditor-qa2026-09-14)。
 
 全部用会话临时目录的隔离 `--artifacts-path` 与 `--disable-build-servers` 构建，报告写到新目录，没有安装、没有启动 GTFO、没有改动 ForgeRuntime 的源码或 Git 状态。
 
@@ -18,7 +18,7 @@ interop 目录：调研用 r2modman `Forge-MapEditor-QA` profile 的 `BepInEx/in
 | --- | --- | --- |
 | 宿主、`ForgeWeapon`、`ForgeMap.Native`、`ForgeWeapon.Native` 构建 | 0 | 各 0 警告 0 错误 |
 | `tests/NativeLayout` | 0 | `PASS 68/68 Weapon native layout checks; no GTFO execution.` |
-| `tests/NativeEvidence`（`Temp` profile） | 0 | `PASS 71/71 Weapon static native evidence checks; game execution NOT tested.` |
+| `tests/NativeEvidence`（当时的 `Temp` profile 输入） | 0 | `PASS 71/71 Weapon static native evidence checks; game execution NOT tested.` |
 | `tests/Identity` | 0 | `RESULT {…"cases":43,"assertions":102…,"gameExecuted":false,"installed":false,"nativeCalls":0}` |
 | `tests/IdentityAcceptance --report <新路径>` | 0 | `INDEPENDENT IDENTITY: 37/37 passed; gameExecuted=false; synthetic inputs` |
 | `tests/NativeAdapter`（工作区 SDK） | 1 | `FAIL 11/43 Weapon native adapter cases`，32 个 `Unsupported plan version.` |
@@ -42,9 +42,25 @@ NativeAdapter 新增 5 例：`deploy.sentry-slot-reads-back-deployed`、`deploy.
 
 **两个套件在当前工作区无法运行，原因不是本次改动。** `ForgeRuntime/Framework/RuntimePlan.cs` 在本会话期间被另一任务改成要求 `schemaVersion == 3`（D-017 R4-a 的步骤/后继/纯步骤计划格式），而 Weapon 的测试夹具仍写 v2，于是所有需要加载计划的用例报 `Unsupported plan version.`。这可复现地定位为环境问题：把提交版 HEAD 的 `ForgeRuntime/Framework` 源码与本次工作区的 Weapon 源码一起隔离构建后，同一批用例 43/43 通过，改动前的 38 个用例也是 38/38；工作区 SDK 下改动前就是 11/38。没有改 ForgeRuntime，也没有把 Weapon 的夹具迁到尚未定稿的 v3 计划格式。`Architecture` 的失败来自另一任务在 `ForgeTrigger/ModuleDefinition.cs` 里新增的 `forge.condition.predicate.compare` capability：断言仍要求能力列表恰为 Weapon 的两项，本次改动没有触碰任何托管 capability，也没有触碰该测试文件。
 
-`NativeEvidence` 用 `Forge-MapEditor-QA` profile 运行时会停在 69/71，失败的只有 `hash.Modules-ASM.dll` 与 `mvid.Modules-ASM.dll`（该 profile 的副本 2026-09-09 重新生成过），签名、RVA 唯一性、可执行段与 32 条调用边全部通过，因此按上面的指纹等价结论改用冻结锁对应的 `Temp` 副本运行。
+`NativeEvidence` 当时用 `Forge-MapEditor-QA` profile 运行会停在 69/71，失败的只有 `hash.Modules-ASM.dll` 与 `mvid.Modules-ASM.dll`（该 profile 的副本 2026-09-09 重新生成过），签名、RVA 唯一性、可执行段与 32 条调用边全部通过，因此当时按指纹等价结论改用冻结锁对应的 `Temp` 副本运行。**当天稍后已把冻结锁统一到 `Forge-MapEditor-QA` 副本，这两项不符随之消失**，见下一节。
 
 **这些仍是托管替身、编译后元数据与静态调用图证据，不是游戏验证。** 部署读回的真实行为（游戏是否保留部署槽位的 `BackpackItem` 实例、原生标记的生命周期）未在游戏内核验，已列入 README 的未核验清单。
+
+## NativeEvidence 冻结输入统一到 Forge-MapEditor-QA（2026-09-14）
+
+`w1-native-hooks.json` 与 `w1-native-contract.json` 冻结的 interop 副本原指只读的 `Temp` profile，而构建引用、本节调研与 `w1-native-world-paths.json` 用的是 `Forge-MapEditor-QA`（2026-09-09 重新生成）。两份副本的 MVID 与文件字节不同，但各自 `interop/assembly-hash.txt` 相同（`565871abd714937729d0e74520563bec`），即由同一份 `GameAssembly.dll` 生成。按"唯一冻结来源与构建参考同一目录"的决定，该来源定为 `Forge-MapEditor-QA` 的 `BepInEx/interop`。
+
+换锁前只读复检（Cecil 与 dump 解析，不加载程序集、不启动游戏）：
+
+| 检查 | 结果 |
+| --- | --- |
+| 逐类型/字段/属性/方法签名指纹（Cecil，`$env:TEMP\dsh-v2\fingerprint.json`） | 3/3 identical：`Modules-ASM.dll` rows=170126 摘要 `E22E23BF…27B44`、`GameData-ASM.dll` rows=32818 摘要 `3F24DCF5…AF1A1F`、`SNet_ASM.dll` rows=6869 摘要 `888B8ED4…49B4337`，两份副本逐行相同 |
+| 锁定 RVA 在 dump.cs（sha256 `BF657C0E…DE1CC`，build 20403457）里的声明数与共享计数（`$env:TEMP\dsh-v2\rva-results.json`） | 98/98 恰好一条声明且不共享：8 个 Hook 目标、37 个直接调用边端点、51 个 world-paths 成员与调用方、2 个 Enemy `nativeRva` |
+| 构建来源 | `GameAssembly.dll` sha256 `C6A5C3CD…7BF55`、Steam buildid 20403457 与两个锁的 `gameAssemblySha256`/`buildId` 一致，故同一份 dump.cs 对两份 interop 都成立 |
+
+改动只替换锁里的文件 sha256 与 MVID（`Modules-ASM.dll` → `E499B9C0…36D63` / `6d066008-…`；`GameData-ASM.dll` → `DEE52362…E7106`；`SNet_ASM.dll` → `6DAD1168…CF9B2C`），签名、RVA、调用边、`dumpSha256` 与游戏标识未改。`w1-native-world-paths.json` 的 `interop.used` 已是该目录；原先只用于记录 `Temp` 差异的 `frozenEvidenceLock` 随差异消失一并删除。README 的原生套件说明改为把 `$bep` 指向该 profile。
+
+改动前的运行计数（上一次运行留下的报告，不是本次运行）：`Temp` 输入 `PASS 71/71`（`$env:TEMP\dsh-v\logs\weapon-before-temp.log`）；`Forge-MapEditor-QA` 输入 `FAIL 69/71`，仅 `hash.Modules-ASM.dll` 与 `mvid.Modules-ASM.dll` 不符（`$env:TEMP\dsh-v\logs\weapon-before-qa.log`）。换锁后用 `Forge-MapEditor-QA` 输入、独立 artifacts 构建复跑 `tests/NativeEvidence`：退出码 0，`PASS 71/71`；没有跑任何游戏或安装动作。命令见 [README](README.md#复跑)。
 
 ## W1 游戏加载入口（2026-09-13，implementation-only）
 
@@ -88,7 +104,7 @@ NativeLayout 从 51 变为 62，参数改为 8 个（增加宿主 `ForgeRuntime.
 目的：确认插件在真实游戏中加载，owner 来自 Map 的玩家引用，各退出场景的日志与托管替身一致。**以下期望都未经游戏验证**；某步无法操作时记"未执行"，不要推断。
 
 准备：
-- 在 r2modman 新建一个隔离的测试 profile，不用日常 profile，也不用编译参考的 Temp profile。只放 BepInEx、宿主 `ForgeRuntime.dll` 及 `ForgeRuntime.Framework.dll`，`ForgeMap.dll` + `ForgeMap.Native.dll`，`ForgeWeapon.dll` + `ForgeWeapon.Native.dll`，全部取同一次构建。宿主模式设为 Play（非 Off）。
+- 在 r2modman 新建一个隔离的测试 profile，不用日常 profile，也不用构建参考的 `Forge-MapEditor-QA` profile。只放 BepInEx、宿主 `ForgeRuntime.dll` 及 `ForgeRuntime.Framework.dll`，`ForgeMap.dll` + `ForgeMap.Native.dll`，`ForgeWeapon.dll` + `ForgeWeapon.Native.dll`，全部取同一次构建。宿主模式设为 Play（非 Off）。
 - 用户开私人大厅当主机，可带 bot。开始前清空或记下 `BepInEx/LogOutput.log` 的位置，以下日志都在该文件里搜索。
 - 下面的 `<W>` 是当前世界编号，`<n>` 是装备序号，`<m>` 是玩家编号，均以实际值为准。
 

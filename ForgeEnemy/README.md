@@ -68,7 +68,7 @@ Enemy 只声明需要什么空间，**合法空间求解归 Map**。合同文件
 
 ## 复跑
 
-从仓库根运行，先把 `GTFO_BEPINEX_PATH` 设为合法的本地编译引用目录。输出必须用隔离路径，不写入已安装的 profile：
+从仓库根运行，先把 `GTFO_BEPINEX_PATH` 设为只读的 `Forge-MapEditor-QA` profile 的 BepInEx 目录（`%APPDATA%\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx`）：它与构建引用、`evidence/native-api-20403457.json` 冻结的三个 interop 程序集是同一份副本。输出必须用隔离路径，不写入任何 profile：
 
 ```powershell
 $out = Join-Path $env:TEMP ('forge-enemy-qa-' + [guid]::NewGuid().ToString('N'))

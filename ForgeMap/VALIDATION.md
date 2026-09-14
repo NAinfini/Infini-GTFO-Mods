@@ -2,6 +2,33 @@
 
 **上次更新：2026-09-14**（2026-09-13 内容合并自原 MAP1-DELIVERY 与 MAP1-IDENTITY-CONTINUATION 两份交接记录）。
 
+## NativeEvidence 冻结输入改用 QA profile interop（2026-09-14）
+
+按框架 §6 U-MAP-MOD 与合同"编译引用与冻结输入要指定同一个明确来源"，把 `tests/MapNativeEvidence` 的冻结输入统一到唯一来源：`%APPDATA%\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx\interop`（构建时的 `GTFOBepInExPath` 也指向同一 profile）。此前 `evidence/map5a-player-hooks.json` 锁的是同机 `Temp` profile 的旧副本，而 `Forge-MapEditor-QA` 的 interop 于 2026-09-09 重新生成，两个程序集的 `hash.*` 与 `mvid.*` 共 4 项因此一直失败。证据等级不变：**metadata-and-static-native-call-graph-only**，没有启动游戏、没有安装或复制任何 profile 文件。
+
+改动只有该文件 2 条 `assemblies` 记录的 `sha256` 与 `mvid`；**签名、`isVirtual`、`rva`、`readbacks` 与 7 条 `callEdges` 一字未改**，`buildId`、`gameAssemblySha256`、`dumpSha256`、`codeSection` 也未变（dump 仍是本机 build 20403457 的那份，`BF657C0E…`；`GameAssembly.dll` 仍是 `C6A5C3CD…`）。[README](README.md#复跑) 的 MAP5a 复跑段把 `$bep` 显式写成 QA profile。
+
+换锁前的两项证明（临时 Cecil 工具，只在 `$env:TEMP` 下运行，仓库零改动）：
+
+| 证明 | 结果 |
+| --- | --- |
+| Modules-ASM 逐类型/字段/属性/方法指纹 | Temp 与 QA 副本各 4283 类型、57776 字段、27357 属性、80710 方法（170127 行），除 MVID 外逐行相同 |
+| SNet_ASM 逐类型/字段/属性/方法指纹 | 各 301 类型、2620 字段、805 属性、3143 方法（6870 行），除 MVID 外逐行相同 |
+| 被锁成员在同 build dump 中 | 2 个 Hook RVA 各声明一次、dump 内 entries=1；7 条调用边的 8 个端点 RVA entries 全为 1 且跨度 ≤0x4000 |
+
+| 程序集 | sha256 旧 → 新 | mvid 旧 → 新 |
+| --- | --- | --- |
+| Modules-ASM.dll | `A31AF38F…7943` → `E499B9C0…6D63` | `2875668a-…c926` → `6d066008-28db-4edf-9c0e-df9db732560d` |
+| SNet_ASM.dll | `99175A1E…60B2` → `6DAD1168…9B2C` | `63a2b9c8-…48c5` → `143acd09-f561-44d0-9455-a78706262fb5` |
+
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| `tests/MapNativeEvidence` 构建 | `dotnet build ForgeMap/tests/MapNativeEvidence/MapNativeEvidence.csproj -c Release --artifacts-path <临时目录> -p:GTFOBepInExPath=<QA BepInEx>` | 退出码 0，0 警告 0 错误 |
+| `tests/MapNativeEvidence` 运行 | 见 [README](README.md#复跑) | QA interop 输入：退出码 0，`PASS 29/29` |
+| `tests/MapNativeLayout` 运行 | 同一证据文件与 QA interop | 退出码 0，`PASS 39/39` |
+
+仍然指向 `Temp` 的 interop 冻结输入（本批未改，等裁决方决定是否统一）：`evidence/map1-2026-09-12/native-api.json`、`evidence/map1-2026-09-12/native-api-recheck.json`、`evidence/map2-scope-2026-09-13/generation-api.json` 里的 5 个 interop 程序集身份（另 4 条 `core/*.dll` 两个 profile 字节相同）。它们的复采命令写在本文档"复跑"一节与 [GENERATION-SPEC.md](GENERATION-SPEC.md)，只改锁会让 `verify_native_api.py` 按新来源报出差异，必须同时改那两处。`evidence/map1-2026-09-12/native-regions-recheck.json` 锁的是 `GameAssembly.dll` 的区段，与 profile 无关。
+
 ## MAP2 原生发现（2026-09-14）
 
 按框架 §6 U-MAP-MOD 未完成项"MAP2 原生发现"与 §3.2 I-MAP-PLAN（D-013 过渡期）新增：游戏无关的 `AssemblyPlanDiscovery.cs` 发现 `BepInEx/plugins/*/forge/maps/` 并只跑 G0–G6 静态检查；原生 `Native/MapPlanDiagnostics.cs` 在插件 `Load` 注册身份后调用一次，每个计划一条有界（512 字符）诊断行。**只读、只诊断**：不生成、不改游戏状态、不注册 provider、不读网络。证据等级：**本地验证（托管发现 + 合成夹具 + 替身接线）**；没有启动游戏、没有加载 bundle、没有安装到任何 profile，通过静态检查不等于生成成功。

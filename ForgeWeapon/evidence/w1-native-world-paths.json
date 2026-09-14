@@ -22,12 +22,6 @@
         { "name": "GameData-ASM.dll", "length": 2649600, "sha256": "DEE523620186887A95A8E940FF1DDB0CDB94E395840F12C823CC26AE4F5E7106" },
         { "name": "SNet_ASM.dll", "length": 760320, "sha256": "6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C" }
       ]
-    },
-    "frozenEvidenceLock": {
-      "directory": "r2modmanPlus-local/GTFO/profiles/Temp/BepInEx/interop",
-      "modulesAsmSha256": "A31AF38FAC3F96F1130CF7CDFCD10AE436E0D553EDA7163B9A9FF82392907943",
-      "modulesAsmMvid": "2875668a-4ea7-42ad-b126-73590ea1c926",
-      "note": "w1-native-hooks.json and w1-native-contract.json keep the byte identity of this copy; NativeEvidence must be pointed at it. The two copies differ only in assembly identity (MVID and therefore file hash): a Cecil fingerprint over every type, field, property and method signature is identical, rows=170126 fingerprint=7E7665E8C4902317F8FF8A48644FAD45736B9802A902027B83CE3AE91C9D8C8B for Modules-ASM.dll, rows=32818 1870F20AFBB7AA7F49BA5762ECE456AFC41DA30E0FB4A50E2A398F9E8B1CDCB6 for GameData-ASM.dll and rows=6869 83B16D5D060B1F8C76EEA4B5F3ECE3C261FDEA4509EBC7A521228460D5CD3F83 for SNet_ASM.dll. The QA profile copy was regenerated on 2026-09-09, the Temp copy dates from 2026-06-07, both describe the same game build."
     }
   },
   "paths": [

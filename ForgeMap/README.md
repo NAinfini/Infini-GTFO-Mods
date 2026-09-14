@@ -100,9 +100,10 @@ dotnet build ForgeMap/tests/MapContracts/MapContracts.csproj -c Release --artifa
 dotnet "$artifacts/bin/MapContracts/release/MapContracts.dll"
 ```
 
-MAP5a 原生玩家身份（`$bep` 为只读 BepInEx 目录，`$game` 为 GTFO 根目录，`$dump` 为同 build 的 dump.cs；先构建宿主取得 `ForgeRuntime.dll`）：
+MAP5a 原生玩家身份。`$bep` 是只读 BepInEx 目录，interop 身份只有一个冻结来源：`Forge-MapEditor-QA` profile 的 `BepInEx`（`evidence/map5a-player-hooks.json` 的 sha256 与 MVID 就是该副本的实际值）；`$game` 为 GTFO 根目录，`$dump` 为同 build 的 dump.cs；先构建宿主取得 `ForgeRuntime.dll`：
 
 ```powershell
+$bep = "$env:APPDATA/r2modmanPlus-local/GTFO/profiles/Forge-MapEditor-QA/BepInEx"
 $a = '<new-empty-artifacts-dir>'
 dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $a "-p:GTFOBepInExPath=$bep"
 dotnet build ForgeMap/Native/ForgeMap.Native.csproj -c Release --artifacts-path $a "-p:GTFOBepInExPath=$bep" "-p:ForgeRuntimeAssembly=$a/bin/ForgeRuntime/release/ForgeRuntime.dll"

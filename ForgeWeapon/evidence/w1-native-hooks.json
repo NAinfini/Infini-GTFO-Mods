@@ -7,7 +7,7 @@
   "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
   "codeSection": "il2cpp",
   "assemblies": [
-    { "file": "Modules-ASM.dll", "sha256": "A31AF38FAC3F96F1130CF7CDFCD10AE436E0D553EDA7163B9A9FF82392907943", "mvid": "2875668a-4ea7-42ad-b126-73590ea1c926" }
+    { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" }
   ],
   "hooks": [
     { "hook": "BackpackItemStored", "assembly": "Modules-ASM.dll", "type": "Player.PlayerBackpack", "name": "CreateAndStoreBackpackItem",

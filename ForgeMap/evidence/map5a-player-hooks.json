@@ -7,8 +7,8 @@
   "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
   "codeSection": "il2cpp",
   "assemblies": [
-    { "file": "Modules-ASM.dll", "sha256": "A31AF38FAC3F96F1130CF7CDFCD10AE436E0D553EDA7163B9A9FF82392907943", "mvid": "2875668a-4ea7-42ad-b126-73590ea1c926" },
-    { "file": "SNet_ASM.dll", "sha256": "99175A1EF40454C1C8DD45D86D9EB9D3DF4D24891FB26ED649835BA25E7360B2", "mvid": "63a2b9c8-7187-45a4-9d66-1761e79748c5" }
+    { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
+    { "file": "SNet_ASM.dll", "sha256": "6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C", "mvid": "143acd09-f561-44d0-9455-a78706262fb5" }
   ],
   "hooks": [
     { "hook": "PlayerSpawnedReadback", "assembly": "Modules-ASM.dll", "type": "Player.PlayerManager", "name": "OnPlayerSpawned",

@@ -29,6 +29,22 @@ R4（运行时枚举值端口，见下方阻塞项表）落地后，ReceiverProb
 
 `ForgeEnemy.Native` 与完整宿主的零警告结果单独记录。Trigger 的测试工程构建有 3 条 NETSDK1138 目标框架提示，0 错误；本仓库没有切换目标框架。
 
+## NativeEvidence 冻结输入统一到 Forge-MapEditor-QA（2026-09-14）
+
+`evidence/native-api-20403457.json` 原来冻结 `Temp` profile 的三个 interop 程序集哈希与 MVID，而构建引用、调研与其它套件都用只读的 `Forge-MapEditor-QA` profile，于是用 QA 输入跑 NativeEvidence 有 6 项不符（见下）。两份副本的 MVID 与字节不同，但各自 `interop/assembly-hash.txt` 相同（`565871abd714937729d0e74520563bec`），说明由同一份 `GameAssembly.dll` 生成；按"唯一冻结来源与构建参考同一目录"的决定，冻结输入改为 QA 副本。
+
+换锁前的只读复检（Cecil 与 dump 解析，不加载程序集、不启动游戏）：
+
+| 检查 | 结果 |
+| --- | --- |
+| 逐类型/字段/属性/方法签名指纹（`$env:TEMP\dsh-v2\fingerprint.json`） | 3/3 identical：`Modules-ASM.dll` rows=170126、`GameData-ASM.dll` rows=32818、`SNet_ASM.dll` rows=6869，两份副本逐行相同 |
+| 锁定的 `nativeRva`（`SendSetHealth` 0x161F790、`ReceiveSetHealth` 0x1380D50）在 dump.cs（sha256 `BF657C0E…DE1CC`）中的声明数与共享计数 | 各恰一条声明、共享计数 1（与 Weapon 的锁定 RVA 一起跑，98/98） |
+| 游戏来源 | `GameAssembly.dll` sha256 `C6A5C3CD…7BF55`、Steam buildid 20403457 与锁一致 |
+
+改动只替换 `assemblies` 三个条目的 sha256 与 MVID（`Modules-ASM.dll` → `E499B9C0…36D63` / `6d066008-…`；`GameData-ASM.dll` → `DEE52362…E7106` / `10c226b4-…`；`SNet_ASM.dll` → `6DAD1168…CF9B2C` / `143acd09-…`），127 个签名、7 个枚举常量、Forge IL 用法、`dataEvidenceFiles` 与游戏标识未改。
+
+改动前的运行计数（上一次运行留下的报告，不是本次运行）：`Temp` 输入 `PASS 544/544`（`$env:TEMP\dsh-v\logs\enemy-before-temp.log`）；`Forge-MapEditor-QA` 输入 `FAIL 538/544`，失败的正是三个哈希与三个 MVID（`$env:TEMP\dsh-v\logs\enemy-before-qa.log`）。换锁后用 QA 输入、独立 artifacts 构建复跑：NativeEvidence 退出码 0，`PASS 544/544`；`verify_negative_cases.py` 退出码 0，`PASS 22/22`。命令见[复跑](#复跑)。
+
 ## r11 heal 结果聚合与 21 码改名（2026-09-14）
 
 `Native/EnemyModule.cs` 的 `Heal` 与 `Receivers/EnemyHealthCommit.cs` 的 `Execute` 全部 21 个拒绝码改成 `CombatContracts.cs` 已提交的 kebab-case 形式（如 `gtfo.enemy.overheal_unsupported` → `overheal-unsupported`），删除 `heal-no-state-change`；最终聚合按"有无 committed 行"重写而不是按 `unknown==0`/`facts.Count==0`：≥1 行 committed 且存在 rejected/unknown 时报 Partial（commitState 视是否有 unknown 行取 unknown/confirmed，facts 可为空）；0 committed 只剩 rejected 时报 Rejected/None；0 committed 有 unknown 时报 Failed/Unknown。随动改了 `CommitCases.cs`（两个用例改名并重写为 `-is-partial-confirmed`/`-is-partial-unknown`）、`AuditScene.cs`、`verify_mutations.py`（三处 mutation 字符串同步改名，`exception-none` 改指向 `EnemyModule.cs` 新的第一个 catch 块）、`GameBindings/Program.cs`、`ReceiverProbe/Program.cs` 的对应码字符串断言。
@@ -87,7 +103,7 @@ R4（运行时枚举值端口，见下方阻塞项表）落地后，ReceiverProb
 | NativeEvidence | `dotnet $out/bin/NativeEvidence/release/NativeEvidence.dll $frozen $game $enemyDll ForgeEnemy/evidence/native-api-20403457.json "$out/native.json"` | PASS 544/544；检错 22/22 |
 | GameBindings `--bridge` | `dotnet $out/bin/GameBindings/release/GameBindings.dll --bridge E:\SteamLibrary\steamapps\common\GTFO` | PASS 74，BLOCKED 0 |
 
-NativeEvidence 先用 `Forge-MapEditor-QA` 的 interop 跑，结果 FAIL 538/544：只有 Modules-ASM、GameData-ASM、SNet_ASM 三个文件的哈希与 MVID 共 6 项不符（该 profile 的 interop 于 2026-09-09 重新生成，与冻结输入不同）。随后改用只读的 `Temp` profile interop（`$frozen`，三个哈希与输入锁表一致）重跑，得到上表结果。GameAssembly.dll 哈希与输入锁一致。`--bridge` 由此前的 63 升到 74，本批只新增 4 个断言，其余差值来自两次记录之间的其他改动，未逐条归因。LifecycleFacts、ReceiverProbe、CommitAudit、NativePlugin 在 recorder 端口补 `unit: hp` 之后重建重跑；EntityObservation、BehaviorObservation、NativeLayout 不编译 `tests/Shared`，结果对应当前源码。
+NativeEvidence 先用 `Forge-MapEditor-QA` 的 interop 跑，结果 FAIL 538/544：只有 Modules-ASM、GameData-ASM、SNet_ASM 三个文件的哈希与 MVID 共 6 项不符（该 profile 的 interop 于 2026-09-09 重新生成，与冻结输入不同）。随后改用只读的 `Temp` profile interop（`$frozen`，三个哈希与输入锁表一致）重跑，得到上表结果。**同日晚些时候已把冻结输入本身统一到 `Forge-MapEditor-QA` 副本，这 6 项不符随之消失**，见 [NativeEvidence 冻结输入统一到 Forge-MapEditor-QA](#nativeevidence-冻结输入统一到-forge-mapeditor-qa2026-09-14)。GameAssembly.dll 哈希与输入锁一致。`--bridge` 由此前的 63 升到 74，本批只新增 4 个断言，其余差值来自两次记录之间的其他改动，未逐条归因。LifecycleFacts、ReceiverProbe、CommitAudit、NativePlugin 在 recorder 端口补 `unit: hp` 之后重建重跑；EntityObservation、BehaviorObservation、NativeLayout 不编译 `tests/Shared`，结果对应当前源码。
 
 源码哈希：`Native/EnemyModule.cs` `F09F0743…93AFC1`，`tests/Shared/LocalPlan.cs` `7B9537A6…932273`，GameBindings `Program.cs` `2AFF9CE4…7442CB`；SDK `FE629515…555F5B`。
 
@@ -207,9 +223,9 @@ D-004 之前记录的事件套件 52/52 包含原生 Hook 适配器（作为托�
 | 输入 | SHA-256 |
 | --- | --- |
 | GameAssembly.dll | `C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55` |
-| interop/Modules-ASM.dll | `A31AF38FAC3F96F1130CF7CDFCD10AE436E0D553EDA7163B9A9FF82392907943` |
-| interop/GameData-ASM.dll | `3A74E6656CDA3A563290BBE71B70578E1E8D0745A5ECDDD05C894934A7A8CC7B` |
-| interop/SNet_ASM.dll | `99175A1EF40454C1C8DD45D86D9EB9D3DF4D24891FB26ED649835BA25E7360B2` |
+| interop/Modules-ASM.dll | `E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63` |
+| interop/GameData-ASM.dll | `DEE523620186887A95A8E940FF1DDB0CDB94E395840F12C823CC26AE4F5E7106` |
+| interop/SNet_ASM.dll | `6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C` |
 | GTFO_Data/resources.assets | `5833891d4f9d04c8ddb103e2f7feca5c67ed7ec70a7618374fa3cc51640aae5f` |
 | GTFO_Data/sharedassets43.assets | `d2b5db1128577bdd48f68c61002106fdc60d100ad8b5e542f7748cd7d5db866e` |
 | GTFO_Data/globalgamemanagers | `7825069c90c34fbb49e9e742197d4a6ef2abee09cd60b8193e2a3304c1ff6337` |
@@ -219,7 +235,7 @@ D-004 之前记录的事件套件 52/52 包含原生 Hook 适配器（作为托�
 
 ## 复跑
 
-先按 [README 的构建入口](README.md#复跑) 得到 `$hostDll`、`$sdkDll` 与 `$enemyDll`（`bin/ForgeEnemy.Native/release/ForgeEnemy.Native.dll`），然后从仓库根运行，输出目录必须隔离。Enemy 套件不再读网站夹具，计划都从内核注册表本地构造。每个 `dotnet build` 都带 `--artifacts-path $out "-p:ForgeFrameworkAssembly=$sdkDll"`；NativeEvidence 与 NativeLayout 还要 `"-p:GTFOBepInExPath=$bepinex"`。
+先按 [README 的构建入口](README.md#复跑) 得到 `$hostDll`、`$sdkDll` 与 `$enemyDll`（`bin/ForgeEnemy.Native/release/ForgeEnemy.Native.dll`），然后从仓库根运行，输出目录必须隔离。Enemy 套件不再读网站夹具，计划都从内核注册表本地构造。`$bepinex` 是只读的 `Forge-MapEditor-QA` profile 的 `BepInEx` 目录（与冻结输入同一份 interop）。每个 `dotnet build` 都带 `--artifacts-path $out "-p:ForgeFrameworkAssembly=$sdkDll"`；NativeEvidence 与 NativeLayout 还要 `"-p:GTFOBepInExPath=$bepinex"`。
 
 ```powershell
 # 生成物位于 $out/bin/<工程名>/release/<工程名>.dll
