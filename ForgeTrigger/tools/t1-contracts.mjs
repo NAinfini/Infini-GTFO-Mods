@@ -25,13 +25,12 @@ const suite = read(path.join(root, 'tests/fixtures/t1/cases.json'));
 const manifest = read(path.join(output, 'sdk-manifest.json'));
 check(manifest.runtime.gameBuild === 'synthetic-no-game', 'manifest is explicitly synthetic');
 const registry = new ForgeRegistry(manifest.registry);
-const grant = ['test.permission.record'];
 const options = id => ({planId: 't1-' + id, resource: {id: 'test.resource', revision: 't1'},
-    limits: {maxEventsPerTick: 16, maxCommandsPerTick: 16, maxQueuedEvents: 32, maxCausalDepth: 8}, grantedPermissions: grant});
+    limits: {maxEventsPerTick: 16, maxCommandsPerTick: 16, maxQueuedEvents: 32, maxCausalDepth: 8}});
 const wires = [];
 for (const row of suite.validGraphs) {
     const compiled = compileForgeRuntimePlan(row.graph, manifest, options(row.id));
-    const roundtrip = validateForgeRuntimePlan(compiled.plan, manifest, grant);
+    const roundtrip = validateForgeRuntimePlan(compiled.plan, manifest);
     check(compiled.semanticJson === roundtrip.semanticJson, 'graph/plan roundtrip: ' + row.id);
     const reordered = structuredClone(row.graph); reordered.nodes.reverse(); reordered.edges.reverse();
     check(compileForgeRuntimePlan(reordered, manifest, options(row.id)).semanticJson === compiled.semanticJson,
@@ -56,8 +55,8 @@ function mutate(input, changes) {
     return value;
 }
 for (const row of suite.invalidPlans) {
-    const plan = mutate(wires[0].plan, row.changes), grants = row.grants ?? grant;
-    rejects(() => validateForgeRuntimePlan(plan, manifest, grants), row.error, 'wire: ' + row.id);
+    const plan = mutate(wires[0].plan, row.changes);
+    rejects(() => validateForgeRuntimePlan(plan, manifest), row.error, 'wire: ' + row.id);
     wires.push({id: row.id, accepted: false, plan, code: row.code});
 }
 for (const name of ['branch', 'add']) {
@@ -71,7 +70,7 @@ for (const name of ['branch', 'add']) {
     const pin = id => plan.bindings.findIndex(row => row.bindingId === id);
     plan.entrypoints[0].binding = pin('test.trigger.binding.event');
     plan.entrypoints[0].steps[0].binding = pin(binding.id);
-    rejects(() => validateForgeRuntimePlan(plan, manifest, grant), 'Unsupported runtime node kind', 'wire cannot disguise ' + name + ' as action');
+    rejects(() => validateForgeRuntimePlan(plan, manifest), 'Unsupported runtime node kind', 'wire cannot disguise ' + name + ' as action');
     wires.push({id: 'disguised-' + name, accepted: false, plan, code: 'node-kind'});
 }
 const renamed = structuredClone(manifest);
@@ -156,7 +155,7 @@ const report = {kind:'generated-non-executable-source-audit', schemaVersion:1, s
 write('node-audit.json', report);
 const provenanceOnly = structuredClone(wires[0].plan);
 provenanceOnly.resource.revision = 'unresolved-resource-revision';
-check(validateForgeRuntimePlan(provenanceOnly, manifest, grant).kind === 'compiled-runtime-plan', 'plan resource revision is provenance, not resource-catalog validation');
+check(validateForgeRuntimePlan(provenanceOnly, manifest).kind === 'compiled-runtime-plan', 'plan resource revision is provenance, not resource-catalog validation');
 wires.push({id:'resource-revision-provenance-only', accepted:true, plan:provenanceOnly});
 write('wire-cases.json', {schemaVersion:1,evidence:'synthetic-no-game', cases:wires});
 write('typescript-result.json', {assertions,status:'passed',gameVerified:false,graphNegativeCases:suite.invalidGraphs.length,sharedWireCases:wires.length});

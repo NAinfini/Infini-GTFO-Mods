@@ -160,11 +160,11 @@ const graph = {schemaVersion:1,domain:'logic',authority:'host',entrypoints:['Sta
     edges:[{from:{node:'Start',port:'out'},to:{node:'Action',port:'in'}},
         {from:{node:'Start',port:'target'},to:{node:'Action',port:'target'}}]};
 const options = {planId:'graph-port-expansion',resource:{id:'test.resource',revision:'1'},
-    limits:{maxEventsPerTick:16,maxCommandsPerTick:16,maxQueuedEvents:32,maxCausalDepth:8},grantedPermissions:[]};
+    limits:{maxEventsPerTick:16,maxCommandsPerTick:16,maxQueuedEvents:32,maxCausalDepth:8}};
 const fixedPlan = compileForgeRuntimePlan(graph,fixedManifest,options).plan;
-validateForgeRuntimePlan(fixedPlan,fixedManifest,[]);
+validateForgeRuntimePlan(fixedPlan,fixedManifest);
 const variablePlan = compileForgeRuntimePlan(graph,variableManifest,options).plan;
-validateForgeRuntimePlan(variablePlan,variableManifest,[]);
+validateForgeRuntimePlan(variablePlan,variableManifest);
 // output_count 3 inserts value_3 after the declared base block, before the result output.
 const outputTypes = plan => plan.entrypoints[0].steps[0].layout.outputs.map(slot => slot.type);
 assert.deepEqual(outputTypes(fixedPlan), [3, 3, 11]);
@@ -172,8 +172,8 @@ assert.deepEqual(outputTypes(variablePlan), [3, 3, 3, 11]);
 assert.deepEqual(resolveGraphContract(variableSeed.capabilities[1].graph, {output_count:3}).outputs.map(p => p.id),
     ['value_1', 'value_2', 'value_3', 'result']);
 // A layout written for the other contract never passes: the loader re-derives it.
-assert.throws(()=>validateForgeRuntimePlan(fixedPlan,variableManifest,[]),/differs from its locked graph compilation/);
-assert.throws(()=>validateForgeRuntimePlan(variablePlan,fixedManifest,[]),/differs from its locked graph compilation/);
+assert.throws(()=>validateForgeRuntimePlan(fixedPlan,variableManifest),/differs from its locked graph compilation/);
+assert.throws(()=>validateForgeRuntimePlan(variablePlan,fixedManifest),/differs from its locked graph compilation/);
 const sourceFiles = fs.readdirSync(path.join(site,'site/forge')).filter(f=>f.endsWith('.ts'))
     .map(f=>path.join('site/forge',f)).concat(['Tools/register-typescript.ts']);
 const hashes = Object.fromEntries(sourceFiles.map(f=>[f,
