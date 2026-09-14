@@ -14,14 +14,16 @@ E1 的源码与程序集切换完成，R3 实体观察在共享 SDK 中实际接
 
 D-004（Heal 多目标、伤害与生命周期事实形状）之后，前四行在 2026-09-13 于 HEAD `d09d6bb` 加未提交的 D-004 改动上重跑（隔离构建，Native 与宿主 0 警告 0 错误）；测试计划已改为本地构造，阻塞项见[阻塞项与解除条件](#阻塞项与解除条件)。其余行未受 D-004 测试迁移影响，同一次重跑结果与表中一致。
 
+R4（运行时枚举值端口，见下方阻塞项表）落地后，ReceiverProbe 与 CommitAudit 在 `feat/enum-value-ports` 于 HEAD `96d8756` 加未提交改动上重跑（隔离构建，0 警告 0 错误），下表两行已更新为新结果；其余行不受影响，未重跑。
+
 | 套件 | 结果 | 口径 |
 | --- | --- | --- |
 | 生命周期事实（LifecycleFacts） | 50/52，BLOCKED 2；变体 7/7 | 死亡流程与肢体破坏；含原生 Hook 适配器；事实→Heal 联调阻塞（J-003） |
-| 接收器（ReceiverProbe） | 36/44，BLOCKED 8；变体 6/8，BLOCKED 2 | 唯一现行接收器；伤害用例阻塞（R4），Heal 内核用例阻塞（J-003） |
+| 接收器（ReceiverProbe） | 43/44，BLOCKED 1；变体 8/8 | 唯一现行接收器；伤害用例已随 R4 恢复执行，仅 Heal 内核用例仍阻塞（J-003） |
 | 实体观察（EntityObservation） | 66/66 | 通过实际共享 SDK |
 | 行为观察（BehaviorObservation） | 22/22 | AI、移动状态、技能的只读观察 |
 | 插件生命周期（NativePlugin） | 24/24 | 跨线程、卸载、失败清理；计划为 death_started → 记录 |
-| 提交路径审计（CommitAudit） | 62/68，BLOCKED 6 | 现行路径 32（伤害 6 项阻塞，R4）+ 迁移边界 20；20 个是同一批治疗用例在两条路径上各跑一次，不算独立机制 |
+| 提交路径审计（CommitAudit） | 68/68，BLOCKED 0 | 现行路径 32（伤害 6 项已随 R4 恢复执行）+ 迁移边界 20；20 个是同一批治疗用例在两条路径上各跑一次，不算独立机制 |
 | cutover 布局（NativeLayout） | 38/38 | Enemy 五 Hook、Runtime 四 Hook |
 | 原生静态审计（NativeEvidence） | 544/544；工具检错 22/22 | 127 个签名 + 7 个枚举常量 + Forge IL 用法 + 数据指针；读元数据与 PE 指令，不加载也不调用游戏方法 |
 | 出生空间要求（SpawnRequirements） | 48/48 | 离线数据合同 + Map 替身求解器 + 内容依赖 |
@@ -38,8 +40,9 @@ Enemy 套件的计划全部由 `tests/Shared/LocalPlan.cs` 从内核注册表本
 | 阻塞原因 | 用例 | 解除条件 |
 | --- | --- | --- |
 | J-003：没有合法的 Heal 计划 | LifecycleFacts `integration.real-heal-death_started`、`integration.real-heal-limb_broken`；ReceiverProbe `commit.kernel-unknown-no-retry`；GameBindings `bridge.configured-heal-plan-commits-5hp` | D-004 后 Heal 的 `targets` 是多值实体输入，事件实体是单值输出，另有必填 `amount` 与 `overheal_policy`。要等 J-003（字面量输入、单值接多值，FORGE-FRAMEWORK §8.2 D-006 ①②）在 SDK 落地。之后 Enemy 用例用 `LocalPlan` 构造事实→Heal 计划并恢复 +5 HP 断言；GameBindings bridge 改回读取网站按 J-002 导出重新生成的 `native-heal.plan.json`。 |
-| R4：运行时枚举值端口未开放 | ReceiverProbe 的 7 个伤害用例（`E3-003.duplicate-damage-observation`、`damage.two-hits-same-tick`、`damage.zero-window-consumed`、`damage.rejected-window-consumed`、`identity.late-damage-after-respawn`、`damage.token-owner`、`damage.replaced-component`）；CommitAudit 6 个 `existing-path.damage.*` | `damage_applied` 的 `damage_kind` 输出是枚举，加载器以 `unsupported-event-port` 拒绝任何订阅它的计划。`LocalPlan.Load` 只把这一种拒绝转成阻塞，其余拒绝照常失败；SDK 开放枚举事件端口后这些用例自动恢复执行，ReceiverProbe 的 `observation-replay`、`late-damage-retargeted` 两个变体也随之恢复检出。 |
 | J-002/J-003：网站夹具早于注册表 | GameBindings `fixtures.valid-plan-heal-dispatch`、`fixtures.invalid-plan-rejections` | `--fixtures` 先把网站有效计划的 capability/provider 版本与注册表逐项比对，不一致就整组阻塞（无效计划都是有效计划的单字段变体，版本不符会让它们因错误的原因被拒）。模组导出 J-002 清单、网站据此重生成夹具且 J-003 让 Heal 计划合法后，比对一致即自动恢复执行。 |
+
+R4（运行时枚举值端口）已随本次改动解除：`damage_applied` 的 `damage_kind` 输出不再以 `unsupported-event-port` 拒绝订阅，`LocalPlan.Load` 也已移除把这一种拒绝转成阻塞的特判。原先列在此处的 ReceiverProbe 7 个伤害用例、CommitAudit 6 个 `existing-path.damage.*`、以及 ReceiverProbe 的 `observation-replay`/`late-damage-retargeted` 两个变体均已恢复执行并通过，见上表。
 
 ## E2 批次
 

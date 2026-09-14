@@ -84,7 +84,9 @@ SDK 合同与注册探针 76 项、Enemy 消费方 66 项、Trigger 的 R3 消�
 
 ## 提升参数（layout.promoted）
 
-网站工作树的编译器开始为每个 layout 写出 `promoted`：严格递增的参数声明下标，被提升的参数在 `constants` 中必须为 null。加载器据此把这些 value 参数移出参数表，按声明顺序作为输入追加在展开后的输入之后（类型沿用参数；recipient-policy 变为 schema `forge.policy.recipient` 的 policy；枚举带 set；单位照抄；非必填即 optional），再与文件 layout 逐项比对。只有 role 为 value 的参数可以提升。enum 参数可以提升成端口形状，但运行期没有 enum 值端口，加载时以 `unsupported-input-port` 拒绝；含 recipient-policy 参数的能力仍以 `unsupported-parameter` 拒绝。这两处 policy 与 enum 端口映射目前只用于与网站的合同推导保持一致，与网站同批放开。
+网站工作树的编译器开始为每个 layout 写出 `promoted`：严格递增的参数声明下标，被提升的参数在 `constants` 中必须为 null。加载器据此把这些 value 参数移出参数表，按声明顺序作为输入追加在展开后的输入之后（类型沿用参数；recipient-policy 变为 schema `forge.policy.recipient` 的 policy；枚举带 set；单位照抄；非必填即 optional），再与文件 layout 逐项比对。只有 role 为 value 的参数可以提升。
+
+R4/Q3：枚举值端口已放开。运行期把 enum 端口/字面量/提升输入的 wire 值一律当作集合内的成员下标——事件槽和提升输入按端口 schema 对应的完整具名集合算下标，结构参数的字面量常量若带 inline `values` 则按该列表算，否则按所属 set 算；计划里任何位置都不能出现成员名字符串，出现即以 `invalid-enum` 拒绝（越界、非整数、字符串同一处理）。dispatch 时按索引重新校验提升值的边界与成员，通过后才在 handler 边界把索引换回成员名字符串，交给 handler 的 `CommandContext.Parameters`/`Inputs` 与改动前一样是名字，无需改动现有 handler。含 recipient-policy 参数的能力仍以 `unsupported-parameter` 拒绝，这一处与 enum 无关，未随本次改动变化。
 
 handler 不感知提升：dispatch 把事件送来的值并回 Parameters，再按注册合同重新校验边界与成员，**越界直接拒绝，不钳制**，handler 不被调用。输入仍只能来自触发事件槽位。
 
@@ -121,6 +123,22 @@ public bool IsEntityCurrent(EntityReference reference);                         
 隔离 `--artifacts-path` 构建，0 警告 0 错误：
 
 | 套件 | 退出码 | 输出结尾 |
+
+## R4：运行时枚举值端口（本批）
+
+Q3 落地：enum 的运行期/wire 值是集合内的成员下标，而不是成员名。事件槽、字面量常量、提升输入三处一起放开；下标基准——结构参数带 inline `values` 时按该列表算，否则（含提升输入、事件/输入端口）按端口或参数指向的完整具名集合算。计划里任何位置出现成员名字符串一律 `invalid-enum` 拒绝，越界与非整数同一处理。handler 边界不变：dispatch 校验通过后，`CommandContext.Parameters`/`Inputs` 里的 enum 字段在调用 handler 前从下标换回成员名字符串，现有 handler（如 `EnemyModule.Heal` 读 `overheal_policy`）不用改。`ForgeEnemy/Native/EnemyModule.cs` 的 `damage_applied` 事实同步把 `damage_kind` 声明为可空下标（`int?`），仍然只在能判定时才发布非空值。
+
+隔离 `--artifacts-path` 构建，0 警告 0 错误：
+
+| 套件 | 结果 |
+| --- | --- |
+| Framework | 275（新增 enum 事件槽/字面量/提升输入的合法用例，越界、非整数、字符串三类拒绝用例，以及 handler 边界换名断言） |
+| GraphContracts | verify.py 1770 项通过，0 失败；`EnumSetTable` 与网站 `contracts.ts` 的 22 个集合逐项一致，未发现漂移 |
+| GameBindings | 默认 31；`--native` 51 |
+| 宿主 | Architecture 36；HostIntegration 默认 61（含 `--host`）；PluginStartup 39；HostConfiguration 90 |
+| Enemy | NativePlugin 24/24；EntityObservation 66/66；LifecycleFacts 50/52，BLOCKED 2（J-003，与 enum 无关）；**ReceiverProbe 43/44，BLOCKED 1（此前 36/44 BLOCKED 8，7 个伤害用例随 R4 恢复执行，仅剩 J-003 一项）**；**CommitAudit 68/68，BLOCKED 0（此前 62/68 BLOCKED 6，6 个伤害用例随 R4 恢复执行）**；ReceiverProbe 变体 8/8（`observation-replay`、`late-damage-retargeted` 随 R4 恢复检出）；LifecycleFacts 变体 7/7 |
+
+`Framework --fixtures` 与 `LifecycleWork --fixtures` 仍然崩溃，但栈顶已经从 `DamageObserved.damage_kind`（R4 未开放时）变成 `HealExplicitRecipient.targets`——即本次改动已经让这两个夹具测试越过枚举端口这一关，卡在的是另一个已知且无关的缺口：网站 `Tests/Forge/fixtures/runtime` 里的合法计划仍按 D-004 之前的 Heal 单值 `targets` 形状编写，与当前需要多值输入的 Heal 合同不符（J-003，由另一工作树的 heal 合并处理，不在本批范围）。两处均用 `git stash` 在改动前的 HEAD 上重新构建验证过：改动前后这两个夹具用例都是同样的 "0 assertions passed"/未捕获异常收场，只是失败原因从 damage_kind 换成了 targets，本次改动没有引入新的回归，也没有为字符串枚举常量添加任何兼容层。
 | --- | --- | --- |
 | Framework | 0 | `Framework checks: 255 passed.` |
 | EntityObservation | 0 | `Entity contracts: 118 passed; 0 failed. No native APIs exercised.` |
