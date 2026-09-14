@@ -16,6 +16,9 @@ namespace ForgeRuntime.Framework;
 internal static class RuntimeGraphContracts
 {
     internal const int MaximumVariadicPorts = 32;
+    /// <summary>Mirrors site/forge/graph-schema.ts DOMAIN_REASON_CODE_MAX_LENGTH / DOMAIN_REASON_CODE_PATTERN.</summary>
+    internal const int DomainReasonCodeMaxLength = 64;
+    private static readonly Regex DomainReasonCodePattern = new(@"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$", RegexOptions.CultureInvariant);
     internal static readonly string[] PortTypes = { "execution", "boolean", "integer", "number", "string", "enum",
         "vector3", "entity", "resource", "handle", "event", "result", "policy" };
     internal static readonly string[] Cardinalities = { "one", "many" };
@@ -74,7 +77,7 @@ internal static class RuntimeGraphContracts
 
     internal static void ValidatePort(JsonElement port, string id)
     {
-        RuntimeJson.Shape(port, "id type", "cardinality schema resourceKind handleKind lifetime unit nullable optional");
+        RuntimeJson.Shape(port, "id type", "cardinality schema resourceKind handleKind lifetime unit nullable optional codes");
         RuntimeJson.Require(IsName(RuntimeJson.Text(port, "id")), "port-name", id);
         var type = RuntimeJson.Text(port, "type");
         RuntimeJson.Require(PortTypes.Contains(type), "port-type", id);
@@ -97,6 +100,14 @@ internal static class RuntimeGraphContracts
             RuntimeJson.Require(!port.TryGetProperty("unit", out _) && schema == null && !RuntimeJson.Flag(port, "nullable")
                 && !port.TryGetProperty("cardinality", out _), "execution-port", id);
         if (port.TryGetProperty("unit", out _)) RuntimeJson.Require(type is "number" or "integer" or "vector3", "port-unit", id);
+        if (port.TryGetProperty("codes", out var codes))
+        {
+            RuntimeJson.Require(type == "result", "port-codes", id);
+            RuntimeJson.Require(codes.ValueKind == JsonValueKind.Array && codes.GetArrayLength() <= 2048, "port-codes", id);
+            var items = codes.EnumerateArray().Select(c => c.ValueKind == JsonValueKind.String ? c.GetString() : null).ToArray();
+            RuntimeJson.Require(items.All(c => c != null && c.Length <= DomainReasonCodeMaxLength && DomainReasonCodePattern.IsMatch(c)), "port-codes", id);
+            RuntimeJson.Require(items.Distinct(StringComparer.Ordinal).Count() == items.Length, "port-codes", id);
+        }
     }
 
     /// <summary>Forge Standard v0.2 metadata plus the capability-kind rules every registry applies.</summary>

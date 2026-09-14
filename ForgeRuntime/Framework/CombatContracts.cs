@@ -127,7 +127,30 @@ public static class CombatContracts
               {
                 "id": "result",
                 "type": "result",
-                "schema": "forge.result.combat.heal"
+                "schema": "forge.result.combat.heal",
+                "codes": [
+                  "overheal-unsupported",
+                  "amount-out-of-range",
+                  "invalid-cap",
+                  "too-many-targets",
+                  "authority-or-phase",
+                  "not-attempted-after-unknown-commit",
+                  "stale-or-unsupported-recipient",
+                  "missing-health-receiver",
+                  "health-receiver-owner-mismatch",
+                  "not-alive",
+                  "invalid-health-state",
+                  "would-overheal",
+                  "quantization-failed",
+                  "state-changed-before-commit",
+                  "preflight-exception",
+                  "receiver-changed-during-commit",
+                  "unexpected-health-readback",
+                  "native-commit-exception",
+                  "readback-exception",
+                  "heal-all-rejected",
+                  "heal-all-unknown"
+                ]
               }
             ],
             "parameters": [
