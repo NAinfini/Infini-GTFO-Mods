@@ -18,15 +18,15 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 ### 宿主启动与配置
 
-宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`、`Framework.PlanPath`、`Framework.AllowedPermissions`、`Logging.Level`。原键名、命名与数字模式值和现有默认值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
+宿主配置由 `RuntimeSettings.cs` 拥有：`Runtime.Mode`、`Logging.Level`。原键名、命名与数字模式值和现有默认值都保留。模式按原始文本显式解析——真实的 `ConfigFile` 枚举绑定器曾被观察到对非法文本静默选中 `Authoring` 或组合枚举值，因此非法或空模式现在在原生初始化之前就失败，不会拿到一个"启用"的默认值。
 
-`Off` 只绑定宿主键，不启动任何组件或 Hook。`Play` 与 `Authoring` 启动同一个宿主：4 个世界/会话/检查点 Hook（`harmony.PatchAll` 只扫描宿主程序集）与 `FrameworkMonitor`。**宿主不含任何诊断、报告或性能采集**；两种模式唯一的区别是可选的 [ForgeDevelopment](../ForgeDevelopment/README.md) 插件只在 `Authoring` 下启动。模式、计划路径与权限的变更需要重启进程，不支持热卸载。
+`Off` 只绑定宿主键，不启动任何组件或 Hook，也不扫描计划。`Play` 与 `Authoring` 启动同一个宿主：4 个世界/会话/检查点 Hook（`harmony.PatchAll` 只扫描宿主程序集）与 `FrameworkMonitor`。**宿主不含任何诊断、报告或性能采集**；两种模式唯一的区别是可选的 [ForgeDevelopment](../ForgeDevelopment/README.md) 插件只在 `Authoring` 下启动。模式变更需要重启进程，不支持热卸载。
 
 `Plugin.ConfiguredMode` 是冻结的启动选择，公开在宿主程序集里，**不是权限、不是就绪状态、不是主机权威**。`Plugin.Runtime` 只在 Load 成功后提供；失败或 Off 状态下为 null，同一实例不重试 Load。依赖 Runtime 的插件在自己的 Load 中、Runtime 首个 FixedUpdate 之前注册。
 
 启动失败时先关闭玩法入口再清理：宿主停止 → unpatch → 销毁 FrameworkMonitor。每个已获取的阶段都会被尝试清理，即使其中一步或错误上报失败也继续执行后面的步骤，最后重新抛出原始启动异常。清理与上报的失败保留在 `Data["ForgeRuntime.StartupCleanupFailures"]` 的 AggregateException 里（字典不可写时不能替换原始异常）。这是对已获取阶段的尽力清理，不是任意原生副作用的回滚保证。
 
-`[Framework] PlanPath` 和 `AllowedPermissions` 默认均为空，因此不会自动启用任何行为。开发者显式选择 BepInEx 内的相对路径离线计划（最大 4 MiB）和权限；首个固定更新在其他插件注册完成后验证加载，版本、模块、路径或权限不符即失败，本次进程不反复读取重试。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
+**计划发现（I-PACK D-009）不再走单一配置路径。** `Play`/`Authoring` 下，首个固定更新在其他插件注册完成后，按包目录扫描离线计划：只看 `BepInEx/plugins` 的一级子目录，每个子目录下若存在 `forge/plans`（不存在则静默跳过，不算错误），取其中直接子文件、按 ordinal 精确匹配 `.plan.json` 后缀的文件（不递归、不识别其他扩展名）；发现顺序按 `/` 分隔的 BepInEx 相对路径以 `StringComparer.Ordinal` 排序。单文件上限 4 MiB，合并上限 256 个文件且 64 MiB，超出部分按排序尾部依次拒绝；链接/联接检查只在确认 `forge/plans` 存在后，沿 `<目录>→forge→plans` 链与文件本身进行。每个文件独立产生一条 `plan.loaded`/`plan.rejected`（带 `path`，前者还带 `permissions`）；同一 planId 出现在多个文件中全部按 `plan-conflict` 拒绝；解析后的计划总数上限仍是 128（`plan-budget`）。本次进程只扫描一次，不支持热重载。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
 
 ### 执行日志（D-007 阶段 B）
 
@@ -64,10 +64,6 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 ```ini
 [Runtime]
 Mode = Authoring
-
-[Framework]
-PlanPath =
-AllowedPermissions =
 
 [Logging]
 Level = error
