@@ -9,7 +9,7 @@ internal static class WeaponNativeHooks
 {
     internal static IReadOnlyList<Type> Types { get; } = Array.AsReadOnly(new[]
     {
-        typeof(BackpackItemStored), typeof(BackpackSlotCleared), typeof(BackpackInstancesDestroyed),
+        typeof(BackpackItemStored), typeof(BackpackSlotCleared), typeof(BackpackInstancesDestroyed), typeof(BackpackItemDeployed),
         typeof(LocalItemWielded), typeof(LocalItemUnwielded), typeof(SyncedItemEquipped), typeof(SyncedItemUnwielded)
     });
 }
@@ -36,6 +36,16 @@ internal static class BackpackSlotCleared
 
 [HarmonyPatch(typeof(PlayerBackpack), nameof(PlayerBackpack.DestroyAllInstance))]
 internal static class BackpackInstancesDestroyed
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(PlayerBackpack __instance)
+        => WeaponNativeSession.Current?.Guard(adapter => adapter.Reconcile(__instance));
+}
+
+// Deployables stay in their backpack slot: the sentry or barrier marks the slot deployed instead of leaving the
+// backpack, and the pickup clears the same marker. This hook only chooses when to read that marker back.
+[HarmonyPatch(typeof(PlayerBackpack), nameof(PlayerBackpack.SetDeployed))]
+internal static class BackpackItemDeployed
 {
     [HarmonyPostfix, HarmonyPriority(Priority.Last)]
     private static void Postfix(PlayerBackpack __instance)

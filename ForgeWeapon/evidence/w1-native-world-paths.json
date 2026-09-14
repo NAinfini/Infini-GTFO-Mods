@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameExecuted": false,
+  "gameBuild": "20403457",
+  "dump": {
+    "name": "gtfo-inspection/dumper/dump.cs",
+    "sha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+    "sameDumpAs": "w1-native-hooks.json"
+  },
+  "method": [
+    "Read-only Mono.Cecil metadata over the local BepInEx interop assemblies; no assembly is loaded, no game process is started.",
+    "RVA uniqueness is the count of dump.cs method entries declaring that exact RVA; every rva below was checked to be exactly 1 unless rvaSharing says otherwise.",
+    "Direct call edges are decoded from method bodies with Iced x64; a caller body is bounded by the next dump.cs RVA and never exceeds 0x4000 bytes, so an edge listed here is a literal rel32 call at that site.",
+    "Indirect (vtable/register) dispatch is NOT decoded, so a method with no listed callers may still run through a delegate or a virtual override."
+  ],
+  "interop": {
+    "used": {
+      "directory": "r2modmanPlus-local/GTFO/profiles/Forge-MapEditor-QA/BepInEx/interop",
+      "assemblies": [
+        { "name": "Modules-ASM.dll", "length": 16777728, "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
+        { "name": "GameData-ASM.dll", "length": 2649600, "sha256": "DEE523620186887A95A8E940FF1DDB0CDB94E395840F12C823CC26AE4F5E7106" },
+        { "name": "SNet_ASM.dll", "length": 760320, "sha256": "6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C" }
+      ]
+    },
+    "frozenEvidenceLock": {
+      "directory": "r2modmanPlus-local/GTFO/profiles/Temp/BepInEx/interop",
+      "modulesAsmSha256": "A31AF38FAC3F96F1130CF7CDFCD10AE436E0D553EDA7163B9A9FF82392907943",
+      "modulesAsmMvid": "2875668a-4ea7-42ad-b126-73590ea1c926",
+      "note": "w1-native-hooks.json and w1-native-contract.json keep the byte identity of this copy; NativeEvidence must be pointed at it. The two copies differ only in assembly identity (MVID and therefore file hash): a Cecil fingerprint over every type, field, property and method signature is identical, rows=170126 fingerprint=7E7665E8C4902317F8FF8A48644FAD45736B9802A902027B83CE3AE91C9D8C8B for Modules-ASM.dll, rows=32818 1870F20AFBB7AA7F49BA5762ECE456AFC41DA30E0FB4A50E2A398F9E8B1CDCB6 for GameData-ASM.dll and rows=6869 83B16D5D060B1F8C76EEA4B5F3ECE3C261FDEA4509EBC7A521228460D5CD3F83 for SNet_ASM.dll. The QA profile copy was regenerated on 2026-09-09, the Temp copy dates from 2026-06-07, both describe the same game build."
+    }
+  },
+  "paths": [
+    {
+      "id": "deployable-slot-marker",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpack",
+      "member": "SetDeployed",
+      "signature": "System.Void Player.PlayerBackpack::SetDeployed(Player.InventorySlot,System.Boolean)",
+      "rva": "0x1760BB0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "isStatic": false,
+      "side": "local placement and synced placement/pickup",
+      "identity": "The deployed marker is per backpack slot, so it identifies an existing equipment life rather than a new one: the slot still holds the same BackpackItem, and the hook re-reads that slot through the already verified PlayerBackpack.Slots item pointer.",
+      "owner": "The backpack belongs to one player; the owner still comes from the verified SDK ResolveEntityInstance(\"gtfo.player\") lookup, not from this hook.",
+      "directCallers": [
+        { "rva": "0x14115E0", "signature": "System.Void SentryGunFirstPerson::PlaceOnGround()", "meaning": "local sentry placement after the spawn request" },
+        { "rva": "0x14184B0", "signature": "System.Void SentryGunInstance::OnSpawn(pGearSpawnData)", "meaning": "synced sentry spawn; its body also calls PlayerBackpackManager.TryGetBackpack at 0x175BFC0 before this call, which shows the marker is written on the owner's backpack" },
+        { "rva": "0x141B2B0", "signature": "System.Void SentryGunInstance::SyncedPickup(Player.PlayerAgent)", "meaning": "sentry recalled back into the inventory" },
+        { "rva": "0x14AE1E0", "signature": "System.Void BarrierFirstPerson::PlaceOnGround()", "meaning": "local barrier placement" },
+        { "rva": "0x19B2DE0", "signature": "System.Void Player.PlayerBotActionDeploySentryGun::PlaceSentryGunOnGround()", "meaning": "bot sentry placement" }
+      ],
+      "decision": "wired",
+      "reason": "Postfix-only readback on an instance method with a single __instance parameter; the hook only re-reads slot state, so no game state is written and no history is invented. Record() already refuses to publish equipped/unequipped facts for a non-Inventory location, so a deploy or a recall produces an observation change and a log line, never a fabricated wield fact."
+    },
+    {
+      "id": "deployable-slot-query",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpack",
+      "member": "IsDeployed",
+      "signature": "System.Boolean Player.PlayerBackpack::IsDeployed(Player.InventorySlot)",
+      "rva": "0x1760390",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "isStatic": false,
+      "side": "query",
+      "identity": "Reads the same per-slot marker the deploy path writes; used as the strict readback source so a recorded location is re-validated against native state.",
+      "owner": "not applicable",
+      "directCallers": [
+        { "rva": "0x14115E0", "signature": "System.Void SentryGunFirstPerson::PlaceOnGround()", "meaning": "the placement site queries the same marker it later sets" }
+      ],
+      "decision": "wired",
+      "reason": "Added to the named pure-query whitelist of the native read-only check (NativeLayout queries and expectedReads) because it is a pure bool query with no out parameter and no write."
+    },
+    {
+      "id": "deployable-instance-spawn-and-pickup",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "member": "OnSpawn / SyncedPickup / OnDespawn",
+      "signature": "System.Void SentryGunInstance::OnSpawn(pGearSpawnData); System.Void SentryGunInstance::SyncedPickup(Player.PlayerAgent); System.Void SentryGunInstance::OnDespawn()",
+      "rva": "0x14184B0 / 0x141B2B0 / 0x1417A20",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "isStatic": false,
+      "side": "synced world instance",
+      "identity": "The world instance is a separate object with its own life; it never identifies the backpack life (the backpack slot keeps its item). Deployed world state is therefore recorded through the slot marker, not through this instance.",
+      "owner": "OnSpawn receives pGearSpawnData, not a player reference; the owner is only reachable through the backpack marker path.",
+      "directCallers": [{ "rva": "none", "signature": "no direct callers in the dump; virtual dispatch only" }],
+      "decision": "recorded-only",
+      "reason": "Virtual methods reached through the vtable cannot be pinned by a direct call edge, and the instance itself provides no owner and no resource definition, so hooking it would add an unverifiable event with no identity."
+    },
+    {
+      "id": "deployable-instance-mine",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "MineDeployerInstance",
+      "member": "OnSpawn / SyncedPickup",
+      "signature": "System.Void MineDeployerInstance::OnSpawn(pItemSpawnData); System.Void MineDeployerInstance::SyncedPickup(Player.PlayerAgent)",
+      "rva": "0x14FFEF0 / 0x1500600",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "isStatic": false,
+      "side": "synced world instance",
+      "identity": "Same limit as the sentry instance: a world object, not the backpack life. Type exists with base ItemEquippable; the mine is removed from its slot instead of being marked deployed.",
+      "owner": "no player reference on the spawn path",
+      "directCallers": [{ "rva": "none", "signature": "no direct callers in the dump; virtual dispatch only" }],
+      "decision": "recorded-only",
+      "reason": "The covered path for mines is the slot clear, which the existing BackpackSlotCleared hook already observes."
+    },
+    {
+      "id": "deployable-clear-local-slot",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpackManager",
+      "member": "ClearLocalSlot",
+      "signature": "System.Void Player.PlayerBackpackManager::ClearLocalSlot(Player.InventorySlot,System.Boolean,System.Boolean)",
+      "rva": "0x174DD70",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "isStatic": true,
+      "side": "local and synced removal",
+      "identity": "Identifies the slot that loses its item, which retires the existing equipment life through the already wired slot-clear hook.",
+      "owner": "the local backpack; the owner is resolved by the existing hook path",
+      "directCallers": [
+        { "rva": "0x14FCB20", "signature": "System.Void MineDeployerFirstPerson::OnStickyMineSpawned(ISyncedItem,Player.PlayerAgent)", "meaning": "a thrown mine leaves its slot instead of being marked deployed" },
+        { "rva": "0x14ADEC0", "signature": "System.Void BarrierFirstPerson::OnBarrierSpawned(ISyncedItem,Player.PlayerAgent)", "meaning": "a placed barrier starts on the clear path; its PlaceOnGround also sets the deployed marker at 0x14AE1E0" },
+        { "rva": "0x14F06A0", "signature": "System.Void MapperDroneFirstPerson::OnMapperDroneSpawned(ISyncedItem,Player.PlayerAgent)", "meaning": "mapper drone leaves its slot" },
+        { "rva": "0x12E2280", "signature": "System.Void LockMelterFirstPerson::Reset()", "meaning": "melter path" },
+        { "rva": "0x12E2760", "signature": "System.Void LockMelterFirstPerson::Update()", "meaning": "melter path" },
+        { "rva": "0x1401390", "signature": "System.Void ThrowingWeapon::Reset()", "meaning": "throwable path" },
+        { "rva": "0x1401EF0", "signature": "System.Void ThrowingWeapon::Update()", "meaning": "throwable path" },
+        { "rva": "0x14029F0", "signature": "System.Boolean SyringeFirstPerson/<ApplySyringe>d__18::MoveNext()", "meaning": "syringe consumption" },
+        { "rva": "0x13BF2D0", "signature": "System.Void Gear.ResourcePackFirstPerson::ApplyPack()", "meaning": "resource pack use" }
+      ],
+      "reaches": { "rva": "0x1761800", "signature": "System.Boolean Player.PlayerBackpack::TryClearSlot(Player.InventorySlot)", "status": "already hooked as BackpackSlotCleared" },
+      "decision": "covered-by-existing-hook",
+      "reason": "Direct edge into the hooked TryClearSlot; no second hook is added for the same slot removal."
+    },
+    {
+      "id": "deployable-throw-and-bot-trip-mine",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "ItemEquippable / Player.PlayerBotActionDeployTripMine",
+      "member": "Throw / PlaceTripMine",
+      "signature": "System.Void ItemEquippable::Throw(UnityEngine.Vector3); System.Void Player.PlayerBotActionDeployTripMine::PlaceTripMine()",
+      "rva": "0x1326FF0 / 0x19B4A10",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "isStatic": false,
+      "side": "local throw and bot placement",
+      "identity": "Both reach the same slot clear, so the equipment life is retired by the existing hook.",
+      "owner": "existing hook path",
+      "directCallers": [],
+      "reaches": { "rva": "0x1761800", "signature": "System.Boolean Player.PlayerBackpack::TryClearSlot(Player.InventorySlot)", "status": "already hooked as BackpackSlotCleared" },
+      "decision": "covered-by-existing-hook",
+      "reason": "Verified callee edges into the hooked slot clear; recorded here so the deployable survey is complete without adding redundant hooks."
+    },
+    {
+      "id": "level-item-placed-and-picked-up",
+      "group": "level-item",
+      "assembly": "Modules-ASM.dll",
+      "type": "LevelGeneration.ItemInLevel",
+      "member": "OnPlacedInLevel / OnPickedUp / OnDespawn",
+      "signature": "System.Void LevelGeneration.ItemInLevel::OnPlacedInLevel(LevelGeneration.pPickupPlacement,Player.PlayerAgent,ItemCuller); System.Void LevelGeneration.ItemInLevel::OnPickedUp(Player.PlayerAgent,Player.InventorySlot,Player.AmmoType); System.Void LevelGeneration.ItemInLevel::OnDespawn()",
+      "rva": "0x147B9A0 / 0x147B530 / 0x147B4D0",
+      "rvaSharing": 1,
+      "isVirtual": "OnPlacedInLevel and OnPickedUp are non-virtual; OnDespawn is virtual",
+      "isStatic": false,
+      "side": "world item, reached from the synced pickup components",
+      "identity": "A world item is a different life from a backpack item, and its resource definition is not recoverable: the payload carries pItemData/pItemData_Custom, whose itemID_gearCRC field is documented by the game as \"itemID or gearCRC\" and has no discriminator, and no world item table binds it to a gear definition. A recorded resource id would therefore be a guess.",
+      "owner": "OnPickedUp carries a PlayerAgent, but a placed item has no owner by construction; the world location has no ownership to report.",
+      "directCallers": [
+        { "rva": "0x13C1AD0", "signature": "System.Void Gear.ResourcePackPickup::OnSyncStateChange(LevelGeneration.ePickupItemStatus,LevelGeneration.pPickupPlacement,Player.PlayerAgent,System.Boolean)", "meaning": "reaches both OnPlacedInLevel and OnPickedUp" },
+        { "rva": "0x17CB380", "signature": "System.Void ConsumablePickup_Core::OnSyncStateChange(...)", "meaning": "reaches both OnPlacedInLevel and OnPickedUp" }
+      ],
+      "decision": "recorded-only",
+      "reason": "Hooking it would create an observation with a guessed resource definition; the equipment observation contract requires a resource reference that the world payload cannot supply."
+    },
+    {
+      "id": "level-pickup-components",
+      "group": "level-item",
+      "assembly": "Modules-ASM.dll",
+      "type": "Gear.ResourcePackPickup / ConsumablePickup_Core / CarryItemPickup_Core / GenericSmallPickupItem_Core",
+      "member": "OnSyncStateChange",
+      "signature": "System.Void <type>::OnSyncStateChange(LevelGeneration.ePickupItemStatus,LevelGeneration.pPickupPlacement,Player.PlayerAgent,System.Boolean)",
+      "rva": "0x13C1AD0 / 0x17CB380 / 0x153AA60 / 0x13B3DF0",
+      "rvaSharing": 1,
+      "isVirtual": "false for Gear.ResourcePackPickup, ConsumablePickup_Core and GenericSmallPickupItem_Core; true for CarryItemPickup_Core",
+      "isStatic": false,
+      "side": "synced pickup state change (SNet)",
+      "identity": "Status plus placement describe where a world item went; the item's own definition is still only reachable through pPickupPlacement/pItemData, with the same itemID_gearCRC ambiguity.",
+      "owner": "the player argument is the interacting player, but it is also present for drops and recalls, so it cannot be read as ownership.",
+      "directCallers": [
+        { "rva": "0x133A6D0", "signature": "System.Void Gear.HeavyFogRepellerPickup::OnSyncStateChange(LevelGeneration.ePickupItemStatus,LevelGeneration.pPickupPlacement,Player.PlayerAgent,System.Boolean)", "meaning": "the only direct caller of the CarryItemPickup_Core base implementation" },
+        { "rva": "none", "signature": "Gear.ResourcePackPickup, ConsumablePickup_Core and GenericSmallPickupItem_Core have no direct callers; they are invoked through the LG_PickupItem_Sync state machine delegate" }
+      ],
+      "decision": "recorded-only",
+      "reason": "Same resource-definition limit as ItemInLevel, plus these are the components that call into it, so hooking both would double-count one transition."
+    },
+    {
+      "id": "level-pickup-generation-and-sync",
+      "group": "level-item",
+      "assembly": "Modules-ASM.dll",
+      "type": "LevelGeneration.LG_PickupItem / LevelGeneration.LG_PickupItem_Sync",
+      "member": "SpawnGenericPickupItem and the SetupAs* family / OnStateChange and AttemptPickupInteraction",
+      "signature": "LevelGeneration.LG_PickupItem LevelGeneration.LG_PickupItem::SpawnGenericPickupItem(UnityEngine.Transform) [static, 0x1361340]; System.Void LevelGeneration.LG_PickupItem_Sync::OnStateChange(LevelGeneration.pPickupItemState,LevelGeneration.pPickupItemState,System.Boolean) [0x1361BF0]; System.Void LevelGeneration.LG_PickupItem_Sync::AttemptPickupInteraction(LevelGeneration.ePickupItemInteractionType,SNetwork.SNet_Player,Player.pItemData_Custom,UnityEngine.Vector3,UnityEngine.Quaternion,AIGraph.AIG_CourseNode,System.Boolean,System.Boolean) [0x1361920]",
+      "rva": "0x1361340 / 0x1361BF0 / 0x1361920",
+      "rvaSharing": 1,
+      "isVirtual": "LG_PickupItem.SpawnGenericPickupItem is static; LG_PickupItem_Sync.OnStateChange and AttemptPickupInteraction are virtual",
+      "isStatic": "mixed",
+      "side": "level generation (LG_PickupItem) and synced pickup state machine (LG_PickupItem_Sync)",
+      "identity": "The generation side carries an itemID or a consumable/commodity/artifact id plus a distribution block, which is the spawn recipe, not the identity of a live equipment instance; the sync side carries pItemData_Custom. Neither yields a GearIDRange for the spawned gear.",
+      "owner": "a spawned world item has no owner; the sync side's player argument is an interaction actor.",
+      "directCallers": [
+        { "rva": "0x150D4A0", "signature": "System.Void WO_ActivateSmallHSU::OnSpawnObjectiveItemsInLandingArea(out Transform[])", "meaning": "warden objective setup" },
+        { "rva": "0x15DE910", "signature": "LevelGeneration.CarryItemPickup_Core LevelGeneration.LG_HSUActivator_Core::SpawnPickupItemOnAlign(uint,Transform,bool,int)", "meaning": "objective setup" },
+        { "rva": "0x16746B0", "signature": "System.Void ElevatorCargoCage::SetupForWardenObjective(int)", "meaning": "objective setup" },
+        { "rva": "0x169C510", "signature": "System.Boolean WorldEventUtils::TrySpawnItemOnAlign(uint,Transform,uint,out ItemInLevel)", "meaning": "world event setup" },
+        { "rva": "none", "signature": "LG_PickupItem_Sync.OnStateChange and AttemptPickupInteraction have no direct callers; the SNet state replicator invokes them through delegates" }
+      ],
+      "decision": "recorded-only",
+      "reason": "The generation path runs before any equipment exists, and the sync state machine is reached only through a delegate, so neither can be pinned by a direct call edge or supply a resource definition."
+    },
+    {
+      "id": "world-drop",
+      "group": "world-drop",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpackManager",
+      "member": "DropItemFromBackpack / DropItemOnFloor",
+      "signature": "System.Void Player.PlayerBackpackManager::DropItemFromBackpack(Player.PlayerBackpack,Player.InventorySlot,Player.AmmoType,UnityEngine.Vector3,UnityEngine.Quaternion,Player.PlayerAgent); System.Void Player.PlayerBackpackManager::DropItemOnFloor(Player.pItemData,SNetwork.IReplicator,AIGraph.AIG_CourseNode,UnityEngine.Vector3)",
+      "rva": "0x174F000 / 0x174FDA0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "isStatic": false,
+      "side": "local drop and unclaimed-item drop",
+      "identity": "The drop reads a source backpack and slot, so the identity of the item that leaves the backpack is knowable; the identity of the item that lands in the world is not, and the equipment life ends at the backpack, where the existing slot hooks already run.",
+      "owner": "DropItemFromBackpack takes the source backpack and the acting PlayerAgent; DropItemOnFloor takes unclaimed item data without an owner.",
+      "directCallers": [
+        { "rva": "0x147B530", "signature": "LevelGeneration.ItemInLevel::OnPickedUp(Player.PlayerAgent,Player.InventorySlot,Player.AmmoType)", "meaning": "a pickup first drops whatever occupied the target slot" },
+        { "rva": "0x174C7D0", "signature": "System.Void Player.PlayerBackpackManager::AddItem(Player.pItemData_WithOwner)", "meaning": "an item arriving at a full or reserved slot first drops the occupant" },
+        { "rva": "0x18D1C90", "signature": "System.Void Player.PlayerSessionStatusManager::CheckUnclaimedItems(List<Player.pItemData_WithOwner>,List<Player.pItemData_WithOwner>,bool,Player.pPlayerLocationData)", "meaning": "unclaimed items are dropped on the floor through DropItemOnFloor at 0x174FDA0" },
+        { "rva": "0x18D3F10", "signature": "System.Void Player.PlayerSessionStatusManager::DebugPlaceItem(Player.pItemData)", "meaning": "debug drop" },
+        { "rva": "0x18D4080", "signature": "System.Void Player.PlayerSessionStatusManager::DebugPlaceItem(Player.PocketItem)", "meaning": "debug drop" }
+      ],
+      "decision": "recorded-only",
+      "reason": "A dropped item leaves the backpack, which the wired slot hooks already observe, and the world side adds no owner and no resource definition; a third hook would restate one removal."
+    },
+    {
+      "id": "deployed-item-query",
+      "group": "deployable",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpack",
+      "member": "TryGetDeployedItem",
+      "signature": "System.Boolean Player.PlayerBackpack::TryGetDeployedItem(Player.InventorySlot,Item&)",
+      "rva": "0x1762000",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "isStatic": false,
+      "side": "query",
+      "identity": "Would return the world item a slot was deployed into; a world item is not an equipment life, so it adds no identity.",
+      "owner": "not applicable",
+      "directCallers": [{ "rva": "none", "signature": "no direct callers in the dump" }],
+      "decision": "recorded-only",
+      "reason": "Unused in this build, so there is no paired call site to justify it; the deployed state is read through IsDeployed, which is pinned by a caller."
+    },
+    {
+      "id": "level-pickup-interaction",
+      "group": "level-item",
+      "assembly": "Modules-ASM.dll",
+      "type": "Interact_Pickup_PickupItem",
+      "member": "TriggerInteractionAction",
+      "signature": "System.Void Interact_Pickup_PickupItem::TriggerInteractionAction(Player.PlayerAgent)",
+      "rva": "0x131F090",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "isStatic": false,
+      "side": "player interaction with a world pickup",
+      "identity": "The interaction target is a world item and the method receives only the interacting player; no resource definition and no backpack slot.",
+      "owner": "the interacting player, which is not the owner of a world item",
+      "directCallers": [{ "rva": "none", "signature": "no direct callers in the dump; virtual dispatch only" }],
+      "decision": "recorded-only",
+      "reason": "Interaction is a request, not the state change; the resulting inventory change is observed by the wired hooks and the world side has no resource definition."
+    }
+  ],
+  "probes": {
+    "note": "Type names were checked for existence before anything was claimed; the task's examples resolve to real types, and names that do not exist were not used.",
+    "found": [
+      "LevelGeneration.LG_PickupItem (MonoBehaviour) and LevelGeneration.LG_PickupItem_Sync",
+      "LevelGeneration.ItemInLevel (base Item)",
+      "SentryGunInstance (base ItemEquippable), SentryGunInstance_Sync, MineDeployerInstance (base ItemEquippable)",
+      "Gear.ResourcePackPickup, ConsumablePickup_Core, CarryItemPickup_Core, CommodityPickup_Core, ArtifactPickup_Core, KeyItemPickup_Core, GenericSmallPickupItem_Core (all base LevelGeneration.ItemInLevel)"
+    ],
+    "absent": [
+      "PickupItem (the pickup component is LevelGeneration.LG_PickupItem)",
+      "DeployerInstance (the deployed mine is MineDeployerInstance)",
+      "LG_Item"
+    ]
+  },
+  "limits": [
+    "No claim about runtime behaviour: nothing here was executed, and a direct call edge only proves that a call site exists in the shipped binary.",
+    "Whether the game keeps a deployed slot's BackpackItem instance alive is not verified; if the instance is destroyed, the existing Matches/IsNativeCurrent logic retires the life instead of reporting a false deployed location.",
+    "SentryGunInstance.OnDespawn and SyncedPickup do not both revisit SetDeployed, so the native marker can stay set after the world instance is gone; the readback mirrors the native marker rather than repairing it.",
+    "The itemID_gearCRC field is documented by the game as carrying either an item id or a gear CRC; the backpack path resolves it through the slot's BackpackItem, the world paths have no such resolution."
+  ]
+}

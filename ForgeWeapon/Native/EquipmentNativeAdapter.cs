@@ -18,7 +18,7 @@ internal sealed class EquipmentNativeAdapter
     // so it never derives a player from slots, agents, names, pointers or the account key.
     internal const string PlayerKind = "gtfo.player";
     private sealed record Handle(EntityReference Entity, PlayerBackpack Backpack, IntPtr BackpackPointer,
-        IntPtr ItemPointer, IntPtr InstancePointer, int SlotIndex, string ResourceId, EntityReference Owner);
+        IntPtr ItemPointer, IntPtr InstancePointer, int SlotIndex, string ResourceId, EntityReference Owner, bool Deployed);
     private readonly Dictionary<IntPtr, Handle> _byInstance = new();
     private readonly Dictionary<string, Handle> _byEntity = new(StringComparer.Ordinal);
     private readonly HashSet<IntPtr> _unresolvedReported = new();
@@ -94,6 +94,9 @@ internal sealed class EquipmentNativeAdapter
             }
             var instancePointer = item.Instance.Pointer;
             var resource = Resource(item);
+            // The deployed marker belongs to the slot, not to a second object: a sentry or barrier stays this slot's
+            // equipment life while the game reports the slot as deployed. The world instance itself is not tracked.
+            bool deployed = backpack.IsDeployed((InventorySlot)index);
             if (_byInstance.TryGetValue(instancePointer, out var existing)
                 && (existing.BackpackPointer != pointer || existing.SlotIndex != index
                     || existing.ItemPointer != item.Pointer || existing.ResourceId != resource))
@@ -102,18 +105,24 @@ internal sealed class EquipmentNativeAdapter
                 Retire(existing, "moved-or-replaced");
                 existing = null;
             }
-            bool recorded = existing != null;
-            var handle = existing ?? new Handle(NewEntity(), backpack, pointer, item.Pointer, instancePointer, index, resource, owner);
+            bool recorded = existing != null, locationChanged = recorded && existing!.Deployed != deployed;
+            var handle = existing == null
+                ? new Handle(NewEntity(), backpack, pointer, item.Pointer, instancePointer, index, resource, owner, deployed)
+                : existing with { Deployed = deployed };
             _byInstance[instancePointer] = handle; _byEntity[handle.Entity.Id] = handle;
             var slot = ((InventorySlot)index).ToString();
             var observation = new EquipmentObservation(handle.Entity, resource, ResourceRevision, owner,
-                slot, EquipmentLocation.Inventory, item.IsLoaded, Wielded(inventory, item));
+                deployed ? null : slot, deployed ? EquipmentLocation.Deployed : EquipmentLocation.Inventory,
+                item.IsLoaded, !deployed && Wielded(inventory, item));
             try
             {
                 var published = _identity!.Record(observation);
                 if (!recorded)
                     _info("weapon.equipment-life-started id=" + handle.Entity.Id + " world=" + Number(handle.Entity.WorldEpoch)
-                        + " owner=" + owner.Id + " ownerLife=" + Number(owner.LifeEpoch) + " slot=" + slot + " resource=" + resource);
+                        + " owner=" + owner.Id + " ownerLife=" + Number(owner.LifeEpoch) + " slot=" + slot + " resource=" + resource
+                        + " location=" + (deployed ? "Deployed" : "Inventory"));
+                if (locationChanged)
+                    _info("weapon.equipment-location id=" + handle.Entity.Id + " location=" + (deployed ? "Deployed" : "Inventory"));
                 if (published == null) continue;
                 if (published.Status == "rejected") _report("weapon.wield-fact-rejected: " + published.Code);
                 else _info("weapon.wield-fact kind=" + (observation.IsWielded ? "equipped" : "unequipped") + " id=" + handle.Entity.Id
@@ -135,11 +144,13 @@ internal sealed class EquipmentNativeAdapter
         var backpack = handle.Backpack;
         if (backpack.Pointer != handle.BackpackPointer || !Matches(handle, backpack)) return false;
         var item = backpack.Slots![handle.SlotIndex]!;
+        bool deployed = backpack.IsDeployed((InventorySlot)handle.SlotIndex);
         var player = backpack.Owner;
-        return player != null && _kernel.ResolveEntityInstance(PlayerKind, player) == value.Owner
-            && ((InventorySlot)handle.SlotIndex).ToString() == value.Slot
+        return deployed == handle.Deployed && player != null && _kernel.ResolveEntityInstance(PlayerKind, player) == value.Owner
+            && value.Location == (deployed ? EquipmentLocation.Deployed : EquipmentLocation.Inventory)
+            && (deployed ? value.Slot == null : ((InventorySlot)handle.SlotIndex).ToString() == value.Slot)
             && Resource(item) == value.ResourceId && item.IsLoaded == value.IsReady
-            && Wielded(Inventory(player), item) == value.IsWielded;
+            && value.IsWielded == (!deployed && Wielded(Inventory(player), item));
     }
 
     private EntityReference NewEntity()

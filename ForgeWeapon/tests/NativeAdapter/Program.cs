@@ -293,6 +293,63 @@ Case("owner.lookup-inside-entity-inspection-is-stale-not-fault", () =>
     Require(inspected.Items.Single().Code == "stale-entity" && w.Current(entity) && !w.Session!.Faulted,
         "Entity inspection changed equipment state: " + inspected.Items.Single().Code);
 });
+var deployed = typeof(BackpackItemDeployed);
+Case("deploy.sentry-slot-reads-back-deployed", () =>
+{
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearSpecial, 55);
+    Hook(stored, p.Backpack); var entity = w.EntityOf(item.Instance!)!;
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, true); Hook(deployed, p.Backpack);
+    Require(w.Session!.Identity.TryResolve(entity, out var o, out _) && o!.Location == EquipmentLocation.Deployed
+        && o.Slot == null && !o.IsWielded && o.Owner == p.Reference && o.ResourceId == "gtfo.gear:55",
+        "Deployed slot did not read back as a deployed location: " + o);
+    Require(w.Session.Adapter.TrackedCount == 1 && w.Current(entity), "Deployment replaced the equipment life.");
+    w.Tick(); Require(w.Sink.Count == 0, "Deployment synthesized wield history.");
+});
+Case("deploy.pickup-returns-to-inventory", () =>
+{
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearSpecial, 55);
+    Hook(stored, p.Backpack); var entity = w.EntityOf(item.Instance!)!;
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, true); Hook(deployed, p.Backpack);
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, false); Hook(deployed, p.Backpack);
+    Require(w.Session!.Identity.TryResolve(entity, out var o, out _) && o!.Location == EquipmentLocation.Inventory
+        && o.Slot == nameof(InventorySlot.GearSpecial) && !o.IsWielded, "Recalled deployable did not return to its slot: " + o);
+    w.Tick(); Require(w.Sink.Count == 0, "Deploy and recall synthesized wield history.");
+});
+Case("deploy.wielded-deployed-slot-publishes-no-fact", () =>
+{
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearSpecial, 55);
+    Hook(stored, p.Backpack); w.Tick();
+    p.Inventory.WieldedItem = (ItemEquippable)item.Instance!; Hook(typeof(LocalItemWielded), p.Inventory); w.Tick();
+    Require(w.Sink.Count == 1, "Wielding after the recorded snapshot did not publish.");
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, true); Hook(deployed, p.Backpack); w.Tick();
+    Require(w.Sink.Count == 1, "A deployed slot was reported as unequipped.");
+    Require(w.Session!.Identity.TryResolve(w.EntityOf(item.Instance!)!, out var o, out _) && !o!.IsWielded,
+        "A deployed slot still read back as wielded.");
+});
+Case("deploy.stale-deployed-observation-is-not-current", () =>
+{
+    // IsNativeCurrent re-reads the marker, so a slot that changed state without a hook is stale, not a fault.
+    var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearSpecial, 55);
+    Hook(stored, p.Backpack); var entity = w.EntityOf(item.Instance!)!;
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, true);
+    Require(!w.Current(entity) && !w.Session!.Faulted, "Deployed state changed without a hook but stayed current.");
+    Hook(deployed, p.Backpack);
+    Require(w.Current(entity), "The deploy hook did not refresh the recorded location.");
+});
+Case("log.deploy-location-lines-are-exact", () =>
+{
+    var w = new World(); var p = w.Player("a"); World.Put(p.Backpack, InventorySlot.GearSpecial, 55);
+    Hook(stored, p.Backpack);
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, true); Hook(deployed, p.Backpack);
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, true); Hook(deployed, p.Backpack);
+    p.Backpack.SetDeployed(InventorySlot.GearSpecial, false); Hook(deployed, p.Backpack);
+    Require(w.Infos.SequenceEqual(new[]
+    {
+        "weapon.equipment-life-started id=gtfo.equipment:7.1 world=7 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:55 location=Inventory",
+        "weapon.equipment-location id=gtfo.equipment:7.1 location=Deployed",
+        "weapon.equipment-location id=gtfo.equipment:7.1 location=Inventory"
+    }) && w.Reports.Count == 0, string.Join(" | ", w.Infos.Concat(w.Reports)));
+});
 Case("contract.rejected-observation-does-not-fault", () =>
 {
     var w = new World(); var p = w.Player("a"); var item = World.Put(p.Backpack, InventorySlot.GearStandard, 1234);
@@ -316,12 +373,12 @@ Case("log.life-wield-and-clear-lines-are-exact", () =>
     Hook(stored, p.Backpack);
     Require(w.Infos.SequenceEqual(new[]
     {
-        "weapon.equipment-life-started id=gtfo.equipment:7.1 world=7 owner=gtfo.player:a ownerLife=1 slot=GearStandard resource=gtfo.gear:1234",
+        "weapon.equipment-life-started id=gtfo.equipment:7.1 world=7 owner=gtfo.player:a ownerLife=1 slot=GearStandard resource=gtfo.gear:1234 location=Inventory",
         "weapon.wield-fact kind=equipped id=gtfo.equipment:7.1 owner=gtfo.player:a status=queued code=accepted",
         "weapon.equipment-life-ended id=gtfo.equipment:7.1 reason=slot-changed",
-        "weapon.equipment-life-started id=gtfo.equipment:7.2 world=7 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:77",
+        "weapon.equipment-life-started id=gtfo.equipment:7.2 world=7 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:77 location=Inventory",
         "weapon.equipment-lives-cleared world=7 count=1 reason=world-changed",
-        "weapon.equipment-life-started id=gtfo.equipment:8.1 world=8 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:77"
+        "weapon.equipment-life-started id=gtfo.equipment:8.1 world=8 owner=gtfo.player:a ownerLife=1 slot=GearSpecial resource=gtfo.gear:77 location=Inventory"
     }) && w.Reports.Count == 0, string.Join(" | ", w.Infos.Concat(w.Reports)));
 });
 Case("guard.unexpected-native-failure-latches", () =>

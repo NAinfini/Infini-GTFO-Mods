@@ -56,7 +56,7 @@ Check("native.no-account-lookup", !calls.Any(m => m.Name == "get_Lookup"));
 var gameCalls = calls.Where(m => GameAssembly(Scope(m)) && !Scope(m).StartsWith("BepInEx", StringComparison.Ordinal)
         && !Scope(m).Contains("Harmony", StringComparison.Ordinal))
     .Select(Member).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
-string[] queries = { "TryGetBackpack", "GetChecksum", "TryCast", "op_Equality", "op_Inequality", "op_Implicit" };
+string[] queries = { "TryGetBackpack", "IsDeployed", "GetChecksum", "TryCast", "op_Equality", "op_Inequality", "op_Implicit" };
 var writes = gameCalls.Where(c => { var name = c[(c.LastIndexOf("::", StringComparison.Ordinal) + 2)..];
     return !name.StartsWith("get_", StringComparison.Ordinal) && !queries.Contains(name); }).ToArray();
 Check("native.read-only-game-access", gameCalls.Length > 0 && writes.Length == 0, writes.Length == 0 ? string.Join(", ", gameCalls) : string.Join(", ", writes));
@@ -74,6 +74,7 @@ string[] expectedReads =
     "Player.BackpackItem::get_ItemID",
     "Player.PlayerAgent::get_Inventory",
     "Player.PlayerAgent::get_Owner",
+    "Player.PlayerBackpack::IsDeployed",
     "Player.PlayerBackpack::get_Owner",
     "Player.PlayerBackpack::get_Slots",
     "Player.PlayerBackpackManager::TryGetBackpack",

@@ -113,6 +113,17 @@ Case("drop-deploy-and-recall-change-preconditions", w =>
     Reject(() => w.Session.RequireCurrent(deployed), "equipment.observation-changed");
     Reject(() => w.Session.RequireCurrent(old), "equipment.observation-changed");
 });
+Case("deploy-and-recall-keeps-one-life", w =>
+{
+    // A deployed sentry or barrier stays the same slot life; only its location and slot read back differently.
+    var item = w.Item(); w.Track(item);
+    w.Session.Record(item with { Location = EquipmentLocation.Deployed, Slot = null, IsWielded = false });
+    Check(w.Session.IsCurrent(item.Entity) && w.Session.Count == 1, "deployed location kept the life");
+    w.Session.Record(item);
+    Check(w.Session.RequireCurrent(w.Session.CaptureOwnedUse(item.Entity, w.Owner, true)) == item,
+        "recall restored the slot and wield precondition");
+    Check(w.Session.Count == 1 && w.Session.IdentityHistoryCount == 1, "deploy and recall churned identity");
+});
 Case("native-probe-reread-and-fail-closed", w =>
 {
     var ticket = w.Track(); int before = w.NativeReads; w.NativeCurrent = false;

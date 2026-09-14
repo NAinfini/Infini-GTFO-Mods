@@ -19,6 +19,9 @@
     { "hook": "BackpackInstancesDestroyed", "assembly": "Modules-ASM.dll", "type": "Player.PlayerBackpack", "name": "DestroyAllInstance",
       "signature": "System.Void Player.PlayerBackpack::DestroyAllInstance()", "isVirtual": false, "rva": "0x175F0E0",
       "readback": "retire lives whose instances were destroyed" },
+    { "hook": "BackpackItemDeployed", "assembly": "Modules-ASM.dll", "type": "Player.PlayerBackpack", "name": "SetDeployed",
+      "signature": "System.Void Player.PlayerBackpack::SetDeployed(Player.InventorySlot,System.Boolean)", "isVirtual": false, "rva": "0x1760BB0",
+      "readback": "per-slot deployed marker of the same backpack after the deploy or pickup body; a deployed slot reads back as a Deployed location without a slot or wield state. The deployed world instance itself is not an identity here" },
     { "hook": "LocalItemWielded", "assembly": "Modules-ASM.dll", "type": "PlayerInventoryLocal", "name": "DoWieldItem",
       "signature": "System.Void PlayerInventoryLocal::DoWieldItem()", "isVirtual": false, "rva": "0x12C8B00",
       "readback": "WieldedItem of the local inventory after the wield body" },
@@ -49,6 +52,21 @@
     { "id": "synced-sync-wield.calls-finish-action", "from": "0x12CC370", "to": "0x12CB1B0", "meaning": "PlayerInventorySynced.SyncWieldItem calls FinishOngoingAction" },
     { "id": "presentation.local-wield-attaches-first-person", "from": "0x12C8B00", "to": "0x1718570", "meaning": "offline presentation path only: DoWieldItem calls FirstPersonItemHolder.SetWieldedItem; attach, rig and visible result NOT verified" },
     { "id": "presentation.local-wield-plays-animations", "from": "0x12C8B00", "to": "0x12C52B0", "meaning": "offline presentation path only: DoWieldItem calls PlayerInventoryBase.PlayAnimationsForWieldedItem; animation result NOT verified" },
-    { "id": "presentation.local-unwield-detaches-first-person", "from": "0x12C98A0", "to": "0x1719E00", "meaning": "offline presentation path only: PlayerInventoryLocal.UnWield calls FirstPersonItemHolder.UnWield; visible result NOT verified" }
+    { "id": "presentation.local-unwield-detaches-first-person", "from": "0x12C98A0", "to": "0x1719E00", "meaning": "offline presentation path only: PlayerInventoryLocal.UnWield calls FirstPersonItemHolder.UnWield; visible result NOT verified" },
+    { "id": "sentry-place-on-ground.marks-slot-deployed", "from": "0x14115E0", "to": "0x1760BB0", "meaning": "offline call edge: SentryGunFirstPerson.PlaceOnGround reaches the deploy hook after spawning the world instance" },
+    { "id": "sentry-instance-spawn.marks-slot-deployed", "from": "0x14184B0", "to": "0x1760BB0", "meaning": "offline call edge: SentryGunInstance.OnSpawn marks the owner's slot deployed; it also calls PlayerBackpackManager.TryGetBackpack at 0x175BFC0" },
+    { "id": "sentry-instance-pickup.clears-deployed", "from": "0x141B2B0", "to": "0x1760BB0", "meaning": "offline call edge: SentryGunInstance.SyncedPickup reaches the same hook to clear the marker" },
+    { "id": "barrier-place-on-ground.marks-slot-deployed", "from": "0x14AE1E0", "to": "0x1760BB0", "meaning": "offline call edge: BarrierFirstPerson.PlaceOnGround reaches the deploy hook; its OnBarrierSpawned clears the slot instead (BarrierFirstPerson.OnBarrierSpawned -> 0x174DD70)" },
+    { "id": "bot-deploy-sentry.marks-slot-deployed", "from": "0x19B2DE0", "to": "0x1760BB0", "meaning": "offline call edge: PlayerBotActionDeploySentryGun.PlaceSentryGunOnGround reaches the deploy hook" },
+    { "id": "sentry-place-on-ground.queries-deployed", "from": "0x14115E0", "to": "0x1760390", "meaning": "offline call edge: the deploy site queries the same per-slot marker the postfix reads back" },
+    { "id": "mine-sticky-spawned.clears-local-slot", "from": "0x14FCB20", "to": "0x174DD70", "meaning": "offline call edge: a thrown mine is removed from its backpack slot instead of being marked deployed" },
+    { "id": "clear-local-slot.clears-slot", "from": "0x174DD70", "to": "0x1761800", "meaning": "the mine deploy path reaches the existing slot-clear hook" },
+    { "id": "throw.clears-slot", "from": "0x1326FF0", "to": "0x1761800", "meaning": "throwing an equipped item reaches the existing slot-clear hook" },
+    { "id": "bot-trip-mine.clears-slot", "from": "0x19B4A10", "to": "0x1761800", "meaning": "bot trip-mine placement reaches the existing slot-clear hook" },
+    { "id": "level-pickup.drops-occupied-slot", "from": "0x147B530", "to": "0x174F000", "meaning": "offline call edge: ItemInLevel.OnPickedUp drops the item occupying the target slot before the picked-up item is stored" },
+    { "id": "resource-pack-sync.places-in-level", "from": "0x13C1AD0", "to": "0x147B9A0", "meaning": "offline call edge: Gear.ResourcePackPickup.OnSyncStateChange reaches ItemInLevel.OnPlacedInLevel (recorded only, not wired)" },
+    { "id": "consumable-sync.places-in-level", "from": "0x17CB380", "to": "0x147B9A0", "meaning": "offline call edge: ConsumablePickup_Core.OnSyncStateChange reaches ItemInLevel.OnPlacedInLevel (recorded only, not wired)" },
+    { "id": "resource-pack-sync.picks-up", "from": "0x13C1AD0", "to": "0x147B530", "meaning": "offline call edge: Gear.ResourcePackPickup.OnSyncStateChange reaches ItemInLevel.OnPickedUp (recorded only, not wired)" },
+    { "id": "consumable-sync.picks-up", "from": "0x17CB380", "to": "0x147B530", "meaning": "offline call edge: ConsumablePickup_Core.OnSyncStateChange reaches ItemInLevel.OnPickedUp (recorded only, not wired)" }
   ]
 }

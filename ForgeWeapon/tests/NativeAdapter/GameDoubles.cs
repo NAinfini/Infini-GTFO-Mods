@@ -93,10 +93,13 @@ namespace Player
         public SNetwork.SNet_Player? Owner;
         public bool ThrowOnSlots;
         private readonly BackpackItem?[] _slots = new BackpackItem?[12];
+        private readonly bool[] _deployed = new bool[12];
         public BackpackItem?[]? Slots => ThrowOnSlots ? throw new InvalidOperationException("fixture native read failure") : _slots;
         public BackpackItem? CreateAndStoreBackpackItem(Item item, InventorySlot slot, Gear.GearIDRange gearIDRange) => null;
         public bool TryClearSlot(InventorySlot slot) => true;
         public void DestroyAllInstance() { }
+        public bool IsDeployed(InventorySlot slot) => _deployed[(int)slot];
+        public void SetDeployed(InventorySlot slot, bool mode) => _deployed[(int)slot] = mode;
     }
     public sealed class PlayerBackpackManager
     {

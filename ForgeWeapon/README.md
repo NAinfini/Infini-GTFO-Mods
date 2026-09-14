@@ -37,19 +37,22 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 组成：
 - `Plugin`：BepInEx 插件 `NAinfini.ForgeWeapon` / `Infini Forge Weapon` / `0.1.0`（与 `ForgeWeapon.dll` 版本一致），依赖 `NAinfini.ForgeRuntime` 1.2.0 与 `NAinfini.ForgeMap` 0.1.0。宿主 Off 时不注册、不装 Hook；宿主不可用时抛出；Load 只允许一次，失败回滚并保留原始异常，`Unload()` 返回 false（不热卸载）。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
 - `WeaponNativeSession` 按固定顺序启动：注册窗口内先注册身份 Session（重复 provider 在装 Hook 前失败），再装 Hook；失败时回滚，释放时先注销再卸 Hook。任何意外异常都锁存故障，并清空句柄表。
-- `WeaponNativeHooks` 有 7 个 `Priority.Last` 的 postfix-only Hook，只读回、不改参数或返回值：
-  - `PlayerBackpack.CreateAndStoreBackpackItem` / `TryClearSlot` / `DestroyAllInstance`
+- `WeaponNativeHooks` 有 8 个 `Priority.Last` 的 postfix-only Hook，只读回、不改参数或返回值：
+  - `PlayerBackpack.CreateAndStoreBackpackItem` / `TryClearSlot` / `DestroyAllInstance` / `SetDeployed`
   - `PlayerInventoryLocal.DoWieldItem` / `UnWield`
   - `PlayerInventorySynced.DoEquipItem` / `UnWield`
 - `EquipmentNativeAdapter` 只在 `SNet.IsMaster`、Runtime Ready 且 host 时对账。
   - 背包每个有实例的槽位都读回成 `EquipmentObservation`。
   - 实例 ID `gtfo.equipment:<world>.<n>` 由接线按世界递增生成，槽位、指针或资源变化即退役旧生命。
+  - 炮台与屏障放置后槽位仍然持有同一件装备，接线用 `PlayerBackpack.IsDeployed(slot)` 读回该槽位的部署标记：标记为真时同一个生命以 `Location=Deployed`（无槽位、未持有）记录，收回后回到 `Inventory`。**部署状态变化不发布 equipped/unequipped 事实**，也不为世界里的部署实例另建身份。
   - owner 只经 SDK 的 `ResolveEntityInstance("gtfo.player", backpack.Owner)` 取得；返回 null 就不记录并警告一次，不从指针、名字、槽位或 `Lookup` 推断玩家。
 
 证据文件 `evidence/w1-native-hooks.json` 锁定的内容：
 - 每个 Hook 的签名、是否 virtual、dump RVA（各自唯一且不共享）。
-- 14 条到达或清理路径的直接调用边。
+- 32 条到达或清理路径的直接调用边，其中 15 条是 2026-09-14 为部署与回收路径补的（`SentryGunInstance.OnSpawn` 先取 owner 背包再调用部署标记、`SentryGunInstance.SyncedPickup`、`BarrierFirstPerson.PlaceOnGround`、bot 放置、以及矿与投掷物的清槽路径）。
 - 3 条离线表现调用边：DoWieldItem 调 `FirstPersonItemHolder.SetWieldedItem` 与 `PlayAnimationsForWieldedItem`，本地 UnWield 调 `FirstPersonItemHolder.UnWield`。**这 3 条不证明模型挂载、rig 或动画的实际结果。**
+
+背包之外的装备路径调研（关卡拾取、世界掉落、部署物、转移）见 `evidence/w1-native-world-paths.json`：记录所用 interop 目录与各程序集 sha256、每个类型的签名与 RVA 唯一性、直接调用方、同步/本地归属，以及为什么只有部署标记被接线。该文件同时记录 `LG_PickupItem`、`ItemInLevel`、`SentryGunInstance`、`MineDeployerInstance` 等真实类型与它们缺少资源定义或 owner 的原因；`PickupItem`、`DeployerInstance` 这类不存在的名字没有被使用。
 
 玩家 owner 的来源：玩家引用 `gtfo.player:<n>` 的编号与 lifeEpoch 由 ForgeMap 的 MAP5a 私有分配（见 [ForgeMap README](../ForgeMap/README.md#map5a-玩家实体身份implementation-only)）；唯一稳定的原生玩家键 `SNet_Player.Lookup` 是 Steam64 账号 ID，不能成为公开键。所以 Weapon 不猜、不自造、不读 `Lookup`，只调用 SDK 的 `ResolveEntityInstance("gtfo.player", player)`，由 Map 按 SNet_Player 指针在已登记表里查找并复核；接口规则见 [Framework README](../ForgeRuntime/Framework/README.md#从原生实例取得引用)。`gtfo.player` 没有实例解析器（例如 Map 未加载）时该调用抛 `entity-resolver`，会话锁存故障、停止观察，**不回退、不记录无 owner 的装备**。
 
@@ -58,7 +61,8 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 - 清表行在世界切换后的下一次 Hook 才写出，不在切换当刻。
 
 信息日志（BepInEx 来源 `Infini Forge Weapon`，只含 Forge 引用、槽位与资源键）：
-- `weapon.equipment-life-started id=gtfo.equipment:<world>.<n> world=<world> owner=gtfo.player:<m> ownerLife=<life> slot=<InventorySlot> resource=gtfo.gear:<checksum>|gtfo.item:<id>`
+- `weapon.equipment-life-started id=gtfo.equipment:<world>.<n> world=<world> owner=gtfo.player:<m> ownerLife=<life> slot=<InventorySlot> resource=gtfo.gear:<checksum>|gtfo.item:<id> location=Inventory|Deployed`
+- `weapon.equipment-location id=… location=Inventory|Deployed`：同一生命的部署状态变化时写一次（起始位置已在 life-started 行里）。
 - `weapon.equipment-life-ended id=… reason=owner-unresolved|owner-changed|slot-changed|moved-or-replaced|observation-rejected`
 - `weapon.wield-fact kind=equipped|unequipped id=… owner=… status=<dispatch status> code=<code>`：没有计划消费时是 `status=ignored code=no-consumer`。
 - `weapon.equipment-lives-cleared world=<旧世界> count=<n> reason=world-changed|identity-cleared`
@@ -69,6 +73,9 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 - `Slots` 下标是否等于 `InventorySlot` 值。
 - `IsLoaded` 的实际语义。
 - UnWield 后 `WieldedItem` 的状态。
+- 部署后槽位是否仍持有原来的 `BackpackItem` 实例；若实例被销毁，现有 `Matches` 逻辑退役该生命，而不是报出错误的部署位置。
+- `SentryGunInstance.OnDespawn` 与 `SyncedPickup` 不都回写部署标记，原生标记可能在部署物消失后仍为真；读回只镜像原生标记，不替游戏修正。
+- `itemID_gearCRC` 在游戏里既可能是 itemID 也可能是 gearCRC；背包路径靠槽位的 `BackpackItem` 解析，世界路径没有对应解析，因此没有接线。
 - Bot 等其他 inventory 子类。
 - 两次 Hook 之间指针被复用且没有任何清理 Hook。
 - 转交时新背包先于旧背包被对账。

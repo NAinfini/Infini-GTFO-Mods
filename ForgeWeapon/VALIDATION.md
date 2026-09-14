@@ -1,6 +1,50 @@
 # ForgeWeapon 验证记录
 
-**上次更新：2026-09-13**（内容合并自原 W1-IDENTITY-HANDOFF、W1-IDENTITY-ACCEPTANCE-HANDOFF、W1-IDENTITY-REVIEW-HANDOFF、W1-NATIVE-API-AUDIT 四份交接记录与旧 VALIDATION）。
+**上次更新：2026-09-14**（内容合并自原 W1-IDENTITY-HANDOFF、W1-IDENTITY-ACCEPTANCE-HANDOFF、W1-IDENTITY-REVIEW-HANDOFF、W1-NATIVE-API-AUDIT 四份交接记录与旧 VALIDATION）。
+
+## W1 背包之外装备路径调研与部署读回（2026-09-14）
+
+新增 `evidence/w1-native-world-paths.json`：只读调研背包之外的装备出现/消失路径（关卡拾取、世界掉落、部署物、转移），记录所用 interop 目录与程序集 sha256、每个成员的签名、RVA 唯一性（dump 中声明该 RVA 的条目数）、直接调用方与同步/本地归属，以及"能否提供身份与 owner"的判定。调研结论只接线了一条路径：`PlayerBackpack.SetDeployed` 的 postfix（第 8 个 Hook）加 `PlayerBackpack.IsDeployed(slot)` 读回，同一个装备生命在部署时以 `Location=Deployed`（无槽位、未持有）记录，收回后回到 `Inventory`；其余路径记录在案但不接线（世界物品的 `itemID_gearCRC` 没有 gear/item 判别，也没有世界物品表，资源定义只能靠猜；世界实例与虚拟分发的方法没有直接调用边）。
+
+- `WeaponNativeHooks` 7 → 8 个 Hook；`NativeLayout` 的纯查询白名单增加 `IsDeployed`，精确读取集合增加 `Player.PlayerBackpack::IsDeployed`。
+- `weapon.equipment-life-started` 行末增加 `location=Inventory|Deployed`；同一生命的部署状态变化另写 `weapon.equipment-location`；`Record` 对非 Inventory 位置不发布 equipped/unequipped，因此部署与回收只产生观察变化，不补造持有事实。
+- 证据文件 `w1-native-hooks.json`：8 个 Hook、32 条直接调用边（新增 15 条）。
+
+interop 目录：调研用 r2modman `Forge-MapEditor-QA` profile 的 `BepInEx/interop`（`Modules-ASM.dll` sha256 `E499B9C0…36D63`，mvid `6d066008-28db-4edf-9c0e-df9db732560d`；`GameData-ASM.dll` `DEE52362…E7106`；`SNet_ASM.dll` `6DAD1168…CF9B2C`）。`w1-native-hooks.json` 与 `w1-native-contract.json` 里冻结的文件锁指向 `Temp` profile 的旧副本（`A31AF38F…07943`，mvid `2875668a-…`），两份副本的 MVID 与文件字节不同，但逐类型/字段/属性/方法签名的 Cecil 指纹完全一致（`Modules-ASM.dll` rows=170126 `7E7665E8…C8B`，`GameData-ASM.dll` rows=32818 `1870F20A…CB6`，`SNet_ASM.dll` rows=6869 `83B16D5D…F83`），所以没有改写冻结的锁，`NativeEvidence` 仍指向 `Temp` 副本运行。
+
+全部用会话临时目录的隔离 `--artifacts-path` 与 `--disable-build-servers` 构建，报告写到新目录，没有安装、没有启动 GTFO、没有改动 ForgeRuntime 的源码或 Git 状态。
+
+| 套件 | 退出码 | 输出结尾 |
+| --- | --- | --- |
+| 宿主、`ForgeWeapon`、`ForgeMap.Native`、`ForgeWeapon.Native` 构建 | 0 | 各 0 警告 0 错误 |
+| `tests/NativeLayout` | 0 | `PASS 68/68 Weapon native layout checks; no GTFO execution.` |
+| `tests/NativeEvidence`（`Temp` profile） | 0 | `PASS 71/71 Weapon static native evidence checks; game execution NOT tested.` |
+| `tests/Identity` | 0 | `RESULT {…"cases":43,"assertions":102…,"gameExecuted":false,"installed":false,"nativeCalls":0}` |
+| `tests/IdentityAcceptance --report <新路径>` | 0 | `INDEPENDENT IDENTITY: 37/37 passed; gameExecuted=false; synthetic inputs` |
+| `tests/NativeAdapter`（工作区 SDK） | 1 | `FAIL 11/43 Weapon native adapter cases`，32 个 `Unsupported plan version.` |
+| `tests/NativeAdapter`（提交版 HEAD SDK，隔离构建） | 0 | `PASS 43/43 Weapon native adapter cases; managed doubles, no GTFO execution.` |
+| `tests/IdentityDispatchReview --report <新路径>`（工作区 SDK） | 1 | `DISPATCH REVIEW: 2/20 passed`，18 个 `Unsupported plan version.` |
+| `tests/IdentityDispatchReview`（提交版 HEAD SDK，隔离构建） | 0 | `DISPATCH REVIEW: 20/20 passed; fixture-only; gameExecuted=false` |
+| `ForgeRuntime/tests/Architecture` | 非 0（`0xE0434352`） | `FAIL: Weapon still owns its two observed wield triggers` |
+
+改动前后的计数（同一台机器、同一次会话）：
+
+| 套件 | 改动前 | 改动后 |
+| --- | --- | --- |
+| NativeAdapter（提交版 HEAD SDK） | 38/38 | 43/43 |
+| NativeAdapter（工作区 SDK） | 11/38 | 11/43 |
+| NativeLayout | 62/62 | 68/68 |
+| NativeEvidence | 52/52 | 71/71 |
+| Identity | 42 场景 / 99 断言 | 43 场景 / 102 断言 |
+| IdentityAcceptance | 37/37 | 37/37 |
+
+NativeAdapter 新增 5 例：`deploy.sentry-slot-reads-back-deployed`、`deploy.pickup-returns-to-inventory`、`deploy.wielded-deployed-slot-publishes-no-fact`、`deploy.stale-deployed-observation-is-not-current`、`log.deploy-location-lines-are-exact`（日志逐字比对）。Identity 新增 `deploy-and-recall-keeps-one-life`。NativeLayout 的 62 → 68 是第 8 个 Hook 的 6 项形状检查（声明目标、interop 元数据里的唯一目标方法、postfix-only、单个 `__instance` 参数、`Priority.Last`、经会话守卫）；`IsDeployed` 加入纯查询白名单与精确读取集合属于既有检查的内容变化，不新增检查项。
+
+**两个套件在当前工作区无法运行，原因不是本次改动。** `ForgeRuntime/Framework/RuntimePlan.cs` 在本会话期间被另一任务改成要求 `schemaVersion == 3`（D-017 R4-a 的步骤/后继/纯步骤计划格式），而 Weapon 的测试夹具仍写 v2，于是所有需要加载计划的用例报 `Unsupported plan version.`。这可复现地定位为环境问题：把提交版 HEAD 的 `ForgeRuntime/Framework` 源码与本次工作区的 Weapon 源码一起隔离构建后，同一批用例 43/43 通过，改动前的 38 个用例也是 38/38；工作区 SDK 下改动前就是 11/38。没有改 ForgeRuntime，也没有把 Weapon 的夹具迁到尚未定稿的 v3 计划格式。`Architecture` 的失败来自另一任务在 `ForgeTrigger/ModuleDefinition.cs` 里新增的 `forge.condition.predicate.compare` capability：断言仍要求能力列表恰为 Weapon 的两项，本次改动没有触碰任何托管 capability，也没有触碰该测试文件。
+
+`NativeEvidence` 用 `Forge-MapEditor-QA` profile 运行时会停在 69/71，失败的只有 `hash.Modules-ASM.dll` 与 `mvid.Modules-ASM.dll`（该 profile 的副本 2026-09-09 重新生成过），签名、RVA 唯一性、可执行段与 32 条调用边全部通过，因此按上面的指纹等价结论改用冻结锁对应的 `Temp` 副本运行。
+
+**这些仍是托管替身、编译后元数据与静态调用图证据，不是游戏验证。** 部署读回的真实行为（游戏是否保留部署槽位的 `BackpackItem` 实例、原生标记的生命周期）未在游戏内核验，已列入 README 的未核验清单。
 
 ## W1 游戏加载入口（2026-09-13，implementation-only）
 
@@ -51,7 +95,7 @@ NativeLayout 从 51 变为 62，参数改为 8 个（增加宿主 `ForgeRuntime.
 | 步骤 | 操作 | 期望日志（按出现顺序） |
 | --- | --- | --- |
 | 0 加载 | 启动游戏到主菜单 | `[Info   :Infini Forge Map] Forge Map registered gtfo.player identity; native bindings remain implementation-only.`，其后 `[Info   :Infini Forge Weapon] Forge Weapon registered equipment identity with gtfo.player owners; native bindings remain implementation-only.`；不应出现 `Weapon equipment observation disabled until restart` |
-| 1 拾取 | 进关出生；再在关卡里拾取一个资源包或消耗品 | `map.player-life-started id=gtfo.player:<m> world=<W> life=1 bot=false`；每个有物品的槽位一行 `weapon.equipment-life-started id=gtfo.equipment:<W>.<n> world=<W> owner=gtfo.player:<m> ownerLife=1 slot=<槽位> resource=gtfo.gear:<checksum>`（非 gear 物品为 `gtfo.item:<id>`）；拾取后多一行同格式、新 `<n>` 的 life-started。若先出现一次 `weapon.owner-unresolved`，记下，它对应"出生 Hook 早于 Map 登记"的未核验项 |
+| 1 拾取 | 进关出生；再在关卡里拾取一个资源包或消耗品 | `map.player-life-started id=gtfo.player:<m> world=<W> life=1 bot=false`；每个有物品的槽位一行 `weapon.equipment-life-started id=gtfo.equipment:<W>.<n> world=<W> owner=gtfo.player:<m> ownerLife=1 slot=<槽位> resource=gtfo.gear:<checksum> location=Inventory`（非 gear 物品为 `gtfo.item:<id>`）；拾取后多一行同格式、新 `<n>` 的 life-started。若先出现一次 `weapon.owner-unresolved`，记下，它对应"出生 Hook 早于 Map 登记"的未核验项 |
 | 2 切换 | 从主武器切到副武器 | `weapon.wield-fact kind=unequipped id=<主武器 id> owner=gtfo.player:<m> status=ignored code=no-consumer` 与 `weapon.wield-fact kind=equipped id=<副武器 id> … status=ignored code=no-consumer`（没有加载计划时 status 为 ignored）；不应出现 life-ended |
 | 3 收起 | 让当前武器被收起（例如拿起大型任务物品或爬梯子） | `weapon.wield-fact kind=unequipped id=<该武器 id> …`；恢复持有后同 id 的 `kind=equipped`。没有这两行时记下，它对应"UnWield 后 WieldedItem 状态"的未核验项 |
 | 4 换槽 | 用新的同类物品替换某槽位的物品，或丢下资源包 | `weapon.equipment-life-ended id=<旧 id> reason=slot-changed`（被同一实例移动时为 `moved-or-replaced`），替换时随后是新 `<n>` 的 life-started；新旧 id 不同 |
