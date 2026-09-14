@@ -77,13 +77,13 @@ Level = error
 
 **依赖方向。** 领域原生插件（`ForgeEnemy.Native`、`ForgeMap.Native`、`ForgeWeapon.Native`、`ForgeDevelopment.Native`）单向引用宿主程序集取得 `Plugin.Runtime`，之后只用 SDK 类型；SDK 不引用宿主或领域，也不含 Unity、BepInEx 依赖。领域之间不引用对方程序集：Weapon 插件以 `BepInDependency` 依赖 `NAinfini.ForgeMap`，经 SDK 的 `ResolveEntityInstance("gtfo.player", …)` 取玩家引用。源码依赖、运行时能力闭包和发布包依赖是三件不同的事。
 
-**工程。** `ForgeRuntime.csproj` 是 GTFO 宿主（模拟时钟、世界与会话桥、启动配置、计划发现 `GameBindings/PlanDiscovery.cs`、日志 writer `Logging/RuntimeLogWriter.cs`，不含诊断）；`Framework/ForgeRuntime.Framework.csproj` 是唯一公共 SDK。各领域的托管工程（`ForgeTrigger`、`ForgeMap`、`ForgeWeapon`、`ForgeEnemy`、`ForgeDevelopment`）只引用 SDK；`ForgeEnemy/ForgeEnemy.csproj` 只是托管辅助，不是玩家发行包。根 `Forge.Architecture.sln` 覆盖 SDK、五个领域托管工程与 `tests/Architecture`，不代替宿主完整构建。架构验收检查：领域程序集只引用同一份 SDK、不含 Unity/BepInEx/Harmony 引用、不内嵌第二个内核、provider 可共存、重复注册以 `provider-conflict` 原子拒绝、注册不启动工作、注销幂等。全部工程 `net6.0`，没有 DI 容器、第二套事件总线或状态机框架。
+**工程。** `ForgeRuntime.csproj` 是 GTFO 宿主（模拟时钟、世界与会话桥、启动配置、计划发现 `GameBindings/PlanDiscovery.cs`、日志 writer `Logging/RuntimeLogWriter.cs`，不含诊断）；`Framework/ForgeRuntime.Framework.csproj` 是唯一公共 SDK。各领域的托管工程（`ForgeTrigger`、`ForgeMap`、`ForgeWeapon`、`ForgeEnemy`）只引用 SDK；`ForgeEnemy/ForgeEnemy.csproj` 只是托管辅助，不是玩家发行包；ForgeDevelopment 没有托管工程。根 `Forge.Architecture.sln` 覆盖 SDK、四个领域托管工程与 `tests/Architecture`，不代替宿主完整构建。架构验收检查：领域程序集只引用同一份 SDK、不含 Unity/BepInEx/Harmony 引用、不内嵌第二个内核、provider 可共存、重复注册以 `provider-conflict` 原子拒绝、注册不启动工作、注销幂等。全部工程 `net6.0`，没有 DI 容器、第二套事件总线或状态机框架。
 
 **注册身份。** 只有调用方显式 `RegisterModule` 才登记 provider，加载程序集不启动任何工作。
 
 | 模块 | provider ID | 版本 | 注册内容 |
 | --- | --- | --- | --- |
-| Development | `forge.module.development` | `0.1.0` | 空；原生插件 `NAinfini.ForgeDevelopment` 1.0.0 不登记 provider |
+| Development | — | — | 不登记 provider；原生插件 `NAinfini.ForgeDevelopment` 1.0.0 只在 `Authoring` 下启动 |
 | Trigger | `forge.module.trigger` | `0.1.0` | 空；没有 BepInEx 插件 |
 | Map | `forge.module.gtfo.map` | `0.1.0` | 清单为空；原生插件 `NAinfini.ForgeMap` 0.1.0 追加 `gtfo.player` resolver 与实例解析器 |
 | Weapon | `forge.module.gtfo.weapon` | `0.1.0` | 2 个观察型 trigger 与 binding；原生插件 `NAinfini.ForgeWeapon` 0.1.0 登记 `gtfo.equipment` resolver |

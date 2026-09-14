@@ -1,6 +1,22 @@
 # ForgeDevelopment 验证记录
 
-**上次更新：2026-09-14**（补记 D2 全量运行记录；D2 切换后重写于 2026-09-13；D1 部分合并自原 CONTINUATION-STATUS、D1-CONTINUATION、D1-INTEGRATION-REVIEW、D1-SNAPSHOT-DELIVERY、D1-VALIDATION 五份交接记录）。
+**上次更新：2026-09-14**（补记托管 ModuleDefinition 清理与 CHANGELOG 迁移的运行记录；补记 D2 全量运行记录；D2 切换后重写于 2026-09-13；D1 部分合并自原 CONTINUATION-STATUS、D1-CONTINUATION、D1-INTEGRATION-REVIEW、D1-SNAPSHOT-DELIVERY、D1-VALIDATION 五份交接记录）。
+
+## 运行记录 2026-09-14 — 托管 ModuleDefinition 清理与 CHANGELOG 迁移（U-DEV-MOD / U-RELEASE）
+
+- 范围：删除托管 `ForgeDevelopment.csproj` 与 `ModuleDefinition.cs`（空 provider `forge.module.development` 0.1.0）。引用它的只有 `ForgeRuntime/tests/Architecture`、根 `Forge.Architecture.sln` 与 `scripts/verify-diagnostics.py`，三处同步删除该引用，没有留测试种子或空壳；`ForgeRuntime/CHANGELOG.md` 的 1.0.0–1.1.2 诊断版条目原文迁入本包 [CHANGELOG.md](CHANGELOG.md)，宿主文件改为从 1.2.0 起只记宿主内容。
+- 命令（仓库根目录，`Forge-MapEditor-QA` profile 只作编译引用）：
+
+  ```powershell
+  $env:GTFO_BEPINEX_PATH="$env:APPDATA\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx"
+  python ForgeDevelopment/scripts/verify-diagnostics.py --bepinex "$env:GTFO_BEPINEX_PATH" --output "$env:TEMP\forge-taskL-verify-20260914T1425"
+  ```
+
+- 结果：24 条子命令全部退出 0，其中 12 次构建均 0 警告 0 错误；PluginStartup 54、Reports 99/99、ProjectChecks 204/204、DevelopmentInspection 47/47、ReportSnapshots 100/100、Shutdown 31/31、SceneInventory 8、Telemetry 56、Samples 7、NativeLayout 23/23、Python 41/41。除托管 SDK 工程删除后构建由 13 次降为 12 次外，数字与本文件 2026-09-14 全量运行一致。
+- 脚本仍按设计报"源码在运行中变化"，所以 `summary.json` 的 `passed` 为 false、进程退出码为 1：并行的另一任务当时正在改 `ForgeRuntime/tests/Framework/Program.cs`（第一次复跑还有 `ForgeRuntime/Framework/RuntimeJson.cs`、`RuntimePlan.cs`）。三次复跑的 132 个被哈希文件中，只有这些非本次改动的文件变化；本次改动的 `scripts/verify-diagnostics.py`、`ForgeRuntime/tests/Architecture/Program.cs` 与 `Architecture.csproj` 前后哈希相同。
+- `Forge.Architecture.sln` 构建 0 警告 0 错误。Architecture 套件在并行任务在途的断言 `Weapon still owns its two observed wield triggers` 上失败；改动前后是同一条失败，且该套件不属于本包套件，未计入上表。
+- 证据：`C:\Users\nainf\AppData\Local\Temp\forge-taskL-verify-20260914T1425\`（`summary.json`、各步 `*.log`、运行前后源码 hash；另两次复跑在 `...T1400`、`...T1410`；均未入库、临时目录）。
+- 未验证：宿主侧 Architecture 之外的套件本轮未复跑，见 [Runtime 验证记录](../ForgeRuntime/VALIDATION.md)；没有加载游戏，没有安装到任何 profile。
 
 ## 运行记录 2026-09-14 — I-RELEASE 精确版本（D-018）ProjectChecks
 

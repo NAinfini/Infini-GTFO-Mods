@@ -13,7 +13,6 @@ import xml.etree.ElementTree as ET
 
 PROJECTS = (
     ("host", "ForgeRuntime/ForgeRuntime.csproj", False),
-    ("development", "ForgeDevelopment/ForgeDevelopment.csproj", False),
     ("development-native", "ForgeDevelopment/Native/ForgeDevelopment.Native.csproj", False),
     ("plugin-startup", "ForgeDevelopment/tests/PluginStartup/PluginStartup.csproj", True),
     ("reports", "ForgeDevelopment/tests/Reports/Reports.csproj", True),

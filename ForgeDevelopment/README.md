@@ -4,16 +4,17 @@
 
 **普通玩家默认不依赖这个包。** 它不调度正常玩法，也不把"没有报错"解释为地图正确。需要玩家自己启用诊断回传才能用起来的能力不算完成——诊断是作者型用户的第二层入口，不是玩家必经路径。
 
-计划与状态见两仓统一框架第 6 节 U-DEV-MOD（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)。**所有性能相关内容都归本包**，一般游玩用不到；InfiniTweaks 只放 Quality of Life 功能。历史记录：[1.1.0 制作端范围](AUTHORING-SCOPE.md)、[InfiniTweaks 标记与 HUD 性能对照](PERFORMANCE-REVIEW.md)。
+计划与状态见两仓统一框架第 6 节 U-DEV-MOD（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)，版本历史见 [CHANGELOG.md](CHANGELOG.md)。**所有性能相关内容都归本包**，一般游玩用不到；InfiniTweaks 只放 Quality of Life 功能。历史记录：[1.1.0 制作端范围](AUTHORING-SCOPE.md)、[InfiniTweaks 标记与 HUD 性能对照](PERFORMANCE-REVIEW.md)。
 
 ## 工程与启动门槛
 
-两个工程：
+只有一个工程：
 
 | 工程 | 内容 |
 | --- | --- |
-| `ForgeDevelopment.csproj` | 只引用 `ForgeRuntime.Framework` 的 SDK 程序集；`ModuleDefinition.Create()` 仍是空 provider，排除 `Native/**` 与 `tests/**` |
 | `Native/ForgeDevelopment.Native.csproj` | 真实 BepInEx 插件 `ForgeDevelopment.Native.dll`，包含全部诊断源码（原 `ForgeRuntime/` 根目录的 16 个文件）与 10 个诊断 Hook |
+
+托管 SDK 程序集已删除：原来只登记空 provider 的 `ForgeDevelopment.csproj` 与 `ModuleDefinition.cs`（`forge.module.development` 0.1.0）都不再存在，也没有测试种子保留这个身份；包版本只取 `Native/Plugin.cs` 的 `PluginVersion`。
 
 插件身份是 `[BepInPlugin("NAinfini.ForgeDevelopment", "Infini Forge Development", "1.0.0")]`，硬依赖 `NAinfini.ForgeRuntime` 1.2.0，软依赖 InfiniTweaks（同装时要求 2.5.0 或更新，旧版包含重复采集器）。原生工程只引用宿主 `ForgeRuntime.dll` 与 SDK，不内嵌第二个内核；构建时必须显式传入 `ForgeRuntimeAssembly`、`ForgeFrameworkAssembly` 与 `GTFOBepInExPath`，缺一即失败。
 
@@ -84,7 +85,7 @@ python ForgeDevelopment/scripts/analyze_performance.py session.log --output perf
 python ForgeDevelopment/scripts/verify-diagnostics.py --bepinex "$env:GTFO_BEPINEX_PATH"
 ```
 
-脚本依次构建宿主、SDK 模块、原生插件，运行插件启动、报告、项目规则、检查、快照、关机、场景清单、遥测、采样、原生布局与 Python 套件。默认新建系统临时目录，也可以指定一个尚不存在的 `--output`；源码变化或任何失败都返回非零。完整的套件清单与结果见 [VALIDATION.md](VALIDATION.md)。
+脚本依次构建宿主、原生插件与各测试工程，运行插件启动、报告、项目规则、检查、快照、关机、场景清单、遥测、采样、原生布局与 Python 套件。默认新建系统临时目录，也可以指定一个尚不存在的 `--output`；源码变化或任何失败都返回非零。完整的套件清单与结果见 [VALIDATION.md](VALIDATION.md)。
 
 ## 边界
 

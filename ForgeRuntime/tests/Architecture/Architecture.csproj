@@ -10,7 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Framework/ForgeRuntime.Framework.csproj" />
-    <ProjectReference Include="../../../ForgeDevelopment/ForgeDevelopment.csproj" />
     <ProjectReference Include="../../../ForgeTrigger/ForgeTrigger.csproj" />
     <ProjectReference Include="../../../ForgeMap/ForgeMap.csproj" />
     <ProjectReference Include="../../../ForgeWeapon/ForgeWeapon.csproj" />

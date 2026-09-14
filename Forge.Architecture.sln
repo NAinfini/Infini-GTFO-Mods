@@ -9,8 +9,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Framework", "Framework", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ForgeRuntime.Framework", "ForgeRuntime\Framework\ForgeRuntime.Framework.csproj", "{71652225-9586-42CC-97CE-1648A6C965BD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ForgeDevelopment", "ForgeDevelopment\ForgeDevelopment.csproj", "{D3690204-6092-4DDA-A81F-6AA271EFA7FB}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ForgeTrigger", "ForgeTrigger\ForgeTrigger.csproj", "{1B7D73BC-CB45-48E1-90C1-59A9FC3A161F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ForgeMap", "ForgeMap\ForgeMap.csproj", "{2B93C7E5-9382-4784-8A6A-77FB4FF22875}"
@@ -45,18 +43,6 @@ Global
 		{71652225-9586-42CC-97CE-1648A6C965BD}.Release|x64.Build.0 = Release|Any CPU
 		{71652225-9586-42CC-97CE-1648A6C965BD}.Release|x86.ActiveCfg = Release|Any CPU
 		{71652225-9586-42CC-97CE-1648A6C965BD}.Release|x86.Build.0 = Release|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Debug|x64.Build.0 = Debug|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Debug|x86.Build.0 = Debug|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Release|x64.ActiveCfg = Release|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Release|x64.Build.0 = Release|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Release|x86.ActiveCfg = Release|Any CPU
-		{D3690204-6092-4DDA-A81F-6AA271EFA7FB}.Release|x86.Build.0 = Release|Any CPU
 		{1B7D73BC-CB45-48E1-90C1-59A9FC3A161F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1B7D73BC-CB45-48E1-90C1-59A9FC3A161F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1B7D73BC-CB45-48E1-90C1-59A9FC3A161F}.Debug|x64.ActiveCfg = Debug|Any CPU

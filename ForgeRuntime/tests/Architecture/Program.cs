@@ -11,7 +11,6 @@ void Check(bool value, string name)
 
 var definitions = new (Type Type, Func<RuntimeModule> Create)[]
 {
-    (typeof(ForgeDevelopment.ModuleDefinition), ForgeDevelopment.ModuleDefinition.Create),
     (typeof(ForgeTrigger.ModuleDefinition), ForgeTrigger.ModuleDefinition.Create),
     (typeof(ForgeMap.ModuleDefinition), ForgeMap.ModuleDefinition.Create),
     (typeof(ForgeWeapon.ModuleDefinition), ForgeWeapon.ModuleDefinition.Create),
@@ -19,7 +18,7 @@ var definitions = new (Type Type, Func<RuntimeModule> Create)[]
 var sdk = typeof(RuntimeKernel).Assembly;
 Check(sdk.GetName().Name == "ForgeRuntime.Framework", "the shared SDK has its own assembly");
 var assemblies = definitions.Select(d => d.Type.Assembly).Append(typeof(ForgeEnemy.ModuleDefinition).Assembly).Append(sdk).ToArray();
-Check(assemblies.Distinct().Count() == 6, "five managed domain assemblies and one SDK; native Enemy is checked by NativeLayout");
+Check(assemblies.Distinct().Count() == 5, "four managed domain assemblies and one SDK; native Enemy is checked by NativeLayout");
 Check(typeof(ForgeEnemy.ModuleDefinition).GetMethod("Create") == null, "retired empty Enemy provider cannot register beside native Enemy");
 Check(ForgeEnemy.ModuleDefinition.ProviderId == "forge.module.gtfo.enemy", "Enemy provider identity preserved");
 foreach (var assembly in assemblies)
