@@ -277,6 +277,7 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
         Field(text, "subject", r.SubjectProvider);
         if (r.Plan is RuntimeLogPlan plan) text.Append(" plan=").Append(plan.PlanId).Append(" resource=").Append(plan.ResourceId).Append('@').Append(plan.ResourceRevision);
         Field(text, "path", r.Path);
+        Field(text, "detail", r.Detail);
         Field(text, "entry", r.Entry);
         Field(text, "step", r.Step);
         Field(text, "binding", r.Binding);

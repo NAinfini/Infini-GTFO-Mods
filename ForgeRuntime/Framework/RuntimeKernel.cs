@@ -111,19 +111,8 @@ public sealed partial class RuntimeKernel
     {
         ArgumentNullException.ThrowIfNull(files);
         Mutable();
+        AcceptRuntimeWork(true);
         var outcomes = new List<PlanLoadOutcome>(files.Count);
-        try { AcceptRuntimeWork(true); }
-        catch (RuntimeContractException ex) when (ex.Code == "runtime-not-ready")
-        {
-            // Discovery-triggered runtime-not-ready is reported per file as plan.rejected rather than thrown (unlike every
-            // other SDK-caller-error code), so a host that scans before the runtime is ready never crashes on it.
-            foreach (var file in files)
-            {
-                LogPlanRejected(file.Path, null, ex.Code);
-                outcomes.Add(new PlanLoadOutcome(file.Path, false, null, ex.Code, ex.Message));
-            }
-            return outcomes;
-        }
         var identified = new List<(PlanCandidate File, PlanIdentity Identity)>();
         foreach (var file in files)
         {
@@ -148,11 +137,11 @@ public sealed partial class RuntimeKernel
             if (members.Length > 1)
             {
                 // Each conflicting file gets its own path-carrying record; collectively the group's records cover every path.
-                var paths = string.Join(", ", members.Select(m => m.File.Path));
+                var paths = string.Join(", ", members.Select(m => m.File.Path).OrderBy(p => p, StringComparer.Ordinal));
                 foreach (var member in members)
                 {
                     var plan = new RuntimeLogPlan { PlanId = member.Identity.Id, ResourceId = member.Identity.ResourceId, ResourceRevision = member.Identity.ResourceRevision };
-                    LogPlanRejected(member.File.Path, plan, "plan-conflict");
+                    LogPlanRejected(member.File.Path, plan, "plan-conflict", paths);
                     outcomes.Add(new PlanLoadOutcome(member.File.Path, false, member.Identity.Id, "plan-conflict", paths));
                 }
                 continue;
@@ -161,7 +150,7 @@ public sealed partial class RuntimeKernel
             var identityPlan = new RuntimeLogPlan { PlanId = identity.Id, ResourceId = identity.ResourceId, ResourceRevision = identity.ResourceRevision };
             if (plans.ContainsKey(identity.Id))
             {
-                LogPlanRejected(file.Path, identityPlan, "plan-conflict");
+                LogPlanRejected(file.Path, identityPlan, "plan-conflict", file.Path);
                 outcomes.Add(new PlanLoadOutcome(file.Path, false, identity.Id, "plan-conflict", file.Path));
                 continue;
             }
@@ -189,11 +178,11 @@ public sealed partial class RuntimeKernel
         if (loadedAny) RebuildSubscriptions();
         return outcomes;
     }
-    private void LogPlanRejected(string path, RuntimeLogPlan? plan, string code)
+    private void LogPlanRejected(string path, RuntimeLogPlan? plan, string code, string? detail = null)
     {
         if (logSink == null || !LogGate(Identity.Id).IsEnabled(RuntimeLogLevel.Error)) return;
         WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Error, Code = RuntimeLogCodes.PlanRejected, Provider = Identity.Id,
-            Tick = CurrentTick, WorldEpoch = WorldEpoch, Path = path, Plan = plan,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, Path = path, Plan = plan, Detail = detail,
             Result = new RuntimeLogResult { Status = "rejected", Commit = null, Reason = code } });
     }
     private void LogPlanLoaded(string path, RuntimeLogPlan plan, IReadOnlyList<string> permissions)

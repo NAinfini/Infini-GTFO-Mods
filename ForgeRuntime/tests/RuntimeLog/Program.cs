@@ -302,6 +302,22 @@ Case("plan.loaded and plan.rejected carry path and permissions", () => {
     Check(!rejected.TryGetProperty("permissions", out _) && !rejected.TryGetProperty("plan", out _), "plan.rejected without a resolved identity leaked plan or permissions");
 });
 
+Case("plan-conflict Detail is folded into the message for every path in the group, never its own JSON field", () => {
+    var directory = NewDirectory(); var (writer, _, _) = Writer(directory);
+    var kernel = Kernel(writer, RuntimeLogLevel.Info);
+    string conflictDetail = string.Join(", ", "Team-Pack/forge/plans/a.plan.json", "Team-Pack/forge/plans/b.plan.json", "Other-Pack/forge/plans/c.plan.json");
+    kernel.WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Error, Code = RuntimeLogCodes.PlanRejected, Provider = Runtime, Tick = 1, WorldEpoch = 1,
+        Path = "Team-Pack/forge/plans/a.plan.json", Detail = conflictDetail, Result = new RuntimeLogResult { Status = "rejected", Commit = null, Reason = "plan-conflict" } });
+    writer.Dispose(); var lines = Lines(writer);
+    var rejected = lines.Single(line => Text(line, "code") == RuntimeLogCodes.PlanRejected);
+    Check(!rejected.TryGetProperty("detail", out _), "Detail leaked as its own JSON field");
+    string message = Text(rejected, "message")!;
+    Check(message.Contains("Team-Pack/forge/plans/a.plan.json", StringComparison.Ordinal)
+        && message.Contains("Team-Pack/forge/plans/b.plan.json", StringComparison.Ordinal)
+        && message.Contains("Other-Pack/forge/plans/c.plan.json", StringComparison.Ordinal),
+        "plan-conflict message did not carry every path in the conflict group: " + message);
+});
+
 Case("privacy: no Steam64-shaped numbers", () => {
     var steam = new Regex("(?<![0-9])[0-9]{17}(?![0-9])");
     Check(steam.IsMatch("id 76561198000000000.") && !steam.IsMatch("765611980000000001"), "privacy pattern control");

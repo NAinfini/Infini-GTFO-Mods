@@ -59,6 +59,9 @@ public readonly struct RuntimeLogRecord
     public string? Step { get; init; }
     public string? Binding { get; init; }
     public RuntimeLogResult? Result { get; init; }
+    /// <summary>Free-text detail folded into the writer's composed message only; it is never its own JSON field.
+    /// Carries the comma-joined, ordinal-sorted paths of every file in a plan-conflict group.</summary>
+    public string? Detail { get; init; }
 }
 
 public readonly record struct RuntimeLogProviderLevel(string Provider, RuntimeLogLevel Level);
