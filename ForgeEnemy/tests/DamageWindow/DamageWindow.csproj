@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="ValidateDisassemblyReference" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/Iced.dll')"
+      Text="Set GTFO_BEPINEX_PATH or GTFOBepInExPath to a BepInEx directory that ships Iced.dll." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" />
+  </ItemGroup>
+</Project>
