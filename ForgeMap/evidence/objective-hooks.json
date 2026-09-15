@@ -1,0 +1,508 @@
+{
+  "schemaVersion": 1,
+  "purpose": "forge-map-objective-alarm-scan-extraction-native-hooks",
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameVerified": false,
+  "gameVerifiedNote": "Static evidence only: interop metadata from the Forge-MapEditor-QA profile, dump.cs of the same build, and direct x64 call sites decoded from GameAssembly.dll. No side, no ordering, no frequency and no in-game behaviour was executed or observed; every claim about which peer runs a member is inference and is marked as such in side.verified=false.",
+  "buildId": "20403457",
+  "gameAssemblySha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55",
+  "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+  "codeSection": "il2cpp",
+  "dumpSource": "C:\\Users\\nainf\\Github\\General Task\\gtfo-inspection\\dumper\\dump.cs",
+  "interopSource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop",
+  "gameAssemblySource": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
+  "rulingRefs": [
+    "rulings-step1.md 19: host authority; client-local triggers go through a command-request channel",
+    "rulings-step1.md 26: handle and resource-reference plan value types",
+    "rulings-step1.md 31: doors/terminals/alarms/scans belong to ForgeMap",
+    "rulings-step1.md 43: FrameHandle is bit-identical to FrameEntity; provider index in the 24 B slot",
+    "rulings-step1.md 49: objective triggers drop the resource output port; structural resource parameter plus instance handle output"
+  ],
+  "assemblies": [
+    { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
+    { "file": "SNet_ASM.dll", "sha256": "6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C", "mvid": "143acd09-f561-44d0-9455-a78706262fb5" },
+    { "file": "GameData-ASM.dll", "sha256": "DEE523620186887A95A8E940FF1DDB0CDB94E395840F12C823CC26AE4F5E7106", "mvid": "10c226b4-0ffe-41dc-8e66-7c049afdb4d9" }
+  ],
+  "sideVocabulary": {
+    "both": "the member is reached from a state-replication callback (iSNet_StateReplicatorProvider) or a replicated component, so both peers run it; mark verified=false because no body or runtime observation backs the claim",
+    "host": "the member is only reached from master-only paths (Master_/Sync* naming, level-build callbacks); inference, not observed",
+    "unknown": "no static evidence about the executing peer"
+  },
+  "stateShapes": [
+    { "id": "pWardenObjectiveState", "assembly": "Modules-ASM.dll", "dumpLine": 589478, "replicatedBy": "SNet_StateReplicator<pWardenObjectiveState, pWardenObjectiveInteraction> WardenObjectiveManager.m_stateReplicator", "fields": "main|second|third status (eWardenObjectiveStatus), subObj (eWardenSubObjectiveStatus), chainIndex, itemIndexPlusOne, onActivateEventBreakIndex, onActivateEventIndex, startTime; forceUpdate; extraTime; exitWaveTriggered; ObjectiveItemStates[96]; RequiredObjectiveItems[8]" },
+    { "id": "pWardenObjectiveInteraction", "assembly": "Modules-ASM.dll", "dumpLine": 589441, "fields": "type (eWardenObjectiveInteractionType), newSubObj, forceUpdate, itemIndexPlusOne, newOnActivateEventBreakIndex, newOnActivateEventIndex, ownerChainIndexPlusOne, inLayer (LG_LayerType), newCustomSubObjectiveHeaderID, newCustomSubObjectiveTextID, itemID, extraTime" },
+    { "id": "pBioscanState", "assembly": "Modules-ASM.dll", "dumpLine": 609004, "replicatedBy": "SNet_StateReplicator<pBioscanState> CP_Bioscan_Sync.m_stateReplicator", "fields": "status (eBioscanStatus), progress (float), playersInScan, playersMax, playerInScan1..4 (SNetStructs.pPlayer), requiredObjStatus (byte)" },
+    { "id": "pChainedPuzzleState", "assembly": "Modules-ASM.dll", "dumpLine": 610077, "replicatedBy": "SNet_StateReplicator<pChainedPuzzleState, pChainedPuzzleInteraction> ChainedPuzzleInstance.m_stateReplicator", "fields": "status (eChainedPuzzleStatus), currentSurvivalWave_EventID (ushort), isActive, isSolved" },
+    { "id": "pExitScanEventTrigger", "assembly": "Modules-ASM.dll", "dumpLine": 589471, "fields": "InLayer (LG_LayerType)", "note": "payload of WardenObjectiveManager.m_exitScanEventSync (SNet_Packet<pExitScanEventTrigger>)" },
+    { "id": "pWardenObjectiveWaveID", "assembly": "Modules-ASM.dll", "dumpLine": 589464, "fields": "waveID (ushort)", "note": "payload of WardenObjectiveManager.m_recallWardenObjectiveWaveID (SNet_Packet<pWardenObjectiveWaveID>)" },
+    { "id": "pComputerTerminalState", "assembly": "Modules-ASM.dll", "dumpLine": 681583, "fields": "UsedCommands[44], RemovedCommands[8], CommandRules[8], IsPasswordProtected, PuzzleComplete, PuzzleSeed, PuzzleRoundIndex" }
+  ],
+  "stateVocabulary": [
+    { "id": "eWardenObjectiveStatus", "assembly": "Modules-ASM.dll", "dumpLine": 589295, "values": { "NotDiscovered": 0, "Discovered": 10, "Started": 20, "WardenObjectivePartiallySolved": 30, "WardenObjectiveItemSolved": 40 } },
+    { "id": "eWardenSubObjectiveStatus", "assembly": "Modules-ASM.dll", "dumpLine": 589307, "values": { "FindLocationInfo": 0, "FindLocationInfoHelp": 1, "GoToZone": 2, "GoToZoneHelp": 3, "InZoneFindItem": 4, "InZoneFindItemHelp": 5, "SolveItem": 6, "SolveItemHelp": 7, "GoToWinCondition": 8, "GoToWinConditionHelp": 9 } },
+    { "id": "eWardenObjectiveInteractionType", "assembly": "Modules-ASM.dll", "dumpLine": 589274, "values": { "DiscoverObjective": 0, "StartObjective": 1, "SolveWardenObjectiveItem": 2, "PartiallySolveWardenObjectiveItem": 3, "SolveWinCondition": 4, "UpdateSubObjective": 5, "ChangeLocalLayer": 6, "EventUpdate": 7, "CustomSubObjectiveUpdate": 8, "SetItemSolved": 9, "AddRequiredItem": 10, "SetExtraTime": 11, "SetSolveOnDeath": 12, "SetExitWaveTriggered": 13 } },
+    { "id": "eWardenObjectiveWinCondition", "assembly": "Modules-ASM.dll", "dumpLine": 589372, "values": { "GoToElevator": 0, "GoToExitGeo": 1 } },
+    { "id": "LG_LayerType", "assembly": "Modules-ASM.dll", "dumpLine": 684602, "values": { "MainLayer": 0, "SecondaryLayer": 1, "ThirdLayer": 2 } },
+    { "id": "eBioscanStatus", "assembly": "Modules-ASM.dll", "dumpLine": 608569, "values": { "Disabled": 0, "SplineReveal": 1, "Waiting": 2, "Scanning": 3, "Finished": 4, "TimedOut": 5 } },
+    { "id": "eChainedPuzzleStatus", "assembly": "Modules-ASM.dll", "dumpLine": 610057, "values": { "Disabled": 0, "Active": 1, "Solved": 2 } },
+    { "id": "eWardenObjectiveEventTrigger", "assembly": "GameData-ASM.dll", "dumpLine": 647002, "values": { "None": 0, "OnStart": 1, "OnMid": 2, "OnEnd": 3 } },
+    { "id": "TERM_State", "assembly": "Modules-ASM.dll", "dumpLine": 681551, "note": "Sleeping/Awake/PlayerInteracting/DataMining/Hacked/CodePuzzle/InputTest/ReactorError/AskToPlayLogAudio/DoPlayAudioFile/AudioLoopError/Ping/PasswordProtected/EnterPassword" }
+  ],
+  "layerCompletionEvidence": [
+    {
+      "topic": "layer identity",
+      "evidence": "pWardenObjectiveState (Modules-ASM.dll, dump line 589478) carries exactly three fixed slots named main_, second_ and third_ (status, subObj, chainIndex, itemIndexPlusOne, onActivateEventBreakIndex, onActivateEventIndex, startTime); LG_LayerType (dump line 684602) = MainLayer 0, SecondaryLayer 1, ThirdLayer 2. WardenObjectiveManager.get_LocalPlayerLayer and get_LastUpdatedLayer are the readbacks.",
+      "conclusion": "objective progress is per layer with a compile-time layer key; there is no dynamic layer list"
+    },
+    {
+      "topic": "layer advance",
+      "evidence": "WardenObjectiveManager.OnStateChange -> OnObjectiveChainUpdated(layer, chainIndex) (verified edge, three call sites) and -> UpdateEventStep(layer, oldState, newState) (verified edge); CheckWardenObjectiveStatus takes old and new chainIndex plus old and new eWardenSubObjectiveStatus.",
+      "conclusion": "the per-layer phase is chainIndex (byte) and the sub-phase is eWardenSubObjectiveStatus; both advance inside the status machine, not through a separate API"
+    },
+    {
+      "topic": "main/secondary/third completion",
+      "evidence": "eWardenObjectiveStatus (dump line 589295) NotDiscovered 0 / Discovered 10 / Started 20 / WardenObjectivePartiallySolved 30 / WardenObjectiveItemSolved 40; WardenObjectiveManager.ForceCompleteObjective(LG_LayerType) 0x1515380 and ForceCompleteObjectiveAll(LG_LayerType) 0x1515270; OnWinConditionSolved(LG_LayerType, bool) 0x151C330; ActivateWinCondition() 0x150F710 called by CheckWardenObjectiveStatus (verified edge).",
+      "conclusion": "per-layer completion is the status transition to WardenObjectiveItemSolved for that layer, forced through AttemptInteract/ForceCompleteObjective; the layer key tells main from secondary from third"
+    },
+    {
+      "topic": "overload naming",
+      "evidence": "the string Overload only occurs in the .NET reflection/command tables of the dump; the objective layer model, the state struct and LG_LayerType never use it.",
+      "conclusion": "the catalog word overload has no native identifier; it can only be mapped onto third_* / LG_LayerType.ThirdLayer by convention, which is an assumption and not evidence"
+    },
+    {
+      "topic": "whole-expedition completion",
+      "evidence": "WardenObjectiveManager.CheckExpeditionSuccess() 0x15124F0 / CheckExpeditionFailed() 0x15123B0 (no direct caller decoded), ElevatorShaftLanding win-condition callbacks, ElevatorRide.StartElevatorRide 0x1678BB0, ExpeditionEndState enum, GS_ExpeditionSuccess/Fail/Abort state classes whose methods are shared stubs.",
+      "conclusion": "expedition success/failure is decided by the game-state machine, not by a hookable per-objective event; the extraction trigger should be derived from the exit scan and the landing, not from CheckExpeditionSuccess"
+    }
+  ],
+  "frequencyEvidence": [
+    { "id": "objective-state", "member": "WardenObjectiveManager.OnStateChange", "frequency": "event-driven", "basis": "state-replicator callback; called on every applied objective state change" },
+    { "id": "objective-status", "member": "WardenObjectiveManager.CheckWardenObjectiveStatus", "frequency": "event-driven", "basis": "only caller is OnStateChange (verified edge)" },
+    { "id": "objective-poll", "member": "WardenObjectiveManager.UpdateFromInLevel", "frequency": "periodic, rate unproven", "basis": "no direct caller decoded; body 4384 bytes and it calls CheckWardenObjectiveCompleted plus AttemptInteract" },
+    { "id": "puzzle-state", "member": "ChainedPuzzles.ChainedPuzzleInstance.OnStateChange", "frequency": "event-driven", "basis": "state-replicator callback" },
+    { "id": "bioscan-sync", "member": "ChainedPuzzles.CP_Bioscan_Sync.OnStateChange", "frequency": "event-driven", "basis": "state-replicator callback; the scan state is only published when it changes" },
+    { "id": "bioscan-sync-publish", "member": "ChainedPuzzles.CP_Bioscan_Sync.SetStateData", "frequency": "periodic while scanning, rate unproven", "basis": "no direct caller decoded; the sync component owns the publish cadence" },
+    { "id": "bioscan-local", "member": "ChainedPuzzles.CP_PlayerScanner.StartScan / MasterScan", "frequency": "local scanner tick", "basis": "CP_PlayerScanner.MasterScan 0x17327F0 and CheckLocalPlayerIsCLose 0x1732780 are local-player checks" },
+    { "id": "door-lock", "member": "LevelGeneration.LG_SecurityDoor_Locks.OnDoorState", "frequency": "event-driven", "basis": "called by every Setup* variant (verified callers) and on lock state change" },
+    { "id": "terminal", "member": "LevelGeneration.LG_ComputerTerminal.OnStateChange", "frequency": "event-driven", "basis": "state-replicator callback; the manager funnels client requests through WantToChangeTerminalState (ruling 19 pattern)" }
+  ],
+  "hooks": [
+    {
+      "hook": "ObjectiveStateChange", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "OnStateChange",
+      "signature": "System.Void WardenObjectiveManager::OnStateChange(pWardenObjectiveState,pWardenObjectiveState,System.Boolean)",
+      "isVirtual": true, "rva": "0x151B2D0", "slot": 14, "dumpLine": 589577, "bodyBytes": 4003,
+      "entry": "iSNet_StateReplicatorProvider<pWardenObjectiveState, pWardenObjectiveInteraction>.OnStateChange callback of WardenObjectiveManager.m_stateReplicator",
+      "reads": "old and new pWardenObjectiveState for all three layers (status, sub-status, chain index, item index, start time, item states)",
+      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
+      "rows": ["forge.trigger.objective.state_changed", "forge.trigger.objective.progress_changed", "forge.trigger.objective.phase_changed"],
+      "harmony": "prefix and postfix both usable; the callback carries both old and new state, so a postfix diff needs no extra readback"
+    },
+    {
+      "hook": "ObjectiveStatusCheck", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "CheckWardenObjectiveStatus",
+      "signature": "System.Void WardenObjectiveManager::CheckWardenObjectiveStatus(System.Boolean,LevelGeneration.LG_LayerType,pWardenObjectiveState,eWardenObjectiveStatus,eWardenObjectiveStatus,System.Int32,System.Int32,eWardenSubObjectiveStatus,eWardenSubObjectiveStatus)",
+      "isVirtual": false, "rva": "0x1512D90", "dumpLine": 589577, "bodyBytes": 6761,
+      "entry": "private method, only called from ObjectiveStateChange (verified direct edge)",
+      "reads": "layer, new state, old/new eWardenObjectiveStatus, old/new chain index, old/new eWardenSubObjectiveStatus",
+      "side": { "execution": "both", "basis": "only-caller-is-OnStateChange", "verified": false },
+      "rows": ["forge.trigger.objective.state_changed", "forge.trigger.objective.progress_changed", "forge.trigger.objective.phase_changed"],
+      "harmony": "prefix and postfix usable; this is the per-change transition machine and the place where node/overload progression, waves and native events are decided"
+    },
+    {
+      "hook": "ObjectiveChainUpdated", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "OnObjectiveChainUpdated",
+      "signature": "System.Void WardenObjectiveManager::OnObjectiveChainUpdated(LevelGeneration.LG_LayerType,System.Int32)",
+      "isVirtual": false, "rva": "0x151ACB0", "dumpLine": 589577, "bodyBytes": 234,
+      "entry": "called from ObjectiveStateChange (verified direct edge, three call sites)",
+      "reads": "layer and the new chain index",
+      "side": { "execution": "both", "basis": "only-caller-is-OnStateChange", "verified": false },
+      "rows": ["forge.trigger.objective.phase_changed"],
+      "harmony": "postfix gives the node/overload phase index directly"
+    },
+    {
+      "hook": "ObjectiveAttemptInteract", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "AttemptInteract",
+      "signature": "System.Void WardenObjectiveManager::AttemptInteract(pWardenObjectiveInteraction)",
+      "isVirtual": true, "rva": "0x1510920", "slot": 15, "dumpLine": 589577, "bodyBytes": 689,
+      "entry": "iSNet_StateReplicatorProvider interaction channel plus local-player paths (OnLocalPlayerFoundObjectiveItem, OnLocalPlayerEnterNewLayerType, OnExitScanProgressUpdate, UpdateFromInLevel)",
+      "reads": "pWardenObjectiveInteraction (type, layer, item index, extra time, custom sub-objective ids)",
+      "side": { "execution": "both", "basis": "interface-slot-plus-local-callers", "verified": false, "note": "ruling 19: local triggers must be routed to the host; this member is the objective-side request entry" },
+      "rows": ["forge.action.map.objective_state", "forge.action.map.objective_progress", "forge.action.map.objective_phase"],
+      "harmony": "prefix is the action entry; suppressing the original would block the native objective machine, so the action should call the original after its own validation"
+    },
+    {
+      "hook": "ObjectiveInLevelUpdate", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "UpdateFromInLevel",
+      "signature": "System.Void WardenObjectiveManager::UpdateFromInLevel()",
+      "isVirtual": false, "rva": "0x1520E30", "dumpLine": 589577, "bodyBytes": 4384,
+      "entry": "polling entry (no direct caller in the image; invoked as a global-manager update step), calls CheckWardenObjectiveCompleted and AttemptInteract",
+      "reads": "current in-level objective state and gather counts",
+      "side": { "execution": "unknown", "basis": "no-direct-caller", "verified": false },
+      "rows": ["forge.trigger.objective.progress_changed"],
+      "harmony": "postfix polling is safe; do not use it as a per-frame trigger source because the frequency is not established"
+    },
+    {
+      "hook": "ProgressionObjectiveStateChange", "assembly": "Modules-ASM.dll", "type": "ProgressionObjectivesManager", "name": "OnStateChange",
+      "signature": "System.Void ProgressionObjectivesManager::OnStateChange(pProgressionObjectiveState,pProgressionObjectiveState,System.Boolean)",
+      "isVirtual": true, "rva": "0x13C7830", "slot": 4, "dumpLine": 595359, "bodyBytes": 677,
+      "entry": "state-replicator callback of ProgressionObjectivesManager",
+      "reads": "per progression-objective state (bulkhead key, power generator cell, keycard, reactor cell) before and after",
+      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
+      "rows": ["forge.trigger.objective.progression_changed"],
+      "harmony": "prefix and postfix usable; instance identity equals the int id returned by RegisterProgressionObjective"
+    },
+    {
+      "hook": "ChainedPuzzleStateChange", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "OnStateChange",
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::OnStateChange(ChainedPuzzles.pChainedPuzzleState,ChainedPuzzles.pChainedPuzzleState,System.Boolean)",
+      "isVirtual": true, "rva": "0x1734BF0", "slot": 4, "dumpLine": 610099, "bodyBytes": 1344,
+      "entry": "state-replicator callback of ChainedPuzzleInstance.m_stateReplicator",
+      "reads": "eChainedPuzzleStatus before and after, currentSurvivalWave_EventID, isActive, isSolved",
+      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
+      "rows": ["forge.trigger.objective.alarm_started", "forge.trigger.objective.alarm_stopped", "forge.trigger.objective.scan_started", "forge.trigger.objective.scan_completed"],
+      "harmony": "postfix diff on status gives Active (alarm/scan running) and Solved (alarm cleared) without any native field access"
+    },
+    {
+      "hook": "SecurityDoorLockState", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "OnDoorState",
+      "signature": "System.Void LevelGeneration.LG_SecurityDoor_Locks::OnDoorState(LevelGeneration.pDoorState,System.Boolean)",
+      "isVirtual": true, "rva": "0x159F2D0", "slot": 27, "dumpLine": 686903, "bodyBytes": 108,
+      "entry": "lock state dispatch; called by every Setup* variant of the same type (Setup, SetupForChainedPuzzle, SetupForGateKey, SetupForPowerGenerator, SetupForBulkheadDC, SetupAsLockedNoKey)",
+      "reads": "pDoorState (status, player, locked-with-key flags)",
+      "side": { "execution": "both", "basis": "replicated-lock-component", "verified": false },
+      "rows": ["forge.trigger.objective.alarm_started", "forge.trigger.objective.alarm_stopped"],
+      "harmony": "prefix; the actual alarm instance is reached through the ChainedPuzzleToSolve property, which is set by SetupForChainedPuzzle"
+    },
+    {
+      "hook": "SecurityDoorSyncStatus", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "OnSyncDoorStatusChange",
+      "signature": "System.Void LevelGeneration.LG_SecurityDoor::OnSyncDoorStatusChange(LevelGeneration.pDoorState,System.Boolean)",
+      "isVirtual": false, "rva": "0x15A2E40", "dumpLine": 688079, "bodyBytes": 862,
+      "entry": "door sync callback (iLG_Door_Sync)",
+      "reads": "door state and LastStatus/eDoorStatus",
+      "side": { "execution": "both", "basis": "replicated-door-component", "verified": false },
+      "rows": ["forge.trigger.objective.alarm_started", "forge.trigger.objective.alarm_stopped"],
+      "harmony": "postfix; the door alarm puzzle is created earlier by SetupChainedPuzzleLock and solved through add_OnPuzzleSolved"
+    },
+    {
+      "hook": "TerminalStateChange", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "OnStateChange",
+      "signature": "System.Void LevelGeneration.LG_ComputerTerminal::OnStateChange(LevelGeneration.pComputerTerminalState,LevelGeneration.pComputerTerminalState,System.Boolean)",
+      "isVirtual": true, "rva": "0x1297E80", "slot": 32, "dumpLine": 681625, "bodyBytes": 610,
+      "entry": "state-replicator callback of the terminal",
+      "reads": "used/removed commands, command rules, password flag, puzzle round index",
+      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
+      "rows": ["forge.trigger.objective.alarm_started", "forge.trigger.objective.scan_started"],
+      "harmony": "prefix; a terminal command can own a chained puzzle, so the per-command alarm instance comes from SetChainPuzzleForCommand, not from this callback"
+    },
+    {
+      "hook": "BioscanSyncStateChange", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "name": "OnSyncStateChange",
+      "signature": "System.Void ChainedPuzzles.CP_Bioscan_Core::OnSyncStateChange(ChainedPuzzles.eBioscanStatus,System.Single,Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent>,System.Int32,Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1<System.Boolean>,System.Boolean)",
+      "isVirtual": false, "rva": "0x1863230", "dumpLine": 608665, "bodyBytes": 1534,
+      "entry": "subscriber of CP_Bioscan_Sync.OnSyncStateChange (Action<eBioscanStatus, float, List<PlayerAgent>, int, bool[], bool>)",
+      "reads": "scan status, progress, players currently in the scan, players max, required-item status, drop-in flag",
+      "side": { "execution": "both", "basis": "sync-delegate-subscriber", "verified": false },
+      "rows": ["forge.trigger.objective.scan_started", "forge.trigger.objective.scan_progress", "forge.trigger.objective.scan_membership", "forge.trigger.objective.scan_paused", "forge.trigger.objective.scan_completed", "forge.trigger.objective.scan_failed"],
+      "harmony": "prefix; this single callback carries every scan trigger input (status, progress, membership) in one place"
+    },
+    {
+      "hook": "BioscanActivate", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "name": "Activate",
+      "signature": "System.Void ChainedPuzzles.CP_Bioscan_Core::Activate()",
+      "isVirtual": true, "rva": "0x1861D50", "slot": 5, "dumpLine": 608665, "bodyBytes": 1031,
+      "entry": "iChainedPuzzleCore.Activate, invoked by the owning ChainedPuzzleInstance",
+      "reads": "none (no parameters)",
+      "side": { "execution": "host", "basis": "interface-slot-called-by-owner", "verified": false },
+      "rows": ["forge.trigger.objective.scan_started", "forge.action.map.scan_start"],
+      "harmony": "prefix is the native scan-start entry; the matching stop entries are Deactivate, SetTimeOut and SetTimeIn"
+    },
+    {
+      "hook": "BioscanSyncComponentStateChange", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Sync", "name": "OnStateChange",
+      "signature": "System.Void ChainedPuzzles.CP_Bioscan_Sync::OnStateChange(ChainedPuzzles.pBioscanState,ChainedPuzzles.pBioscanState,System.Boolean)",
+      "isVirtual": true, "rva": "0x1867BB0", "slot": 9, "dumpLine": 609024, "bodyBytes": 842,
+      "entry": "state-replicator callback of CP_Bioscan_Sync.m_stateReplicator",
+      "reads": "pBioscanState before and after",
+      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
+      "rows": ["forge.trigger.objective.scan_started", "forge.trigger.objective.scan_progress", "forge.trigger.objective.scan_membership", "forge.trigger.objective.scan_completed", "forge.trigger.objective.scan_failed"],
+      "harmony": "postfix; the verified direct edge to CP_Bioscan_Core.AddPlayersInScanToList shows this is where membership is rebuilt from the replicated player slots"
+    },
+    {
+      "hook": "BioscanLocalPlayerScannerStart", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_PlayerScanner", "name": "StartScan",
+      "signature": "System.Void ChainedPuzzles.CP_PlayerScanner::StartScan()",
+      "isVirtual": true, "rva": "0x17328B0", "slot": 6, "dumpLine": 609781, "bodyBytes": 426,
+      "entry": "iChainedPuzzleScanner slot on the local player's scanner component",
+      "reads": "none",
+      "side": { "execution": "both", "basis": "local-player-component", "verified": false, "note": "the scanner component lives on the local player object, so this is the client-visible half of a scan" },
+      "rows": ["forge.trigger.objective.scan_membership"],
+      "harmony": "prefix; use it only for local feedback, never as the authoritative scan event (that is BioscanSyncStateChange)"
+    },
+    {
+      "hook": "ExitWinConditionActivated", "assembly": "Modules-ASM.dll", "type": "ElevatorShaftLanding", "name": "ActivateWinCondition",
+      "signature": "System.Void ElevatorShaftLanding::ActivateWinCondition()",
+      "isVirtual": true, "rva": "0x167B860", "slot": 4, "dumpLine": 574924, "bodyBytes": 250,
+      "entry": "iWardenObjectiveWinConditionItem slot of the elevator landing; calls NavMarker.SetVisible (verified direct edge) and tail-jumps into ChainedPuzzleInstance.AttemptInteract(eChainedPuzzleInteraction)",
+      "reads": "none",
+      "side": { "execution": "host", "basis": "level-object-win-condition", "verified": false },
+      "rows": ["forge.trigger.objective.extraction_state"],
+      "harmony": "prefix marks the exit scan being armed; the matching progress callback is ElevatorShaftLanding.<OnBuildDone>b__19_1 -> WardenObjectiveManager.OnExitScanProgressUpdate"
+    },
+    {
+      "hook": "ExitLandingBuildDone", "assembly": "Modules-ASM.dll", "type": "ElevatorShaftLanding", "name": "OnBuildDone",
+      "signature": "System.Void ElevatorShaftLanding::OnBuildDone()",
+      "isVirtual": false, "rva": "0x167BCA0", "dumpLine": 574924, "bodyBytes": 2354,
+      "entry": "level-generation callback on the landing object",
+      "reads": "none (no parameters)",
+      "side": { "execution": "host", "basis": "level-build-callback", "verified": false },
+      "rows": ["forge.trigger.objective.extraction_state"],
+      "harmony": "postfix; this is where the exit chained puzzle is created and registered as the exit win-condition item, so it is the earliest stable point to learn the exit scan instance"
+    },
+    {
+      "hook": "SecurityDoorChainedPuzzleLockSetup", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "SetupChainedPuzzleLock",
+      "signature": "System.Void LevelGeneration.LG_SecurityDoor::SetupChainedPuzzleLock(System.UInt32)",
+      "isVirtual": false, "rva": "0x15A4500", "dumpLine": 688079, "bodyBytes": 1026,
+      "entry": "door setup path; calls ChainedPuzzleManager.CreatePuzzleInstance and ChainedPuzzleInstance.add_OnPuzzleSolved (verified direct edges)",
+      "reads": "the author-defined ChainedPuzzleDataBlock id of the door alarm/scan",
+      "side": { "execution": "host", "basis": "level-build-setup", "verified": false },
+      "rows": ["forge.trigger.objective.alarm_started", "forge.action.map.alarm_start"],
+      "harmony": "postfix; the created instance is the runtime identity behind the author's alarm reference"
+    },
+    {
+      "hook": "SecurityDoorUseChainedPuzzleOrUnlock", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "UseChainedPuzzleOrUnlock",
+      "signature": "System.Void LevelGeneration.LG_SecurityDoor::UseChainedPuzzleOrUnlock(SNetwork.SNet_Player)",
+      "isVirtual": false, "rva": "0x15A7480", "dumpLine": 688079, "bodyBytes": 501,
+      "entry": "door interaction path; callers are LG_SecurityDoor.OnBulkheadDCUnlock, SetupPowerGeneratorLock closure and a Setup closure",
+      "reads": "the interacting SNet_Player; reads ChainedPuzzleInstance.IsSolved (verified direct edge)",
+      "side": { "execution": "both", "basis": "player-interaction-entry", "verified": false, "note": "the player side of the door alarm; per ruling 19 the request must be forwarded to the host" },
+      "rows": ["forge.trigger.objective.alarm_started"],
+      "harmony": "prefix; carries the player who triggered the alarm"
+    }
+  ],
+  "readbacks": [
+    { "id": "objective-state", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "pWardenObjectiveState WardenObjectiveManager::get_CurrentState()", "rva": "0x15247A0", "isStatic": true, "note": "all three layers of the replicated objective state" },
+    { "id": "objective-started", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Boolean WardenObjectiveManager::get_IsExpeditionStarted()", "rva": "0x1524840", "note": "distinguishes lobby from running expedition" },
+    { "id": "objective-layer", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "LevelGeneration.LG_LayerType WardenObjectiveManager::get_LastUpdatedLayer()", "rva": "0x15248A0" },
+    { "id": "objective-local-layer", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "LevelGeneration.LG_LayerType WardenObjectiveManager::get_LocalPlayerLayer()", "rva": "0x1524900", "isStatic": true },
+    { "id": "objective-datablock", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Boolean WardenObjectiveManager::TryGetActiveWardenObjectiveData(LevelGeneration.LG_LayerType,GameData.WardenObjectiveDataBlock&)", "rva": "0x1520600", "note": "author-defined objective behind a layer, matches the structural resource parameter of ruling 49" },
+    { "id": "bioscan-state", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "signature": "ChainedPuzzles.pBioscanState ChainedPuzzles.CP_Bioscan_Core::get_State()", "rva": "0x18657E0" },
+    { "id": "bioscan-finished", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "signature": "System.Boolean ChainedPuzzles.CP_Bioscan_Core::IsFinished()", "rva": "0x1862E00" },
+    { "id": "bioscan-players-on-scan", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "signature": "Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent> ChainedPuzzles.CP_Bioscan_Core::get_PlayersOnScan()", "rva": "0x46D980", "rvaShared": true, "note": "shared stub RVA; the getter is callable but not a Harmony target by RVA" },
+    { "id": "puzzle-active", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "signature": "System.Boolean ChainedPuzzles.ChainedPuzzleInstance::get_IsActive()", "rva": "0x1736950" },
+    { "id": "puzzle-solved", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "signature": "System.Boolean ChainedPuzzles.ChainedPuzzleInstance::get_IsSolved()", "rva": "0x1736990" },
+    { "id": "puzzle-datablock", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "signature": "GameData.ChainedPuzzleDataBlock ChainedPuzzles.ChainedPuzzleInstance::get_Data()", "rva": "0x3A3F50", "rvaShared": true },
+    { "id": "door-alarm-puzzle", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "signature": "ChainedPuzzles.ChainedPuzzleInstance LevelGeneration.LG_SecurityDoor_Locks::get_ChainedPuzzleToSolve()", "rva": "0x3EF800", "rvaShared": true },
+    { "id": "wave-event", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "System.Boolean Mastermind::TryGetEvent(System.UInt16,Mastermind/MastermindEvent&)", "rva": "0x14F8880", "note": "resolves a wave/alarm wave from the ushort EventID that pChainedPuzzleState already carries" }
+  ],
+  "members": [
+    { "id": "objective-force-complete", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "ForceCompleteObjective", "signature": "System.Void WardenObjectiveManager::ForceCompleteObjective(LevelGeneration.LG_LayerType)", "rva": "0x1515380", "isStatic": true, "role": "action: complete one layer; verified caller of AttemptInteract" },
+    { "id": "objective-force-complete-all", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "ForceCompleteObjectiveAll", "signature": "System.Void WardenObjectiveManager::ForceCompleteObjectiveAll(LevelGeneration.LG_LayerType)", "rva": "0x1515270", "isStatic": true, "role": "action: complete every layer" },
+    { "id": "objective-stop-alarms", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "StopAlarms", "signature": "System.Void WardenObjectiveManager::StopAlarms()", "rva": "0x151F8F0", "isStatic": true, "role": "action entry for alarm_stop; no direct caller found in the image (reached from native event dispatch)" },
+    { "id": "objective-stop-waves", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "StopAllWardenObjectiveEnemyWaves", "signature": "System.Void WardenObjectiveManager::StopAllWardenObjectiveEnemyWaves()", "rva": "0x151F9B0", "isStatic": true, "role": "action entry for alarm_stop/wave_stop; called by ObjectiveStatusCheck, OnPrepareForRecall and the terminal DEACTIVATE_ALARMS closure (verified edges)" },
+    { "id": "objective-trigger-waves", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "TriggerEnemyWaves", "signature": "System.Void WardenObjectiveManager::TriggerEnemyWaves(Il2CppSystem.Collections.Generic.List`1<GameData.GenericEnemyWaveData>,AIGraph.AIG_CourseNode,SurvivalWaveSpawnType,System.Single,Player.PlayerAgent)", "rva": "0x151FD90", "isStatic": true, "role": "objective-owned wave start; callers are ObjectiveStatusCheck and OnExitScanProgressUpdate (verified edges)" },
+    { "id": "objective-win-condition-solved", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "OnWinConditionSolved", "signature": "System.Void WardenObjectiveManager::OnWinConditionSolved(LevelGeneration.LG_LayerType,System.Boolean)", "rva": "0x151C330", "isStatic": true, "role": "layer win/elevator extraction transition" },
+    { "id": "objective-activate-win-condition", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "ActivateWinCondition", "signature": "System.Void WardenObjectiveManager::ActivateWinCondition()", "rva": "0x150F710", "role": "per-layer win-condition activation; called by ObjectiveStatusCheck (verified edge)" },
+    { "id": "objective-expedition-success", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "CheckExpeditionSuccess", "signature": "System.Boolean WardenObjectiveManager::CheckExpeditionSuccess()", "rva": "0x15124F0", "isStatic": true, "role": "extraction success; no direct caller in the image (invoked indirectly by the game-state machine)" },
+    { "id": "objective-expedition-failed", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "CheckExpeditionFailed", "signature": "System.Boolean WardenObjectiveManager::CheckExpeditionFailed()", "rva": "0x15123B0", "isStatic": true, "role": "extraction failure; no direct caller in the image" },
+    { "id": "objective-exit-scan-progress", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "OnExitScanProgressUpdate", "signature": "System.Void WardenObjectiveManager::OnExitScanProgressUpdate(System.Single,AIGraph.AIG_CourseNode)", "rva": "0x15170A0", "isStatic": true, "role": "exit scan progress; called by ElevatorShaftLanding.<OnBuildDone>b__19_1 (verified edge)" },
+    { "id": "objective-event-step", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "UpdateEventStep", "signature": "System.Int32 WardenObjectiveManager::UpdateEventStep(LevelGeneration.LG_LayerType,pWardenObjectiveState,pWardenObjectiveState)", "rva": "0x1520BC0", "role": "native WardenObjectiveEvent step pointer; called by ObjectiveStateChange (verified edge)" },
+    { "id": "objective-execute-events", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "CheckAndExecuteEventsOnTrigger", "signature": "System.Void WardenObjectiveManager::CheckAndExecuteEventsOnTrigger(Il2CppSystem.Collections.Generic.List`1<GameData.WardenObjectiveEventData>,GameData.eWardenObjectiveEventTrigger,System.Boolean,System.Single,Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1<GameData.eWardenObjectiveEventType>)", "rva": "0x1511810", "isStatic": true, "extraOverloads": ["(GameData.WardenObjectiveEventData,GameData.eWardenObjectiveEventTrigger,System.Boolean,System.Single)", "(Il2CppSystem.Collections.Generic.List`1<GameData.WardenObjectiveEventData>,GameData.eWardenObjectiveEventTrigger,System.Boolean,System.Single,GameData.eWardenObjectiveEventType[])"], "role": "existing native event entry used by the level's author-defined events; callers include ObjectiveStatusCheck, OnExitScanProgressUpdate and LG_SecurityDoor.OnDoorIsOpened (verified edges)" },
+    { "id": "objective-set-extra-time", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "SetExtraTime", "signature": "System.Void WardenObjectiveManager::SetExtraTime(System.Single)", "rva": "0x151DE70", "isStatic": true, "role": "objective timer action" },
+    { "id": "objective-register-wave-id", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "name": "RegisterSurvivalWaveID", "signature": "System.Void WardenObjectiveManager::RegisterSurvivalWaveID(System.UInt16)", "rva": "0x151D410", "isStatic": true, "role": "links a wave EventID to the objective; only caller is Mastermind.TriggerSurvivalWave (verified edge)" },
+    { "id": "puzzle-create-instance", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleManager", "name": "CreatePuzzleInstance", "signature": "ChainedPuzzles.ChainedPuzzleInstance ChainedPuzzles.ChainedPuzzleManager::CreatePuzzleInstance(GameData.ChainedPuzzleDataBlock,LevelGeneration.LG_Area,LevelGeneration.LG_Area,UnityEngine.Vector3,UnityEngine.Transform,System.Boolean)", "rva": "0x1736F50", "isStatic": true, "extraOverloads": ["(System.UInt32,LevelGeneration.LG_Area,UnityEngine.Vector3,UnityEngine.Transform) @0x1736CD0", "(GameData.ChainedPuzzleDataBlock,LevelGeneration.LG_Area,UnityEngine.Vector3,UnityEngine.Transform) @0x1736EA0", "(GameData.ChainedPuzzleDataBlock,LevelGeneration.LG_Area,UnityEngine.Vector3,UnityEngine.Transform,System.Boolean) @0x1736DF0"], "role": "action entry for alarm_start/scan_start; the runtime instance identity is the returned ChainedPuzzleInstance" },
+    { "id": "puzzle-setup", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "Setup", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::Setup(GameData.ChainedPuzzleDataBlock,LevelGeneration.LG_Area,UnityEngine.Vector3,UnityEngine.Transform,LevelGeneration.LG_Area,System.Boolean)", "rva": "0x1735870", "role": "instance setup; binds Data (author reference) after creation" },
+    { "id": "puzzle-attempt-interact", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "AttemptInteract", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::AttemptInteract(ChainedPuzzles.eChainedPuzzleInteraction)", "rva": "0x1733280", "extraOverloads": ["(ChainedPuzzles.pChainedPuzzleInteraction) @0x17330D0 [virtual, slot 5]"], "role": "action entry for scan_start/alarm_start; called by ElevatorShaftLanding.ActivateWinCondition (verified edge)" },
+    { "id": "puzzle-master-activate", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "MasterActivate", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::MasterActivate()", "rva": "0x17334D0", "role": "master-side activation; calls TriggerEnemyWave (verified edge)" },
+    { "id": "puzzle-master-deactivate", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "MasterDeactivate", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::MasterDeactivate()", "rva": "0x1733A90", "role": "master-side deactivation; the native stop side of an alarm/scan" },
+    { "id": "puzzle-trigger-enemy-wave", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "TriggerEnemyWave", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::TriggerEnemyWave()", "rva": "0x1736600", "role": "alarm wave start inside the puzzle; calls Mastermind.TriggerSurvivalWave and SetSurvivalWaveID (verified edges)" },
+    { "id": "puzzle-set-is-exit", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "set_IsExitPuzzle", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::set_IsExitPuzzle(System.Boolean)", "rva": "0x1736B20", "role": "marks the exit scan; set by ElevatorShaftLanding.OnBuildDone (verified edge)" },
+    { "id": "puzzle-solved-callback", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "add_OnPuzzleSolved", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::add_OnPuzzleSolved(Il2CppSystem.Action)", "rva": "0x17368B0", "role": "solved callback used by LG_SecurityDoor.SetupChainedPuzzleLock, LG_SecurityDoor_Locks.SetupForChainedPuzzle and ElevatorShaftLanding.OnBuildDone (verified edges)" },
+    { "id": "puzzle-scan-changed-callback", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "add_Master_OnPlayerScanChangedCallback", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::add_Master_OnPlayerScanChangedCallback(Il2CppSystem.Action`4<System.Single,Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent>,System.Int32,Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1<System.Boolean>>)", "rva": "0x1736810", "role": "master-side scan progress and membership callback; registered by ElevatorShaftLanding.OnBuildDone (verified edge)" },
+    { "id": "bioscan-deactivate", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "name": "Deactivate", "signature": "System.Void ChainedPuzzles.CP_Bioscan_Core::Deactivate()", "rva": "0x1862CC0", "role": "iChainedPuzzleCore slot 6; scan/alarm stop side" },
+    { "id": "bioscan-time-out", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "name": "SetTimeOut", "signature": "System.Void ChainedPuzzles.CP_Bioscan_Core::SetTimeOut()", "rva": "0x1864A60", "role": "iChainedPuzzleCore slot 7; candidate native entry for scan_pause/failed, exact meaning not proven" },
+    { "id": "bioscan-time-in", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "name": "SetTimeIn", "signature": "System.Void ChainedPuzzles.CP_Bioscan_Core::SetTimeIn()", "rva": "0x1864950", "role": "iChainedPuzzleCore slot 8; candidate native entry for scan resume, exact meaning not proven" },
+    { "id": "bioscan-master-progress", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "name": "Master_OnPlayerScanChangedCheckProgress", "signature": "System.Void ChainedPuzzles.CP_Bioscan_Core::Master_OnPlayerScanChangedCheckProgress(System.Single,Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent>,System.Int32,Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1<System.Boolean>)", "rva": "0x1862E60", "role": "master-side progress check driven by the scan delegate (naming only)" },
+    { "id": "bioscan-sync-set-state", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Sync", "name": "SetStateData", "signature": "System.Void ChainedPuzzles.CP_Bioscan_Sync::SetStateData(ChainedPuzzles.eBioscanStatus,System.Single,Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent>,System.Int32,Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1<System.Boolean>)", "rva": "0x1867F80", "role": "publishes scan state into the replicator; no direct caller in the image (delegate/closure dispatch)" },
+    { "id": "terminal-set-chain-puzzle", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "SetChainPuzzleForCommand", "signature": "System.Void LevelGeneration.LG_ComputerTerminal::SetChainPuzzleForCommand(LevelGeneration.TERM_Command,System.Int32,ChainedPuzzles.ChainedPuzzleInstance)", "rva": "0x12987D0", "role": "binds a chained puzzle (terminal alarm/scan) to a terminal command; the per-command instance identity" },
+    { "id": "terminal-sync-change-state", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "SyncChangeState", "signature": "System.Void LevelGeneration.LG_ComputerTerminal::SyncChangeState(LevelGeneration.TERM_State,Player.PlayerAgent)", "rva": "0x129C070", "role": "host-applied terminal state change with the requesting player" },
+    { "id": "terminal-manager-want-change-state", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "WantToChangeTerminalState", "signature": "System.Void LevelGeneration.LG_ComputerTerminalManager::WantToChangeTerminalState(System.UInt32,LevelGeneration.TERM_State,Player.PlayerAgent)", "rva": "0x143DD80", "isStatic": true, "role": "client-side command request channel for terminals (ruling 19 pattern)" },
+    { "id": "terminal-manager-get-terminal", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "GetTerminal", "signature": "LevelGeneration.LG_ComputerTerminal LevelGeneration.LG_ComputerTerminalManager::GetTerminal(System.UInt32)", "rva": "0x143D790", "isStatic": true, "role": "resolves a terminal by its stable uint SyncID, the terminal identity source" },
+    { "id": "landing-stop-ambient-alarm", "assembly": "Modules-ASM.dll", "type": "ElevatorShaftLanding", "name": "StopAmbientAlarm", "signature": "System.Void ElevatorShaftLanding::StopAmbientAlarm()", "rva": "0x167C9E0", "isStatic": true, "role": "native alarm stop used by the terminal DEACTIVATE_ALARMS closure and by ObjectiveStatusCheck (verified edges)" },
+    { "id": "elevator-start-ride", "assembly": "Modules-ASM.dll", "type": "ElevatorRide", "name": "StartElevatorRide", "signature": "System.Void ElevatorRide::StartElevatorRide()", "rva": "0x1678BB0", "isStatic": true, "role": "extraction ride start; not a Harmony instance hook" },
+    { "id": "progression-attempt-set-state", "assembly": "Modules-ASM.dll", "type": "ProgressionObjectivesManager", "name": "AttemptSetState", "signature": "System.Void ProgressionObjectivesManager::AttemptSetState(System.Int32,System.UInt32,System.Boolean,System.Boolean)", "rva": "0x13C6BF0", "isStatic": true, "role": "progression action entry (bulkhead key, generator cell, keycard, reactor cell)" },
+    { "id": "progression-register", "assembly": "Modules-ASM.dll", "type": "ProgressionObjectivesManager", "name": "RegisterProgressionObjective", "signature": "System.Int32 ProgressionObjectivesManager::RegisterProgressionObjective(eDimensionIndex,LevelGeneration.LG_LayerType,GameData.eLocalZoneIndex,IProgressionObjective)", "rva": "0x13C7B00", "isStatic": true, "role": "assigns the int identity used by progression state and triggers" },
+    { "id": "datablock-alarm", "assembly": "GameData-ASM.dll", "type": "GameData.ChainedPuzzleDataBlock", "name": "TriggerAlarmOnActivate", "signature": "System.Boolean GameData.ChainedPuzzleDataBlock::get_TriggerAlarmOnActivate()", "dumpLine": 620708, "role": "author-defined flag that turns a chained puzzle into an alarm; companion fields PublicAlarmName, AlarmSoundStart, AlarmSoundStop, SurvivalWaveSettings, SurvivalWavePopulation, SurvivalWaveAreaDistance, DisableSurvivalWaveOnComplete, ChainedPuzzle[ChainedPuzzleComponent]" },
+    { "id": "datablock-objective", "assembly": "GameData-ASM.dll", "type": "GameData.WardenObjectiveDataBlock", "name": "ChainedPuzzleToActive", "signature": "System.UInt32 GameData.WardenObjectiveDataBlock::get_ChainedPuzzleToActive()", "dumpLine": 644551, "role": "author-defined link from an objective layer to its alarm/scan blocks; companions ChainedPuzzleMidObjective, ChainedPuzzleAtExit, ChainedPuzzleAtExitScanSpeedMultiplier, EventsOnActivate, EventsOnGotoWin, EventsOnElevatorLand, Type, WinCondition" }
+  ],
+  "callEdges": [
+    { "id": "objective-state.calls-status-check", "from": "0x151B2D0", "to": "0x1512D90", "meaning": "ObjectiveStateChange runs the per-layer status/sub-status transition machine" },
+    { "id": "objective-state.calls-chain-updated", "from": "0x151B2D0", "to": "0x151ACB0", "meaning": "ObjectiveStateChange advances the objective chain (three call sites) and therefore the phase/materialised node" },
+    { "id": "objective-state.calls-event-step", "from": "0x151B2D0", "to": "0x1520BC0", "meaning": "ObjectiveStateChange advances the native WardenObjectiveEvent step" },
+    { "id": "objective-status.calls-trigger-waves", "from": "0x1512D90", "to": "0x151FD90", "meaning": "the status machine starts objective-owned enemy waves" },
+    { "id": "objective-status.calls-stop-waves", "from": "0x1512D90", "to": "0x151F9B0", "meaning": "the status machine stops objective-owned waves (alarm stop side)" },
+    { "id": "objective-status.calls-attempt-interact", "from": "0x1512D90", "to": "0x1510920", "meaning": "the status machine feeds the objective interaction channel" },
+    { "id": "objective-status.calls-activate-win-condition", "from": "0x1512D90", "to": "0x150F710", "meaning": "the status machine arms the win condition of the layer" },
+    { "id": "objective-status.calls-stop-ambient-alarm", "from": "0x1512D90", "to": "0x167C9E0", "meaning": "objective completion silences the ambient alarm of the exit landing" },
+    { "id": "terminal-disable-alarms.calls-stop-waves", "from": "0x1293960", "to": "0x151F9B0", "meaning": "the terminal DEACTIVATE_ALARMS closure is a real native alarm stop, not only text output" },
+    { "id": "terminal-disable-alarms.calls-stop-ambient-alarm", "from": "0x1293960", "to": "0x167C9E0", "meaning": "same closure also silences the ambient alarm" },
+    { "id": "door-setup-chained-lock.calls-create-puzzle", "from": "0x15A4500", "to": "0x1736F50", "meaning": "a door alarm/scan is a ChainedPuzzleInstance created through ChainedPuzzleManager" },
+    { "id": "door-setup-chained-lock.calls-solved-callback", "from": "0x15A4500", "to": "0x17368B0", "meaning": "the door subscribes to the puzzle solved callback" },
+    { "id": "door-locks-setup-for-puzzle.calls-solved-callback", "from": "0x15A02A0", "to": "0x17368B0", "meaning": "the lock component also subscribes to the puzzle solved callback before dispatching OnDoorState" },
+    { "id": "puzzle-master-activate.calls-trigger-wave", "from": "0x17334D0", "to": "0x1736600", "meaning": "activating an alarm puzzle starts its enemy wave" },
+    { "id": "puzzle-trigger-wave.calls-mastermind-wave", "from": "0x1736600", "to": "0x14F8280", "meaning": "the alarm wave goes through the same Mastermind entry as any survival wave" },
+    { "id": "puzzle-trigger-wave.calls-set-wave-id", "from": "0x1736600", "to": "0x17353E0", "meaning": "the puzzle stores its wave EventID, which is replicated in pChainedPuzzleState.currentSurvivalWave_EventID" },
+    { "id": "puzzle-state-change.calls-try-get-event", "from": "0x1734BF0", "to": "0x14F8880", "meaning": "the puzzle resolves its wave by EventID from Mastermind, e.g. to stop it when solved" },
+    { "id": "mastermind-wave.calls-register-wave-id", "from": "0x14F8280", "to": "0x151D410", "meaning": "every triggered wave is registered with the objective manager by EventID" },
+    { "id": "mastermind-wave.calls-wave-spawn", "from": "0x14F8520", "to": "0x13F5520", "meaning": "the Mastermind overload without a course node spawns SurvivalWave at an explicit position" },
+    { "id": "bioscan-sync-state.calls-add-players", "from": "0x1867BB0", "to": "0x1862220", "meaning": "replicated bioscan state rebuilds the player-in-scan list" },
+    { "id": "landing-build-done.calls-create-puzzle", "from": "0x167BCA0", "to": "0x1736EA0", "meaning": "the exit scan is created at level build time" },
+    { "id": "landing-build-done.calls-set-exit-puzzle", "from": "0x167BCA0", "to": "0x1736B20", "meaning": "the created puzzle is marked as the exit puzzle" },
+    { "id": "landing-build-done.calls-register-exit-win", "from": "0x167BCA0", "to": "0x151CC40", "meaning": "the landing registers itself as the exit win-condition item" },
+    { "id": "landing-activate-win.calls-navmarker-visible", "from": "0x167B860", "to": "0x16FB840", "meaning": "arming the exit win condition makes the exit-scan nav marker visible; the call into ChainedPuzzleInstance.AttemptInteract from the same body is a tail jump (jmp), which this harness does not count as a call edge" },
+    { "id": "door-use-puzzle.calls-is-solved", "from": "0x15A7480", "to": "0x1736990", "meaning": "the door interaction checks whether its chained puzzle (alarm) is already solved before unlocking" },
+    { "id": "exit-scan-progress.calls-trigger-waves", "from": "0x15170A0", "to": "0x151FD90", "meaning": "exit scan progress triggers the exit wave" },
+    { "id": "exit-scan-progress.calls-attempt-interact", "from": "0x15170A0", "to": "0x1510920", "meaning": "exit scan progress feeds the objective interaction channel (win condition bookkeeping)" },
+    { "id": "exit-scan-progress.calls-execute-events", "from": "0x15170A0", "to": "0x1511810", "meaning": "exit scan progress runs the author-defined OnGotoWin events" },
+    { "id": "door-opened.calls-execute-events", "from": "0x15A28B0", "to": "0x1511810", "meaning": "opening a security door runs the door-linked native objective events" },
+    { "id": "progression-state.calls-show-objectives", "from": "0x13C7830", "to": "0x13C89A0", "meaning": "progression state changes drive the objective HUD entries" }
+  ],
+  "rowEvidence": [
+    {
+      "row": "forge.trigger.objective.state_changed", "entry": { "kind": "hook", "id": "ObjectiveStateChange" },
+      "identity": { "authorReference": "WardenObjectiveDataBlock (per LG_LayerType, WardenObjectiveManager.TryGetActiveWardenObjectiveData)", "runtimeInstance": "layer key (LG_LayerType MainLayer|SecondaryLayer|ThirdLayer) plus chainIndex", "invalidatedBy": "level cleanup/recall (WardenObjectiveManager.OnLevelCleanup, OnPrepareForRecall)" },
+      "side": "both", "harmony": "postfix diff of oldState/newState", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.progress_changed", "entry": { "kind": "hook", "id": "ObjectiveStatusCheck" },
+      "identity": { "authorReference": "WardenObjectiveDataBlock objective items", "runtimeInstance": "layer + chainIndex + pWardenObjectiveState.ObjectiveItemStates[96] / RequiredObjectiveItems[8]" },
+      "side": "both", "harmony": "postfix; old/new status and item index are parameters", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.phase_changed", "entry": { "kind": "hook", "id": "ObjectiveChainUpdated" },
+      "identity": { "authorReference": "WardenObjectiveDataBlock chain entry", "runtimeInstance": "layer + int chainIndex" },
+      "side": "both", "harmony": "postfix", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.alarm_started", "entry": { "kind": "hook", "id": "ChainedPuzzleStateChange" },
+      "identity": { "authorReference": "ChainedPuzzleDataBlock id (door/terminal/objective reference)", "runtimeInstance": "ChainedPuzzleInstance component; optional Mastermind EventID via pChainedPuzzleState.currentSurvivalWave_EventID", "invalidatedBy": "ChainedPuzzleInstance.OnDestroy" },
+      "side": "both", "harmony": "postfix when status becomes Active; door callbacks add_OnPlayerActivateChainedPuzzle and add_OnPuzzleSolved/remove_ give the door-scoped variants", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.alarm_stopped", "entry": { "kind": "hook", "id": "ChainedPuzzleStateChange" },
+      "identity": { "authorReference": "ChainedPuzzleDataBlock id", "runtimeInstance": "same ChainedPuzzleInstance; solved or deactivated" },
+      "side": "both", "harmony": "postfix when status becomes Solved; native stop paths are Mastermind.TryGetEvent (solved) and WardenObjectiveManager.StopAllWardenObjectiveEnemyWaves plus ElevatorShaftLanding.StopAmbientAlarm (terminal DEACTIVATE_ALARMS)", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.scan_started", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
+      "identity": { "authorReference": "ChainedPuzzleDataBlock with a ChainedPuzzleComponent whose PuzzleType is the bioscan core", "runtimeInstance": "CP_Bioscan_Core (iChainedPuzzleCore) inside the ChainedPuzzleInstance, addressed by puzzle index" },
+      "side": "both", "harmony": "postfix on status transition into Scanning; Activate is the master-side entry", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.scan_progress", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
+      "identity": { "runtimeInstance": "pBioscanState.progress on the owning bioscan core" },
+      "side": "both", "harmony": "postfix; both oldState and newState carry progress", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.scan_membership", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
+      "identity": { "runtimeInstance": "pBioscanState.playersInScan, playersMax, playerInScan1..4" },
+      "side": "both", "harmony": "postfix; CP_PlayerScanner.StartScan is the local-only half and must not be the authority", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.scan_paused", "entry": { "kind": "member", "id": "bioscan-time-out" },
+      "identity": { "runtimeInstance": "CP_Bioscan_Core slots SetTimeOut (7) and SetTimeIn (8) mapped onto eBioscanStatus Waiting/TimedOut" },
+      "side": "host", "harmony": "prefix on the two slots", "verifiedInGame": false,
+      "notes": "no eBioscanStatus value means paused; the exact meaning of TimeOut/TimeIn is naming-based and must be confirmed in game"
+    },
+    {
+      "row": "forge.trigger.objective.scan_completed", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
+      "identity": { "runtimeInstance": "eBioscanStatus.Finished; CP_Bioscan_Core.IsFinished() and ChainedPuzzleInstance.OnPuzzleDone/add_OnPuzzleSolved" },
+      "side": "both", "harmony": "postfix on Finished", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.scan_failed", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
+      "identity": { "runtimeInstance": "eBioscanStatus.TimedOut" },
+      "side": "both", "harmony": "postfix on TimedOut", "verifiedInGame": false,
+      "notes": "TimedOut is the only remaining terminal status besides Finished and Disabled; whether a player leaving the scan produces it is unproven"
+    },
+    {
+      "row": "forge.trigger.objective.extraction_state", "entry": { "kind": "hook", "id": "ExitWinConditionActivated" },
+      "identity": { "authorReference": "WardenObjectiveDataBlock.WinCondition (GoToElevator|GoToExitGeo) and ChainedPuzzleAtExit", "runtimeInstance": "the exit ChainedPuzzleInstance marked by IsExitPuzzle plus pExitScanEventTrigger.InLayer" },
+      "side": "host", "harmony": "prefix on ActivateWinCondition and postfix on OnBuildDone; progress through WardenObjectiveManager.OnExitScanProgressUpdate", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.objective.progression_changed", "entry": { "kind": "hook", "id": "ProgressionObjectiveStateChange" },
+      "identity": { "authorReference": "the progression item placed by the level (bulkhead key, generator cell, keycard, reactor cell)", "runtimeInstance": "int id from ProgressionObjectivesManager.RegisterProgressionObjective" },
+      "side": "both", "harmony": "postfix diff", "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.objective_state", "entry": { "kind": "hook", "id": "ObjectiveAttemptInteract" },
+      "nativeCall": "WardenObjectiveManager.AttemptInteract(pWardenObjectiveInteraction) with type DiscoverObjective(0)|StartObjective(1)|UpdateSubObjective(5)|CustomSubObjectiveUpdate(8)|SetItemSolved(9)|SetExtraTime(11)|SetSolveOnDeath(12)|SetExitWaveTriggered(13); forced completion through ForceCompleteObjective/ForceCompleteObjectiveAll",
+      "sync": "the interaction goes into the replicated objective state (m_stateReplicator); host authority per ruling 19",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.objective_progress", "entry": { "kind": "hook", "id": "ObjectiveAttemptInteract" },
+      "nativeCall": "AttemptInteract with SolveWardenObjectiveItem(2)|PartiallySolveWardenObjectiveItem(3)|AddRequiredItem(10)",
+      "sync": "same replicated interaction channel",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.objective_phase", "entry": { "kind": "hook", "id": "ObjectiveAttemptInteract" },
+      "nativeCall": "AttemptInteract with EventUpdate(7) (newOnActivateEventBreakIndex/newOnActivateEventIndex) and SolveWinCondition(4)",
+      "sync": "same replicated interaction channel; the phase index is the byte chainIndex in pWardenObjectiveState",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.alarm_start", "entry": { "kind": "member", "id": "puzzle-create-instance" },
+      "nativeCall": "ChainedPuzzleManager.CreatePuzzleInstance(data, sourceArea, sourcePos, parent) then ChainedPuzzleInstance.Setup or AttemptInteract(eChainedPuzzleInteraction); for a door, LG_SecurityDoor.SetupChainedPuzzleLock(puzzleDataId)",
+      "sync": "the instance owns m_stateReplicator, so activation replicates; the wave it starts goes through Mastermind.TriggerSurvivalWave",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.alarm_stop", "entry": { "kind": "member", "id": "objective-stop-waves" },
+      "nativeCall": "WardenObjectiveManager.StopAllWardenObjectiveEnemyWaves() (the exact call the terminal DEACTIVATE_ALARMS closure uses) plus ElevatorShaftLanding.StopAmbientAlarm(); per-instance alternative ChainedPuzzleInstance.MasterDeactivate",
+      "sync": "state replicator plus the existing wave stop paths",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.scan_start", "entry": { "kind": "hook", "id": "BioscanActivate" },
+      "nativeCall": "CP_Bioscan_Core.Activate() (iChainedPuzzleCore slot 5) or ChainedPuzzleInstance.AttemptInteract(eChainedPuzzleInteraction); scan creation through ChainedPuzzleManager.CreatePuzzleInstance",
+      "sync": "scan state is replicated through CP_Bioscan_Sync",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.scan_pause", "entry": { "kind": "member", "id": "bioscan-time-out" },
+      "nativeCall": "CP_Bioscan_Core.SetTimeOut() / SetTimeIn()",
+      "sync": "these only change master-side state that is published through CP_Bioscan_Sync",
+      "verifiedInGame": false,
+      "notes": "no native pause flag exists in pBioscanState; a Forge pause would have to hold Activate/Deactivate or drive the sync state itself"
+    },
+    {
+      "row": "forge.action.map.scan_progress", "entry": { "kind": "member", "id": "bioscan-sync-set-state" },
+      "nativeCall": "there is no native 'set progress' entry; progress is computed on the master by CP_Bioscan_Core.Master_OnPlayerScanChangedCheckProgress and published through CP_Bioscan_Sync.SetStateData",
+      "sync": "replicated through SNet_StateReplicator<pBioscanState>",
+      "verifiedInGame": false,
+      "notes": "an amount/rate action cannot be expressed natively without owning the scan state; blocking or computing is required"
+    },
+    {
+      "row": "forge.action.map.scan_path", "entry": { "kind": "none" },
+      "nativeCall": "none found",
+      "sync": "not applicable",
+      "verifiedInGame": false,
+      "notes": "the scan path is scenery geometry (CP_Holopath_Spline / CP_BasicMovable) driven by the puzzle's own movement code; no native entry takes a path resource"
+    }
+  ],
+  "catalogMismatches": [
+    "ruling 49 removes the resource output port of forge.trigger.objective.*, but the current catalog still declares resource outputs (objective/alarm/scan) on every objective trigger row; the rows also declare no handle output yet.",
+    "forge.trigger.objective.scan_paused and forge.action.map.scan_pause have no native counterpart: eBioscanStatus has no paused value and pBioscanState has no pause flag.",
+    "forge.trigger.objective.scan_failed maps only onto eBioscanStatus.TimedOut, which is a timeout, not a documented failure; failure semantics must be defined by Forge.",
+    "forge.action.map.scan_progress has no native setter; the catalog row implies an amount/rate write that the game does not expose.",
+    "forge.action.map.scan_path has no native entry at all.",
+    "forge.trigger.objective.alarm_started/stopped and scan_started are the same native instance kind (ChainedPuzzleInstance); the catalog splits them into two resources, while the game distinguishes them by ChainedPuzzleDataBlock.TriggerAlarmOnActivate and ChainedPuzzleComponent.PuzzleType."
+  ],
+  "unproven": [
+    "Every host/client claim: no body was executed and no runtime log was captured. The side values rest on state-replicator interfaces and Master_/Sync naming only.",
+    "Call frequency of UpdateFromInLevel, Mastermind.UpdateEvents and CP_Bioscan_Core.Update: no direct caller exists in the image, so the poll rate is unknown.",
+    "Whether OnStateChange runs before or after the native state is applied on a client, and whether it is invoked on the host for locally produced changes.",
+    "Exact meaning of CP_Bioscan_Core.SetTimeOut/SetTimeIn and of eBioscanStatus.Waiting versus TimedOut.",
+    "Whether ChainedPuzzleInstance.OnStateChange fires for a solved alarm before or after the wave stop it performs through Mastermind.TryGetEvent.",
+    "Terminal alarm lifecycle: no native 'terminal alarm started/stopped' event exists; only SetChainPuzzleForCommand binds the puzzle and the DEACTIVATE_ALARMS closure stops waves.",
+    "Harmony feasibility of virtual interface implementations (IsVirtual=true in the interop table) is assumed to behave like any managed method; it was not tested against the IL2CPP runtime in game."
+  ],
+  "inGameVerificationPlan": [
+    "Load a level with a door alarm and log ChainedPuzzleInstance.OnStateChange on host and client with the puzzle instance id and pChainedPuzzleState fields; confirm that Active is the alarm start and Solved the alarm stop, and record the order relative to Mastermind.TriggerSurvivalWave.",
+    "Load a bioscan scan and log CP_Bioscan_Sync.OnStateChange plus CP_Bioscan_Core.OnSyncStateChange with status, progress and playersInScan while players enter, leave, die and while the scan times out; this fixes scan_paused/scan_failed semantics.",
+    "Trigger the terminal DEACTIVATE_ALARMS command and the terminal that owns a chained puzzle; confirm which of StopAllWardenObjectiveEnemyWaves, StopAmbientAlarm and the puzzle state change actually run and on which peer.",
+    "Run the exit scan and record ElevatorShaftLanding.ActivateWinCondition, WardenObjectiveManager.OnExitScanProgressUpdate and CheckExpeditionSuccess/Failed ordering for the extraction trigger.",
+    "Confirm that Harmony patching of the virtual interface implementations listed in hooks works in the shipped IL2CPP runtime and that the patched callback runs on both peers."
+  ]
+}

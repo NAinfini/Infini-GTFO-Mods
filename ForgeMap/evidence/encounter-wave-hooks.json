@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "purpose": "forge-enemy-encounter-wave-native-hooks",
+  "ownership": "ruling 49: encounter/wave/spawn_shortfall triggers and the encounter/wave actions belong to ForgeEnemy; this file is the native evidence handover and stays dual-read until the ForgeEnemy evidence set exists",
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameVerified": false,
+  "gameVerifiedNote": "Static evidence only: interop metadata from the Forge-MapEditor-QA profile, dump.cs of the same build, and direct x64 call sites decoded from GameAssembly.dll. Nothing was executed. Per-batch spawn timing, exhaustion and shortfall are NOT observable from metadata; only the fields that would carry them are listed.",
+  "buildId": "20403457",
+  "gameAssemblySha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55",
+  "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+  "codeSection": "il2cpp",
+  "dumpSource": "C:\\Users\\nainf\\Github\\General Task\\gtfo-inspection\\dumper\\dump.cs",
+  "interopSource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop",
+  "gameAssemblySource": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
+  "rulingRefs": [
+    "rulings-step1.md 19: host authority; the wave lifecycle is master-side",
+    "rulings-step1.md 26: wave handle identity",
+    "rulings-step1.md 43: handle frames",
+    "rulings-step1.md 49: encounter/wave/spawn_shortfall are produced by ForgeEnemy"
+  ],
+  "assemblies": [
+    { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
+    { "file": "SNet_ASM.dll", "sha256": "6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C", "mvid": "143acd09-f561-44d0-9455-a78706262fb5" },
+    { "file": "GameData-ASM.dll", "sha256": "DEE523620186887A95A8E940FF1DDB0CDB94E395840F12C823CC26AE4F5E7106", "mvid": "10c226b4-0ffe-41dc-8e66-7c049afdb4d9" }
+  ],
+  "sideVocabulary": {
+    "host": "master-side path (Master_/Master/increments the master-owned event id); inference from naming and call graph, not observed",
+    "both": "reached from a replicator callback, so both peers run it",
+    "unknown": "no static evidence"
+  },
+  "stateShapes": [
+    { "id": "pSurvivalWaveSpawnData", "assembly": "Modules-ASM.dll", "dumpLine": 591980, "fields": "replicationData, position, rotation, courseNode (pCourseNode), eventID (ushort), settingsID (ushort), populationDataID (ushort), populationPointsSpentTotal (ushort), populationPointsSpentDuringWave (ushort), playScreamOnSpawn, spawnType (SurvivalWaveSpawnType), spawnDirection, spawnDelay, areaDistance, overrideWorldEventObjectFilter, WaveState (SurvivalWave.eSurvivalWaveState)" },
+    { "id": "SurvivalWave.eSurvivalWaveState", "assembly": "Modules-ASM.dll", "note": "nested type; not usable as a Harmony target type in this dump layout", "values": { "Setup": 0, "InitialPause": 1, "WatitingForWaveSpawn": 2, "WaitForGroupSpawn": 3, "SustainGroups": 4, "Done": 5 } },
+    { "id": "eMastermindEventType", "assembly": "Modules-ASM.dll", "dumpLine": 592377, "values": { "None": 0, "SurvivalWave": 1 } },
+    { "id": "SurvivalWaveSpawnType", "assembly": "Modules-ASM.dll", "note": "values in Modules-ASM.dll; used by both GenericEnemyWaveData consumers and the static SurvivalWave.Spawn overloads" },
+    { "id": "eEnemyGroupSpawnType", "assembly": "Modules-ASM.dll", "dumpLine": 665502, "values": { "RandomInArea": 0, "Position": 1, "CycleAligns": 2, "OnLine": 3, "Birther": 4 } },
+    { "id": "EnemyGroupType", "assembly": "Modules-ASM.dll", "dumpLine": 665958, "values": { "Hibernating": 0, "Patrolling": 1, "Hunters": 2, "Survival": 3, "DebugSpawnUnit": 4 } }
+  ],
+  "waveStateWithoutNativeEvent": [
+    "There is no native 'wave exhausted' or 'wave cleared' event: Mastermind keeps a List<Mastermind.MastermindEvent> m_events and SurvivalWave carries m_state (eSurvivalWaveState) plus m_populationPointsSpentTotal / m_populationPointsSpentDuringWave / m_populationPointsPerWaveMax. Exhaustion has to be derived (state Done, or spent >= per-wave max), and clearing has to be derived from Mastermind.m_activeGroups / m_events becoming empty.",
+    "There is no native 'spawn shortfall' event. The only inputs are the requested population spend versus the actual EnemyGroup spawn results (Mastermind.SpawnGroup returns void, so the count must be observed through group registration).",
+    "There is no native 'encounter paused' event. The closest native state is SurvivalWave.eSurvivalWaveState.InitialPause (1) and WaitForGroupSpawn (3) inside the wave's own timer machine; a Forge pause would have to hold the wave or stop and re-spawn it.",
+    "EnemySpawner, SurvivalWaveGroup and SurvivalWaveSettingsSupplier are empty shells in this build (every method resolves to the shared thunk at RVA 0x353190), so they cannot carry any of these events."
+  ],
+  "frequencyEvidence": [
+    { "id": "wave-tick", "member": "SurvivalWave.MastermindUpdate", "frequency": "per Mastermind tick (rate unproven)", "basis": "override of Mastermind.MastermindEvent.MastermindUpdate, driven by Mastermind.UpdateEvents 0x14F89C0" },
+    { "id": "mastermind-pump", "member": "Mastermind.UpdateEvents / MaintainGroups / GameStateUpdateFixed", "frequency": "per tick and per fixed step", "basis": "no direct caller decoded; the Mastermind singleton is the global update owner" },
+    { "id": "wave-group-step", "member": "SurvivalWave.SpawnGroup", "frequency": "once per batch inside the wave state machine", "basis": "private step that picks a spawn point and may randomize the direction; the batch cadence comes from SurvivalWave.m_waveSpawnTimer / m_groupSpawnTimer and the settings block" },
+    { "id": "wave-spawn-events", "member": "SurvivalWave.OnSpawn / OnDespawn", "frequency": "event-driven", "basis": "replicator callbacks" },
+    { "id": "group-registry", "member": "Mastermind.RegisterGroup / UnregisterGroup / AddEvent / RemoveEvent", "frequency": "event-driven, once per group or per wave", "basis": "small bodies (77-100 bytes) that only mutate the master lists" }
+  ],
+  "hooks": [
+    {
+      "hook": "WaveOnSpawn", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "OnSpawn",
+      "signature": "System.Void SurvivalWave::OnSpawn(pSurvivalWaveSpawnData)",
+      "isVirtual": true, "rva": "0x13F4810", "slot": 9, "dumpLine": 592027, "bodyBytes": 804,
+      "entry": "replicator spawn callback of the wave object; calls Mastermind.AddEvent (verified direct edge)",
+      "reads": "the whole pSurvivalWaveSpawnData: eventID, settingsID, populationDataID, populationPointsSpentTotal/DuringWave, WaveState, courseNode, spawnType, spawnDelay, areaDistance",
+      "side": { "execution": "both", "basis": "replicator-spawn-callback", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_started", "forge.trigger.encounter.wave_spawned"],
+      "harmony": "prefix; this is the single point where a wave becomes live and where the EventID needed for the handle is available"
+    },
+    {
+      "hook": "WaveOnDespawn", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "OnDespawn",
+      "signature": "System.Void SurvivalWave::OnDespawn()",
+      "isVirtual": true, "rva": "0x13F4780", "slot": 8, "dumpLine": 592027, "bodyBytes": 127,
+      "entry": "replicator despawn callback; calls Mastermind.RemoveEvent (verified direct edge)",
+      "reads": "none",
+      "side": { "execution": "both", "basis": "replicator-despawn-callback", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_cleared", "forge.trigger.encounter.encounter_completed"],
+      "harmony": "prefix; fires for every teardown, including level cleanup, so a cleared trigger must also check that the encounter was not cancelled"
+    },
+    {
+      "hook": "WaveStopEvent", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "StopEvent",
+      "signature": "System.Void SurvivalWave::StopEvent()",
+      "isVirtual": true, "rva": "0x13F5BE0", "slot": 7, "dumpLine": 592027, "bodyBytes": 221,
+      "entry": "Mastermind.MastermindEvent.StopEvent override; calls Mastermind.RemoveEvent (verified direct edge)",
+      "reads": "none",
+      "side": { "execution": "host", "basis": "mastermind-event-stop", "verified": false },
+      "rows": ["forge.action.map.wave_stop", "forge.action.map.encounter_stop"],
+      "harmony": "prefix; this is the native per-wave stop entry the Mastermind uses when it tears an event down from the objective or puzzle side"
+    },
+    {
+      "hook": "WaveMastermindUpdate", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "MastermindUpdate",
+      "signature": "System.Void SurvivalWave::MastermindUpdate()",
+      "isVirtual": true, "rva": "0x13F4360", "slot": 5, "dumpLine": 592027, "bodyBytes": 125,
+      "entry": "Mastermind.MastermindEvent per-tick pump; drives the wave state machine",
+      "reads": "m_state, m_waveSpawnTimer, m_groupSpawnTimer, m_populationPointsSpentDuringWave",
+      "side": { "execution": "host", "basis": "mastermind-tick", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_spawned", "forge.trigger.encounter.encounter_paused"],
+      "harmony": "postfix per-tick readback; it is the only periodic hook that sees the wave state machine, and it also shows InitialPause/WaitForGroupSpawn for a pause-like trigger"
+    },
+    {
+      "hook": "WaveSpawnGroup", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "SpawnGroup",
+      "signature": "System.Void SurvivalWave::SpawnGroup()",
+      "isVirtual": false, "rva": "0x13F4FB0", "dumpLine": 592027, "bodyBytes": 452,
+      "entry": "private per-group spawn step; calls SurvivalWave.GetScoredSpawnPoint and SurvivalWave.TriggerDirRandomization (verified direct edges); the EnemyGroup is created outside this body, so group creation has to be observed through Mastermind.RegisterGroup",
+      "reads": "m_settings (SurvivalWaveSettingsDataBlock population points), m_populationPointsSpentDuringWave, m_courseNode, m_spawnDirection",
+      "side": { "execution": "host", "basis": "mastermind-side-spawn-step", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_spawned"],
+      "harmony": "prefix/postfix per batch; this is the per-batch spawn point that wave_spawned should be derived from"
+    },
+    {
+      "hook": "WaveTryEndEvent", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "TryEndEvent",
+      "signature": "System.Boolean SurvivalWave::TryEndEvent()",
+      "isVirtual": false, "rva": "0x13F5E90", "dumpLine": 592027, "bodyBytes": 62,
+      "entry": "private wave completion test used by the wave's own update",
+      "reads": "returns whether the wave considers itself finished",
+      "side": { "execution": "host", "basis": "mastermind-side-check", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_exhausted", "forge.trigger.encounter.wave_cleared"],
+      "harmony": "postfix on the returned bool; the closest native signal to 'this wave is done spawning and has nothing left to spend'"
+    },
+    {
+      "hook": "WaveRegisterCost", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "RegisterCost",
+      "signature": "System.Void SurvivalWave::RegisterCost(System.Single)",
+      "isVirtual": false, "rva": "0x13F4C10", "dumpLine": 592027, "bodyBytes": 24,
+      "entry": "private budget bookkeeping called when a group is paid for",
+      "reads": "the float population cost of one group; adds into m_populationPointsSpentTotal/DuringWave",
+      "side": { "execution": "host", "basis": "mastermind-side-bookkeeping", "verified": false },
+      "rows": ["forge.trigger.encounter.spawn_shortfall"],
+      "harmony": "prefix records the requested cost; comparing the sum of requested costs with the groups actually registered is the only native basis for a shortfall trigger"
+    },
+    {
+      "hook": "WaveRegisterGroup", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "RegisterGroup",
+      "signature": "System.Void SurvivalWave::RegisterGroup(Enemies.EnemyGroup,System.Boolean)",
+      "isVirtual": false, "rva": "0x13F4C30", "dumpLine": 592027, "bodyBytes": 610,
+      "entry": "private group registration called after a group was produced",
+      "reads": "the EnemyGroup and the isRecall flag; calls SurvivalWave.TryPlayWaveDialogSound (verified direct edge)",
+      "side": { "execution": "host", "basis": "mastermind-side-bookkeeping", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_spawned", "forge.trigger.encounter.spawn_shortfall"],
+      "harmony": "postfix counts the groups that actually registered; paired with WaveRegisterCost it gives requested-versus-delivered"
+    },
+    {
+      "hook": "WaveDeSpawn", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "DeSpawn",
+      "signature": "System.Void SurvivalWave::DeSpawn()",
+      "isVirtual": false, "rva": "0x13F2110", "dumpLine": 592027, "bodyBytes": 67,
+      "entry": "wave-side despawn request (the native counterpart of a stop action)",
+      "reads": "none",
+      "side": { "execution": "host", "basis": "wave-teardown", "verified": false },
+      "rows": ["forge.action.map.wave_stop"],
+      "harmony": "prefix; a Forge wave_stop should call this or StopEvent rather than removing the event list entry itself"
+    },
+    {
+      "hook": "MastermindAddEvent", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "AddEvent",
+      "signature": "System.Void Mastermind::AddEvent(Mastermind/MastermindEvent)",
+      "isVirtual": false, "rva": "0x14F6910", "dumpLine": 592392, "bodyBytes": 100,
+      "entry": "master event registry; only caller is SurvivalWave.OnSpawn (verified direct edge)",
+      "reads": "the MastermindEvent instance (m_events list insertion)",
+      "side": { "execution": "both", "basis": "called-from-replicator-spawn-callback", "verified": false },
+      "rows": ["forge.trigger.encounter.encounter_started", "forge.trigger.encounter.wave_started"],
+      "harmony": "prefix; the authoritative 'a wave event now exists' point, independent of the wave object's own state"
+    },
+    {
+      "hook": "MastermindRemoveEvent", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "RemoveEvent",
+      "signature": "System.Void Mastermind::RemoveEvent(Mastermind/MastermindEvent)",
+      "isVirtual": false, "rva": "0x14F7DE0", "dumpLine": 592392, "bodyBytes": 77,
+      "entry": "master event registry removal; callers are SurvivalWave.StopEvent and SurvivalWave.OnDespawn (verified direct edges)",
+      "reads": "the MastermindEvent instance",
+      "side": { "execution": "both", "basis": "called-from-replicator-and-stop-paths", "verified": false },
+      "rows": ["forge.trigger.encounter.encounter_completed", "forge.trigger.encounter.wave_cleared"],
+      "harmony": "postfix; combined with Mastermind.m_events/m_activeGroups emptiness this is the cleared signal"
+    },
+    {
+      "hook": "MastermindSpawnGroup", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "SpawnGroup",
+      "signature": "System.Void Mastermind::SpawnGroup(UnityEngine.Vector3,AIGraph.AIG_CourseNode,Enemies.EnemyGroupType,Enemies.eEnemyGroupSpawnType,GameData.EnemyGroupDataBlock,System.Single,UnityEngine.Vector3,SNetwork.IReplicator)",
+      "isVirtual": false, "rva": "0x14F8010", "dumpLine": 592392, "bodyBytes": 613,
+      "entry": "the single native group spawn entry used by waves, the factory and the debug spawner",
+      "reads": "position, course node, group type, spawn type, EnemyGroupDataBlock, score, direction, replicator",
+      "side": { "execution": "host", "basis": "mastermind-singleton-spawn", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_spawned", "forge.trigger.encounter.spawn_shortfall"],
+      "harmony": "prefix; returns void, so the spawned group must be observed through Mastermind.RegisterGroup"
+    },
+    {
+      "hook": "MastermindRegisterGroup", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "RegisterGroup",
+      "signature": "System.Void Mastermind::RegisterGroup(Enemies.EnemyGroup)",
+      "isVirtual": false, "rva": "0x14F7D80", "dumpLine": 592392, "bodyBytes": 77,
+      "entry": "adds an EnemyGroup to m_activeGroups",
+      "reads": "the EnemyGroup",
+      "side": { "execution": "host", "basis": "mastermind-singleton", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_spawned"],
+      "harmony": "prefix; counts the groups that really exist"
+    },
+    {
+      "hook": "MastermindUnregisterGroup", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "UnregisterGroup",
+      "signature": "System.Void Mastermind::UnregisterGroup(Enemies.EnemyGroup)",
+      "isVirtual": false, "rva": "0x14F8960", "dumpLine": 592392, "bodyBytes": 77,
+      "entry": "removes an EnemyGroup from m_activeGroups",
+      "reads": "the EnemyGroup",
+      "side": { "execution": "host", "basis": "mastermind-singleton", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_cleared"],
+      "harmony": "postfix; when the last group of an encounter unregisters the encounter is cleared"
+    },
+    {
+      "hook": "MastermindUpdateEvents", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "UpdateEvents",
+      "signature": "System.Void Mastermind::UpdateEvents()",
+      "isVirtual": false, "rva": "0x14F89C0", "dumpLine": 592392, "bodyBytes": 165,
+      "entry": "per-tick pump that walks m_events and calls each event's MastermindUpdate",
+      "reads": "m_events",
+      "side": { "execution": "host", "basis": "mastermind-tick", "verified": false },
+      "rows": ["forge.trigger.encounter.encounter_started", "forge.trigger.encounter.encounter_completed"],
+      "harmony": "prefix; the per-tick point where a Forge-side encounter state machine can be observed without hooking every wave"
+    },
+    {
+      "hook": "MastermindMaintainGroups", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "MaintainGroups",
+      "signature": "System.Void Mastermind::MaintainGroups()",
+      "isVirtual": false, "rva": "0x14F75B0", "dumpLine": 592392, "bodyBytes": 275,
+      "entry": "per-tick maintenance of m_activeGroups",
+      "reads": "m_activeGroups, m_groupSpawnTime",
+      "side": { "execution": "host", "basis": "mastermind-tick", "verified": false },
+      "rows": ["forge.trigger.encounter.wave_cleared"],
+      "harmony": "postfix; the group list after maintenance is the native answer to 'is anything still alive from this encounter'"
+    },
+    {
+      "hook": "MastermindGameStateUpdateFixed", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "GameStateUpdateFixed",
+      "signature": "System.Void Mastermind::GameStateUpdateFixed()",
+      "isVirtual": false, "rva": "0x14F6FA0", "dumpLine": 592392, "bodyBytes": 257,
+      "entry": "fixed-step master update",
+      "reads": "m_factoryGroupDatas*, m_groupSpawnTime",
+      "side": { "execution": "host", "basis": "mastermind-fixed-tick", "verified": false },
+      "rows": ["forge.trigger.encounter.encounter_started"],
+      "harmony": "postfix polling; the fixed-step cadence is a stable place to evaluate encounter transitions"
+    },
+    {
+      "hook": "SecurityDoorActiveEnemyWaveToggle", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "SetActiveEnemyWaveEnabled",
+      "signature": "System.Void LevelGeneration.LG_SecurityDoor_Locks::SetActiveEnemyWaveEnabled(System.Boolean)",
+      "isVirtual": true, "rva": "0x159FE50", "slot": 28, "dumpLine": 686903, "bodyBytes": 26,
+      "entry": "door active-enemy-wave switch; the door data block carries ActiveEnemyWaveData",
+      "reads": "the enabled flag only",
+      "side": { "execution": "host", "basis": "door-lock-component", "verified": false },
+      "rows": ["forge.trigger.encounter.encounter_started", "forge.action.map.encounter_pause"],
+      "harmony": "prefix; this is the only native 'pause/resume enemy pressure' switch on a door, and it is a suppression flag, not a wave pause"
+    }
+  ],
+  "readbacks": [
+    { "id": "mastermind-current", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "Mastermind Mastermind::Current", "kind": "static-field", "dumpLine": 592392, "note": "singleton; the encounter owner on the master" },
+    { "id": "mastermind-event-lookup", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "System.Boolean Mastermind::TryGetEvent(System.UInt16,Mastermind/MastermindEvent&)", "rva": "0x14F8880", "note": "resolves a wave from the ushort EventID that pChainedPuzzleState and pSurvivalWaveSpawnData already carry; callers are ChainedPuzzleInstance.OnStateChange and WardenObjectiveManager.StopAllWardenObjectiveEnemyWaves" },
+    { "id": "mastermind-has-events", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "System.Boolean Mastermind::HasEventOfType(eMastermindEventType)", "rva": "0x14F74A0", "isStatic": true, "note": "native 'is any survival wave running' query" },
+    { "id": "mastermind-has-situation", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "System.Boolean Mastermind::get_HasSurvivalWaveSituation()", "rva": "0x14F8B40", "isStatic": true, "note": "used by the objective/WardenObjectiveDataBlock.WaveSettingsHasAlarm checks; also the closest thing to a global encounter-active flag" },
+    { "id": "mastermind-events", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "List<Mastermind.MastermindEvent> Mastermind::m_events", "kind": "field", "dumpLine": 592392, "note": "live event list; empty means no wave is running" },
+    { "id": "mastermind-active-groups", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "List<Enemies.EnemyGroup> Mastermind::m_activeGroups", "kind": "field", "dumpLine": 592392, "note": "live enemy groups; the native answer for 'cleared'" },
+    { "id": "mastermind-next-event-id", "assembly": "Modules-ASM.dll", "type": "Mastermind", "signature": "System.UInt16 Mastermind::m_nextEventID", "kind": "field", "dumpLine": 592392, "note": "monotonic EventID source; the natural wave handle key" },
+    { "id": "wave-state", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "signature": "SurvivalWave.eSurvivalWaveState SurvivalWave::m_state", "kind": "field", "dumpLine": 592027, "note": "Setup/InitialPause/WatitingForWaveSpawn/WaitForGroupSpawn/SustainGroups/Done" },
+    { "id": "wave-budget", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "signature": "System.Single SurvivalWave::m_populationPointsSpentTotal / m_populationPointsSpentDuringWave / m_populationPointsPerWaveMax", "kind": "field", "dumpLine": 592027, "note": "spent-versus-max per wave; the only native exhaustion/shortfall inputs" },
+    { "id": "wave-event-start", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "signature": "System.Single SurvivalWave::m_eventStartTime / System.Boolean SurvivalWave::m_isNewWave", "kind": "field", "dumpLine": 592027, "note": "batch timing" },
+    { "id": "wave-settings", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "signature": "SurvivalWaveSettingsDataBlock SurvivalWave::m_settings", "kind": "field", "dumpLine": 592027, "note": "author-defined cadence: m_pauseBeforeStart, m_pauseBetweenGroups, m_wavePauseMin/Max, m_populationPointsTotal, m_populationPointsPerWaveStart/End, m_populationPointsPerGroupStart/End, m_populationRampOverTime" },
+    { "id": "objective-wave-entry", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Void WardenObjectiveManager::TriggerEnemyWaves(Il2CppSystem.Collections.Generic.List`1<GameData.GenericEnemyWaveData>,AIGraph.AIG_CourseNode,SurvivalWaveSpawnType,System.Single,Player.PlayerAgent)", "rva": "0x151FD90", "isStatic": true, "note": "cross-file: objective-owned wave start; the action side of encounter_start" },
+    { "id": "objective-wave-stop", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Void WardenObjectiveManager::StopAllWardenObjectiveEnemyWaves()", "rva": "0x151F9B0", "isStatic": true, "note": "cross-file: native 'stop the objective's waves' action" },
+    { "id": "door-active-wave-data", "assembly": "GameData-ASM.dll", "type": "GameData.ActiveEnemyWaveData", "signature": "System.Boolean GameData.ActiveEnemyWaveData::get_HasActiveEnemyWave()", "dumpLine": 634189, "note": "author-defined door wave: HasActiveEnemyWave, EnemyGroupInfrontOfDoor, EnemyGroupInArea, EnemyGroupsInArea" },
+    { "id": "wave-datablock-settings", "assembly": "GameData-ASM.dll", "type": "GameData.SurvivalWaveSettingsDataBlock", "dumpLine": 643404, "note": "author reference for a wave: population points, pause cadence and population ramp" },
+    { "id": "wave-datablock-population", "assembly": "GameData-ASM.dll", "type": "GameData.SurvivalWavePopulationDataBlock", "dumpLine": 643325, "note": "author reference for the role mix: WaveRoleWeakling/Standard/Special/MiniBoss/Boss" },
+    { "id": "wave-datablock-group", "assembly": "GameData-ASM.dll", "type": "GameData.EnemyGroupDataBlock", "dumpLine": 623907, "note": "author reference for the group template: Type, Difficulty, SpawnPlacementType, MaxScore, RelativeWeight, Roles" },
+    { "id": "objective-wave-datablock", "assembly": "GameData-ASM.dll", "type": "GameData.GenericEnemyWaveData", "dumpLine": 644420, "note": "author wave entry inside an objective: WaveSettings, WavePopulation, AreaDistance, WorldEventObjectFilterSpawnPoint, SpawnDelay, TriggerAlarm, IntelMessage" }
+  ],
+  "members": [
+    { "id": "mastermind-trigger-wave-with-node", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "TriggerSurvivalWave", "signature": "System.Boolean Mastermind::TriggerSurvivalWave(AIGraph.AIG_CourseNode,System.UInt32,System.UInt32,System.UInt16&,SurvivalWaveSpawnType,System.Single,System.Single,System.Boolean,System.Boolean,UnityEngine.Vector3,System.String)", "rva": "0x14F8280", "role": "action entry for wave_start/encounter_start; assigns/returns the EventID (out ushort), calls WardenObjectiveManager.RegisterSurvivalWaveID and the position overload (verified edges)" },
+    { "id": "mastermind-trigger-wave-position", "assembly": "Modules-ASM.dll", "type": "Mastermind", "name": "TriggerSurvivalWave", "signature": "System.Boolean Mastermind::TriggerSurvivalWave(AIGraph.AIG_CourseNode,System.UInt32,System.UInt32,System.UInt16&,SurvivalWaveSpawnType,System.Single,System.Single,UnityEngine.Vector3,System.Boolean,System.Boolean,UnityEngine.Vector3,System.String)", "rva": "0x14F8520", "role": "position overload; calls SurvivalWave.Spawn (verified edge)" },
+    { "id": "wave-spawn-with-node", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "Spawn", "signature": "System.Void SurvivalWave::Spawn(System.Single,System.Single,SurvivalWaveSpawnType,AIGraph.AIG_CourseNode,System.UInt16,System.UInt16,System.UInt16,System.Boolean,System.Boolean,UnityEngine.Vector3)", "rva": "0x13F58E0", "isStatic": true, "role": "static wave construction by course node" },
+    { "id": "wave-spawn-position", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "Spawn", "signature": "System.Void SurvivalWave::Spawn(System.Single,System.Single,SurvivalWaveSpawnType,AIGraph.AIG_CourseNode,UnityEngine.Vector3,System.UInt16,System.UInt16,System.UInt16,System.Boolean,System.Boolean,UnityEngine.Vector3,System.String)", "rva": "0x13F5520", "isStatic": true, "role": "static wave construction at a position; called by Mastermind.TriggerSurvivalWave (verified edge)" },
+    { "id": "wave-get-scored-spawn-point", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "GetScoredSpawnPoint", "signature": "SurvivalWaveSpawnPoint SurvivalWave::GetScoredSpawnPoint()", "rva": "0x13F3F60", "role": "spawn point selection inside SpawnGroup (verified edge); where a spawn shortfall would physically originate" },
+    { "id": "wave-trigger-dir-randomization", "assembly": "Modules-ASM.dll", "type": "SurvivalWave", "name": "TriggerDirRandomization", "signature": "System.Void SurvivalWave::TriggerDirRandomization()", "rva": "0x13F5CD0", "role": "spawn direction randomization inside SpawnGroup (verified edge)" },
+    { "id": "puzzle-trigger-enemy-wave", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.ChainedPuzzleInstance", "name": "TriggerEnemyWave", "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::TriggerEnemyWave()", "rva": "0x1736600", "role": "cross-file: alarm waves enter the same Mastermind path (verified edge to Mastermind.TriggerSurvivalWave)" },
+    { "id": "door-wave-toggle", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "SetActiveEnemyWaveEnabled", "signature": "System.Void LevelGeneration.LG_SecurityDoor_Locks::SetActiveEnemyWaveEnabled(System.Boolean)", "rva": "0x159FE50", "role": "also listed as a hook; the door-side suppression of its active enemy wave" },
+    { "id": "debug-group-spawner", "assembly": "Modules-ASM.dll", "type": "GroupSpawner", "name": "Spawn", "signature": "System.Void GroupSpawner::Spawn(System.Int32,Enemies.EnemyGroupType)", "rva": "0x139CC60", "dumpLine": 665539, "role": "NOT a wave path: this is the debug spawner driven by m_spawnOnKey (KeyCode) and m_groupOverrideID; listed to prevent it being mistaken for an encounter entry" }
+  ],
+  "callEdges": [
+    { "id": "wave-on-spawn.calls-add-event", "from": "0x13F4810", "to": "0x14F6910", "meaning": "a spawned wave registers itself as a Mastermind event, so the event list is the wave registry" },
+    { "id": "wave-stop-event.calls-remove-event", "from": "0x13F5BE0", "to": "0x14F7DE0", "meaning": "the wave stop entry removes its event from the Mastermind" },
+    { "id": "wave-on-despawn.calls-remove-event", "from": "0x13F4780", "to": "0x14F7DE0", "meaning": "despawn also removes the event; cleared must therefore distinguish stop from despawn" },
+    { "id": "wave-spawn-group.calls-scored-spawn-point", "from": "0x13F4FB0", "to": "0x13F3F60", "meaning": "each batch picks a scored spawn point" },
+    { "id": "wave-spawn-group.calls-dir-randomization", "from": "0x13F4FB0", "to": "0x13F5CD0", "meaning": "each batch may randomize its direction per the settings block" },
+    { "id": "wave-register-group.calls-dialog-sound", "from": "0x13F4C30", "to": "0x13F5EE0", "meaning": "group registration is also where the wave's dialog/intel sound is triggered" },
+    { "id": "mastermind-wave-node.calls-register-wave-id", "from": "0x14F8280", "to": "0x151D410", "meaning": "every triggered wave is registered with the objective manager, linking the EventID to the objective" },
+    { "id": "mastermind-wave-node.calls-position-overload", "from": "0x14F8280", "to": "0x14F8520", "meaning": "the course-node entry forwards to the position entry" },
+    { "id": "mastermind-wave-position.calls-wave-spawn", "from": "0x14F8520", "to": "0x13F5520", "meaning": "the Mastermind constructs the wave object through the static SurvivalWave.Spawn" }
+  ],
+  "rowEvidence": [
+    {
+      "row": "forge.trigger.encounter.encounter_started", "entry": { "kind": "hook", "id": "MastermindAddEvent" },
+      "identity": { "authorReference": "GenericEnemyWaveData (objective-owned) or ActiveEnemyWaveData (door-owned) plus SurvivalWaveSettingsDataBlock / SurvivalWavePopulationDataBlock ids", "runtimeInstance": "Mastermind EventID (ushort, from Mastermind.m_nextEventID) plus the SurvivalWave object; WaveSettings/WavePopulation datablock ids are the author reference" },
+      "side": "both", "harmony": "postfix at Mastermind.AddEvent, or prefix at WardenObjectiveManager.TriggerEnemyWaves for the objective-scoped start", "verifiedInGame": false,
+      "notes": "there is no 'encounter' object in the game; an encounter is a Forge-level grouping of waves that share a settings/population pair and a spawn context"
+    },
+    {
+      "row": "forge.trigger.encounter.encounter_paused", "entry": { "kind": "hook", "id": "WaveMastermindUpdate" },
+      "identity": { "runtimeInstance": "SurvivalWave.m_state == InitialPause(1) or WaitForGroupSpawn(3); door suppression through LG_SecurityDoor_Locks.SetActiveEnemyWaveEnabled" },
+      "side": "host", "harmony": "postfix per tick", "verifiedInGame": false,
+      "notes": "the native pause is the wave's own timer state, not a controllable pause; there is no native pause flag and no native paused event"
+    },
+    {
+      "row": "forge.trigger.encounter.encounter_completed", "entry": { "kind": "hook", "id": "MastermindRemoveEvent" },
+      "identity": { "runtimeInstance": "Mastermind.m_events empty for the encounter's EventIDs and Mastermind.m_activeGroups empty" },
+      "side": "both", "harmony": "postfix; MastermindUpdateEvents and MaintainGroups give the per-tick view", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.encounter.wave_started", "entry": { "kind": "hook", "id": "WaveOnSpawn" },
+      "identity": { "authorReference": "SurvivalWaveSettingsDataBlock id + SurvivalWavePopulationDataBlock id", "runtimeInstance": "SurvivalWave object with pSurvivalWaveSpawnData.eventID; Mastermind.MastermindEvent.EventID is the stable ushort key" },
+      "side": "both", "harmony": "prefix at OnSpawn; Mastermind.AddEvent is the registry view", "verifiedInGame": false
+    },
+    {
+      "row": "forge.trigger.encounter.wave_spawned", "entry": { "kind": "hook", "id": "WaveSpawnGroup" },
+      "identity": { "runtimeInstance": "one SurvivalWave batch: m_isNewWave, m_waveSpawnTimer, m_groupSpawnTimer, and the EnemyGroups registered by RegisterGroup" },
+      "side": "host", "harmony": "prefix/postfix per batch; pair with Mastermind.RegisterGroup and Mastermind.SpawnGroup to count the groups actually produced", "verifiedInGame": false,
+      "notes": "the batch boundary is the wave's own state machine, so a Forge batch number has to be assigned by Forge"
+    },
+    {
+      "row": "forge.trigger.encounter.wave_exhausted", "entry": { "kind": "hook", "id": "WaveTryEndEvent" },
+      "identity": { "runtimeInstance": "SurvivalWave.m_state == Done(5) or m_populationPointsSpentDuringWave >= m_populationPointsPerWaveMax" },
+      "side": "host", "harmony": "postfix on the returned bool plus a readback of m_state and the three population fields", "verifiedInGame": false,
+      "notes": "no native exhausted event exists; exhaustion is a derived condition"
+    },
+    {
+      "row": "forge.trigger.encounter.wave_cleared", "entry": { "kind": "hook", "id": "MastermindUnregisterGroup" },
+      "identity": { "runtimeInstance": "Mastermind.m_activeGroups empty while the wave's event still exists; then Mastermind.RemoveEvent / SurvivalWave.OnDespawn ends the wave" },
+      "side": "host", "harmony": "postfix on UnregisterGroup and on RemoveEvent", "verifiedInGame": false,
+      "notes": "cleared means the spawned enemies are gone, which is distinct from the wave's spawn budget being exhausted"
+    },
+    {
+      "row": "forge.trigger.encounter.spawn_shortfall", "entry": { "kind": "hook", "id": "WaveRegisterCost" },
+      "identity": { "runtimeInstance": "requested cost (RegisterCost sum) versus groups actually registered (RegisterGroup count) inside one wave, plus the spawn point returned by GetScoredSpawnPoint" },
+      "side": "host", "harmony": "prefix on RegisterCost and postfix on RegisterGroup; Mastermind.SpawnGroup returns void so the failure itself is invisible", "verifiedInGame": false,
+      "notes": "no native shortfall event exists; Forge has to define the threshold and compute the difference"
+    },
+    {
+      "row": "forge.action.map.encounter_start", "entry": { "kind": "member", "id": "mastermind-trigger-wave-with-node" },
+      "nativeCall": "Mastermind.TriggerSurvivalWave(courseNode, settingsID, populationID, out ushort eventID, spawnType, spawnDelay, areaDistance, ...) or, for an objective-owned encounter, WardenObjectiveManager.TriggerEnemyWaves(List<GenericEnemyWaveData>, courseNode, spawnType, delay, player)",
+      "sync": "the Mastermind runs on the host and the wave object replicates through OnSpawn / OnDespawn",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.encounter_pause", "entry": { "kind": "hook", "id": "SecurityDoorActiveEnemyWaveToggle" },
+      "nativeCall": "no native encounter pause exists; the only nearby switches are LG_SecurityDoor_Locks.SetActiveEnemyWaveEnabled(bool) for the door's active enemy wave and the wave's own eSurvivalWaveState timers",
+      "sync": "not applicable",
+      "verifiedInGame": false,
+      "notes": "a Forge pause must be implemented as stop-plus-resume (SurvivalWave.StopEvent / DeSpawn followed by a new TriggerSurvivalWave), which changes the EventID and therefore the handle"
+    },
+    {
+      "row": "forge.action.map.encounter_stop", "entry": { "kind": "member", "id": "objective-wave-stop" },
+      "nativeCall": "WardenObjectiveManager.StopAllWardenObjectiveEnemyWaves() for objective-owned waves, or Mastermind.TryGetEvent(eventID) followed by MastermindEvent.StopEvent() per wave",
+      "sync": "host action; the wave object despawns and replicates",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.wave_start", "entry": { "kind": "member", "id": "mastermind-trigger-wave-with-node" },
+      "nativeCall": "Mastermind.TriggerSurvivalWave(...) with out ushort eventID; the returned bool reports whether the wave was accepted",
+      "sync": "host action; SurvivalWave.OnSpawn replicates, and WardenObjectiveManager.RegisterSurvivalWaveID records the EventID",
+      "verifiedInGame": false
+    },
+    {
+      "row": "forge.action.map.wave_stop", "entry": { "kind": "hook", "id": "WaveStopEvent" },
+      "nativeCall": "SurvivalWave.StopEvent() (MastermindEvent virtual, slot 7) or SurvivalWave.DeSpawn(); both end in Mastermind.RemoveEvent",
+      "sync": "host action; the removal and despawn replicate",
+      "verifiedInGame": false
+    }
+  ],
+  "catalogMismatches": [
+    "ruling 49 assigns encounter/wave/spawn_shortfall to ForgeEnemy, while this evidence file lives in ForgeMap/evidence; the file must be moved or mirrored when the ForgeEnemy evidence set is created.",
+    "The catalog models an 'encounter' as a native object with start/pause/stop; the game has no encounter type. The nearest native owners are Mastermind (event list plus active groups), SurvivalWave (one event) and the door's ActiveEnemyWaveData.",
+    "forge.trigger.encounter.encounter_paused and forge.action.map.encounter_pause have no native counterpart at all: the only pause-like states are internal wave timers (InitialPause, WaitForGroupSpawn) and the door suppression flag.",
+    "forge.trigger.encounter.spawn_shortfall has no native event; the game only exposes requested cost and registered groups, so Forge must define the condition.",
+    "forge.trigger.encounter.wave_exhausted has no native event either; eSurvivalWaveState.Done and the population-point fields are the only inputs.",
+    "GenericEnemyWaveData.TriggerAlarm exists inside every objective wave entry, so the catalog's split between encounter triggers and alarm triggers is not a native distinction: an objective wave can itself start an alarm."
+  ],
+  "unproven": [
+    "Every side/host claim is inference from the call graph and Master naming; the Mastermind singleton was not observed at runtime.",
+    "The mapping from one wave to its batches is not directly readable: m_isNewWave, m_waveSpawnTimer, m_groupSpawnTimer and RegisterCost calls are the inputs, but the batch boundary must be reconstructed.",
+    "SurvivalWave.m_populationPointsSpentDuringWave versus m_populationPointsPerWaveMax semantics (per wave versus per group) are field names only; the exact comparison that ends a wave was not decoded.",
+    "GetScoredSpawnPoint returns a spawn point but Mastermind.SpawnGroup returns void, so a native spawn failure cannot be observed without counting registered groups.",
+    "Whether Mastermind.MastermindEvent.StopEvent is called for every teardown path, or whether some paths only call SurvivalWave.OnDespawn, is not established.",
+    "Door active enemy waves (ActiveEnemyWaveData) were not traced to a concrete spawn call; SetActiveEnemyWaveEnabled only flips a flag.",
+    "GroupSpawner, EnemySpawner, SurvivalWaveGroup and SurvivalWaveSettingsSupplier are empty in this build, so any older documentation that hooks them does not apply to build 20403457."
+  ],
+  "inGameVerificationPlan": [
+    "Start an objective wave and log SurvivalWave.OnSpawn, SpawnGroup, RegisterCost, RegisterGroup, TryEndEvent, Mastermind.AddEvent/RemoveEvent, RegisterGroup/UnregisterGroup and m_state per tick on host and client; this fixes the batch boundary and the exhaustion condition.",
+    "Kill all spawned enemies before the wave budget is spent and observe whether wave_cleared can be distinguished from wave_exhausted (m_activeGroups empty while m_events still holds the wave).",
+    "Force a spawn point shortage (small room, blocked spawn points) and log the requested cost versus registered groups to calibrate the shortfall threshold.",
+    "Trigger a door active enemy wave and check whether anything beyond SetActiveEnemyWaveEnabled runs, and on which peer.",
+    "Confirm the client side sees OnSpawn/OnDespawn but not MastermindUpdate/SpawnGroup, which decides which triggers are host-only."
+  ]
+}
