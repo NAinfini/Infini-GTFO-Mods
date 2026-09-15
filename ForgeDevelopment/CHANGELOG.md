@@ -34,3 +34,4 @@
 - Optional QOL telemetry uses removable subscriptions; no hard dependency on Infini Tweaks.
 - Preserve unavailable timing states and report limits.
 - Document generation diagnosis and controlled reproduction work as pending; no speculative generation or lifecycle patches.
+- First release candidate: the packaged `NAinfini-ForgeDevelopment` 1.0.0 is the author-only base package of the Forge set and never enters a player dependency closure.

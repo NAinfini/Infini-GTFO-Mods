@@ -14,3 +14,4 @@
 - Publish the canonical combat definitions in the SDK and expose `EntityInstanceResolvers`, `ResolveEntityInstance` and `IsEntityCurrent` so a domain can resolve its own native instances into shared entity references.
 - Name the Thunderstore package `ForgeRuntime` (D-013) and describe the host role only; domain bindings ship in their own base packages.
 - Offline validation only: the host and `Forge.Architecture.sln` build with 0 warnings and 0 errors. 1.2.0 is not released, not installed and has no game verification.
+- First release candidate: the packaged `NAinfini-ForgeRuntime` 1.2.0 ships `ForgeRuntime.dll` and `ForgeRuntime.Framework.dll` as the one installable host package of the Forge base set.

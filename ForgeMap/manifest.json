@@ -1,0 +1,10 @@
+{
+  "name": "ForgeMap",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
+  "description": "Forge Map: map and player identity for the Forge framework. Registers provider forge.module.gtfo.map and the player entity resolver with the Forge Runtime; hard dependency on ForgeRuntime.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.2",
+    "NAinfini-ForgeRuntime-1.2.0"
+  ]
+}

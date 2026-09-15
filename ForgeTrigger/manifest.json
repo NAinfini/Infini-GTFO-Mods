@@ -1,0 +1,10 @@
+{
+  "name": "ForgeTrigger",
+  "version_number": "0.1.0",
+  "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
+  "description": "Forge Trigger: the cross-domain logic module of the Forge framework. Registers provider forge.module.trigger with the Forge Runtime; hard dependency on ForgeRuntime.",
+  "dependencies": [
+    "BepInEx-BepInExPack_GTFO-3.2.2",
+    "NAinfini-ForgeRuntime-1.2.0"
+  ]
+}
