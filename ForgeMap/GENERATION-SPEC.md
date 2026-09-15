@@ -8,8 +8,8 @@
 
 1. **不做 G7 精确拼接生成。** 原 G0–G10 生成步骤、I-MAP-PLAN 拼装计划、原版房间描述符，以及模组侧 G0–G6 静态检查（`AssemblyPlanDiscovery` / `AssemblyPlanReader` / `AssemblyPlanContracts` / `AssemblyPlanChecks`、原生 `MapPlanDiagnostics` 与 `tests/MapAssemblyPlan`、`tests/MapPlanDiscovery`）全部取消并删除，本文件对应章节已移除；历史运行记录见 [VALIDATION.md](VALIDATION.md)。
 2. **LGTuner 长期保留。** 区域内房间选择顺序与额外环境资源加载继续归 LGTuner，不再计划由 ForgeMap 替代（D-013 的"生成完全替代 LGTuner"目标作废）。
-3. **新方向（待游戏内可行性原型）**：房间结构全部在网站编辑器里拼（只用游戏已有零件），导出为数据；ForgeMap 在游戏里用游戏自带素材搭建该房间，并登记为可用 geomorph（候选接口 GTFO-API `AssetAPI.RegisterAsset` / `PrefabAPI`，**未核实**），再由 ComplexResourceSet + `CustomGeomorph` / LGTuner 使用。兜底路线：作者上传模组包，网站提取房间进社区（D-012）。
-4. 所有测试放到最终阶段统一跑。
+3. **新方向（待游戏内可行性原型）**：房间结构全部在网站编辑器里拼（只用游戏已有零件），导出为数据；ForgeMap 在游戏里用游戏自带素材搭建该房间，并登记为可用 geomorph（候选接口 GTFO-API `AssetAPI.RegisterAsset` / `PrefabAPI`，**未核实**），再由 ComplexResourceSet + `CustomGeomorph` / LGTuner 使用。这是地图编辑的必需功能，原型只决定实现方式，不决定做不做（框架 D-021）；它不是 G7，摆放仍归原版生成器。补充来源：作者上传模组包，网站提取房间进社区（D-012）。
+4. 所有测试放到最终阶段统一跑（框架 D-020）。
 
 ## 1. 现在谁在生成地图
 
@@ -82,7 +82,7 @@ Adapter 不做的事：选择摆放、计算碰撞或连通、声明 NavMesh 就
 2. ForgeMap 读取该数据，在游戏里用游戏自带素材搭建该房间。
 3. 把搭好的房间登记为可用 geomorph：候选接口是 GTFO-API 的 `AssetAPI.RegisterAsset` / `PrefabAPI`，**未核实**；登记失败即停止，不按名字或包名兜底猜测。
 4. 由 ComplexResourceSet + `CustomGeomorph` / LGTuner 按现有方式选取与加载。区域内房间选择顺序与额外环境资源加载仍归 LGTuner。
-5. 主路线不可行时走兜底路线：作者上传模组包，网站提取房间进社区（D-012）。
+5. 补充来源：作者上传模组包，网站提取房间进社区（D-012）；它与本链路并存，不是替代。
 6. 世界结束或重建时按身份层现有规则注销引用，旧回调按 stale-world / stale-generation 拒绝。
 
 这条链路只到"房间成为原版流程可用的 geomorph"为止；摆放、AIGraph、NavMesh 与剔除照旧由原版流程完成，ForgeMap 不重写也不预估它们的结果。
@@ -114,7 +114,7 @@ python "$m/tools/verify_native_api.py" "$m/evidence/map2-scope-2026-09-13/genera
 1. 在 Temp profile 装原版关卡 + Development 诊断，订阅 `LG_Factory.add_OnFactoryBatchDone`，记录一次完整构建的批次序列与每批耗时（主机与客户端各一次）。
 2. 记录 geomorph prefab 首次实例化、`LG_Plug.Pair`、`LG_BuildUnityGraphJob.NavmeshDone`、`LG_BuildAIGraphJob_End.Build` 分别发生在哪个批次。
 3. 按第 4 节把编辑器导出的一个房间在游戏里用自带素材搭起来，尝试登记为可用 geomorph（候选接口 `AssetAPI.RegisterAsset` / `PrefabAPI`，未核实），确认 ComplexResourceSet + `CustomGeomorph` / LGTuner 是否真的把它当普通 geomorph 选取与加载。
-4. 结论决定主路线是否可行；不可行则改走兜底路线（作者上传模组包、网站提取房间进社区，D-012），把结果写回本文件。
+4. 结论决定搭建与登记的实现方式（登记接口、登记时机、需要补齐的 area / plug / AI 节点 / 导航源），把结果写回本文件；原型失败只换实现方式，MAP-BUILD 不取消（框架 D-021）。
 
 **B. `gtfo.complex-resource-geomorph` profile 核验（MAP-ADAPTER 的开始条件；第三方 Geo 包按 D-010、D-012 暂缓，B 组保持未执行）**
 1. 装 CheeseGeos 0.5.8 + MTFO，使用引用其 geomorph 的 ComplexResourceSet。
@@ -143,6 +143,6 @@ python "$m/tools/verify_native_api.py" "$m/evidence/map2-scope-2026-09-13/genera
 | 提供方 | 最小需求 | 证据 |
 | --- | --- | --- |
 | 网站 | 导出编辑期拼好的房间结构数据（只用游戏已有零件，格式待定；I-MAP-PLAN 已取消，需重新定范围） | 框架 §6 U-MAP-WEB 尚未完成 |
-| 网站 | 按第 3.1 节输出资源描述符（提取器归网站），D-012 兜底路线用它提取作者上传的模组包；native room 的 revision 规则 | `forge/resource-adapters.ts` 目前只有 pin 与预览，运行期阻塞 `native-resource-binding-unverified` |
-| Runtime | 公开的"关卡构建开始 / 构建完成 / NavMesh 就绪"生命周期观察；现在只有 `BeginWorld(worldEpoch)` | `ForgeRuntime/Framework` 中无生成阶段相关 API |
+| 网站 | 按第 3.1 节输出资源描述符（提取器归网站），D-012 上传提取（补充来源）用它提取作者上传的模组包；native room 的 revision 规则 | `forge/resource-adapters.ts` 目前只有 pin 与预览，运行期阻塞 `native-resource-binding-unverified` |
+| Runtime | 把游戏原生 `LG_Factory` 构建回调接成公开的"关卡构建开始 / 构建完成 / NavMesh 就绪"生命周期观察（框架 D-021）；现在只有 `BeginWorld(worldEpoch)` | `ForgeRuntime/Framework` 中无生成阶段相关 API |
 | GTFO-API（外部，未核实） | 运行期注册自定义 asset / prefab 并让它成为可用 geomorph 的能力 | `AssetAPI.RegisterAsset` / `PrefabAPI` 只是候选接口，语义与合法阶段未核验 |
