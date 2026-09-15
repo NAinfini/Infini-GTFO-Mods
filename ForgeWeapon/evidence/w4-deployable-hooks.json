@@ -1,0 +1,598 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameExecuted": false,
+  "gameBuild": "20403457",
+  "gameRevision": "34873",
+  "dump": {
+    "name": "gtfo-inspection/dumper/dump.cs",
+    "length": 27985238,
+    "sha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+    "sameDumpAs": ["w1-native-hooks.json", "w1-native-world-paths.json", "w4-combat-hooks.json"]
+  },
+  "interop": {
+    "used": [
+      { "name": "Modules-ASM.dll", "length": 16777728, "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "readWith": "ilspycmd 11.0.0.9375, read-only metadata listing" }
+    ]
+  },
+  "nativeImage": {
+    "file": "GameAssembly.dll",
+    "length": 57070592,
+    "sha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55"
+  },
+  "method": [
+    "Read-only static analysis. No assembly is loaded into the CLR, no game process is started, nothing is written to a profile or to the game directory.",
+    "A method body begins at its dump.cs RVA, is bounded by the next distinct RVA of the same owning type (cap 0x4000 bytes) and stops at the first terminator followed by int3/nop padding.",
+    "The body is decoded with Iced x64. An edge below is a literal E8/E9 rel32 call at that site. Indirect dispatch (vtable call, interface call, delegate Invoke, register) is NOT resolved, so a lifecycle method with no listed caller is normally invoked by the native replication system rather than unused.",
+    "rvaSharing is the number of dump.cs method entries that declare that exact RVA in the whole image; share=1 means the RVA identifies exactly one method entry, which is what a Harmony patch target needs.",
+    "A dump.cs entry carries a Slot number exactly when the shipped metadata declares it virtual, override or abstract, so isVirtual below is read from the presence of Slot."
+  ],
+  "types": [
+    { "name": "Gear.SentryGunFirstPerson", "declaration": "public class SentryGunFirstPerson : ItemEquippable // TypeDefIndex: 12642" },
+    { "name": "Gear.SentryGunInstance", "declaration": "public class SentryGunInstance : ItemEquippable, IDynamicReplicatorSupplier<pGearSpawnData>, IReplicatorSupplier, iSentrygunInstanceCore, iResourcePackReceiver, IWarpableObject // TypeDefIndex: 12646" },
+    { "name": "Gear.SentryGunInstance_Detection", "declaration": "public class SentryGunInstance_Detection : MonoBehaviour, iSentrygunInstance_Detection // TypeDefIndex: 12649" },
+    { "name": "Gear.SentryGunInstance_Firing_Bullets", "declaration": "public class SentryGunInstance_Firing_Bullets : MonoBehaviour, iSentrygunInstance_Firing // TypeDefIndex: 12652" },
+    { "name": "Gear.SentryGunInstance_Sync", "declaration": "public class SentryGunInstance_Sync : MonoBehaviour, iSentrygunInstance_Sync // TypeDefIndex: 12657" },
+    { "name": "Gear.SentryGunInstance_ScannerVisuals_Plane", "declaration": "public class SentryGunInstance_ScannerVisuals_Plane : MonoBehaviour, iSentrygunInstance_ScannerVisuals // TypeDefIndex: 12654" },
+    { "name": "Gear.MineDeployerInstance", "declaration": "public class MineDeployerInstance : ItemEquippable, IDynamicReplicatorSupplier<pItemSpawnData>, IReplicatorSupplier, iMineDeployerInstanceCore // TypeDefIndex: 12616" },
+    { "name": "Player.PlayerBackpack", "declaration": "PlayerBackpack // TypeDefIndex seen in w1-native-world-paths.json" },
+    { "name": "Gear.ItemEquippable", "declaration": "public class ItemEquippable : Item // TypeDefIndex: 12533" }
+  ],
+  "answer": {
+    "id": "w4-deployable",
+    "question": "How is a sentry or mine deployed, who owns it, how is it recalled and destroyed, how does it pick a target and fire, and which end is authoritative?",
+    "conclusion": [
+      "Deployment has two distinct steps and two distinct objects. The first-person tool is SentryGunFirstPerson: its private PlaceOnGround reads PlayerBackpack.IsDeployed and writes PlayerBackpack.SetDeployed, i.e. it marks the owning player's slot as deployed. The world object is a separate SentryGunInstance, which arrives through the item replication path (OnSpawn(pGearSpawnData), Slot 150) and marks the same backpack slot deployed again from its own OnSpawn body.",
+      "SentryGunInstance.OnSpawn(pGearSpawnData) is the world-spawn entry, and SentryGunInstance.SyncedPickup(PlayerAgent agent) (Slot 45, an ISyncedItem implementation) is the recall path; SyncedPickup reads PlayerAgent.get_Owner and calls PlayerBackpack.SetDeployed and its own get_Replicator.",
+      "SentryGunInstance.OnDespawn (Slot 35, override of ItemEquippable.OnDespawn) and the private MonoBehaviour OnDestroy are separate paths, and both funnel into the same teardown: OnDestroy calls StopFiring and StopScanning, and the private CleanUp does the same. A level change that destroys the object therefore goes through OnDestroy, not through OnDespawn.",
+      "The deployer identity is the equipment owner, not a bespoke field: SentryGunInstance inherits the PlayerAgent Owner property from ItemEquippable (backed by Item), and CheckIsSetup reads PlayerAgent.get_Owner (which returns SNet_Player) to finish setup. SentryGunInstance.SyncedTurnOn(PlayerAgent, AIG_CourseNode) and SyncedTurnOff(PlayerAgent) also take the acting agent as a parameter.",
+      "Position comes from the world object's own transform: SentryGunFirstPerson computes the placement with CheckCanPlace and PlaceOnGround while the tool is still in hand, and the deployed instance is a separate replicated object placed at the ground position the tool computed. No explicit position field on the sentry is exposed in the metadata beyond GroundOffset (Slot 167) and the course node it registers with.",
+      "Target selection is componentised: SentryGunInstance_Detection.UpdateDetection (Slot 6) calls the three private static selectors CheckForPlayerTarget, CheckForTarget and CheckForTargetLegacy, which take an ArchetypeDataBlock, the detection transform and the course-node list. Enemy targeting and player targeting are separate selectors in the same update body, so a healing sentry can be driven from the same detection component that already picks players.",
+      "Sentry firing has its own component with separate master and client ticks: SentryGunInstance_Firing_Bullets exposes UpdateFireMaster(bool targetIsTagged) at Slot 8 and UpdateFireClient() at Slot 9 of iSentrygunInstance_Firing, and the private FireBullet(bool doDamage, bool targetIsTagged) is called from the master-side bodies UpdateFireAuto and UpdateFireSemi. SentryGunInstance itself splits its own tick the same way: Update (Slot 139) calls UpdateMaster and UpdateClient, and only UpdateMaster calls WantToFire, RefreshDangerZone and the firing start.",
+      "The sentry fires through the same bullet routine as a player weapon: SentryGunInstance_Firing_Bullets.FireBullet calls Gear.BulletWeapon::BulletHit, the same static hit routine that every weapon Fire body calls (see w4-combat-hooks.json). The sentry holds its own static Weapon.WeaponHitData.",
+      "Both ends hold a SentryGunInstance object: it is an IDynamicReplicatorSupplier<pGearSpawnData> and it owns a SentryGunInstance_Sync component that owns an SNet_Packet<pSentryGunSync_New> targeting packet and exposes UpdateMaster (Slot 7) and UpdateClient (Slot 8). The host is authoritative for the world simulation - the firing decision, the danger zone and the ammo - and the client is fed targeting and ammo state through that packet.",
+      "MineDeployerInstance mirrors the sentry shape at a smaller scale: OnSpawn(pItemSpawnData) at Slot 150, OnSpawnData, Setup at Slot 36, SyncedPickup(PlayerAgent) at Slot 45 which reads PlayerAgent.get_Owner, and a private OnDestroy. It does not go through PlayerBackpack.SetDeployed at all - the deployed marker is written only for the sentry path in the code that was decoded."
+    ],
+    "consequences": [
+      "The deployable anchoring point for a behaviour is the world object SentryGunInstance, not the backpack slot marker: the marker only says a slot is deployed, while the instance carries owner, position, course node, detection, firing and the master/client split.",
+      "Because the world object exists on both ends but only the master decides firing, a Forge pulse that drives the sentry must be published host-side; a client-side pulse would double the effect.",
+      "SentryGunInstance.OnDespawn, MineDeployerInstance.OnSpawn and SentryGunInstance.SyncedPickup all have no literal caller, which is expected for interface/replication entry points; they must be treated as live patch targets, not as dead code."
+    ]
+  },
+  "methods": [
+    {
+      "id": "sentry-tool-place",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunFirstPerson",
+      "typeFull": "Gear.SentryGunFirstPerson",
+      "name": "PlaceOnGround",
+      "signature": "Gear.SentryGunFirstPerson::PlaceOnGround(bool)",
+      "dumpSignature": "private void PlaceOnGround()",
+      "rva": "0x14115E0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 730,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x1410310", "signature": "Gear.SentryGunFirstPerson::CheckCanPlace(bool)" },
+        { "rva": "0x1760390", "signature": "Player.PlayerBackpack::IsDeployed(Player.InventorySlot)" },
+        { "rva": "0x1760BB0", "signature": "Player.PlayerBackpack::SetDeployed(Player.InventorySlot, bool)" }
+      ],
+      "decision": "grounded",
+      "reason": "The local placement path. It is reached from the tool's own handling, so it has no literal caller in the decoded bodies; it is the moment the owning backpack slot becomes 'deployed'."
+    },
+    {
+      "id": "sentry-tool-can-place",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunFirstPerson",
+      "typeFull": "Gear.SentryGunFirstPerson",
+      "name": "CheckCanPlace",
+      "signature": "Gear.SentryGunFirstPerson::CheckCanPlace(bool)",
+      "dumpSignature": "private bool CheckCanPlace()",
+      "rva": "0x1410310",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 3007,
+      "terminator": "return",
+      "directCallers": [
+        { "rva": "0x14115E0", "signature": "Gear.SentryGunFirstPerson::PlaceOnGround(bool)" },
+        { "rva": "0x1411BA0", "signature": "Gear.SentryGunFirstPerson::Update()" }
+      ],
+      "decision": "grounded",
+      "reason": "Placement validity, recomputed every tool frame; the ground position the world instance will use is decided here and in PlaceOnGround."
+    },
+    {
+      "id": "sentry-instance-spawn",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "OnSpawn",
+      "signature": "Gear.SentryGunInstance::OnSpawn(pGearSpawnData)",
+      "dumpSignature": "public void OnSpawn(pGearSpawnData spawnData)",
+      "rva": "0x14184B0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": 150,
+      "bodyBytes": 1140,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x1760BB0", "signature": "Player.PlayerBackpack::SetDeployed(Player.InventorySlot, bool)" }
+      ],
+      "callSites": [
+        { "site": "0x1418870", "target": "0x1760BB0", "inLoop": false }
+      ],
+      "decision": "grounded",
+      "reason": "The world instance's spawn entry, carrying the gear spawn data; the slot 150 position and the absence of any literal caller show it is invoked by the replication/gear spawn machinery, not by the placement code. It writes the deployed marker on the owner's backpack, which is how the w1 SetDeployed hook sees a sentry world spawn."
+    },
+    {
+      "id": "sentry-instance-pickup",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "SyncedPickup",
+      "signature": "Gear.SentryGunInstance::SyncedPickup(Player.PlayerAgent)",
+      "dumpSignature": "public override void SyncedPickup(PlayerAgent agent)",
+      "rva": "0x141B2B0",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "slot": 45,
+      "bodyBytes": 1406,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x130B660", "signature": "Player.PlayerAgent::get_Owner()" },
+        { "rva": "0x141E450", "signature": "Gear.SentryGunInstance::get_Replicator()" },
+        { "rva": "0x1760BB0", "signature": "Player.PlayerBackpack::SetDeployed(Player.InventorySlot, bool)" }
+      ],
+      "callSites": [
+        { "site": "0x141B687", "target": "0x1760BB0", "inLoop": false }
+      ],
+      "decision": "grounded",
+      "reason": "The recall path, and an ISyncedItem implementation, so it is reached through interface dispatch and has no literal caller. It takes the acting player as a parameter and clears the deployed state through the backpack."
+    },
+    {
+      "id": "sentry-instance-despawn",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "OnDespawn",
+      "signature": "Gear.SentryGunInstance::OnDespawn()",
+      "dumpSignature": "public override void OnDespawn()",
+      "rva": "0x1417A20",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "slot": 35,
+      "bodyBytes": 90,
+      "terminator": "unconditionalbranch",
+      "directCallers": [],
+      "decision": "grounded",
+      "reason": "Override of ItemEquippable.OnDespawn (Slot 35), so it is virtual with no literal caller. The 90-byte body is a small forwarder, which is why the real teardown work is visible in OnDestroy and CleanUp below rather than here."
+    },
+    {
+      "id": "sentry-instance-destroy",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "OnDestroy",
+      "signature": "Gear.SentryGunInstance::OnDestroy()",
+      "dumpSignature": "private void OnDestroy()",
+      "rva": "0x1417A80",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 493,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x1419F00", "signature": "Gear.SentryGunInstance::StopFiring()" },
+        { "rva": "0x141A080", "signature": "Gear.SentryGunInstance::StopScanning()" }
+      ],
+      "decision": "grounded",
+      "reason": "Unity's destruction path. A level change or an object teardown lands here, and it stops firing and scanning directly, so a Forge behaviour that holds per-sentry state must release it here as well as on despawn."
+    },
+    {
+      "id": "sentry-instance-cleanup",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "CleanUp",
+      "signature": "Gear.SentryGunInstance::CleanUp()",
+      "dumpSignature": "private void CleanUp()",
+      "rva": "0x14122C0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 292,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x1419F00", "signature": "Gear.SentryGunInstance::StopFiring()" },
+        { "rva": "0x141A080", "signature": "Gear.SentryGunInstance::StopScanning()" }
+      ],
+      "decision": "grounded",
+      "reason": "Second teardown path with the same two effects as OnDestroy. It has no literal caller in the decoded bodies, so the caller is an indirect one that this analysis does not resolve."
+    },
+    {
+      "id": "sentry-instance-check-setup",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "CheckIsSetup",
+      "signature": "Gear.SentryGunInstance::CheckIsSetup()",
+      "dumpSignature": "private void CheckIsSetup()",
+      "rva": "0x1411EC0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 966,
+      "terminator": "return",
+      "directCallers": [
+        { "rva": "0x1417C80", "signature": "Gear.SentryGunInstance::OnGearSpawnComplete()" },
+        { "rva": "0x141C620", "signature": "Gear.SentryGunInstance::Setup>b__61_0()" }
+      ],
+      "calls": [
+        { "rva": "0x130B660", "signature": "Player.PlayerAgent::get_Owner()" },
+        { "rva": "0x141E530", "signature": "Gear.SentryGunInstance::set_Ammo(float)" }
+      ],
+      "decision": "grounded",
+      "reason": "The point where the instance reads its owner to finish becoming usable, reached from OnGearSpawnComplete (Slot 37) and from a Setup continuation."
+    },
+    {
+      "id": "sentry-instance-update-master",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "UpdateMaster",
+      "signature": "Gear.SentryGunInstance::UpdateMaster()",
+      "dumpSignature": "private void UpdateMaster()",
+      "rva": "0x141D000",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 1611,
+      "terminator": "return",
+      "directCallers": [
+        { "rva": "0x141DF70", "signature": "Gear.SentryGunInstance::Update()" }
+      ],
+      "calls": [
+        { "rva": "0x141E150", "signature": "Gear.SentryGunInstance::WantToFire()" },
+        { "rva": "0x1418BC0", "signature": "Gear.SentryGunInstance::RefreshDangerZone()" },
+        { "rva": "0x1419CE0", "signature": "Gear.SentryGunInstance::StartFiring()" },
+        { "rva": "0x1419F00", "signature": "Gear.SentryGunInstance::StopFiring()" },
+        { "rva": "0x1419DA0", "signature": "Gear.SentryGunInstance::StartScanning()" },
+        { "rva": "0x141D680", "signature": "Gear.SentryGunInstance::UpdateRotation(bool, bool, UnityEngine.Vector3)" },
+        { "rva": "0x1411DF0", "signature": "Gear.SentryGunInstance::CalcCostOfBullet(bool)" }
+      ],
+      "decision": "grounded",
+      "reason": "The authoritative tick. WantToFire and RefreshDangerZone appear only in this body and not in UpdateClient, which is the structural evidence that the firing decision is master-side."
+    },
+    {
+      "id": "sentry-instance-update-client",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "UpdateClient",
+      "signature": "Gear.SentryGunInstance::UpdateClient()",
+      "dumpSignature": "private void UpdateClient()",
+      "rva": "0x141C8F0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 1757,
+      "terminator": "return",
+      "directCallers": [
+        { "rva": "0x141DF70", "signature": "Gear.SentryGunInstance::Update()" }
+      ],
+      "calls": [
+        { "rva": "0x141E1F0", "signature": "Gear.SentryGunInstance::WantToScan()" },
+        { "rva": "0x1419CE0", "signature": "Gear.SentryGunInstance::StartFiring()" },
+        { "rva": "0x1419F00", "signature": "Gear.SentryGunInstance::StopFiring()" },
+        { "rva": "0x141D680", "signature": "Gear.SentryGunInstance::UpdateRotation(bool, bool, UnityEngine.Vector3)" },
+        { "rva": "0x141E530", "signature": "Gear.SentryGunInstance::set_Ammo(float)" }
+      ],
+      "decision": "grounded",
+      "reason": "The non-authoritative tick: it drives visuals, rotation and the ammo readback from replicated state, and it never calls WantToFire or RefreshDangerZone."
+    },
+    {
+      "id": "sentry-detection-update",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance_Detection",
+      "typeFull": "Gear.SentryGunInstance_Detection",
+      "name": "UpdateDetection",
+      "signature": "Gear.SentryGunInstance_Detection::UpdateDetection()",
+      "dumpSignature": "public void UpdateDetection()",
+      "rva": "0x1413CC0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": 6,
+      "bodyBytes": 1024,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x1412F00", "signature": "Gear.SentryGunInstance_Detection::CheckForTarget(ArchetypeDataBlock, AIG_CourseNode[], ref EnemyTarget[], Transform)" },
+        { "rva": "0x14123F0", "signature": "Gear.SentryGunInstance_Detection::CheckForPlayerTarget(ArchetypeDataBlock, Transform, GameObject)" },
+        { "rva": "0x1412850", "signature": "Gear.SentryGunInstance_Detection::CheckForTargetLegacy(ArchetypeDataBlock, Transform)" }
+      ],
+      "decision": "grounded",
+      "reason": "Slot 6 of iSentrygunInstance_Detection, so it is invoked through the component interface. The three candidate selectors are private static, and the player selector already exists next to the enemy selector, which is the mechanism a friendly-target sentry can reuse."
+    },
+    {
+      "id": "sentry-fire-bullet",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance_Firing_Bullets",
+      "typeFull": "Gear.SentryGunInstance_Firing_Bullets",
+      "name": "FireBullet",
+      "signature": "Gear.SentryGunInstance_Firing_Bullets::FireBullet(bool, bool)",
+      "dumpSignature": "private void FireBullet(bool doDamage, bool targetIsTagged)",
+      "rva": "0x1414370",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 3681,
+      "terminator": "return",
+      "directCallers": [
+        { "rva": "0x1416560", "signature": "Gear.SentryGunInstance_Firing_Bullets::UpdateFireAuto(bool, bool)" },
+        { "rva": "0x1416A80", "signature": "Gear.SentryGunInstance_Firing_Bullets::UpdateFireSemi(bool, bool)" }
+      ],
+      "calls": [
+        { "rva": "0x145EE10", "signature": "Gear.BulletWeapon::BulletHit(Weapon.WeaponHitData, bool, float, uint, bool)" }
+      ],
+      "callSites": [
+        { "site": "0x1414AC6", "target": "0x145EE10", "inLoop": false },
+        { "site": "0x1414D0E", "target": "0x145EE10", "inLoop": true }
+      ],
+      "decision": "grounded",
+      "reason": "The two UpdateFire* bodies that reach it both take an isMaster parameter, and the sentry reaches the same BulletHit routine as a player weapon. This is the sentry's link to the damage domain; the receiving side is enemydmgev's scope."
+    },
+    {
+      "id": "sentry-fire-master",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance_Firing_Bullets",
+      "typeFull": "Gear.SentryGunInstance_Firing_Bullets",
+      "name": "UpdateFireMaster",
+      "signature": "Gear.SentryGunInstance_Firing_Bullets::UpdateFireMaster(bool)",
+      "dumpSignature": "public void UpdateFireMaster(bool targetIsTagged)",
+      "rva": "0x14169E0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": 8,
+      "bodyBytes": 151,
+      "terminator": "return",
+      "directCallers": [],
+      "decision": "grounded",
+      "reason": "Slot 8 of iSentrygunInstance_Firing; the concrete per-fire-mode bodies are selected inside it, which is why FireBullet is reached only from UpdateFireAuto and UpdateFireSemi in the decoded bodies."
+    },
+    {
+      "id": "sentry-fire-client",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance_Firing_Bullets",
+      "typeFull": "Gear.SentryGunInstance_Firing_Bullets",
+      "name": "UpdateFireClient",
+      "signature": "Gear.SentryGunInstance_Firing_Bullets::UpdateFireClient()",
+      "dumpSignature": "public void UpdateFireClient()",
+      "rva": "0x1416990",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": 9,
+      "bodyBytes": 67,
+      "terminator": "unconditionalbranch",
+      "directCallers": [],
+      "decision": "grounded",
+      "reason": "Slot 9 of the same interface; the body is a 67-byte forwarder and does not reach FireBullet, so no bullet is decided on the client tick."
+    },
+    {
+      "id": "sentry-sync-component",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance_Sync",
+      "typeFull": "Gear.SentryGunInstance_Sync",
+      "name": "UpdateMaster",
+      "signature": "Gear.SentryGunInstance_Sync::UpdateMaster()",
+      "dumpSignature": "public void UpdateMaster()",
+      "rva": "0x141AEB0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": 7,
+      "bodyBytes": null,
+      "terminator": null,
+      "directCallers": [],
+      "decision": "recorded-only",
+      "reason": "The replication component that owns SNet_Packet<pSentryGunSync_New> m_targetingPacket and the private OnTargetingData receiver. It is listed to show that the master/client split is a native replication feature that already exists; it is not proposed as a Forge hook. The type is not in the decoded focus set, so no body size or call edge is claimed for it."
+    },
+    {
+      "id": "sentry-turn-on",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "SyncedTurnOn",
+      "signature": "Gear.SentryGunInstance::SyncedTurnOn(Player.PlayerAgent, AIG.AIG_CourseNode)",
+      "dumpSignature": "public override void SyncedTurnOn(PlayerAgent agent, AIG_CourseNode courseNode)",
+      "rva": "0x141B9D0",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "slot": 40,
+      "bodyBytes": 102,
+      "terminator": "unconditionalbranch",
+      "directCallers": [],
+      "decision": "grounded",
+      "reason": "ISyncedItem turn-on, virtual with no literal caller; it receives the acting agent and the course node, which is the game's own 'who and where' for an activated deployable."
+    },
+    {
+      "id": "sentry-turn-off",
+      "assembly": "Modules-ASM.dll",
+      "type": "SentryGunInstance",
+      "typeFull": "Gear.SentryGunInstance",
+      "name": "SyncedTurnOff",
+      "signature": "Gear.SentryGunInstance::SyncedTurnOff(Player.PlayerAgent)",
+      "dumpSignature": "public override void SyncedTurnOff(PlayerAgent agent)",
+      "rva": "0x141B980",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "slot": 41,
+      "bodyBytes": 79,
+      "terminator": "unconditionalbranch",
+      "directCallers": [],
+      "decision": "grounded",
+      "reason": "ISyncedItem turn-off, virtual with no literal caller."
+    },
+    {
+      "id": "mine-spawn",
+      "assembly": "Modules-ASM.dll",
+      "type": "MineDeployerInstance",
+      "typeFull": "Gear.MineDeployerInstance",
+      "name": "OnSpawn",
+      "signature": "Gear.MineDeployerInstance::OnSpawn(pItemSpawnData)",
+      "dumpSignature": "public void OnSpawn(pItemSpawnData spawnData)",
+      "rva": "0x14FFEF0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": 150,
+      "bodyBytes": 585,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x14FFBB0", "signature": "Gear.MineDeployerInstance::OnSpawnData(pItemSpawnData)" }
+      ],
+      "decision": "grounded",
+      "reason": "Same Slot 150 shape and the same kind of dynamic replicator supplier as the sentry, so the mine world object also exists through the replication path."
+    },
+    {
+      "id": "mine-pickup",
+      "assembly": "Modules-ASM.dll",
+      "type": "MineDeployerInstance",
+      "typeFull": "Gear.MineDeployerInstance",
+      "name": "SyncedPickup",
+      "signature": "Gear.MineDeployerInstance::SyncedPickup(Player.PlayerAgent)",
+      "dumpSignature": "public override void SyncedPickup(PlayerAgent agent)",
+      "rva": "0x1500600",
+      "rvaSharing": 1,
+      "isVirtual": true,
+      "slot": 45,
+      "bodyBytes": 489,
+      "terminator": "return",
+      "directCallers": [],
+      "calls": [
+        { "rva": "0x130B660", "signature": "Player.PlayerAgent::get_Owner()" }
+      ],
+      "decision": "grounded",
+      "reason": "Mirrors the sentry recall but does not call PlayerBackpack.SetDeployed, so the mine path does not write the backpack deployed marker in the decoded bodies."
+    },
+    {
+      "id": "mine-destroy",
+      "assembly": "Modules-ASM.dll",
+      "type": "MineDeployerInstance",
+      "typeFull": "Gear.MineDeployerInstance",
+      "name": "OnDestroy",
+      "signature": "Gear.MineDeployerInstance::OnDestroy()",
+      "dumpSignature": "private void OnDestroy()",
+      "rva": "0x14FF9C0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 83,
+      "terminator": "return",
+      "directCallers": [],
+      "decision": "grounded",
+      "reason": "The mine's destruction path; the body is small and has no decoded outgoing edges, unlike the sentry's OnDestroy which stops firing and scanning."
+    },
+    {
+      "id": "backpack-set-deployed",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpack",
+      "typeFull": "Player.PlayerBackpack",
+      "name": "SetDeployed",
+      "signature": "Player.PlayerBackpack::SetDeployed(Player.InventorySlot, bool)",
+      "dumpSignature": "public void SetDeployed(InventorySlot slot, bool mode)",
+      "rva": "0x1760BB0",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 21,
+      "terminator": "unconditionalbranch",
+      "directCallers": [
+        { "rva": "0x14115E0", "signature": "Gear.SentryGunFirstPerson::PlaceOnGround(bool)" },
+        { "rva": "0x14184B0", "signature": "Gear.SentryGunInstance::OnSpawn(pGearSpawnData)" },
+        { "rva": "0x141B2B0", "signature": "Gear.SentryGunInstance::SyncedPickup(Player.PlayerAgent)" }
+      ],
+      "calls": [
+        { "rva": "0x1762350", "signature": "Player.PlayerBackpack::UpdateItemStatus(Player.InventorySlot, eInventoryItemStatus)" }
+      ],
+      "decision": "grounded",
+      "reason": "Already wired as a readback hook in w1-native-hooks.json; this listing adds the three call sites that concern deployables and shows the body is a 21-byte forwarder to UpdateItemStatus, so the marker write is cheap and the readback stays authoritative."
+    },
+    {
+      "id": "backpack-is-deployed",
+      "assembly": "Modules-ASM.dll",
+      "type": "Player.PlayerBackpack",
+      "typeFull": "Player.PlayerBackpack",
+      "name": "IsDeployed",
+      "signature": "Player.PlayerBackpack::IsDeployed(Player.InventorySlot)",
+      "dumpSignature": "public bool IsDeployed(InventorySlot slot)",
+      "rva": "0x1760390",
+      "rvaSharing": 1,
+      "isVirtual": false,
+      "slot": null,
+      "bodyBytes": 174,
+      "terminator": "return",
+      "directCallers": [
+        { "rva": "0x14115E0", "signature": "Gear.SentryGunFirstPerson::PlaceOnGround(bool)" }
+      ],
+      "decision": "grounded",
+      "reason": "Already read by the w1 identity wiring; this listing shows the placement code also reads it, so the marker is meaningful to the game on the placement path."
+    }
+  ],
+  "edges": [
+    { "id": "tool-place.checks-can-place", "from": "Gear.SentryGunFirstPerson::PlaceOnGround", "fromRva": "0x14115E0", "to": "Gear.SentryGunFirstPerson::CheckCanPlace", "toRva": "0x1410310" },
+    { "id": "tool-place.reads-marker", "from": "Gear.SentryGunFirstPerson::PlaceOnGround", "fromRva": "0x14115E0", "to": "Player.PlayerBackpack::IsDeployed", "toRva": "0x1760390" },
+    { "id": "tool-place.writes-marker", "from": "Gear.SentryGunFirstPerson::PlaceOnGround", "fromRva": "0x14115E0", "to": "Player.PlayerBackpack::SetDeployed", "toRva": "0x1760BB0", "site": "0x1411875", "inLoop": false },
+    { "id": "sentry-spawn.writes-marker", "from": "Gear.SentryGunInstance::OnSpawn(pGearSpawnData)", "fromRva": "0x14184B0", "to": "Player.PlayerBackpack::SetDeployed", "toRva": "0x1760BB0", "site": "0x1418870", "inLoop": false },
+    { "id": "sentry-pickup.writes-marker", "from": "Gear.SentryGunInstance::SyncedPickup", "fromRva": "0x141B2B0", "to": "Player.PlayerBackpack::SetDeployed", "toRva": "0x1760BB0", "site": "0x141B687", "inLoop": false },
+    { "id": "sentry-pickup.reads-owner", "from": "Gear.SentryGunInstance::SyncedPickup", "fromRva": "0x141B2B0", "to": "Player.PlayerAgent::get_Owner", "toRva": "0x130B660" },
+    { "id": "sentry-setup.reads-owner", "from": "Gear.SentryGunInstance::CheckIsSetup", "fromRva": "0x1411EC0", "to": "Player.PlayerAgent::get_Owner", "toRva": "0x130B660" },
+    { "id": "sentry-destroy.stops-firing", "from": "Gear.SentryGunInstance::OnDestroy", "fromRva": "0x1417A80", "to": "Gear.SentryGunInstance::StopFiring", "toRva": "0x1419F00" },
+    { "id": "sentry-destroy.stops-scanning", "from": "Gear.SentryGunInstance::OnDestroy", "fromRva": "0x1417A80", "to": "Gear.SentryGunInstance::StopScanning", "toRva": "0x141A080" },
+    { "id": "sentry-update.splits-tick", "from": "Gear.SentryGunInstance::Update", "fromRva": "0x141DF70", "to": "Gear.SentryGunInstance::UpdateMaster", "toRva": "0x141D000" },
+    { "id": "sentry-update.splits-tick-client", "from": "Gear.SentryGunInstance::Update", "fromRva": "0x141DF70", "to": "Gear.SentryGunInstance::UpdateClient", "toRva": "0x141C8F0" },
+    { "id": "sentry-master.wants-fire", "from": "Gear.SentryGunInstance::UpdateMaster", "fromRva": "0x141D000", "to": "Gear.SentryGunInstance::WantToFire", "toRva": "0x141E150" },
+    { "id": "sentry-master.refreshes-danger-zone", "from": "Gear.SentryGunInstance::UpdateMaster", "fromRva": "0x141D000", "to": "Gear.SentryGunInstance::RefreshDangerZone", "toRva": "0x1418BC0" },
+    { "id": "sentry-detection.selects-player", "from": "Gear.SentryGunInstance_Detection::UpdateDetection", "fromRva": "0x1413CC0", "to": "Gear.SentryGunInstance_Detection::CheckForPlayerTarget", "toRva": "0x14123F0" },
+    { "id": "sentry-detection.selects-enemy", "from": "Gear.SentryGunInstance_Detection::UpdateDetection", "fromRva": "0x1413CC0", "to": "Gear.SentryGunInstance_Detection::CheckForTarget", "toRva": "0x1412F00" },
+    { "id": "sentry-fire.reaches-bullet-hit", "from": "Gear.SentryGunInstance_Firing_Bullets::FireBullet", "fromRva": "0x1414370", "to": "Gear.BulletWeapon::BulletHit", "toRva": "0x145EE10", "site": "0x1414D0E", "inLoop": true },
+    { "id": "sentry-auto-fires", "from": "Gear.SentryGunInstance_Firing_Bullets::UpdateFireAuto", "fromRva": "0x1416560", "to": "Gear.SentryGunInstance_Firing_Bullets::FireBullet", "toRva": "0x1414370" },
+    { "id": "sentry-semi-fires", "from": "Gear.SentryGunInstance_Firing_Bullets::UpdateFireSemi", "fromRva": "0x1416A80", "to": "Gear.SentryGunInstance_Firing_Bullets::FireBullet", "toRva": "0x1414370" },
+    { "id": "mine-spawn.reads-spawn-data", "from": "Gear.MineDeployerInstance::OnSpawn(pItemSpawnData)", "fromRva": "0x14FFEF0", "to": "Gear.MineDeployerInstance::OnSpawnData(pItemSpawnData)", "toRva": "0x14FFBB0" },
+    { "id": "mine-pickup.reads-owner", "from": "Gear.MineDeployerInstance::SyncedPickup", "fromRva": "0x1500600", "to": "Player.PlayerAgent::get_Owner", "toRva": "0x130B660" }
+  ],
+  "authority": {
+    "question": "Do host and client both hold a deployable object, and which end is authoritative?",
+    "answer": "Both ends hold the object and the host is authoritative.",
+    "grounds": [
+      "Gear.SentryGunInstance declares IDynamicReplicatorSupplier<pGearSpawnData> and IReplicatorSupplier, and its world object is created through the item replication path: OnSpawn(pGearSpawnData) at Slot 150 with no literal caller.",
+      "The same class contains SentryGunInstance_Sync with SNet_Packet<pSentryGunSync_New> m_targetingPacket, a private OnTargetingData receiver and UpdateMaster (Slot 7) / UpdateClient (Slot 8), i.e. a state stream from the master to the clients.",
+      "On the tick, SentryGunInstance.Update calls both UpdateMaster and UpdateClient, and the firing decision appears only on the master side: WantToFire and RefreshDangerZone have UpdateMaster as their only decoded caller.",
+      "The firing component repeats the split at its own interface: iSentrygunInstance_Firing Slot 8 UpdateFireMaster versus Slot 9 UpdateFireClient, and FireBullet is reached only from UpdateFireAuto and UpdateFireSemi, both of which take an isMaster parameter."
+    ],
+    "consequences": [
+      "A Forge behaviour anchored on a deployable must publish host-side and let the native replication carry the visible effect, matching the host-authority ruling for this step.",
+      "A client-side deployable object is a replica: writing world state from a client-side Forge pulse would fight the native replication."
+    ]
+  },
+  "unverified": [
+    { "id": "world-instance-creation-caller", "statement": "Which native caller creates the world SentryGunInstance after SentryGunFirstPerson.PlaceOnGround runs.", "reason": "OnSpawn, OnDespawn, SyncedPickup, SyncedTurnOn and SyncedTurnOff all have no literal caller: they are reached through interface or delegate dispatch, which this analysis does not follow. The first-person body does not call OnSpawn directly.", "whatWouldSettleIt": "A vtable-aware decompilation of the gear spawn path, or a runtime postfix on SentryGunInstance.OnSpawn that logs the stack." },
+    { "id": "level-change-path", "statement": "Whether a level change destroys the deployed instance through OnDespawn, through OnDestroy, or through both in a fixed order.", "reason": "Both paths exist and both stop firing and scanning, but the metadata does not order them, and CleanUp is a third body with the same effects and no decoded caller.", "whatWouldSettleIt": "A runtime trace across an extraction or a checkpoint restart." },
+    { "id": "despawn-marker-cleanup", "statement": "Whether OnDespawn or the level teardown clears PlayerBackpack.SetDeployed.", "reason": "SetDeployed has exactly three decoded callers - tool placement, instance spawn and instance recall - and OnDespawn is not one of them. The w1 note that the native marker can stay set after the world instance is gone therefore still stands.", "whatWouldSettleIt": "A runtime readback of IsDeployed after a sentry is destroyed by damage or by a level change." },
+    { "id": "target-selection-cadence", "statement": "How often the detection update runs and which of the three selectors is used per archetype.", "reason": "UpdateDetection calls all three, and the per-archetype branch is inside the decoded body as data-dependent control flow that this analysis does not evaluate. The interface only exposes StartDetection and UpdateDetection (Slots 5 and 6).", "whatWouldSettleIt": "A runtime counter on UpdateDetection while a sentry scans, or an archetype-data comparison across the shipped sentry templates." },
+    { "id": "owner-field-for-sentry", "statement": "That SentryGunInstance.Owner is populated from the spawn data before CheckIsSetup reads it.", "reason": "Owner is the ItemEquippable property (backed by Item); CheckIsSetup reads PlayerAgent.get_Owner and sets ammo, but the write site is not present in the metadata.", "whatWouldSettleIt": "A postfix on Item.set_Owner while deploying, or a decompilation of OnSpawnData(pGearSpawnData)." },
+    { "id": "sentry-sync-bodies", "statement": "Body size and outgoing edges of SentryGunInstance_Sync.UpdateMaster / UpdateClient and OnTargetingData.", "reason": "The type was not part of the decoded focus set, so only its declaration, slots and packet fields are claimed here; no call edge is asserted for it.", "whatWouldSettleIt": "Re-running the same decoder with Gear.SentryGunInstance_Sync in the focus list." }
+  ],
+  "limits": [
+    "No claim about runtime behaviour: nothing here was executed, and a literal call edge only proves that a call site exists in the shipped binary.",
+    "rvaSharing counts duplicate method entries in the local dump.cs; a value of 1 is necessary for a safe patch target but does not prove that the RVA is not reached through a shared jump target.",
+    "The dump.cs method list is the source for Slot numbers, which is how virtual and override are recognised; the interop assemblies were used to confirm namespace-qualified type names and the interface layout, not to read bodies, because interop bodies are runtime_invoke thunks.",
+    "The decoder bounds a body by the next distinct RVA of the same owning type. If a method is stored out of line from its type, the bound can be shorter than the real body and call sites would be under-reported, never invented.",
+    "Whether the game keeps the world instance alive across a level change, and what happens to a sentry that runs out of ammo, are runtime questions and are not answered here."
+  ]
+}
