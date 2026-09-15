@@ -4,8 +4,6 @@ namespace BepInEx
     public sealed class BepInPlugin : Attribute { public BepInPlugin(string id, string name, string version) { } }
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class BepInDependency : Attribute { public BepInDependency(string id, string version) { } }
-    // Only the members the production plugin reads are doubled; a missing directory is "no package".
-    public static class Paths { public static string PluginPath = ""; }
 }
 namespace BepInEx.Configuration
 {

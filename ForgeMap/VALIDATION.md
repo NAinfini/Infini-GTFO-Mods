@@ -2,6 +2,12 @@
 
 **上次更新：2026-09-14**（2026-09-13 内容合并自原 MAP1-DELIVERY 与 MAP1-IDENTITY-CONTINUATION 两份交接记录）。
 
+## G7 精确拼接生成取消：G0–G6 静态检查与计划测试删除（2026-09-14）
+
+用户决定不做 G7 精确拼接生成。I-MAP-PLAN 拼装计划、原版房间描述符与模组侧 G0–G6 静态检查全部取消：`AssemblyPlanDiscovery.cs`、`AssemblyPlanReader.cs`、`AssemblyPlanContracts.cs`、`AssemblyPlanChecks.cs`、`Native/MapPlanDiagnostics.cs` 与 `tests/MapAssemblyPlan`、`tests/MapPlanDiscovery`、`tools/verify_assembly_plan_fixtures.py` 删除，插件里的计划发现调用与 `map.plan-*` 诊断接线一并移除。LGTuner 长期保留（区域内房间选择顺序与额外环境资源加载），不再计划被 ForgeMap 替代；新方向（编辑器拼房间 → 游戏内登记为 geomorph → ComplexResourceSet / `CustomGeomorph` / LGTuner 使用）见 [GENERATION-SPEC.md](GENERATION-SPEC.md) 的现行方向一节。
+
+**本文档下方所有 MAP2 计划发现与 G0–G6 拼装计划静态检查记录仅作历史**：对应的检查器、测试与命令已经不存在，不要按旧记录复跑；它们描述的是当时确实跑过的结果，不代表现行方向。本次删除只做构建检查，测试按决定放到最终阶段统一跑。
+
 ## NativeEvidence 冻结输入改用 QA profile interop（2026-09-14）
 
 按框架 §6 U-MAP-MOD 与合同"编译引用与冻结输入要指定同一个明确来源"，把 `tests/MapNativeEvidence` 的冻结输入统一到唯一来源：`%APPDATA%\r2modmanPlus-local\GTFO\profiles\Forge-MapEditor-QA\BepInEx\interop`（构建时的 `GTFOBepInExPath` 也指向同一 profile）。此前 `evidence/map5a-player-hooks.json` 锁的是同机 `Temp` profile 的旧副本，而 `Forge-MapEditor-QA` 的 interop 于 2026-09-09 重新生成，两个程序集的 `hash.*` 与 `mvid.*` 共 4 项因此一直失败。证据等级不变：**metadata-and-static-native-call-graph-only**，没有启动游戏、没有安装或复制任何 profile 文件。

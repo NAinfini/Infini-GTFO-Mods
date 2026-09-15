@@ -6,9 +6,13 @@ Map 与 Room 的空间、设备、任务、遭遇、玩家生命流程与进程�
 
 ## 地图生成归本包
 
-地图生成的底层逻辑归 ForgeMap，不由各个房间包各自实现。近期只用原版 geomorph（框架 D-010、D-012）：自定义地图生成照做，第三方房间包的模型、资源侧 Adapter、素材提取与 geometry pin 暂缓。ForgeMap 生成还要完全接替 LGTuner 现在承担的两件事：同一区域多个房间按顺序放置、加载额外环境资源（D-013）。
+地图生成的底层逻辑归 ForgeMap，不由各个房间包各自实现。**2026-09-14 决定不做 G7 精确拼接生成**：原 G0–G10 生成步骤、I-MAP-PLAN 拼装计划、原版房间描述符，以及模组侧 G0–G6 静态检查（`AssemblyPlanDiscovery` / `AssemblyPlanReader` / `AssemblyPlanContracts` / `AssemblyPlanChecks`、原生 `MapPlanDiagnostics` 与 `tests/MapAssemblyPlan`、`tests/MapPlanDiscovery`）全部删除，不留旧路径。
 
-归属与接口形状见 [GENERATION-SPEC.md](GENERATION-SPEC.md)：生成步骤 G0–G10 各自的输入输出与归属、资源描述符与正反 fixture、运行期调用链、游戏内验证步骤，以及需要网站与其他单元提供的最小接口。**这些目前是计划、fixture 形状和原生签名证据，没有生成器的 C# 实现。**
+LGTuner 长期保留：区域内房间选择顺序与额外环境资源加载继续归它，不再计划由 ForgeMap 替代（D-013 的"生成完全替代 LGTuner"目标作废）。
+
+现行方向（待游戏内可行性原型）：房间结构全部在网站编辑器里拼（只用游戏已有零件），导出为数据；ForgeMap 在游戏里用游戏自带素材搭建该房间，并登记为可用 geomorph（候选接口 GTFO-API `AssetAPI.RegisterAsset` / `PrefabAPI`，**未核实**），再由 ComplexResourceSet + `CustomGeomorph` / LGTuner 使用。兜底路线：作者上传模组包，网站提取房间进社区（D-012）。
+
+归属与接口形状见 [GENERATION-SPEC.md](GENERATION-SPEC.md)：现行方向与归属、资源侧 Adapter 描述符形状与正反 fixture、待验证的调用链与游戏内验证步骤，以及需要网站与其他单元提供的最小接口。**这些目前是计划与 fixture 形状，没有对应实现。**
 
 ## 运行清单与 MAP1 内部身份层
 
@@ -53,27 +57,6 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 
 与 MAP1 的关系：`MapIdentitySession` 也登记 `forge.module.gtfo.map`，两者不能同进程并存；MAP1 原生适配器接线时必须合并为同一个 provider 生命周期。Weapon 的装备 owner 经上面的原生实例解析取得，Weapon 插件因此依赖 `NAinfini.ForgeMap`，但不引用 ForgeMap 程序集，见 [ForgeWeapon README](../ForgeWeapon/README.md#原生观察接线implementation-only)。
 
-## MAP2 G0 计划发现（D-013 过渡期）
-
-`AssemblyPlanDiscovery`（游戏无关程序集）做一次只读发现：枚举 `BepInEx/plugins/` 的一级目录，找出**恰好一个**含 `forge/maps/` 的包，读该包的 `forge/maps/rooms.descriptors.json` 与每份 `<planId>.assembly.json`，按框架 §3.2 I-MAP-PLAN 的 G0–G6 顺序跑已有静态检查，每个计划文件产出一条诊断。**过渡期只做静态检查与诊断**：不生成地图、不改游戏状态、不注册 provider、不读网络；一份计划被拒不影响同包其他计划，也不影响 Runtime 启动。通过不等于生成成功，合法计划照常带 blockers。
-
-- 恰好一个包：没有目录含 `forge/maps/` 时静默跳过（与 I-PACK 计划发现同一条：不打开文件、不报错、不写日志）；多于一个全部拒绝 `assembly.package-layout`。
-- 包内必须有 `forge/maps/rooms.descriptors.json`，缺失按 `assembly.package-layout` 拒绝（与 `tools/verify_assembly_plan_fixtures.py`、`tests/MapAssemblyPlan` 同码同路径）。描述符文档对每个计划都是拒绝顺序的第 1 条，先于计划文档校验。
-- 只处理文件名按 ordinal 精确匹配 `.assembly.json` 的文件，其他文件静默忽略；文件名前缀必须等于文档里的 `planId`，否则 `assembly.plan-file`。
-- 每个 `levelLayoutId` 只允许一份计划，第二个声明同一 id 的文件报 `assembly.duplicate-level-layout`；计划的码与 `$` 路径与两个检查器逐字相同（首错即停）。
-
-原生接线只有 `Native/MapPlanDiagnostics`：插件 `Load` 在注册身份后调用一次（`Unload()` 仍返回 false，无热重载），每个计划一条有界（512 字符）诊断行写到 BepInEx 日志：
-
-| 行首 | 级别 | 字段 |
-| --- | --- | --- |
-| `map.plan-accepted` | Info | `plan=<planId> path=<BepInEx 相对路径> blockers=<按 ordinal 排序>` |
-| `map.plan-rejected` | Error | `plan=<planId 或 -> code=<assembly.*/descriptor.*> path=<BepInEx 相对路径> at=<$ 路径>` |
-| `map.package-rejected` | Error | `code=assembly.package-layout path=<BepInEx 相对路径>`；包级拒绝时没有计划行 |
-
-路径形如 `plugins/<Team-Pkg>/forge/maps/<planId>.assembly.json`。这些行**还不是** I-DIAG 的 `forge.log.v1` 记录：`plan.loaded` / `plan.rejected` 归 Runtime sink，现在只是 BepInEx 日志诊断。Map 的 cfg `Logging.Level`（D-007 阶段 A）已随注册进入内核级别表，本阶段还没有记录点用它。
-
-`tests/MapPlanDiscovery` 用 `$env:TEMP` 下合成夹具覆盖无目录、空目录、合法与非法计划（多个错误码）、非计划文件、多包与重复 level layout；包级规则只有一处实现，`tests/MapAssemblyPlan` 的包级用例与 `tests/MapNativeAdapter` 的接线用例都走它。
-
 ## 边界
 
 没有真实创建适配器、地图 Action、生成器、资源 Adapter 或玩家可用发行物；唯一的游戏 Hook、对外 resolver 与原生实例解析器是上面 MAP5a 的 implementation-only 玩家身份。`tests/fixtures/native-identity-scenarios.json` 的十个原生身份规格只执行了托管替身部分（MapIdentity 按用例 id 标记），原生部分仍然 `nativeExecuted: false`；报告里的 `nativeGameExecuted`、`nativeHooksInstalled` 和 `gameplayBindingsRegistered` 都是 false。没有原生创建、主客机、恢复或导航执行。
@@ -113,14 +96,6 @@ dotnet build ForgeMap/tests/MapNativeLayout/MapNativeLayout.csproj -c Release --
 dotnet "$a/bin/MapNativeLayout/release/MapNativeLayout.dll" $bep "$a/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll" "$a/bin/ForgeRuntime/release/ForgeRuntime.dll" "$a/bin/ForgeMap/release/ForgeMap.dll" "$a/bin/ForgeMap.Native/release/ForgeMap.Native.dll" ForgeMap/evidence/map5a-player-hooks.json "$a/reports/map-native-layout.json"
 dotnet build ForgeMap/tests/MapNativeEvidence/MapNativeEvidence.csproj -c Release --artifacts-path $a "-p:GTFOBepInExPath=$bep"
 dotnet "$a/bin/MapNativeEvidence/release/MapNativeEvidence.dll" $bep $game $dump ForgeMap/evidence/map5a-player-hooks.json "$a/reports/map-native-evidence.json"
-```
-
-MAP2 G0 计划发现（游戏无关的托管发现流程，`$env:TEMP` 下合成夹具，不读游戏）：
-
-```powershell
-$artifacts = Join-Path (Resolve-Path ForgeMap) 'bin/map2-discovery-artifacts'
-dotnet build ForgeMap/tests/MapPlanDiscovery/MapPlanDiscovery.csproj -c Release --artifacts-path $artifacts
-dotnet "$artifacts/bin/MapPlanDiscovery/release/MapPlanDiscovery.dll"
 ```
 
 资源侧 Adapter 描述符 fixture（只读 JSON，不加载资源或游戏程序集）：

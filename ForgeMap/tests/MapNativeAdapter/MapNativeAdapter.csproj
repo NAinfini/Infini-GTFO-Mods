@@ -7,9 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Production Map native sources compiled against loader/game doubles; no GTFO assembly is loaded. -->
-    <Compile Include="../../Native/Plugin.cs;../../Native/MapPluginSession.cs;../../Native/MapNativeHooks.cs;../../Native/PlayerIdentityModule.cs;../../Native/MapPlanDiagnostics.cs" />
+    <Compile Include="../../Native/Plugin.cs;../../Native/MapPluginSession.cs;../../Native/MapNativeHooks.cs;../../Native/PlayerIdentityModule.cs" />
     <Compile Include="Program.cs;GameDoubles.cs;LoaderDoubles.cs" />
-    <Compile Include="../Shared/*.cs" />
     <ProjectReference Include="../../ForgeMap.csproj" />
   </ItemGroup>
 </Project>
