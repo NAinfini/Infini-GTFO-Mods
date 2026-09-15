@@ -8,7 +8,7 @@
 
 ## 当前能力
 
-生产 `ModuleDefinition` 仍是**空 provider**，没有注册任何可执行的游戏 binding。下面全部是编译进 `ForgeTrigger.dll` 的底层方法，被自己的测试工程消费；方法存在不等于节点已注册。
+生产 `ModuleDefinition` 只注册一个节点：能力 `forge.condition.predicate.compare` 与 evaluate binding `forge.module.trigger.binding.compare`，由宿主链接本模块源码后注册（本包还没有自己的插件入口）。下面其余方法编译进 `ForgeTrigger.dll`，只被自己的测试工程消费；方法存在不等于节点已注册。
 
 **纯计算**（`Pure/ScalarNodes.cs`、`VectorNodes.cs`、`SeededNodes.cs`）覆盖现有 23 项语义：常量、四则与最值与幂、clamp/absolute/round/lerp/select_value、compare/range/all/any/not、chance/random_range、三个向量运算。所有数值输入必须有限；NaN、正负无穷、除零、溢出、反向区间、非法权重、非法种子和未知枚举分别拒绝，不以 0 或默认值兜底。
 

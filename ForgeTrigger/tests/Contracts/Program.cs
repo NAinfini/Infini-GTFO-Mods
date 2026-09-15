@@ -21,15 +21,20 @@ void Reject(Action action, string code, string name)
     catch (RuntimeContractException error) { Check(error.Code == code, name + " [" + error.Code + "]"); return; }
     throw new Exception("FAIL: accepted " + name);
 }
+// D-017 R4-a: production advertises its own `compare` evaluate binding, and nothing from the test seed below.
 var production = ForgeTrigger.ModuleDefinition.Create();
-Check(production.Handlers.Count == 0 && production.BindingSupport.Count == 0,
-    "production Trigger does not advertise test handlers or support");
+Check(production.Handlers.Count == 0
+    && production.BindingSupport.Select(support => support.BindingId).SequenceEqual(new[] { ForgeTrigger.ModuleDefinition.ProviderId + ".binding.compare" })
+    && production.Evaluators.Keys.SequenceEqual(new[] { "trigger.condition.compare" })
+    && !production.RegistryJson.Contains("test.trigger", StringComparison.Ordinal),
+    "production Trigger advertises only its compare evaluate binding, no test handler or support");
 var registration = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
 using (var registered = registration.RegisterModule(production, RuntimeLogLevel.Off))
 {
     var snapshot = RuntimeJson.Parse(registration.ExportManifest()).GetProperty("registry");
-    Check(snapshot.GetProperty("capabilities").GetArrayLength() == 0 && snapshot.GetProperty("bindings").GetArrayLength() == 0,
-        "production Trigger manifest remains empty");
+    Check(snapshot.GetProperty("capabilities").EnumerateArray().Select(row => row.GetProperty("id").GetString()!).SequenceEqual(new[] { "forge.condition.predicate.compare" })
+        && snapshot.GetProperty("bindings").EnumerateArray().Select(row => row.GetProperty("id").GetString()!).SequenceEqual(new[] { ForgeTrigger.ModuleDefinition.ProviderId + ".binding.compare" }),
+        "production Trigger manifest carries only the compare condition");
     var before = registration.ExportManifest();
     Reject(() => registration.RegisterModule(production, RuntimeLogLevel.Off), "provider-conflict", "duplicate provider rejected");
     Check(before == registration.ExportManifest(), "duplicate rejection is atomic");

@@ -230,7 +230,7 @@
       "capabilityId": "test.trigger.add",
       "providerId": "test.trigger",
       "handler": "add",
-      "role": "execute",
+      "role": "evaluate",
       "status": "implemented",
       "dependencies": [],
       "requires": []

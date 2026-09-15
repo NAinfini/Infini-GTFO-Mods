@@ -79,6 +79,10 @@ internal sealed class WeightedTests : IAcceptanceGroup
         var maximum=Enumerable.Range(0,4096).Select(i=>new WeightedCandidate(a with{Id="test.weight:"+i},1)).ToArray();
         var upper=WeightedSampling.Sample(maximum,256,42,WeightedSamplingMode.WithoutReplacement);
         check(upper.SelectedCount==256 && upper.Selected.Distinct().Count()==256,"maximum supported candidate/selection budgets");
-        check(ForgeTrigger.ModuleDefinition.Create().BindingSupport.Count==0,"weighted helper grants no runtime binding or authority");
+        var module=ForgeTrigger.ModuleDefinition.Create();
+        check(module.Handlers.Count==0&&module.Evaluators.Keys.All(key=>!key.Contains("weighted",StringComparison.Ordinal))
+            &&module.BindingSupport.All(support=>!support.BindingId.Contains("weighted",StringComparison.Ordinal))
+            &&!module.RegistryJson.Contains("weighted",StringComparison.Ordinal),
+            "weighted helper grants no runtime binding or authority");
     }
 }

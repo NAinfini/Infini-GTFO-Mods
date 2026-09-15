@@ -1285,7 +1285,7 @@
         ]
       },
       "stage": "compile",
-      "error": "direct event output"
+      "error": "from-step-kind"
     },
     {
       "id": "execution-fanout",
@@ -1383,7 +1383,7 @@
         ]
       },
       "stage": "compile",
-      "error": "execution branch requires control lowering"
+      "error": "step-order"
     },
     {
       "id": "control-needs-r4",
@@ -1471,7 +1471,7 @@
         ]
       },
       "stage": "compile",
-      "error": "Unsupported runtime node kind"
+      "error": "control-unsupported"
     },
     {
       "id": "pure-evaluator-needs-r4",
@@ -1559,7 +1559,7 @@
         ]
       },
       "stage": "compile",
-      "error": "Unsupported runtime node kind"
+      "error": "pure-shape"
     },
     {
       "id": "same-type-different-unit",
@@ -1742,7 +1742,7 @@
         ]
       },
       "stage": "compile",
-      "error": "Optional event output"
+      "error": "optional-event-port"
     }
   ],
   "invalidPlans": [

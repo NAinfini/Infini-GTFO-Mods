@@ -4,6 +4,40 @@
 
 计划与状态见两仓统一框架第 6 节 U-TRIGGER（链接见[仓库 README](../README.md)）；本文只记带日期的运行记录。
 
+## t1 的 TypeScript 段跟上网站编译器 v3 拒绝码（2026-09-14）
+
+t1 的 TypeScript 段自 `a565d17`（D-017 R4-a）起从未跑完。`validate-trigger.py --mutations` 在批次 `trigger-20260914-193611` 上 pure 与 independent 已 `passed`，t1 的 C# 段首次跑到 TypeScript 段后失败于 `action-output-dependency`：`t1-contracts.mjs:43` 期望 `/direct event output/i`，网站编译器实际抛 `from-step-kind: Runtime input must read a pure step: Second.value`（`site/forge/runtime-compiler.ts:246`）。本批按网站编译器源码静态逐条核对 `cases.json` 的拒绝期望，不运行脚本。
+
+拒绝断言改为断言码值。`t1-contracts.mjs` 新增 `rejectsCode`，解析方式与网站 `Tests/Forge/runtime-compiler.test.ts:38` 的 `rejectionCode()` 相同（`error.message.split(':')[0].trim()`），用于 `invalidGraphs` 的 `compile` 段与伪装 wire 断言（原先只匹配 `/Unsupported runtime node kind/i` 这类散文）。`graph` 段仍走 `rejects`：`site/forge/graph.ts` 的 `requireValue` 只有散文、没有码，且 pure 与 independent 段已在 `trigger-20260914-193611` 通过。5 条 compile 期望按当前码更新：
+
+| 用例 | 旧期望（散文） | 当前码 | 依据 |
+| --- | --- | --- | --- |
+| `action-output-dependency` | `direct event output` | `from-step-kind` | `runtime-compiler.ts:246`；与交付记录 plan v2→v3 漂移清单一致 |
+| `execution-fanout` | `execution branch requires control lowering` | `step-order` | `runtime-compiler.ts:208`、`:218` |
+| `control-needs-r4` | `Unsupported runtime node kind` | `control-unsupported` | `runtime-compiler.ts:63`（`test.trigger.branch` 的 `kind` 是 `control`） |
+| `pure-evaluator-needs-r4` | `Unsupported runtime node kind` | `pure-shape` | `runtime-compiler.ts:68`（`test.trigger.add` 的 `kind` 是 `modifier`） |
+| `optional-required-recipient` | `Optional event output` | `optional-event-port` | `runtime-compiler.ts:277` |
+
+`tests/fixtures/t1/seed.json` 的 `test.trigger.add` 绑定角色由 `execute` 改为 `evaluate`。契约 §3.2 第 348 行要求纯能力（`selector`/`condition`/`modifier`）只能绑 `execute`/`observe` 之外的 `evaluate`；`test.trigger.add` 是 `kind: modifier`、`graph.execution: pure`，却绑 `execute`，`site/forge/graph.ts:106` 在验证阶段就以“Pure graph node requires an evaluate binding”拒绝，编译期永远到不了，所以 `pure-evaluator-needs-r4` 的 `check`（`t1-contracts.mjs:42`，先断言作者层结构合法）也过不去。改角色后该节点能到 `nodeShape`，按 `runtime-compiler.ts:68` 以 `pure-shape` 拒绝。网站 `RuntimeRegistry.cs:169` 只对 `role: evaluate` 校验能力 `kind`，反向不校验，所以原来的 `execute` 能导出 manifest；C# 侧不因此变更。
+
+没有改 `cases.json` 里 `invalidPlans` 的任何 `code`/`error` 字段：这些是 wire 案例，会被 `t1-contracts.mjs:60` 原样写进 `wire-cases.json` 交给 C# 的 `RuntimePlan.cs` 断言，改错一侧会让两侧不一致。两条用法与当前契约对不上、但本批不擅自改的给 Claude 裁定：`invalid-integer`（`limits.maxEventsPerTick=0` 实际抛 `Runtime budget outside limits`，v3 计划码表里应记 `plan-budget`）与 `unknown-field`（额外步骤字段实际抛 `Unknown runtime field`，v3 计划码表里没有这个码）。另有两条 `execution-slot` 负例（compile 段与计划段）的期望是已不存在的码：v3 表里仍有 `execution-slot`，但计划派发改用 `successors`，fan-out 的新码是 `step-order`，compile 段那一条已没有可编译出的触发路径；`unknown-event-port` 声明的 `event-port-missing` 与实现抛的 `Unknown runtime port slot` 不一致。这四条都不会被 `rejects` 检出，因此不影响退出码。
+
+本批只跑了 `dotnet build ForgeTrigger/tests/Contracts/Contracts.csproj -c Release --artifacts-path %TEMP%\trigt1-build`（成功，0 错误、3 条 net6.0 EOL 警告）、`node --check ForgeTrigger/tools/t1-contracts.mjs`（退出 0）与两份 fixture 的 JSON 解析（退出 0）。**没有**跑 `python ForgeTrigger/tools/validate-trigger.py --mutations`，也没有跑 `node t1-contracts.mjs`：按共同约束第 8 条，运行由 Claude 统一执行。`runtimeReady=false`、`publicationReady=false`、`gameVerified=false` 不变。
+
+## 三条 R4-a 之前的旧断言按当前契约更新（2026-09-14）
+
+`python ForgeTrigger/tools/validate-trigger.py --mutations` 在 `a565d17` 之后的每个 HEAD（含 `d1a65b5`）上退出 1，`scopes` 里 pure / t1 / independent 三项 `failed`、r3 `passed`，产物 `artifacts/trigger-20260914-191912`。四条失败断言——pure 的“helpers are not advertised as runtime handlers”“production provider remains unbound”、t1 的 `ContractTests` 第 25 行“production Trigger does not advertise test handlers or support”、independent 的“weighted helper grants no runtime binding or authority”——都写于检查点 `66eb588`（2026-09-13），并且都要求生产 provider 的 capabilities/bindings 为 0。
+
+`a565d17`（D-017 R4-a）把 `ModuleDefinition.Create()` 从空 provider 改成注册目录行 `forge.condition.predicate.compare` 与唯一的 evaluate binding `forge.module.trigger.binding.compare`。契约第 6 节 U-RUNTIME/R4-a 写“宿主链接并注册 `ForgeTrigger.ModuleDefinition`”，U-TRIGGER 记“可执行节点 1 个（`compare`，evaluate）”“除 `compare` 外的纯计算、集合、筛选与空间方法都没有注册为节点”，ForgeRuntime `tests/Architecture` 也断言 Trigger 只发布这一条能力与一条 evaluate 绑定；同一节 T1 的完成定义要求默认完整入口退出 0。因此判定为测试过时，只改测试与本文，不改生产。
+
+更新后的断言仍然收窄到当前契约，不是删断言或放宽：
+
+- `tests/Pure/Program.cs`：`Handlers.Count == 0` 保留，另要求 `Evaluators` 恰好是 `trigger.condition.compare`、`BindingSupport` 恰好是 `forge.module.trigger.binding.compare`；导出的 registry 恰好一条 `forge.condition.predicate.compare` 能力与一条 `role: evaluate` 绑定。
+- `tests/Contracts/Program.cs`：生产模块仍然不携带测试 seed 的任何 handler/support（`RegistryJson` 不含 `test.trigger`，`Evaluators` 与 `BindingSupport` 各恰好一条 compare），导出 manifest 里恰好一条目录能力与一条 compare 绑定。
+- `tests/Acceptance/WeightedTests.cs`：权重抽样仍然没有运行绑定或权限——模块的 seed、bindings、evaluators 里都不出现 `weighted`，与契约“只是方法，未注册为节点”一致。
+
+三个套件的 `Check`/`check` 调用数都没有增减，所以下面记录的 1697 / 911 / 2557 项计数口径不变。本批只跑了 `dotnet build`（生产工程与三个测试工程，Release，`--artifacts-path %TEMP%\trigval-build`），**没有**复跑 `python ForgeTrigger/tools/validate-trigger.py --mutations`，完整入口由 Claude 统一执行。
+
 ## 空间 capsule/box 实现（2026-09-14）
 
 `ObservedVolumeShape` 增加 `Capsule`、`Box`。`Overlap` 仍是一次形状分派：sphere `Distance ≤ radius`、cylinder `Horizontal ≤ radius && |Δy| ≤ height/2`、capsule 照网站 `logic-evaluator.ts:89` 的 `half = max(height/2 − radius, 0)`、`dy = max(|Δy| − half, 0)`、`hypot(Δx, dy, Δz) ≤ radius`，box 照同一文件 `:90-91` 的“extents 是世界轴半尺寸”逐轴 `|Δ| ≤ 半尺寸`。四种形状都是闭判定（边界点算命中，无额外容差），半径与高度仍在任何原生观察之前由共用的 `Bounds` 拒绝（`spatial-parameter`）。`SpatialTests.cs` 把生成器的 `cases`（117 行）与 `unimplemented` recorded 行（capsule/box 2 行）合并成 119 行全部消费，删除了“未实现形状只列不算”的跳过分支，并新增 `VolumeShapes`：覆盖网站向量没有的样本（`[0,3.5,0]` 在球外但在 capsule 内、`height ≤ 2·radius` 的退化、box 角点与其外 0.001）与 capsule/box 的非正半径、负高度、NaN 高度拒绝。注意 capsule 那一组向量与同参数 sphere 组结果完全相同，生成器本身区分不出“capsule 当成球”，这条由 `[0,3.5,0]` 断言补上。
@@ -115,4 +149,4 @@ SDK 与测试工程构建保留 3 条 NETSDK1138 目标框架生命周期提示�
 
 ## 边界
 
-以上全部是实现级与合成数据的证据。**没有执行 GTFO、没有原生 API、没有多人、没有安装、没有发布。** 生产 `ModuleDefinition` 保持空 provider，独立测试输出明确 `gameVerified=false`、`publicationReady=false`。测试代码与 artifacts 已从生产编译项排除；没有另起 Registry、图执行器、世界时钟或查询服务。
+以上全部是实现级与合成数据的证据。**没有执行 GTFO、没有原生 API、没有多人、没有安装、没有发布。** 生产 `ModuleDefinition` 只注册 `compare` 一条 evaluate 绑定（D-017 R4-a），没有 action/observe 绑定，独立测试输出明确 `gameVerified=false`、`publicationReady=false`。测试代码与 artifacts 已从生产编译项排除；没有另起 Registry、图执行器、世界时钟或查询服务。

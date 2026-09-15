@@ -21,6 +21,13 @@ const write = (name, value) => fs.writeFileSync(path.join(output, name), JSON.st
 let assertions = 0;
 const check = (ok, name) => {assert.ok(ok, name); assertions++; console.log('PASS: ' + name);};
 const rejects = (fn, pattern, name) => {assert.throws(fn, new RegExp(pattern, 'i'), name); assertions++; console.log('PASS: ' + name);};
+/** D-017 R4-a: the plan carries rejection codes (contract §3.2), so the shared cases assert the code
+ *  itself. Parsed exactly like the website's `rejectionCode()`: the text before the first colon. */
+const rejectsCode = (fn, code, name) => {assert.throws(fn, error => {
+    assert.ok(error instanceof Error, `expected an Error carrying ${code}`);
+    assert.equal(error.message.split(':')[0].trim(), code);
+    return true;
+}, name); assertions++; console.log('PASS: ' + name);};
 const suite = read(path.join(root, 'tests/fixtures/t1/cases.json'));
 const manifest = read(path.join(output, 'sdk-manifest.json'));
 check(manifest.runtime.gameBuild === 'synthetic-no-game', 'manifest is explicitly synthetic');
@@ -40,7 +47,7 @@ for (const row of suite.validGraphs) {
 for (const row of suite.invalidGraphs) {
     if (row.stage === 'compile') {
         check(validateForgeGraph(row.graph, registry).kind === 'validated-authoring-ir', 'valid authoring structure before lowering rejection: ' + row.id);
-        rejects(() => compileForgeRuntimePlan(row.graph, manifest, options(row.id)), row.error, row.id);
+        rejectsCode(() => compileForgeRuntimePlan(row.graph, manifest, options(row.id)), row.error, row.id);
     } else rejects(() => validateForgeGraph(row.graph, registry), row.error, row.id);
 }
 function mutate(input, changes) {
@@ -70,7 +77,7 @@ for (const name of ['branch', 'add']) {
     const pin = id => plan.bindings.findIndex(row => row.bindingId === id);
     plan.entrypoints[0].binding = pin('test.trigger.binding.event');
     plan.entrypoints[0].steps[0].binding = pin(binding.id);
-    rejects(() => validateForgeRuntimePlan(plan, manifest), 'Unsupported runtime node kind', 'wire cannot disguise ' + name + ' as action');
+    rejectsCode(() => validateForgeRuntimePlan(plan, manifest), 'node-kind', 'wire cannot disguise ' + name + ' as action');
     wires.push({id: 'disguised-' + name, accepted: false, plan, code: 'node-kind'});
 }
 const renamed = structuredClone(manifest);

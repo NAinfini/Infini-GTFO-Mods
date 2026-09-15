@@ -127,8 +127,11 @@ CollectionTests.Run(Path.Combine(Path.GetDirectoryName(args[0])!, "collections-r
 NumericBoundaryTests.Run(Check);
 // Public R3 consumers run in tests/R3Consumers and the full validation entrypoint.
 
+// D-017 R4-a registers exactly one `evaluate` binding (`compare`); every helper exercised above stays a method.
 var module = ForgeTrigger.ModuleDefinition.Create();
-Check(module.Handlers.Count == 0 && module.BindingSupport.Count == 0, "helpers are not advertised as runtime handlers");
+Check(module.Handlers.Count == 0 && module.Evaluators.Count == 1 && module.Evaluators.ContainsKey("trigger.condition.compare")
+    && module.BindingSupport.Count == 1 && module.BindingSupport[0].BindingId == ForgeTrigger.ModuleDefinition.ProviderId + ".binding.compare",
+    "helpers are not advertised as runtime handlers beyond the compare evaluate binding");
 var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "pure-test-no-game"));
 using (kernel.RegisterModule(module, RuntimeLogLevel.Off))
 {
@@ -136,7 +139,12 @@ using (kernel.RegisterModule(module, RuntimeLogLevel.Off))
     ScalarNodes.Binary(ScalarOperation.Add, 1, 2); SeededNodes.Uniform(0, 1, 42);
     Check(kernel.ExportManifest() == before && kernel.QueuedEvents == 0 && kernel.LoadedPlans == 0, "pure calls cannot schedule gameplay or alter registration");
     var registry = JsonDocument.Parse(before).RootElement.GetProperty("registry");
-    Check(registry.GetProperty("capabilities").GetArrayLength() == 0 && registry.GetProperty("bindings").GetArrayLength() == 0, "production provider remains unbound");
+    var capabilities = registry.GetProperty("capabilities").EnumerateArray().ToArray();
+    var bindings = registry.GetProperty("bindings").EnumerateArray().ToArray();
+    Check(capabilities.Length == 1 && capabilities[0].GetProperty("id").GetString() == "forge.condition.predicate.compare"
+        && bindings.Length == 1 && bindings[0].GetProperty("capabilityId").GetString() == "forge.condition.predicate.compare"
+        && bindings[0].GetProperty("role").GetString() == "evaluate",
+        "production provider exports only the compare evaluate binding");
 }
 var assembly = typeof(ScalarNodes).Assembly;
 Check(assembly.GetType(typeof(RuntimeKernel).FullName!) == null, "production does not embed a second kernel");
