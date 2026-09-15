@@ -25,13 +25,36 @@ public static class RuntimeLogConfiguration
 /// <summary>Rate-limit tier the writer applies; Elevated is irreversible for the session.</summary>
 public enum RuntimeLogTier { Player, Elevated }
 
-/// <summary>Single source of I-DIAG event codes. Only the writer's own codes exist until the website code table is ruled.</summary>
+/// <summary>Single source of the I-DIAG event codes the kernel writes (§3.2 code table). `adapter.attached` and
+/// `adapter.failed` are absent until I-ADAPTER-SCHEMA rules them, and so are the per-package native diagnostic codes.</summary>
 public static class RuntimeLogCodes
 {
     public const string LogDropped = "log.dropped";
     public const string LogLevel = "log.level";
     public const string PlanLoaded = "plan.loaded";
     public const string PlanRejected = "plan.rejected";
+    public const string RegistrationRejected = "registration.rejected";
+    public const string BindingRegistered = "binding.registered";
+    public const string WorldBegan = "world.began";
+    public const string TriggerFired = "trigger.fired";
+    public const string EventRejected = "event.rejected";
+    public const string BudgetExceeded = "budget.exceeded";
+    public const string EventDeferred = "event.deferred";
+    public const string EventCancelled = "event.cancelled";
+    public const string StepStarted = "step.started";
+    public const string StepFinished = "step.finished";
+    public const string EntryStopped = "entry.stopped";
+    public const string ObserverFailed = "observer.failed";
+    public const string RuntimeSuspended = "runtime.suspended";
+}
+
+/// <summary>Kernel reason codes that are not one of the surfaced contract codes (value validation, plan, registration,
+/// graph, step result and event groups are all carried by the exception or result that produced them).</summary>
+public static class RuntimeLogReasonCodes
+{
+    /// <summary>§3.2 result-combination rule: an illegal handler result is recorded as failed/unknown under this code.</summary>
+    public const string InvalidHandlerResult = "invalid-handler-result";
+    public const string LifecycleObserverFailed = "lifecycle-observer-failed";
 }
 
 public readonly struct RuntimeLogPlan

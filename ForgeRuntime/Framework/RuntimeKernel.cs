@@ -41,6 +41,8 @@ public sealed partial class RuntimeKernel
     private bool advancing, worldStarted;
     private bool? worldHost;
     private int eventsThisTick, commandsThisTick;
+    /// <summary>`event.deferred` is one record per tick even when several events wait on it.</summary>
+    private bool deferredLogged;
     private CommandContext? currentCommand;
     public RuntimeIdentity Identity { get; }
     public RuntimeLimits Limits { get; }
@@ -79,13 +81,43 @@ public sealed partial class RuntimeKernel
     internal RuntimeModuleHandle RegisterBuiltinModule(RuntimeModule module) => Register(module, runtimeLogLevel);
     private RuntimeModuleHandle Register(RuntimeModule module, RuntimeLogLevel level)
     {
-        Mutable(); RuntimeJson.Require(IsRegistrationOpen, "registration-closed", "Module registration is frozen before host startup.");
-        RuntimeJson.Require(modules.Count < 128, "module-budget", "Module capacity reached.");
-        var next = registry.WithModule(module, ApiVersion, out var provider);
-        RuntimeJson.Require(next.Providers.Count <= 2048 && next.Capabilities.Count <= 2048 && next.Bindings.Count <= 2048, "registry-budget", "Registration capacity reached.");
+        Mutable(); RuntimeRegistry next; string provider;
+        try
+        {
+            RuntimeJson.Require(IsRegistrationOpen, "registration-closed", "Module registration is frozen before host startup.");
+            RuntimeJson.Require(modules.Count < 128, "module-budget", "Module capacity reached.");
+            next = registry.WithModule(module, ApiVersion, out var declared);
+            provider = declared;
+            RuntimeJson.Require(next.Providers.Count <= 2048 && next.Capabilities.Count <= 2048 && next.Bindings.Count <= 2048, "registry-budget", "Registration capacity reached.");
+        }
+        catch (RuntimeContractException ex)
+        {
+            // The seed's own provider id is the only thing known before the seed validates; anything else is Runtime's own record without a subject.
+            LogRegistrationRejected(DeclaredProvider(module), ex.Code, ex.Message);
+            throw;
+        }
         registry = next; var token = ++generation; modules.Add(provider, token);
         RegisterLogGate(provider, level);
+        if (logSink != null) PublishLogLevels(logLevels!.Tier);
+        LogRegisteredBindings(provider);
         return new RuntimeModuleHandle(this, provider, token);
+    }
+    /// <summary>Reads the provider id straight out of the seed text: the exception path cannot use the parsed registry, and an
+    /// unreadable seed simply has no subject provider.</summary>
+    private static string DeclaredProvider(RuntimeModule module)
+    {
+        try
+        {
+            var providers = RuntimeJson.Rows(RuntimeJson.Parse(module.RegistryJson), "providers");
+            return providers.Length == 1 ? RuntimeJson.Text(providers[0], "id") : "";
+        }
+        catch (Exception) { return ""; }
+    }
+    private void LogRegisteredBindings(string provider)
+    {
+        if (logSink == null || !LogGate(provider).IsEnabled(RuntimeLogLevel.Info)) return;
+        foreach (var binding in registry.Bindings.OrderBy(x => x.Key, StringComparer.Ordinal).ToArray())
+            if (RuntimeJson.Text(binding.Value, "providerId") == provider) LogBindingRegistered(provider, binding.Key);
     }
     internal void Unregister(RuntimeModuleHandle handle)
     {
@@ -96,10 +128,11 @@ public sealed partial class RuntimeKernel
         foreach (var binding in registry.Bindings.Values.Where(b => RuntimeJson.Text(b, "providerId") != provider))
             RuntimeJson.Require(!ownedCaps.Contains(RuntimeJson.Text(binding, "capabilityId")) && !RuntimeJson.Strings(binding.GetProperty("requires")).Any(ownedBindings.Contains), "module-in-use", "Another module still requires this module's contracts/bindings.");
         RuntimeJson.Require(!stateLeases.Values.Any(l => l.Handle.ProviderId != provider && ownedCaps.Contains(l.Key.Definition)), "module-in-use", "Another module still holds a lease of this definition.");
+        // A queued event whose publisher unregisters is dropped at its next dispatch, where the removal is recorded with the
+        // reason the pending snapshot carries (source-lifecycle / plan-unloaded); cancel and unload count before removal.
         StopScheduledSource(provider, null, "module-unregistered"); StopStateSource(provider, null, "module-unregistered");
         RemoveLifecycleObservers(provider, handle.Generation);
         modules.Remove(provider); registry.Providers.Remove(provider);
-        UnregisterLogGate(provider);
         foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Evaluators.Remove(id); registry.Support.Remove(id); }
         foreach (var id in ownedCaps) { registry.Capabilities.Remove(id); registry.CapabilityRegistrants.Remove(id); }
         foreach (var key in registry.Resolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray()) registry.Resolvers.Remove(key);
@@ -108,6 +141,7 @@ public sealed partial class RuntimeKernel
         foreach (var key in registry.EntityInstanceResolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
             registry.EntityInstanceResolvers.Remove(key);
         foreach (var id in plans.Where(x => x.Value.Modules.ContainsKey(provider)).Select(x => x.Key).ToArray()) plans.Remove(id);
+        UnregisterLogGate(provider);
         RebuildSubscriptions();
     }
     public string ExportManifest()
@@ -224,8 +258,9 @@ public sealed partial class RuntimeKernel
         RuntimeJson.Require(!worldStarted || worldEpoch > WorldEpoch, "world-epoch", "A new world must advance its epoch.");
         long? previousWorldEpoch = worldStarted ? WorldEpoch : null;
         StopScheduledSource(null, null, "world-ended"); StopStateSource(null, null, "world-ended");
-        WorldEpoch = worldEpoch; worldStarted = true; CurrentTick = -1; worldHost = null; scheduledThisTick = 0;
+        WorldEpoch = worldEpoch; worldStarted = true; CurrentTick = -1; worldHost = null; scheduledThisTick = 0; deferredLogged = false;
         queue.Clear(); history.Clear(); cancelled.Clear(); planTickUsage.Clear(); eventsThisTick = commandsThisTick = 0;
+        LogWorldBegan();
         NotifyLifecycle(RuntimeLifecycleKind.WorldChanged, previousWorldEpoch);
     }
     internal int CancelScope(RuntimeModuleHandle handle, string scopeId)
@@ -265,7 +300,11 @@ public sealed partial class RuntimeKernel
             var key = handle.ProviderId + "\0" + value.EventId;
             var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(RuntimeJson.StableText(RuntimeJson.From(snapshot)))));
             if (history.TryGetValue(key, out var previous))
-                return new DispatchResult(previous == fingerprint ? "duplicate" : "rejected", previous == fingerprint ? "duplicate-event" : "event-id-conflict", value.EventId);
+            {
+                if (previous == fingerprint) return new DispatchResult("duplicate", "duplicate-event", value.EventId);
+                LogEventRejected(value.BindingId, value.EventId, "event-id-conflict", handle.ProviderId);
+                return new DispatchResult("rejected", "event-id-conflict", value.EventId);
+            }
             var work = registeredWork.ToArray();
             foreach (var group in work.GroupBy(w => w.Plan))
             {
@@ -279,10 +318,23 @@ public sealed partial class RuntimeKernel
             RuntimeJson.Require(queue.Count < Limits.MaxQueuedEvents, "queue-budget", value.EventId);
             history.Add(key, fingerprint);
             queue.Enqueue(new Pending(handle.ProviderId, handle.Generation, snapshot, work), (snapshot.SimulationTick, ++sequence));
+            LogTriggerFired(RuntimeJson.Text(binding, "providerId"), snapshot.BindingId, snapshot.EventId,
+                snapshot.CauseId, snapshot.RootEventId ?? snapshot.EventId);
             return new DispatchResult("queued", "accepted", value.EventId);
         }
-        catch (RuntimeContractException ex) { return new DispatchResult("rejected", ex.Code, value.EventId); }
-        catch (ObjectDisposedException) { return new DispatchResult("rejected", "disposed-payload", value.EventId); }
+        // A refusal is recorded once: a budget reason is what the code table calls budget.exceeded, everything else is
+        // event.rejected. The event's binding may already be unregistered, so the raw id is reported as it arrived.
+        catch (RuntimeContractException ex)
+        {
+            if (ex.Code.EndsWith("-budget", StringComparison.Ordinal)) LogBudgetExceeded(value.BindingId, value.EventId, ex.Code);
+            else LogEventRejected(value.BindingId, value.EventId, ex.Code, handle.ProviderId);
+            return new DispatchResult("rejected", ex.Code, value.EventId);
+        }
+        catch (ObjectDisposedException)
+        {
+            LogEventRejected(value.BindingId, value.EventId, "disposed-payload", handle.ProviderId);
+            return new DispatchResult("rejected", "disposed-payload", value.EventId);
+        }
     }
     private void ValidateEvent(RuntimeEvent value, JsonElement capability)
     {
@@ -331,7 +383,11 @@ public sealed partial class RuntimeKernel
         if (!modules.TryGetValue(owner, out var moduleGeneration))
         {
             for (var i = 0; i < result.Facts.Count; i++)
-                events.Add(new EventReceipt("fact:" + WorldEpoch + ":" + (++sequence), "rejected", "module-unregistered"));
+            {
+                var refused = "fact:" + WorldEpoch + ":" + (++sequence);
+                LogEventRejected(result.Facts[i].BindingId, refused, "module-unregistered", owner);
+                events.Add(new EventReceipt(refused, "rejected", "module-unregistered"));
+            }
             return;
         }
         var handle = new RuntimeModuleHandle(this, owner, moduleGeneration);
@@ -347,6 +403,7 @@ public sealed partial class RuntimeKernel
             catch (Exception error)
             {
                 var code = error is RuntimeContractException contract ? CommandResult.TruncateCode(contract.Code) : "fact-publish-failed";
+                LogEventRejected(fact.BindingId, factId, code);
                 events.Add(new EventReceipt(factId, "rejected", code));
             }
         }
@@ -356,7 +413,7 @@ public sealed partial class RuntimeKernel
         Thread(); RuntimeJson.Require(!advancing && worldStarted, "dispatch-lifecycle", "World must be started and dispatch cannot be recursive.");
         RuntimeJson.Integer(simulationTick); RuntimeJson.Require(simulationTick >= CurrentTick, "time-reversal", "Simulation time cannot go backwards.");
         RuntimeJson.Require(worldHost != false || !isHost, "host-migration-unsupported", "Authority cannot migrate inside the current world.");
-        if (simulationTick > CurrentTick) { CurrentTick = simulationTick; eventsThisTick = commandsThisTick = scheduledThisTick = 0; planTickUsage.Clear(); }
+        if (simulationTick > CurrentTick) { CurrentTick = simulationTick; eventsThisTick = commandsThisTick = scheduledThisTick = 0; deferredLogged = false; planTickUsage.Clear(); }
         worldHost = isHost;
         var commands = new List<CommandReceipt>(); var events = new List<EventReceipt>(); var processed = 0; var executed = 0;
         var scheduleReports = new List<ScheduleReceipt>(); var leaseReports = new List<StateLeaseReceipt>();
@@ -368,7 +425,12 @@ public sealed partial class RuntimeKernel
                 foreach (var job in schedules.Values) scheduleReports.Add(ScheduleReport(job, "cancelled", "not-host"));
                 foreach (var lease in stateLeases.Values) leaseReports.Add(new StateLeaseReceipt(lease.Handle.ProviderId, lease.Handle.LeaseId, lease.Key.Definition, lease.Key.Target, "cancelled", "not-host"));
                 StopScheduledSource(null, null, "not-host"); StopStateSource(null, null, "not-host");
-                while (queue.TryDequeue(out var stale, out _)) events.Add(new EventReceipt(stale.Event.EventId, "rejected", "not-host"));
+                // A non-host advance clears the queue, and every dropped event is recorded once.
+                while (queue.TryDequeue(out var stale, out _))
+                {
+                    LogEventRejected(stale.Event.BindingId, stale.Event.EventId, "not-host", stale.Provider);
+                    events.Add(new EventReceipt(stale.Event.EventId, "rejected", "not-host"));
+                }
                 return new TickResult(0, 0, 0, commands, events) { Schedules = scheduleReports.AsReadOnly(), StateLeases = leaseReports.AsReadOnly() };
             }
             CleanScheduledLifetimes(scheduleReports); CleanStateLifetimes(leaseReports);
@@ -376,23 +438,62 @@ public sealed partial class RuntimeKernel
             {
                 if (pending.Schedule != null && !PreparePulse(pending, scheduleReports)) continue;
                 if (pending.Schedule != null && scheduledThisTick >= MaximumScheduledPulsesPerTick)
-                { scheduleReports.Add(ScheduleReport(pending.Schedule, "deferred", "scheduled-tick-budget")); break; }
-                if (!IsRegistered(pending.Provider, pending.Generation) || cancelled.Contains((pending.Provider, pending.Event.ScopeId)))
-                { queue.Dequeue(); events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "source-lifecycle")); continue; }
+                {
+                    scheduleReports.Add(ScheduleReport(pending.Schedule, "deferred", "scheduled-tick-budget"));
+                    if (!deferredLogged)
+                    {
+                        deferredLogged = true;
+                        LogEventDeferred(pending.Event.BindingId, pending.Event.EventId, "scheduled-tick-budget");
+                    }
+                    break;
+                }
+                var budget = BudgetRefusal(pending);
+                if (budget != null)
+                {
+                    if (pending.Schedule != null) scheduleReports.Add(ScheduleReport(pending.Schedule, "deferred", budget));
+                    if (!deferredLogged)
+                    {
+                        deferredLogged = true;
+                        LogEventDeferred(pending.Event.BindingId, pending.Event.EventId, budget);
+                    }
+                    break;
+                }
+                queue.Dequeue();
+                if (!IsRegistered(pending.Provider, pending.Generation))
+                {
+                    if (pending.Schedule != null) EndSchedule(pending.Schedule, "cancelled", "source-lifecycle");
+                    LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "source-lifecycle", pending.Provider);
+                    events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "source-lifecycle")); continue;
+                }
+                var scopeCancelled = cancelled.Contains((pending.Provider, pending.Event.ScopeId));
+                if (scopeCancelled)
+                {
+                    if (pending.Schedule != null) EndSchedule(pending.Schedule, "cancelled", "source-lifecycle");
+                    LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "source-lifecycle", pending.Provider);
+                    events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "source-lifecycle")); continue;
+                }
                 var active = pending.Work.Where(w => plans.TryGetValue(w.Plan.Plan.Id, out var live) && ReferenceEquals(live, w.Plan)).ToArray();
                 var count = active.Sum(w => w.Entry.DispatchableStepCount);
-                if (active.Length == 0) { queue.Dequeue(); events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "plan-unloaded")); continue; }
+                if (active.Length == 0)
+                {
+                    if (pending.Schedule != null) EndSchedule(pending.Schedule, "cancelled", "plan-unloaded");
+                    LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "plan-unloaded", pending.Provider);
+                    events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "plan-unloaded")); continue;
+                }
                 var groups = active.GroupBy(w => w.Plan).ToArray();
-                if (eventsThisTick >= Limits.MaxEventsPerTick || commandsThisTick + count > Limits.MaxCommandsPerTick || groups.Any(g => {
-                    planTickUsage.TryGetValue(g.Key.Plan.Id, out var used);
-                    return used.Events >= g.Key.Plan.Limits.MaxEventsPerTick || used.Commands + g.Sum(w => w.Entry.DispatchableStepCount) > g.Key.Plan.Limits.MaxCommandsPerTick;
-                })) break;
-                queue.Dequeue();
-                if (pending.Schedule != null && !AdmitPulse(pending, scheduleReports)) continue;
+                if (pending.Schedule != null && !AdmitPulse(pending, scheduleReports))
+                {
+                    // The refused pulse was already dequeued and its schedule ended; leaving it out of the receipts would
+                    // hide a refused event from the tick result.
+                    events.Add(new EventReceipt(pending.Event.EventId, "rejected", scheduleReports[^1].Code));
+                    continue;
+                }
                 eventsThisTick++; commandsThisTick += count; processed++;
                 foreach (var group in groups) { planTickUsage.TryGetValue(group.Key.Plan.Id, out var used); planTickUsage[group.Key.Plan.Id] = (used.Events + 1, used.Commands + group.Sum(w => w.Entry.DispatchableStepCount)); }
                 foreach (var item in active)
                 {
+                    var stepPlan = new RuntimeLogPlan { PlanId = item.Plan.Plan.Id, ResourceId = item.Plan.Plan.ResourceId, ResourceRevision = item.Plan.Plan.ResourceRevision };
+                    var stepOrigin = new StepOrigin(pending.Event, in stepPlan, item.Entry.NodeId);
                     // D-017 R4-a: `pure` steps are never dispatched directly; they are read on demand by whichever
                     // action/control step's input names them via `fromStepSlot`, and memoized at most once per
                     // dispatch of this entry (cleared with `pureCache` on every new event this entry consumes).
@@ -402,7 +503,10 @@ public sealed partial class RuntimeKernel
                     {
                         var step = item.Entry.Steps[stepIndex];
                         var commandId = RuntimeJson.StableText(RuntimeJson.From(new[] { pending.Provider, pending.Event.EventId, item.Plan.Plan.Id, step.NodeId }));
-                        CommandResult? result = null; var invoked = false; int? next = null;
+                        CommandResult? result = null; var invoked = false; int? next = null; var stopped = false;
+                        // `step.*` belongs to the provider of the binding that executes the step, which is not the entry's
+                        // trigger binding: a trigger may route into another package's action.
+                        var stepProvider = BindingProvider(step.BindingId);
                         try
                         {
                             RuntimeJson.Require(item.Plan.Modules.All(m => IsRegistered(m.Key, m.Value)), "binding-lifecycle", step.BindingId);
@@ -453,6 +557,7 @@ public sealed partial class RuntimeKernel
                                 goto continueWalk;
                             }
                             var handler = registry.Handlers[step.BindingId];
+                            LogStepStarted(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId);
                             currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(inputs));
                             executed++; invoked = true;
                             result = NormalizeInvokedResult(handler(currentCommand));
@@ -475,8 +580,12 @@ public sealed partial class RuntimeKernel
                         // partial result with an unknown commit state; a confirmed-commit partial continues.
                         if (commandResult.Status != CommandStatuses.Succeeded
                             && !(commandResult.Status == CommandStatuses.Partial && commandResult.CommitState == CommitStates.Confirmed))
-                        { cursor = null; goto continueWalk; }
-                        next = step.Successors.Count > 0 ? step.Successors[0] : null;
+                        { cursor = null; stopped = true; }
+                        else next = step.Successors.Count > 0 ? step.Successors[0] : null;
+                        LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId, in commandResult);
+                        // The stop shares the code table's level line with step.finished, and is written only when the entry
+                        // really had a step left: the last step of an entry stops nothing.
+                        if (stopped && step.Successors.Count > 0) LogEntryStopped(in stepOrigin, step.NodeId, commandId);
                         cursor = next;
                         continueWalk: ;
                     }
@@ -488,6 +597,25 @@ public sealed partial class RuntimeKernel
         }
         finally { currentCommand = null; advancing = false; }
         return new TickResult(processed, executed, queue.Count, commands, events) { Schedules = scheduleReports.AsReadOnly(), StateLeases = leaseReports.AsReadOnly() };
+    }
+    /// <summary>The budget reason that keeps the head event queued for the next tick, or null when it can dispatch now,
+    /// in the order the dispatch loop has always evaluated them (global event, global command, then per plan). The first
+    /// refused condition is the reason, so the code names what actually stopped it; the caller writes at most one
+    /// `event.deferred` per tick.</summary>
+    private string? BudgetRefusal(Pending pending)
+    {
+        var groups = pending.Work.Where(w => plans.TryGetValue(w.Plan.Plan.Id, out var live) && ReferenceEquals(live, w.Plan))
+            .GroupBy(w => w.Plan).ToArray();
+        var count = groups.Sum(g => g.Sum(w => w.Entry.DispatchableStepCount));
+        if (eventsThisTick >= Limits.MaxEventsPerTick) return "tick-event-budget";
+        if (commandsThisTick + count > Limits.MaxCommandsPerTick) return "tick-command-budget";
+        foreach (var group in groups)
+        {
+            planTickUsage.TryGetValue(group.Key.Plan.Id, out var used);
+            if (used.Events >= group.Key.Plan.Limits.MaxEventsPerTick) return "plan-tick-event-budget";
+            if (used.Commands + group.Sum(w => w.Entry.DispatchableStepCount) > group.Key.Plan.Limits.MaxCommandsPerTick) return "plan-tick-command-budget";
+        }
+        return null;
     }
     /// <summary>D-017 R4-a: evaluates a `pure` step's frame (an object keyed by its own output port ids) on demand,
     /// memoized in <paramref name="cache"/> at most once per dispatch of <paramref name="entry"/>. Any failure —

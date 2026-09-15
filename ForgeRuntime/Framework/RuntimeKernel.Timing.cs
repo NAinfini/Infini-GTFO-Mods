@@ -91,7 +91,12 @@ public sealed partial class RuntimeKernel
             }
             var key = owner.ProviderId + "\0schedule\0" + snapshot.EventId;
             var fingerprint = Fingerprint(new { snapshot, spec });
-            if (history.TryGetValue(key, out var previous)) return new ScheduleResult(previous == fingerprint ? "duplicate" : "rejected", previous == fingerprint ? "duplicate-schedule" : "schedule-id-conflict", null);
+            if (history.TryGetValue(key, out var previous))
+            {
+                if (previous == fingerprint) return new ScheduleResult("duplicate", "duplicate-schedule", null);
+                LogEventRejected(snapshot.BindingId, snapshot.EventId, "schedule-id-conflict", owner.ProviderId);
+                return new ScheduleResult("rejected", "schedule-id-conflict", null);
+            }
             RuntimeJson.Require(history.Count < MaximumEventHistory, "event-history-budget", "Replay ledger capacity reached.");
             RuntimeJson.Require(schedules.Count < MaximumSchedules, "schedule-budget", "Active schedule capacity reached.");
             RuntimeJson.Require(total == 0 || queue.Count < Limits.MaxQueuedEvents, "queue-budget", snapshot.EventId);
@@ -109,8 +114,18 @@ public sealed partial class RuntimeKernel
             else { schedules.Add((owner.ProviderId, handle.ScheduleId), job); QueuePulse(job); }
             return new ScheduleResult("scheduled", handle.Code, handle);
         }
-        catch (RuntimeContractException ex) { return new ScheduleResult("rejected", ex.Code, null); }
-        catch (ObjectDisposedException) { return new ScheduleResult("rejected", "disposed-payload", null); }
+        // A refused schedule is an event that never entered the queue, recorded once under the same split as a publish.
+        catch (RuntimeContractException ex)
+        {
+            if (ex.Code.EndsWith("-budget", StringComparison.Ordinal)) LogBudgetExceeded(template.BindingId, template.EventId, ex.Code);
+            else LogEventRejected(template.BindingId, template.EventId, ex.Code, owner.ProviderId);
+            return new ScheduleResult("rejected", ex.Code, null);
+        }
+        catch (ObjectDisposedException)
+        {
+            LogEventRejected(template.BindingId, template.EventId, "disposed-payload", owner.ProviderId);
+            return new ScheduleResult("rejected", "disposed-payload", null);
+        }
     }
     private void QueuePulse(ScheduledJob job)
     {
@@ -150,25 +165,35 @@ public sealed partial class RuntimeKernel
     private bool PreparePulse(Pending pending, List<ScheduleReceipt> reports)
     {
         var job = pending.Schedule!;
-        if (job.Handle.Status != "active") { queue.Dequeue(); return false; }
+        if (job.Handle.Status != "active")
+        {
+            queue.Dequeue();
+            LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "source-lifecycle", pending.Provider);
+            return false;
+        }
         // A handler earlier in this tick can end the life of the captured source/target. Revalidating the template before every pulse keeps the remaining catch-up from reaching an object that no longer exists and removes the whole timer on its next step instead of leaving it to reject one pulse at a time.
         var invalid = ScheduleEndCode(job);
         if (invalid != null)
         {
             queue.Dequeue(); EndSchedule(job, "cancelled", invalid);
-            reports.Add(ScheduleReport(job, "cancelled", invalid)); return false;
+            reports.Add(ScheduleReport(job, "cancelled", invalid));
+            LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, invalid, pending.Provider);
+            return false;
         }
         if (job.Spec.MissedPulsePolicy == MissedPulsePolicy.SkipMissed)
         {
             if (job.EndTick != null && CurrentTick >= job.EndTick)
             {
                 queue.Dequeue(); job.Handle.SkippedPulses += job.TotalPulses - job.Index;
-                EndSchedule(job, "expired", "lifetime-ended"); reports.Add(ScheduleReport(job, "expired", "lifetime-ended")); return false;
+                EndSchedule(job, "expired", "lifetime-ended"); reports.Add(ScheduleReport(job, "expired", "lifetime-ended"));
+                LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "lifetime-ended", pending.Provider);
+                return false;
             }
             var skipped = (int)Math.Min(job.TotalPulses - job.Index - 1L, (CurrentTick - job.NextTick) / job.Spec.IntervalTicks);
             if (skipped > 0)
             {
                 queue.Dequeue(); job.Index += skipped; job.Handle.SkippedPulses += skipped;
+                LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "missed-pulses", pending.Provider);
                 reports.Add(ScheduleReport(job, "skipped", "missed-pulses")); QueuePulse(job); return false;
             }
         }
@@ -182,11 +207,18 @@ public sealed partial class RuntimeKernel
         var refusal = history.ContainsKey(key) ? "event-id-conflict"
             : history.Count >= MaximumEventHistory ? "event-history-budget" : null;
         if (refusal != null)
-        { EndSchedule(job, "rejected", refusal); reports.Add(ScheduleReport(job, "rejected", refusal)); return false; }
+        {
+            EndSchedule(job, "rejected", refusal); reports.Add(ScheduleReport(job, "rejected", refusal));
+            if (refusal.EndsWith("-budget", StringComparison.Ordinal)) LogBudgetExceeded(pending.Event.BindingId, pending.Event.EventId, refusal);
+            else LogEventRejected(pending.Event.BindingId, pending.Event.EventId, refusal, pending.Provider);
+            return false;
+        }
         history.Add(key, Fingerprint(pending.Event));
         job.Index++; job.Handle.DispatchedPulses++; scheduledThisTick++;
         if (job.Index < job.TotalPulses) QueuePulse(job);
         else job.Handle.NextTick = null;
+        LogTriggerFired(pending.Provider, pending.Event.BindingId, pending.Event.EventId, pending.Event.CauseId,
+            pending.Event.RootEventId ?? job.Template.EventId);
         reports.Add(ScheduleReport(job, "dispatched", "pulse-dispatched")); return true;
     }
     private void CleanScheduledLifetimes(List<ScheduleReceipt> reports)

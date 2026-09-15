@@ -51,7 +51,7 @@ RuntimeModule Module(string id) => new(RuntimeKernel.ApiVersion, JsonSerializer.
 {
     var log = new ManualLogSource("Forge"); var events = new List<LogEventArgs>();
     log.LogEvent += (_, e) => { lock (events) events.Add(e); lock (console) console.Add(e.Data?.ToString() ?? ""); };
-    return (new RuntimeLogWriter(directory, log, limits ?? RuntimeLogLimits.Default), log, events);
+    return (new RuntimeLogWriter(directory, Runtime, log, limits ?? RuntimeLogLimits.Default), log, events);
 }
 JsonElement[] Lines(RuntimeLogWriter writer)
 {
@@ -336,6 +336,232 @@ Case("plan-conflict Detail is folded into the message for every path in the grou
         && message.Contains("Team-Pack/forge/plans/b.plan.json", StringComparison.Ordinal)
         && message.Contains("Other-Pack/forge/plans/c.plan.json", StringComparison.Ordinal),
         "plan-conflict message did not carry every path in the conflict group: " + message);
+});
+
+Case("kernel records registration.rejected with the rejected provider as subject", () => {
+    var sink = new CaptureSink(); var kernel = Kernel(sink, RuntimeLogLevel.Info);
+    // A valid provider id with a capability owned by somebody else: the reason is the registry's own code.
+    var broken = new RuntimeModule(RuntimeKernel.ApiVersion, JsonSerializer.Serialize(new {
+        providers = new[] { new { id = "test.records.broken", kind = "native", version = "1.0.0", dependencies = Array.Empty<object>() } },
+        capabilities = new[] { new { id = "test.records.broken.capability", owner = "test.records.other", kind = "trigger",
+            version = "1.0.0", label = "broken", parameters = new { }, graph = new { domains = new[] { "logic" }, execution = "host",
+                inputs = Array.Empty<object>(), outputs = new[] { new { id = "next", type = "execution" } }, parameters = Array.Empty<object>() } } },
+        bindings = Array.Empty<object>()
+    }), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
+    RejectCode("capability-owner", () => kernel.RegisterModule(broken, RuntimeLogLevel.Info), "broken registration accepted");
+    var record = sink.Records.Single(r => r.Code == RuntimeLogCodes.RegistrationRejected);
+    Check(record.Level == RuntimeLogLevel.Error && record.Provider == Runtime && record.SubjectProvider == "test.records.broken",
+        "registration.rejected level, owner or subject: " + record.Provider + "/" + record.SubjectProvider);
+    Check(record.Result is { Status: "rejected", Commit: null, Reason: "capability-owner" },
+        "registration.rejected must carry status and reason but no commit: " + record.Result?.Commit);
+    Check(record.Tick == -1 && record.WorldEpoch == 0, "registration.rejected tick or epoch before the world began");
+    Check(kernel.LogGate(Runtime).Level == RuntimeLogLevel.Info, "a rejected registration changed the level table");
+});
+
+Case("kernel records binding.registered per binding under the binding's provider", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    var records = fixture.Sink.Records.Where(r => r.Code == RuntimeLogCodes.BindingRegistered).ToArray();
+    Check(records.Length == 5, "expected one binding.registered per registered binding, got " + records.Length);
+    Check(records.All(r => r.Level == RuntimeLogLevel.Info && r.Tick == -1 && r.WorldEpoch == 0), "binding.registered level or tick");
+    // The provider of a record is the binding's own provider, so the two packages show up separately.
+    Check(records.Select(r => r.Provider + " " + r.Binding).OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(new[] {
+        RecordFixture.ActionProvider + " " + RecordFixture.ActionBinding,
+        RecordFixture.ActionProvider + " " + RecordFixture.FailBinding,
+        RecordFixture.SecondActionProvider + " " + RecordFixture.SecondActionBinding,
+        RecordFixture.SecondActionProvider + " " + RecordFixture.SecondTriggerBinding,
+        RecordFixture.TriggerProvider + " " + RecordFixture.TriggerBinding }), "binding.registered attribution or binding id");
+    using var extra = fixture.AddTriggerBinding("test.records.third", "test.records.third.binding.fired");
+    Check(fixture.Sink.Records.Count(r => r.Code == RuntimeLogCodes.BindingRegistered) == 6, "a later registration added no binding record");
+    Check(fixture.Sink.Levels[^1].Providers.Select(p => p.Provider).Contains("test.records.third"), "level table did not gain the new provider");
+    // Registration publishes one table snapshot and writes its binding records against it, so every record sees a table
+    // that already lists the provider it came from.
+    Check(fixture.Sink.Records.Count == fixture.Sink.Levels.Count, "each record must carry the table of its own registration");
+    foreach (var (record, levels) in fixture.Sink.Records.Zip(fixture.Sink.Levels))
+        Check(levels.Providers.Any(p => p.Provider == record.Provider), "record provider missing from its level table: " + record.Provider);
+});
+
+Case("kernel records world.began, plan.loaded and plan.rejected under Runtime", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Start();
+    var began = fixture.Records(RuntimeLogCodes.WorldBegan).Single();
+    Check(began.Level == RuntimeLogLevel.Info && began.Provider == Runtime && began.Tick == -1 && began.WorldEpoch == 1, "world.began level, owner or tick");
+    var loaded = fixture.Records(RuntimeLogCodes.PlanLoaded).Single();
+    Check(loaded.Level == RuntimeLogLevel.Info && loaded.Provider == Runtime && loaded.Path == "pack/plans/test.records.plan.json"
+        && loaded.Plan is { PlanId: "test.records.plan", ResourceId: "test.records.plan", ResourceRevision: "1" }
+        && loaded.Permissions is { Count: 0 } && loaded.Result == null, "plan.loaded required fields");
+    var rejected = fixture.Kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/bad.plan.json", "{\"schemaVersion\":3}") })[0];
+    Check(!rejected.Loaded && rejected.Code == "missing-field", "a malformed plan was accepted: " + rejected.Code);
+    var record = fixture.Records(RuntimeLogCodes.PlanRejected).Single();
+    Check(record.Level == RuntimeLogLevel.Error && record.Provider == Runtime && record.Path == "pack/plans/bad.plan.json"
+        && record.Result is { Status: "rejected", Reason: "missing-field" } && record.Plan == null, "plan.rejected required fields");
+});
+
+Case("kernel records trigger.fired with the binding provider and the root event", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Start();
+    var dispatch = fixture.Trigger.Publish(fixture.Event("evt-root"));
+    Check(dispatch.Status == "queued", "publish refused: " + dispatch.Code);
+    var fired = fixture.Records(RuntimeLogCodes.TriggerFired, RecordFixture.TriggerProvider).Single();
+    Check(fired.Level == RuntimeLogLevel.Info && fired.Binding == RecordFixture.TriggerBinding && fired.EventId == "evt-root"
+        && fired.RootEventId == "evt-root" && fired.CauseId == null && fired.Tick == 0 && fired.WorldEpoch == 1 && fired.Result == null,
+        "trigger.fired required fields or attribution");
+});
+
+Case("kernel records step.started and step.finished under the executing binding's provider", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Kernel.ElevateLogging();
+    fixture.Start();
+    fixture.AdvanceAndCollect("evt-steps");
+    // The entry hangs off the trigger package's binding, but the step runs in another package: attribution follows the
+    // binding that executes the step.
+    var started = fixture.Records(RuntimeLogCodes.StepStarted).Single();
+    var finished = fixture.Records(RuntimeLogCodes.StepFinished).Single();
+    Check(started.Level == RuntimeLogLevel.Trace && started.Provider == RecordFixture.ActionProvider && started.Step == "B"
+        && started.Entry == "A" && started.Binding == RecordFixture.ActionBinding && started.EventId == "evt-steps"
+        && started.RootEventId == "evt-steps" && started.CommandId == finished.CommandId
+        && started.Plan is { PlanId: "test.records.plan", ResourceRevision: "1" }, "step.started required fields or attribution");
+    Check(finished.Level == RuntimeLogLevel.Info && finished.Provider == RecordFixture.ActionProvider && finished.Step == "B"
+        && finished.Result is { Status: "succeeded", Commit: "confirmed", Reason: "committed" }, "step.finished level or result");
+    Check(fixture.Records(RuntimeLogCodes.EntryStopped).Length == 0, "a succeeded entry recorded a stop");
+});
+
+Case("kernel records a failed step and entry.stopped one step before the entry's end", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Start();
+    // The second entry answers its own trigger binding, so only its two steps are involved.
+    fixture.AdvanceAndCollect("evt-stopped", binding: RecordFixture.SecondTriggerBinding);
+    var failure = fixture.Records(RuntimeLogCodes.StepFinished).Single();
+    Check(failure.Level == RuntimeLogLevel.Error && failure.Provider == RecordFixture.ActionProvider
+        && failure.Result is { Status: "failed", Commit: "unknown", Reason: "handler-exception" },
+        "a failed/unknown step is not recorded as an error: " + failure.Level + "/" + failure.Result?.Reason);
+    var stopped = fixture.Records(RuntimeLogCodes.EntryStopped).Single();
+    Check(stopped.Level == RuntimeLogLevel.Info && stopped.Provider == Runtime && stopped.Entry == "C" && stopped.Step == "D"
+        && stopped.CommandId == failure.CommandId && stopped.EventId == "evt-stopped" && stopped.Result == null,
+        "entry.stopped required fields or attribution");
+    // The step after D belongs to a third package, and neither record of it was written.
+    Check(fixture.Records(RuntimeLogCodes.StepStarted).Count(r => r.Step == "E") == 0
+        && fixture.Records(RuntimeLogCodes.StepFinished).All(r => r.Provider != RecordFixture.SecondActionProvider),
+        "a stopped entry executed or recorded its successor");
+    // The other entry's single step succeeds, so the stop count stays where the failed step left it.
+    fixture.Kernel.BeginWorld(2);
+    fixture.Kernel.Advance(1, true);
+    fixture.AdvanceAndCollect("evt-last", binding: RecordFixture.TriggerBinding, tick: 2);
+    Check(fixture.Records(RuntimeLogCodes.StepFinished).Any(r => r.Step == "B")
+        && fixture.Records(RuntimeLogCodes.EntryStopped).Length == 1, "a succeeding step changed the stop count");
+});
+
+Case("kernel records event.deferred once per tick at trace", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Kernel.ElevateLogging();
+    fixture.Start(maxEventsPerTick: 1);
+    foreach (var id in new[] { "evt-one", "evt-two" }) Check(fixture.Trigger.Publish(fixture.Event(id)).Status == "queued", "publish refused");
+    fixture.Kernel.Advance(1, true);
+    var deferred = fixture.Records(RuntimeLogCodes.EventDeferred).Single();
+    Check(deferred.Level == RuntimeLogLevel.Trace && deferred.Provider == Runtime && deferred.Binding == RecordFixture.TriggerBinding
+        && deferred.Result is { Status: "deferred", Reason: "plan-tick-event-budget" }, "event.deferred required fields");
+    Check(fixture.Records(RuntimeLogCodes.EventRejected).Length == 0 && fixture.Records(RuntimeLogCodes.BudgetExceeded).Length == 0,
+        "a deferred event was also recorded as rejected");
+    fixture.Kernel.Advance(2, true);
+    Check(fixture.Records(RuntimeLogCodes.EventDeferred).Length == 1, "a caught-up tick recorded a second deferral");
+    Check(fixture.Records(RuntimeLogCodes.TriggerFired).Count(r => r.EventId == "evt-two") == 1,
+        "the deferred event did not dispatch on the next tick");
+});
+
+Case("kernel records event.cancelled at trace when the scope is gone", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Kernel.ElevateLogging();
+    fixture.Start();
+    Check(fixture.Trigger.Publish(fixture.Event("evt-cancelled")).Status == "queued", "publish refused");
+    Check(fixture.Trigger.CancelScope("test.records.scope") == 1, "scope cancel did not find the queued event");
+    fixture.Kernel.Advance(1, true);
+    var cancelled = fixture.Records(RuntimeLogCodes.EventCancelled).Single();
+    Check(cancelled.Level == RuntimeLogLevel.Trace && cancelled.Provider == Runtime && cancelled.Binding == RecordFixture.TriggerBinding
+        && cancelled.EventId == "evt-cancelled" && cancelled.SubjectProvider == RecordFixture.TriggerProvider
+        && cancelled.Result is { Status: "cancelled", Reason: "source-lifecycle" },
+        "event.cancelled required fields");
+});
+
+Case("kernel splits a refused event between event.rejected and budget.exceeded", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Start();
+    // An event from an older world is refused with a non-budget reason.
+    var rejected = fixture.Trigger.Publish(fixture.Event("evt-stale") with { WorldEpoch = 0 });
+    Check(rejected.Status == "rejected" && rejected.Code == "stale-world", "stale publish accepted: " + rejected.Status + "/" + rejected.Code);
+    var record = fixture.Records(RuntimeLogCodes.EventRejected).Single();
+    Check(record.Level == RuntimeLogLevel.Error && record.Provider == Runtime && record.Binding == RecordFixture.TriggerBinding
+        && record.EventId == "evt-stale" && record.SubjectProvider == RecordFixture.TriggerProvider
+        && record.Result is { Status: "rejected", Reason: "stale-world" },
+        "event.rejected required fields");
+    Check(fixture.Records(RuntimeLogCodes.BudgetExceeded).Length == 0, "a non-budget refusal was also recorded as budget.exceeded");
+    // A full kernel queue is a budget reason, so the same refusal is recorded as budget.exceeded instead.
+    var full = new RecordFixture(RuntimeLogLevel.Info, new RuntimeLimits { MaxQueuedEvents = 1 });
+    full.Start(maxQueuedEvents: 2);
+    Check(full.Trigger.Publish(full.Event("evt-first")).Status == "queued", "first publish refused");
+    Check(full.Trigger.Publish(full.Event("evt-budget")).Status == "rejected", "a full queue accepted a second event");
+    var budget = full.Records(RuntimeLogCodes.BudgetExceeded).Single();
+    Check(budget.Level == RuntimeLogLevel.Error && budget.Provider == Runtime && budget.Binding == RecordFixture.TriggerBinding
+        && budget.EventId == "evt-budget" && budget.Result is { Status: "rejected", Reason: "queue-budget" },
+        "budget.exceeded required fields");
+    Check(full.Records(RuntimeLogCodes.EventRejected).Length == 0, "a budget refusal was also recorded as event.rejected");
+    Check(fixture.Records(RuntimeLogCodes.BudgetExceeded).Length == 0, "an unrelated kernel recorded the refusal");
+});
+
+Case("kernel records observer.failed under the observer's provider and suspends once", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    using var bad = fixture.Action.ObserveLifecycle(_ => throw new InvalidOperationException("observer boom"), false);
+    fixture.Kernel.StartRuntime(() => { });
+    var failed = fixture.Records(RuntimeLogCodes.ObserverFailed).Single();
+    Check(failed.Level == RuntimeLogLevel.Error && failed.Provider == RecordFixture.ActionProvider
+        && failed.Result is { Status: "failed", Reason: "lifecycle-observer-failed" } && failed.Detail != null,
+        "observer.failed level, attribution or result");
+    fixture.Kernel.LogSuspended("bridge-exception", "host callback threw");
+    var suspended = fixture.Records(RuntimeLogCodes.RuntimeSuspended).Single();
+    Check(suspended.Level == RuntimeLogLevel.Error && suspended.Provider == Runtime
+        && suspended.Result is { Status: "failed", Reason: "bridge-exception" }, "runtime.suspended level, owner or result");
+    Exception? threadFailure = null;
+    var thread = new Thread(() => { try { fixture.Kernel.LogSuspended("bridge-exception"); } catch (Exception error) { threadFailure = error; } });
+    thread.Start(); thread.Join();
+    Check(threadFailure is RuntimeContractException { Code: "wrong-thread" }, "a suspend record was accepted off the simulation thread");
+    fixture.Kernel.StopRuntime();
+    Check(fixture.Records(RuntimeLogCodes.RuntimeSuspended).Length == 1, "a normal stop recorded a suspension");
+});
+
+Case("a disabled level keeps every kernel record point out of the sink", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Off);
+    Check(fixture.Sink.Records.Count == 0, "registration wrote at Off");
+    Check(fixture.Kernel.IsRegistrationOpen, "the fixture could not register at Off");
+    fixture.Kernel.BeginWorld(1);
+    using (var observer = fixture.Action.ObserveLifecycle(_ => throw new InvalidOperationException("off boom"), true)) { }
+    Check(fixture.Sink.Records.Count == 0, "registration, world or observer wrote at Off");
+    fixture.Kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/bad.plan.json", "{\"schemaVersion\":3}") });
+    fixture.Kernel.LogSuspended("checkpoint-restore", "test restore");
+    Check(fixture.Sink.Records.Count == 0, "a disabled runtime level still reached the sink: "
+        + string.Join(",", fixture.Sink.Records.Select(r => r.Code)));
+    // Elevation is the only way in, and it reaches a gate obtained before it.
+    var gate = fixture.Kernel.LogGate(RecordFixture.TriggerProvider);
+    fixture.Kernel.ElevateLogging();
+    Check(gate.Level == RuntimeLogLevel.Trace, "elevation did not reach a gate obtained earlier");
+    fixture.Kernel.BeginWorld(2);
+    Check(fixture.Records(RuntimeLogCodes.WorldBegan, Runtime).Length == 1, "an elevated provider wrote nothing");
+});
+
+Case("kernel records reach the session file with at most two log.level lines", () => {
+    var directory = NewDirectory(); var (writer, _, _) = Writer(directory);
+    var kernel = Kernel(writer, RuntimeLogLevel.Info);
+    using var trigger = kernel.RegisterModule(RecordFixture.PublicTriggerModule(), RuntimeLogLevel.Info);
+    kernel.BeginWorld(1);
+    kernel.StartRuntime(() => { });
+    kernel.Advance(0, true);
+    kernel.LogSuspended("checkpoint-restore", "test restore");
+    writer.Dispose(); var lines = Lines(writer);
+    // The first real record opens the file with the current table; registration adds providers without a line of its own.
+    Check(Codes(lines).Count(code => code == RuntimeLogCodes.LogLevel) == 1, "a registration added a log.level line of its own");
+    Check(Codes(lines)[0] == RuntimeLogCodes.LogLevel, "log.level is not the first line of the session file");
+    var suspended = lines.Single(line => Text(line, "code") == RuntimeLogCodes.RuntimeSuspended);
+    Check(Text(suspended, "level") == "error" && Text(suspended, "provider") == Runtime
+        && Text(suspended.GetProperty("result"), "reason") == "checkpoint-restore", "runtime.suspended did not round-trip to JSONL");
+    Check(lines.Any(line => Text(line, "code") == RuntimeLogCodes.WorldBegan && Text(line, "level") == "info"), "world.began missing from the file");
+    Check(Codes(lines).Count(code => code == RuntimeLogCodes.BindingRegistered) == 1, "binding.registered missing from the file");
 });
 
 Case("privacy: no Steam64-shaped numbers", () => {

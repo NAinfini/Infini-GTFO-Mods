@@ -80,18 +80,21 @@
 
 `TickResult` 另带 `Schedules` 和 `StateLeases` 收据，但**只包含该次 `Advance` 期间**产生的条目。主动调用 `Cancel()`、`Release()` 或 `CancelScope` 不保证出现在之后的 `TickResult` 里；这些调用应读方法自身的返回值和句柄的 `Status`/`Code`。
 
-## 执行日志 sink 与级别（D-007 阶段 A+B）
+## 执行日志 sink 与级别（D-007 阶段 A+B+C）
 
 合同在 `RuntimeLogContracts.cs`，内核侧在 `RuntimeKernel.Logging.cs`。宿主用 `RuntimeKernel(identity, limits, IRuntimeLogSink sink, RuntimeLogLevel runtimeLogLevel)` 构造内核，sink 在内核生命周期内固定，没有注册或替换接口。`RuntimeLogLevel` 为 `Off < Error < Info < Trace`，构造参数只接受 off、error、info（否则 `log-level`），trace 只能经提级得到。`RuntimeLogConfiguration.ParseLevel(string)` 是宿主 cfg 与各包 cfg 共用的文本词表：off、error、info，大小写与首尾空白不敏感，非法值抛同一条消息；SDK 自己不读任何 cfg。
 
-- `RuntimeLogRecord` 是 `readonly struct`，以 `in` 传给 `IRuntimeLogSink.Write(in record, RuntimeLogLevels levels)`。字段：Level、Code、Provider、SubjectProvider?、Tick、WorldEpoch、Frame?、CommandId?、EventId?、CauseId?、RootEventId?、Plan?（planId 与 resource id/revision）、Entry?、Step?、Binding?、Result?（status、commit?、reason）。**没有 message 与 inputs**：消息由 sink 在后台线程拼，调用点不构造字符串；inputs 属于 Development 的 trace recorder，未实现。status 与 commit 本阶段是不做词表校验的字符串。
-- 级别表按 provider 保存。每个条目在注册时建立：`RegisterModule(module, level)` 的级别只接受 off、error、info（否则 `log-level`），注册成功后该 provider 的 `LogGate` 返回这个级别；未注册的 provider 仍然抛 `log-provider-unregistered`，不静默当作 off 或 error。注销时移除条目，之后再查同样报错，不允许句柄失效后继续写。Runtime 自己的条目（`Identity.Id`）由宿主构造建立、也不由模块注销删除：模块即便声明同一个 provider id 也替换或删除不了它。表变化（注册、注销、提级）都立即发布新快照。
+- `RuntimeLogRecord` 是 `readonly struct`，以 `in` 传给 `IRuntimeLogSink.Write(in record, RuntimeLogLevels levels)`。字段：Level、Code、Provider、SubjectProvider?、Tick、WorldEpoch、Frame?、CommandId?、EventId?、CauseId?、RootEventId?、Plan?（planId 与 resource id/revision）、Path?、Permissions?、Entry?、Step?、Binding?、Result?（status、commit?、reason）、Detail?（自由文本，只并入 sink 拼出的消息）。**没有 message 与 inputs**：消息由 sink 在后台线程拼，调用点不构造字符串；inputs 属于 Development 的 trace recorder，未实现。status 与 commit 是不做词表校验的字符串。
+- 级别表按 provider 保存。每个条目在注册时建立：`RegisterModule(module, level)` 的级别只接受 off、error、info（否则 `log-level`），注册成功后该 provider 的 `LogGate` 返回这个级别；未注册的 provider 仍然抛 `log-provider-unregistered`，不静默当作 off 或 error。注销时移除条目，之后再查同样报错，不允许句柄失效后继续写。Runtime 自己的条目（`Identity.Id`）由宿主构造建立、也不由模块注销删除：模块即便声明同一个 provider id 也替换或删除不了它。表变化（注册、注销、提级）都立即发布新快照；注册时**先发布新表再写 `binding.registered`**，所以每条记录携带的表都已经列出它自己的 provider。
 - `ElevateLogging()` 把所有条目升为 Trace 并切换到提级限流档。只在注册窗口内接受一次；窗口关闭（Ready、Failed、Stopped）或第二次调用都抛 `log-elevation-rejected`，不可撤销。级别门是同一个可变对象，提级前取得的门也会看到 Trace；提级之后注册的 provider 也是 Trace，不是它的 cfg 值。
 - `WriteLog(in record)` 是记录点到 sink 的唯一通道：所属线程（`wrong-thread`）；无 sink 的内核抛 `log-unconfigured`；缺 code、provider 或不完整的 plan/result 抛 `log-record`；Off 或门未开抛 `log-level-disabled`。调用点应先比对门，再构造记录。
-- 每次级别表变化都会发布新的 `RuntimeLogLevels` 快照（按 provider 排序、带 tier），sink 据引用变化重写 `log.level`。
-- `RuntimeLogCodes` 只有 `log.dropped` 与 `log.level`；其余码表等网站拍板。
+- 每次级别表变化都会发布新的 `RuntimeLogLevels` 快照（按 provider 排序、带 tier）。sink 只在 **tier 变化**时写新的 `log.level` 行（首行 + 提级行），所以注册多少 provider 都不会多出行；提级之前的快照只是让后续记录带上最新的 provider 列表。宿主 writer 的构造参数里带 Runtime 的 provider id：首条记录就被限流丢掉时，`log.dropped` 仍要能写出归属。
+- `RuntimeLogCodes` 是码表单一来源，含 `log.level`、`log.dropped` 与内核写出的 15 个事件码；`RuntimeLogReasonCodes` 只有 `invalid-handler-result`（结果组合非法时内核改记 failed/unknown）与 `lifecycle-observer-failed`（观察者故障结果码），其余 reason 都是产生它的异常码或结果码本身。`adapter.*` 待 I-ADAPTER-SCHEMA，未声明。
+- 内核记录点（§3.2 归属规则）：`registration.rejected`（被拒注册与被拒容量都记，被拒注册的 provider 写进 `subjectProvider`；解析 seed 才知道 provider id 的失败没有 subject）、注册时每个 binding 一条 `binding.registered`、`BeginWorld` 一条 `world.began`、每次入队（发布、事实转发、计划 pulse 放行）一条 `trigger.fired`、事件被拒按 reason 是否以 `-budget` 结尾分流成 `event.rejected`（error）与 `budget.exceeded`（error，发布期的 `queue-budget`、`event-history-budget` 也走这一条）、每 tick 最多一条 `event.deferred`（trace，reason 是第一个拦下它的预算码，含 `scheduled-tick-budget`）、排队事件在派发前被丢弃就写一条 `event.cancelled`（trace，覆盖发布方注销、scope 取消、计划卸载、计划脉冲被跳过期丢弃）、每次调用的 `step.started`（trace）与 `step.finished`（`failed` 或 commit 为 `unknown` 记 error，其余 info，唯一带 `commit` 的记录）、结果停下且该步仍有后继时一条 `entry.stopped`（info，归 Runtime）、观察者抛异常时一条 `observer.failed`（error，归该观察者 provider）、以及 `LogSuspended(code, detail?)`（error，每次暂停一条；`StartRuntime` 失败写 `startup-failed`，正常停止不写——停止不是暂停）。
+- `step.*` 与 `trigger.fired` 的 provider 取自**执行该步的 binding**（`step.BindingId`），不是入口的触发器 binding：跨包触发时归属和级别门都属于真正执行的那一方。
+- 内核直接写事件与步骤记录，不再把 `TickResult` 回执订阅转成日志；error/info 不带 inputs，trace 的 inputs 复制仍由 Development 的 trace 记录器负责，本层只留记录点。
 
-原有构造函数 `RuntimeKernel(identity, limits)` 不带 sink，测试与领域消费方仍用它；它的日志接口一律拒绝，不写任何东西。**内核与领域都还没有记录点**，所以玩家层目前只有 Runtime 自身的日志能力，实际不会写出任何业务记录。
+原有构造函数 `RuntimeKernel(identity, limits)` 不带 sink，测试与领域消费方仍用它；它的日志接口一律拒绝，不写任何东西。领域包自己的记录点（经句柄写出、providerId 由句柄盖）仍不在本层：目前只有内核可见的记录点已接入。
 
 ## 预算
 

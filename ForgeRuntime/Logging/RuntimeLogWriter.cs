@@ -39,13 +39,16 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
     private BlockingCollection<Entry>? queue;
     private Thread? thread;
     private RuntimeLogLevels? announced;
+    private RuntimeLogTier? announcedTier;
+    private readonly string runtimeProvider;
     private long seq, tick = long.MinValue, epoch = long.MinValue, dropped, droppedTick, droppedEpoch;
     private int linesThisTick;
     private bool disposed;
 
-    internal RuntimeLogWriter(string directory, ManualLogSource console, RuntimeLogLimits limits)
+    internal RuntimeLogWriter(string directory, string runtimeProvider, ManualLogSource console, RuntimeLogLimits limits)
     {
         this.directory = Path.GetFullPath(directory);
+        this.runtimeProvider = runtimeProvider;
         this.console = console ?? throw new ArgumentNullException(nameof(console));
         this.limits = limits ?? throw new ArgumentNullException(nameof(limits));
     }
@@ -64,9 +67,12 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
             || queue!.Count >= (elevated ? limits.ElevatedQueue : limits.PlayerQueue))
         { dropped++; droppedTick = record.Tick; droppedEpoch = record.WorldEpoch; return; }
         linesThisTick++;
-        if (!ReferenceEquals(levels, announced))
+        // The contract allows at most two log.level lines in a file: the first real record opens the file with the current
+        // table, and elevation is the one later change that is announced. Registration adds providers to the table without
+        // a line of its own, so a file with N registrations still carries at most two.
+        if (announcedTier != levels.Tier)
         {
-            // The first accepted record opens the file, so log.level is its first line; a later snapshot means elevation happened.
+            announcedTier = levels.Tier;
             announced = levels;
             queue.Add(new Entry(++seq, new RuntimeLogRecord { Level = RuntimeLogLevel.Info, Code = RuntimeLogCodes.LogLevel,
                 Provider = levels.RuntimeProvider, Tick = record.Tick, WorldEpoch = record.WorldEpoch }, levels, 0));
@@ -97,8 +103,10 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
     // log.level and log.dropped bypass the per-tick and queue limits; drops coalesce, so at most one extra entry is pending.
     private void AddDropped()
     {
+        // A session whose very first record was already dropped has no announced table yet, so the Runtime provider is
+        // carried from construction rather than from the level line.
         queue!.Add(new Entry(++seq, new RuntimeLogRecord { Level = RuntimeLogLevel.Error, Code = RuntimeLogCodes.LogDropped,
-            Provider = announced!.RuntimeProvider, Tick = droppedTick, WorldEpoch = droppedEpoch }, null, dropped));
+            Provider = announced?.RuntimeProvider ?? runtimeProvider, Tick = droppedTick, WorldEpoch = droppedEpoch }, null, dropped));
         dropped = 0;
     }
 

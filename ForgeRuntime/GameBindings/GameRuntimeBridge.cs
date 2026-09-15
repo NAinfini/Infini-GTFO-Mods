@@ -18,7 +18,6 @@ internal static class GameRuntimeBridge
     private static bool _inLevel, _suspended, _wasHost, _blockedUntilLobby, _dispatching, _pendingInvalidation;
     private static long _epoch, _tick;
     private static bool _pendingStop;
-    private static long _reportedLifecycleFaults;
     internal static bool CanExecute
     {
         get
@@ -41,9 +40,11 @@ internal static class GameRuntimeBridge
             if (!string.Equals(actual, GameAssemblySha256, StringComparison.Ordinal))
                 throw new InvalidOperationException("Forge native binding does not support this GameAssembly hash: " + actual);
         }
-        _pendingStop = false; _reportedLifecycleFaults = 0;
+        _pendingStop = false;
         _inLevel = _suspended = _blockedUntilLobby = _dispatching = _pendingInvalidation = false; _epoch = 1; _tick = 0;
-        _log = new RuntimeLogWriter(Path.Combine(Paths.BepInExRootPath, RuntimeLogWriter.DirectoryName), Plugin.PluginLog, RuntimeLogLimits.Default);
+        // The writer carries the Runtime provider id itself: a `log.dropped` record written before the first accepted record
+        // has no level table to read it from.
+        _log = new RuntimeLogWriter(Path.Combine(Paths.BepInExRootPath, RuntimeLogWriter.DirectoryName), "forge.runtime", Plugin.PluginLog, RuntimeLogLimits.Default);
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, GameBuild), new RuntimeLimits(), _log, logLevel);
         Kernel.BeginWorld(_epoch);
         // D-007: the Runtime's own providers carry the Runtime cfg level; only packages with their own plugin pass one.
@@ -66,26 +67,18 @@ internal static class GameRuntimeBridge
                 if (discovered.Count > 0) kernel.LoadPlans(discovered);
             });
         }
-        ReportLifecycleFaults(kernel);
         if (kernel.StartupState != RuntimeStartupState.Ready) return;
         if (!_inLevel || _suspended) return;
         if (SNet.IsMaster != _wasHost || (SNet.MasterManagement != null && SNet.MasterManagement.IsMigrating))
-        { Suspend("Host migration is unsupported for this native binding; return to lobby and start a new expedition.", true); return; }
-        TickResult result;
+        { Suspend("host-migration-unsupported", "Host migration is unsupported for this native binding; return to lobby and start a new expedition.", true); return; }
         _dispatching = true;
-        try { result = kernel.Advance(checked(++_tick), SNet.IsMaster); }
+        try { kernel.Advance(checked(++_tick), SNet.IsMaster); }
         finally
         {
             _dispatching = false;
             if (_pendingStop) Stop();
             else if (_pendingInvalidation) { _pendingInvalidation = false; InvalidateWorld(); }
         }
-        ReportLifecycleFaults(kernel);
-        foreach (var command in result.Commands)
-            if (command.Result.Status != "succeeded")
-                Plugin.PluginLog.LogWarning($"Forge command {command.CommandId}: {command.Result.Status}/{command.Result.Code}; plan={command.PlanId} resource={command.ResourceId}@{command.ResourceRevision} node={command.NodeId}");
-        foreach (var evt in result.Events)
-            if (evt.Status == "rejected") Plugin.PluginLog.LogWarning($"Forge event {evt.EventId}: {evt.Code}");
     }
 
     internal static void StateChanged(eGameStateName nextState)
@@ -118,26 +111,20 @@ internal static class GameRuntimeBridge
 
     internal static void EndWorld() { _inLevel = false; InvalidateWorld(); }
 
-    internal static void Suspend(string reason, bool untilLobby = false)
+    internal static void Suspend(string code, string detail, bool untilLobby = false)
     {
         _blockedUntilLobby |= untilLobby;
         if (_suspended) return;
         _suspended = true; InvalidateWorld();
-        Plugin.PluginLog.LogError("Forge framework suspended: " + reason);
+        // I-DIAG: the pause is a kernel record written through the same sink as every other one; the host adds no BepInEx line.
+        if (Kernel is { } kernel && kernel.StartupState is not (RuntimeStartupState.Failed or RuntimeStartupState.Stopped))
+            kernel.LogSuspended(code, detail);
     }
 
     internal static void Guard(Action action)
     {
         try { action(); }
-        catch (Exception error) { Suspend(error.ToString()); }
-    }
-
-    private static void ReportLifecycleFaults(RuntimeKernel kernel)
-    {
-        if (kernel.LifecycleFaultCount == _reportedLifecycleFaults) return;
-        _reportedLifecycleFaults = kernel.LifecycleFaultCount;
-        var fault = kernel.LastLifecycleFault;
-        Plugin.PluginLog.LogWarning($"Forge lifecycle observer removed: count={_reportedLifecycleFaults}; provider={fault?.ProviderId}; {fault?.Code}: {fault?.Detail}");
+        catch (Exception error) { Suspend("bridge-exception", error.Message); }
     }
 
     internal static void Stop()

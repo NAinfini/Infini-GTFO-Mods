@@ -25,8 +25,14 @@ internal static class LogBoundaryProbe
         using var host = AssemblyDefinition.ReadAssembly(Path.GetFullPath(hostPath));
         var sdkScan = Scan(All(sdk.MainModule.Types).SelectMany(t => t.Methods));
         var hostScan = Scan(All(host.MainModule.Types).SelectMany(t => t.Methods));
-        Verify.That(sdkScan.Violations.Count == 0 && hostScan.Violations.Count == 0,
-            "log call site builds text: " + string.Join(", ", sdkScan.Violations.Concat(hostScan.Violations)));
+        // The rule covers every Forge assembly beside the host, so a domain package's own record points are held to it
+        // too and not only this task's kernel-side ones.
+        var domains = Directory.GetFiles(Path.GetDirectoryName(Path.GetFullPath(hostPath))!, "Forge*.dll")
+            .Where(file => Path.GetFileName(file) != Path.GetFileName(hostPath))
+            .SelectMany(file => { using var assembly = AssemblyDefinition.ReadAssembly(file); return Scan(All(assembly.MainModule.Types).SelectMany(t => t.Methods)).Violations; })
+            .ToList();
+        Verify.That(sdkScan.Violations.Count == 0 && hostScan.Violations.Count == 0 && domains.Count == 0,
+            "log call site builds text: " + string.Join(", ", sdkScan.Violations.Concat(hostScan.Violations).Concat(domains)));
         // The writer's own log.level/log.dropped records are the only sites today; zero would mean the rule scanned nothing.
         Verify.That(hostScan.Sites > 0, "no record text setter found in the host; the call-site rule is vacuous");
         var logging = host.MainModule.Types.Where(t => t.Namespace == "ForgeRuntime.Logging").ToArray();

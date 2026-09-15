@@ -4,6 +4,53 @@
 
 计划与状态见两仓统一框架第 6 节 U-RUNTIME（链接见[仓库 README](../README.md)）。本文只记录 Runtime 侧各次交付的实际内容、复跑命令与仍然存在的失败；没有任何游戏、安装、多人或恢复验收。
 
+## D-007 阶段 C — 内核记录点（2026-09-14）
+
+**现状盘点（改前，逐码）。** 已有记录点只有三处：`plan.rejected`（`Framework/RuntimeKernel.cs` 的 `LogPlanRejected`，被 8 个计划拒绝分支调用）、`plan.loaded`（同文件的 `LogPlanLoaded`，1 处）、`log.level` 与 `log.dropped`（`Logging/RuntimeLogWriter.cs` 的 71/100/136 行附近）。其余 13 个内核可见的事件码没有任何记录点。从 `TickResult` 转日志的旧路径有两处，都在 `GameBindings/GameRuntimeBridge.cs`：`FixedTick` 里按 `result.Commands`/`result.Events` 逐条 `LogWarning`（改动前的 84-88 行），以及 `ReportLifecycleFaults` 把内核的观察者故障计数镜像成 `LogWarning`（改动前的 135-141 行）。`Suspend` 直接写 `PluginLog.LogError`。
+
+**事件码表落点。** `Framework/RuntimeLogContracts.cs` 的 `RuntimeLogCodes` 补齐 `registration.rejected`、`binding.registered`、`world.began`、`trigger.fired`、`event.rejected`、`budget.exceeded`、`event.deferred`、`event.cancelled`、`step.started`、`step.finished`、`entry.stopped`、`observer.failed`、`runtime.suspended`，加上原有的 4 个共 17 个；`adapter.attached`/`adapter.failed` 与各包原生诊断码按任务说明不做，也没有提前声明。新增 `RuntimeLogReasonCodes`，只放内核自己发明、契约码表里以「内核码」身份出现的两个值：`invalid-handler-result`（结果组合非法时改记 failed/unknown）与 `lifecycle-observer-failed`（观察者故障结果码，同时仍是 `LastLifecycleFault.Code`）。其余 reason 都是产生它的异常码或结果码本身，例如计划组的 `plan-conflict`/`plan-budget`/`plan-path`/`invalid-json`、结果组的 `rejected`/`failed`/`cancelled`/`expired`/`deferred`、内核码 `source-lifecycle`/`plan-unloaded`/`not-host`/`queue-budget`/`tick-event-budget`/`plan-tick-command-budget` 等 —— 没有新增或删除任何码值。
+
+**记录点（`Framework/RuntimeKernel.Logging.cs` + 调用点）。** 新增一组只在内核里使用的写入方法，全部接收 `in RuntimeLogRecord`（记录是 readonly struct，不装箱），调用点只做一次门比较，不构造字符串：
+
+- `LogRegistrationRejected`：`Register` 的**全部**拒绝路径（注册窗口已关、模块容量、seed 解析与注册表容量）都包在同一处 try/catch 里，按 `rejected` 记 error；`subjectProvider` 从 seed 文本里单独取一次 provider id（`DeclaredProvider`），seed 不可读时留空。
+- `LogBindingRegistered`：注册成功后按 ordinal 顺序为每个属于该 provider 的 binding 写一条 info。为此 `RegisterLogGate` 不再自己发布快照，`Register` 先发布新表、再写 binding 记录，因此每条记录携带的级别表已经列出它自己的 provider。
+- `LogWorldBegan`：`BeginWorld` 状态复位后、通知观察者前写一条 info（tick 为 -1，`worldEpoch` 已是新值）。
+- `LogTriggerFired`：`Publish` 入队成功后与 `AdmitPulse` 计数完成后各写一条 info，归属取 binding 的 provider，`rootEventId` 为事件自身的 root 或它自己的 id。
+- `LogEventRejected` / `LogBudgetExceeded`：`Publish`、`Schedule` 的 catch、`Publish` 与 `Schedule` 的在 try 内直接返回的拒绝（`event-id-conflict`、`schedule-id-conflict`）、`AdmitPulse` 的脉冲拒绝、`PublishConfirmedFacts` 的事实拒绝与非主机队列清理，全部按 reason 是否以 `-budget` 结尾分流；同一拒绝只记一条。`event.rejected` 与 `event.cancelled` 在发布方仍可识别时把 providerId 写进 `subjectProvider`（契约说该字段「可识别时带」）。
+- `LogEventDeferred`：`AdvanceCore` 的分派循环用新的 `BudgetRefusal(Pending)` 统一判断预算顺序（全局事件 → 全局命令 → 每个计划的事件/命令，与循环原来的判断顺序一致），返回第一个拦下它的码；新的 `deferredLogged` 标志保证每 tick 最多一条 trace 记录（重置点与 `eventsThisTick` 相同）。计划 pulse 因每 tick 脉冲上限（`scheduled-tick-budget`）延后时也写这一条。
+- `LogEventCancelled`：排队事件在派发前被丢弃就写一条 trace —— provider 注销、scope 取消、计划卸载，以及计划 pulse 被跳过期策略丢弃、生命周期结束、句柄不再 active 这几种队列内脉冲的丢弃。
+- `LogStepStarted` / `LogStepFinished` / `LogEntryStopped`：`StepOrigin` 是新增的 readonly struct（事件、计划身份、entry nodeId），按 `in` 传递；归属取**执行该步的 binding**（`step.BindingId`，不是入口的 trigger binding），`step.started` 在 handler 调用前（trace），`step.finished` 在命令回执生成后（`failed` 或 commit 为 `unknown` 记 error，其余 info；它是唯一带 `commit` 的记录），`entry.stopped` 只在结果让 entry 停下且该步还有未执行后继时写一条 info，归 Runtime。控制步不发回执，因此仍不写步骤记录；`pure` 步的求值失败继续只走所在的 action/control 步结果。
+- `LogObserverFailed`：`InvokeLifecycle` 的 catch 里写 error，归属观察者的 provider，`Detail` 是单值 `error.Message`；`LastLifecycleFault` 与计数保留。
+- `LogSuspended(code, detail?)`：公开入口，每次暂停一条 error，reason 取契约 `runtime.suspended` 一行的四个值。`StartRuntime` 初始化失败记 `startup-failed`；正常 `StopRuntime` **不写**——停止不是暂停，契约的 reason 表也没有对应码（`runtime-stopped` 在不进日志的内核码表里）。宿主 `Suspend(code, detail)` 只在启动状态不是 Failed/Stopped 时补记，避免与启动失败重复。
+
+**删掉的双路径。** `GameRuntimeBridge` 不再读 `TickResult` 的命令/事件回执写 BepInEx 警告，`ReportLifecycleFaults` 与 `_reportedLifecycleFaults` 整段删除；`Suspend` 改成 `Suspend(string code, string detail, bool untilLobby = false)`，只调 `kernel.LogSuspended`；`Guard` 用 `bridge-exception` + `error.Message`；`NativeHooks` 的检查点恢复传 `checkpoint-restore`。观察者故障不再每帧镜像，因此 `tests/GameBindings` 相应断言改为「宿主不再镜像内核记录」+「故障计数不重复」。
+
+**测试（已写好，未运行）。** `tests/RuntimeLog` 新增 `RecordFixture.cs`：三个托管测试 provider（两个扩展包：一个 trigger，一个同时提供 trigger 与 action，含真实声明图、接收者合同、实体解析器）与一份编译计划（入口 A 走第一个包的 trigger、步骤在第二个包；入口 C 走第二个包自己的 trigger，首个步骤由失败 handler 停住且后继步骤在第二个包，因此「步骤归执行方 provider」和「停止只在还有后继时写」都可观察）。`Program.cs` 新增 11 个用例，覆盖每个码的级别、归属、必带字段与是否带结果（含「除 `step.finished` 外不带 commit」）、`event.rejected`/`budget.exceeded` 的分流、每 tick 一条 `event.deferred`、关闭级别时 sink 零记录且提级后旧门可见、以及 writer 端「一个注册不额外写 `log.level`」与 `runtime.suspended` 的 JSONL 往返。`tests/Architecture` 新增 `RecordPointProbe.cs`：事件码常量与码表双向一致、`RuntimeLogRecord` 不含 message/inputs/玩家标识字段、级别词表顺序不变、只有 `LogStepFinished` 写 `commit`，并用自带的 CIL 走查确认 12 个以上记录点方法都不调用 `System.String`/`StringBuilder`。`tests/HostIntegration` 的 `LogBoundaryProbe` 扩到宿主同目录下的全部 `Forge*.dll`。`tests/GameBindings` 的 `Suspend` 调用点补 code 参数。
+
+**编译（本次实际执行，未运行任何测试）。** `dotnet build <工程> -c Release -v q --artifacts-path $env:TEMP\dsh-d7b`，`GTFO_BEPINEX_PATH` 指向只读的 `Forge-MapEditor-QA` profile。`ForgeRuntime.Framework`、`ForgeRuntime` 宿主与 `tests/Architecture`、`EntityObservation`、`Framework`、`GameBindings`、`GraphContracts`、`HostConfiguration`、`HostIntegration`、`LifecycleWork`、`PluginStartup`、`RuntimeLog` 共 12 个工程，退出码全为 0，0 警告 0 错误。
+
+**待 Claude 统一运行的测试（尚未运行，不能记为通过）。**
+
+| 套件与参数 | 本批关注点 |
+| --- | --- |
+| `tests/RuntimeLog --root <新目录>` | 新增 11 个记录点用例；原有 sink、级别、提级与 writer 场景不变 |
+| `tests/Architecture` | 新增码表双向一致、记录形状与 CIL 走查断言 |
+| `tests/HostIntegration --host <ForgeRuntime.dll>` | `LogBoundaryProbe` 现在也扫宿主同目录的 `Forge*.dll` |
+| `tests/GameBindings`（默认与 `--native`） | 宿主不再镜像内核记录；`Suspend` 补 code 参数后恢复/迁移用例不变 |
+| `tests/Framework`、`GraphContracts`、`LifecycleWork`、`EntityObservation` | 内核记录点接入后原有断言不变（`LifecycleWork` 需 `--fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime`） |
+| `tests/HostConfiguration`、`PluginStartup` | 宿主 cfg 与启动顺序不变 |
+
+**规格歧义与裁定（2026-09-15）。** 1、3、4、5 按本实现接受。2：合同取消组扩为 4 个码，`lifetime-ended`、`missed-pulses` 移出"不写入日志"表。6：合同 `budget.exceeded` 改为"事件发布、入队或派发时因预算被拒"，与后缀分流一致。下面保留原问题描述。
+
+1. 契约「结果组合合法性检查」在 622-627 行给出规则，但内核现有的 `NormalizeInvokedResult` 一直实现着它（`CommandResultRules.TryValidate` 不通过就改记 `failed`/`unknown` + `invalid-handler-result`）。本批没有改动这个行为，只把它的结果码收到 `RuntimeLogReasonCodes.InvalidHandlerResult`；如果契约要求把非法结果的 reason 记成别的码，需要改这一处。
+2. `event.cancelled` 的 reason：契约触发时机说「发布模块已注销、scope 已取消或计划已卸载」，而 reason 表的取消组是 `source-lifecycle`/`plan-unloaded`。本实现把「provider 注销」与「scope 取消」都记 `source-lifecycle`（与该事件原有的 EventReceipt 码一致），只有计划卸载记 `plan-unloaded`。另外契约的取消组没有列「计划脉冲被跳过期策略丢弃」「生命周期结束」「句柄不再 active」这三种队列内脉冲丢弃，本实现分别记 `missed-pulses`、`lifetime-ended`、`source-lifecycle`。
+3. `event.deferred` 的 reason 表列了 `tick-event-budget`、`tick-command-budget`、`plan-tick-event-budget`、`plan-tick-command-budget`、`scheduled-tick-budget` 五个码，本实现按「第一个拦下它的预算」选码（顺序与改动前循环的判断顺序一致）。每 tick 只写一条 `event.deferred`（用第一个被拦下的事件作为 eventId/binding），这也是契约「每 tick 最多一条」的读法。
+4. trace 的 inputs：契约说 trace 的 `inputs` 由 sink 同步复制、由 ForgeDevelopment 的 trace 记录器格式化，但没写清内核侧的传递形状。本批按任务说明只在内核里留了 trace 级记录点（`step.started`/`event.deferred`/`event.cancelled`），`RuntimeLogRecord` 仍没有 inputs 字段，也没有把 slot 数据传出去；`inputs` 的复制与转文本留给 Development 的记录器，需要 Claude 确认这个边界。
+5. `runtime.suspended` 的 level：契约把它列在 error 组，本实现一律记 error。正常 `StopRuntime` 不写这条记录（停止不是暂停，reason 表也没有对应码；`runtime-stopped` 在契约「不写入日志的内核码」表里）。如果契约要求「停止也记一条」，需要先给它一个进日志的 reason 码。
+6. `budget.exceeded` 的适用范围：契约 651 行用「reason 不以 `-budget` 结尾」定义 `event.rejected`，652 行却把 `budget.exceeded` 写成「派发阶段因预算拒收事件」。本实现按后缀规则分流全部拒绝（发布期的 `queue-budget`、`event-history-budget`、`plan-queue-budget` 也走 `budget.exceeded`），否则发布期的预算拒绝会落进 `event.rejected` 与 651 行的定义冲突。需要网站确认 652 行的「派发阶段」是否要按字面收窄。
+
+**未做/未验证。** 没有实机运行、没有加载 GTFO、没有导出 `forge-logs` jsonl 作为 I-DIAG 仲裁物；领域包自己的记录点（经 `RuntimeModuleHandle` 写出）与本包内部原生诊断码仍不在本批；`adapter.*` 待 I-ADAPTER-SCHEMA；没有性能测量，内核记录点的开销只有「未启用时一次门比较」这条静态保证。`TickResult` 的字段与语义没有改动，仍按原样返回给宿主。
+
 ## D-007 阶段 A — 注册时必填日志级别（2026-09-14）
 
 > 本节按任务要求放在顶部；本文件其余章节仍是按交付时间顺序排列的历史记录，下面 D-007 阶段 B 一节里的"只有 Runtime 自身有条目"是当时的记录，已被本节的注册级别取代。

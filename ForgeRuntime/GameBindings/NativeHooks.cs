@@ -30,7 +30,7 @@ internal static class FrameworkCheckpointRestore
     private static void Prefix(pCheckpointState __1, bool __2)
     {
         if (__1.isReloadingCheckpoint || __2)
-            GameRuntimeBridge.Guard(() => GameRuntimeBridge.Suspend("Checkpoint restore requires a fresh expedition; no old graph tasks or entity references are replayed.", true));
+            GameRuntimeBridge.Guard(() => GameRuntimeBridge.Suspend("checkpoint-restore", "Checkpoint restore requires a fresh expedition; no old graph tasks or entity references are replayed.", true));
     }
 }
 

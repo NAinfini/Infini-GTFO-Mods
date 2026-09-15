@@ -101,4 +101,4 @@ using (var manifest = JsonDocument.Parse(kernel.ExportManifest()))
         && binding.GetProperty("handler").GetString() == "runtime.control.branch", "the branch binding is registered without a handler function");
     Check(kernel.ExportManifest().Contains("runtime.control.branch", StringComparison.Ordinal), "the branch binding ships in the exported manifest");
 }
-Console.WriteLine($"PASS {checks} architecture boundary assertions. No GTFO hooks, gameplay, networking or installation exercised.");
+RecordPointProbe.Run(Check);

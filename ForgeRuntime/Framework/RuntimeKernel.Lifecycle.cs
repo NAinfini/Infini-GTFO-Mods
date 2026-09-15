@@ -53,6 +53,7 @@ public sealed partial class RuntimeKernel
         catch
         {
             StartupState = RuntimeStartupState.Failed; ClearLifecycleWork("startup-failed");
+            LogSuspended("startup-failed");
             NotifyLifecycle(RuntimeLifecycleKind.StartupChanged); throw;
         }
         NotifyLifecycle(RuntimeLifecycleKind.StartupChanged);
@@ -124,8 +125,9 @@ public sealed partial class RuntimeKernel
         {
             lifecycleObservers.Remove(observer.Id);
             if (LifecycleFaultCount < long.MaxValue) LifecycleFaultCount++;
-            LastLifecycleFault = new(observer.Provider, "lifecycle-observer-failed",
+            LastLifecycleFault = new(observer.Provider, RuntimeLogReasonCodes.LifecycleObserverFailed,
                 CommandResult.TruncateDetail(error.GetType().Name + ": " + error.Message));
+            LogObserverFailed(observer.Provider, error.Message);
         }
     }
 

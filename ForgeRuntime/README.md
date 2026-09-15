@@ -28,11 +28,15 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 **计划发现（I-PACK D-009）不再走单一配置路径。** `Play`/`Authoring` 下，首个固定更新在其他插件注册完成后，按包目录扫描离线计划：只看 `BepInEx/plugins` 的一级子目录，每个子目录下若存在 `forge/plans`（不存在则静默跳过，不算错误），取其中直接子文件、按 ordinal 精确匹配 `.plan.json` 后缀的文件（不递归、不识别其他扩展名）；发现顺序按 `/` 分隔的 BepInEx 相对路径以 `StringComparer.Ordinal` 排序。单文件超过 4 MiB 按 `json-size` 单独拒绝，且不计入下面的合并预算；其余文件按合并上限 256 个/64 MiB 做尾部优先淘汰——只要剩余集合仍超个数或字节上限，就反复剔除排序最靠后的一个文件（`plan-budget`），不是遇到第一个超限文件就停止接受后面的文件。链接/联接与转义检查只在确认 `forge/plans` 存在后，沿 `<目录>→forge→plans` 链与文件本身进行，命中按 `plan-path` 拒绝；IO 读取失败或非法 UTF-8 按 `invalid-json` 拒绝。每个文件独立产生一条 `plan.loaded`/`plan.rejected`（带 `path`，前者还带 `permissions`）；同一 planId 出现在多个文件中全部按 `plan-conflict` 拒绝，消息带上冲突组内全部相对路径；解析后的计划总数上限仍是 128（`plan-budget`）。本次进程只扫描一次，不支持热重载。实际注册清单输出到 `BepInEx/ForgeRuntime/capabilities.json`；游戏不联网获取最新图。
 
-### 执行日志（D-007 阶段 A+B）
+### 执行日志（D-007 阶段 A+B+C）
 
-**记录点尚未接入。** 内核与 Enemy、Map、Weapon、Trigger 都还没有调用日志接口，所以玩家层现在不会写出任何业务记录；已经落地的是 sink、级别表与提级接口，SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-ab)。
+**内核记录点已接入。** 按 `forge.log.v1` 事件码表，Runtime 归属与内核可见的记录点全部在内核里写出：`registration.rejected`、`binding.registered`、`plan.loaded`、`plan.rejected`、`world.began`、`trigger.fired`、`event.rejected`、`budget.exceeded`、`event.deferred`、`event.cancelled`、`step.started`、`step.finished`、`entry.stopped`、`observer.failed`、`runtime.suspended`，加上 writer 自己的 `log.level`/`log.dropped`。`adapter.*` 等 I-ADAPTER-SCHEMA 定稿后再做，领域包内部的原生诊断码也不在本节范围。SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-abc)。
 
-阶段 A 的注册级别已落地：`RegisterModule(RuntimeModule, RuntimeLogLevel)` 的级别是必填参数，各包原生插件在 Load 里读自己的 `[Logging] Level` 后交给内核，级别不放进 `RuntimeModule`。级别表因此覆盖 Runtime 自己（`forge.runtime`，用宿主 cfg）以及每个已注册的领域 provider；注销即移除。未注册的 provider 仍以 `log-provider-unregistered` 拒绝，不给默认值。Runtime 自己随宿主注册的 CombatContracts、ControlContracts 与 Trigger 框架模块没有包 cfg，走只对宿主程序集可见的内部路径取 Runtime 的级别。
+归属按合同的归属规则：`step.started`/`step.finished` 与 `trigger.fired` 归该 binding 所属的 provider，`binding.registered` 归被注册 binding 的 provider，`observer.failed` 归该观察者的 provider，`event.cancelled` 与其余 `event.*`、`plan.*`、`entry.stopped`、`budget.exceeded`、`world.began`、`runtime.suspended`、`registration.*` 归 Runtime。级别由码本身决定，只有 `step.finished` 按结果分级：`failed` 或 commit 为 `unknown` 记 error，其余记 info。`registration.rejected` 的 `subjectProvider` 是被拒绝的 provider，`runtime.suspended` 一条对应一次暂停（启动失败、主机迁移、检查点恢复、宿主回调异常、停止各一条）。
+
+**内核是唯一来源。** 事件与步骤结果直接交给 sink，宿主不再订阅 `TickResult` 把命令/事件回执转成 BepInEx 警告，也不再逐 tick 镜像观察者故障——这两条旧路径已删除。error/info 不带 `inputs`，调用点不拼接字符串、记录是只读结构按 `in` 传递；`trace` 的 inputs 复制与转文本仍留给 ForgeDevelopment 的 trace 记录器，内核侧只保留 trace 级记录点。
+
+阶段 A 的注册级别已落地：`RegisterModule(RuntimeModule, RuntimeLogLevel)` 的级别是必填参数，各包原生插件在 Load 里读自己的 `[Logging] Level` 后交给内核，级别不放进 `RuntimeModule`。级别表因此覆盖 Runtime 自己（`forge.runtime`，用宿主 cfg）以及每个已注册的领域 provider；注销即移除；注册时先发布新表、再写该 provider 的 `binding.registered` 记录，所以每条记录携带的表都已经列出它自己的 provider。未注册的 provider 仍以 `log-provider-unregistered` 拒绝，不给默认值。Runtime 自己随宿主注册的 CombatContracts、ControlContracts 与 Trigger 框架模块没有包 cfg，走只对宿主程序集可见的内部路径取 Runtime 的级别。
 
 各包 cfg 与宿主同构：`[Logging] Level` 接受 `off`、`error`、`info`（大小写与首尾空白不敏感），默认 `error`，按原始文本解析，其他值（包括 `trace`）在注册之前失败。改动需要重启。`Runtime.Mode = Off` 时依赖 Runtime 的插件在自己的 Load 里直接返回，既不注册也不绑定 cfg。
 
@@ -42,14 +46,14 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 - 惰性启动：第一条被接受的记录才创建后台线程、目录和文件。没有记录就没有线程、目录、文件和控制台输出。
 - 文件是 `BepInEx/forge-logs/<yyyyMMddTHHmmssZ>-<4 位十六进制随机>.jsonl`，UTF-8 无 BOM，`\n` 换行，`CreateNew` 不覆盖。新文件建好后按修改时间只保留最新 10 个，只删该目录顶层的 `*.jsonl`。
-- 第一行是 `log.level`（level 为 info，带 `levels[{provider, level}]` 与 `elevated`），与第一条真实记录一起写出。提级后级别表变化，下一条记录前再写一行 `log.level`。
+- 第一行是 `log.level`（level 为 info，带 `levels[{provider, level}]` 与 `elevated`），与第一条真实记录一起写出。级别表每变一次都会发布新快照（后面的记录因此带上最新的 provider 列表），但文件只在 tier 变化时补一行 `log.level`：首行之外最多再有一行提级行，与合同「一个文件最多两行」一致。
 - 限流：普通档每 tick 256 行、队列 8192；提级档每 tick 4096 行、队列 65536。超限的记录丢弃并计数，下一条被接受的记录前或停止时写 `log.dropped`（带 `count`，level 为 error）。`log.level` 与 `log.dropped` 不受限流，因此队列最多可超出上限 2 项。
 - 单文件 64 MiB（预留一行给最后的 `log.dropped`）。到达上限后停止写文件，控制台报告一次，停止时在文件末尾写带未写条数的 `log.dropped`。
 - error 与 info 通过 `ManualLogSource` 镜像到控制台，trace 不镜像。序列化和消息文本都在后台线程完成，内核线程只做计数、复制和入队。
 - `GameRuntimeBridge.Stop` 在 `StopRuntime` 之后结束写入，最多等 5 秒；超时时报告未写出的条数。进程被强杀时，队列中未写出的记录和文件上限的最后一行 `log.dropped` 会丢失。
 - 限值只是内部构造参数，供测试注入，不对玩家开放配置。
 
-以下尚未验证：游戏内 `ManualLogSource` 从后台线程调用是否安全、真实磁盘和退出时序，以及任何记录点的开销。
+以下尚未验证：游戏内 `ManualLogSource` 从后台线程调用是否安全、真实磁盘和退出时序，以及任何记录点的开销。内核记录点只在托管测试替身上检查过，没有实机运行，也没有导出 `forge-logs` jsonl 作为 I-DIAG 仲裁物。
 
 ### 诊断不在宿主内
 

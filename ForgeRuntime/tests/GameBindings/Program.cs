@@ -384,14 +384,18 @@ if (args.Length >= 2 && args[0] == "--bridge")
         Check(!badSub.IsActive && liveSub.IsActive && liveKernel.LifecycleFaultCount == 1, "bad observer stopped healthy gameplay");
         Check(liveStates.Count(e => e.Kind == RuntimeLifecycleKind.StartupChanged && e.Current.StartupState == RuntimeStartupState.Ready) == 1, "ready notification repeated");
         Reject(() => liveKernel.RegisterModule(ProbeModule(), RuntimeLogLevel.Off), "late module registration allowed by bridge");
-        int observerLogs = Plugin.PluginLog.Messages.Count(m => m.StartsWith("warning:Forge lifecycle observer removed:", StringComparison.Ordinal));
+        // D-007: the kernel records step/event outcomes itself, so the bridge adds no summary line of its own and an
+        // observer fault cannot surface twice. Faults are counted by the kernel, not mirrored into the BepInEx log.
+        Check(!Plugin.PluginLog.Messages.Any(m => m.Contains("Forge lifecycle observer removed", StringComparison.Ordinal)
+            || m.Contains("Forge command ", StringComparison.Ordinal) || m.Contains("Forge event ", StringComparison.Ordinal)),
+            "bridge still mirrors kernel records into the BepInEx log");
         Frame(); Frame();
-        Check(Plugin.PluginLog.Messages.Count(m => m.StartsWith("warning:Forge lifecycle observer removed:", StringComparison.Ordinal)) == observerLogs && observerLogs == 1, "observer error repeats every frame");
+        Check(liveKernel.LifecycleFaultCount == 1, "observer error repeats every frame");
         Exception? threadError = null;
         var thread = new System.Threading.Thread(() => { try { _ = GameRuntimeBridge.CanExecute; } catch (Exception e) { threadError = e; } });
         thread.Start(); thread.Join();
         Check(threadError is RuntimeContractException contract && contract.Code == "wrong-thread", "phase gate accessed native state from wrong thread");
-        GameRuntimeBridge.Suspend("test restore", true);
+        GameRuntimeBridge.Suspend("checkpoint-restore", "test restore", true);
         State(eGameStateName.Generating); Spawn(actor); State(eGameStateName.InLevel); Frame(); Die(actor); Frame();
         Check(records.Count == 1, "checkpoint generation cannot bypass restore suspension");
         State(eGameStateName.Lobby); State(eGameStateName.Generating); Spawn(actor);
