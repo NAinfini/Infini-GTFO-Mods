@@ -117,7 +117,7 @@ public static class DoorTerminalEventContract
     /// status the phase was derived from. `status` is published as well as `phase`, because the derivation is
     /// this provider's reading of the native status and a plan that wants the native value should be able to
     /// read it rather than trust the derivation.</summary>
-    public static object ScanRow() => Row(DoorScanCapability, "门的扫描开始或完成", "门上的扫描开始或完成。", new object[]
+    public static object ScanRow() => Row(DoorScanCapability, "门的扫描开始或完成", "门的扫描开始或者完成。", new object[]
     {
         Port("next", "execution"),
         Port("door", "entity"),
@@ -142,7 +142,7 @@ public static class DoorTerminalEventContract
     /// entity is the identity an author wires on. The zone is a `zone` resource for the same reason the light and
     /// fog rows name zones: it is what an author filters on. The position is the door's own world position, and
     /// the attacker is the player the replication callback named, when it named one.</summary>
-    public static object DoorBrokenRow() => Row(DoorBrokenCapability, "门被敌人攻击或打破", "敌人能打破的门受到攻击，或被打坏。", new object[]
+    public static object DoorBrokenRow() => Row(DoorBrokenCapability, "门被攻击或被打破", "门被攻击，或者被打坏。", new object[]
     {
         Port("next", "execution"),
         Port("door", "entity"),

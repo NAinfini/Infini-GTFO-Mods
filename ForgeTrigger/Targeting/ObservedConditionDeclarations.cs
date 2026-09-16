@@ -45,11 +45,11 @@ public static class ObservedConditionDeclarations
         // ---- life-state conditions --------------------------------------------------------------------------
         // The observed life state is the whole fact: `downed` is published from the native player downed
         // locomotion state, so this family reads the state a provider observed instead of testing an entity kind.
-        ObservedDeclaration.Node("forge.condition.predicate.alive", "query", "仍存活且可受作用", "判断目标还活着且能被作用。",
+        ObservedDeclaration.Node("forge.condition.predicate.alive", "query", "敌人是否存活", "判断目标还活着且能被作用。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Entity("subject"), ObservedDeclaration.Enum("life_state", "recipient_life_state")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Bool("value")), ObservedDeclaration.NoParameters,
             new HandlerShape().Inputs("subject", "life_state").Outputs("value"), LifeStateHandler),
-        ObservedDeclaration.Node("forge.condition.predicate.player_downed", "query", "玩家倒地条件", "判断玩家倒地了。",
+        ObservedDeclaration.Node("forge.condition.predicate.player_downed", "query", "玩家是否倒地", "判断玩家倒地了。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Entity("subject")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Bool("value")), ObservedDeclaration.NoParameters,
             new HandlerShape().Inputs("subject").Outputs("value"), PlayerDowned));

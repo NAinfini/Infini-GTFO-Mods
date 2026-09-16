@@ -8,14 +8,12 @@ namespace ForgeEnemy.Native;
 /// — the `where` value row, a zone-filtered selector, another provider comparing places — arrives here and nowhere
 /// else.
 ///
-/// The two outcomes a bare null used to collapse into one are told apart by what this responder does with them.
-/// A life whose course node names no zone stands outside every zone of this world: that is an answer, and it is
-/// the null the kernel reports as `entity-zone-outside`. A life this provider cannot place — one it no longer
-/// tracks, one whose course node, zone or layer is missing or was collected mid-read, one whose chain throws —
-/// is a read that could not be made, and it is refused with <see cref="ZoneUnknownCode"/> rather than answered as
-/// an entity standing nowhere. A selector that read "cannot place" as "outside the zone I asked about" would
-/// quietly drop the entity from a set it may well belong to, which is why the refusal has to travel as itself.
-/// The level objects can be collected at any point of the chain, so the whole read is one guarded step.</summary>
+/// A life this provider cannot place is a read that could not be made and is refused with
+/// <see cref="ZoneUnknownCode"/>, never answered with a bare null: a null is the same "unknown" to the kernel, and a
+/// selector that read either as "outside the zone I asked about" would quietly drop the entity from a set it may
+/// well belong to. That covers a life it no longer tracks, one whose course node, zone or layer is missing or was
+/// collected mid-read, one whose course node names no zone at all, and one whose chain throws. The level objects
+/// can be collected at any point of the chain, so the whole read is one guarded step.</summary>
 internal sealed partial class EnemyModule
 {
     /// <summary>The refusal this provider's zone read makes when it cannot place a life it owns. The kernel
@@ -25,8 +23,9 @@ internal sealed partial class EnemyModule
 
     /// <summary>The zone one tracked enemy life stands in: the zone its own course node belongs to, named by the
     /// level's three coordinates — the same text the Map provider names a zone with, so a trigger row that filters
-    /// a candidate set by zone compares one place rather than two. A course node that names no zone is the one
-    /// answer that is not a failure: the life stands outside every zone this world has.</summary>
+    /// a candidate set by zone compares one place rather than two. Every way this read can fail is the same
+    /// refusal: a course node that names no zone is a life this provider cannot place, not one standing outside
+    /// every zone, and the kernel answers a bare null the same way.</summary>
     private EntityReference? ZoneOfEnemy(EntityReference reference)
     {
         if (Resolve(reference) is not { } entry) throw Unknown("This provider does not track that life.");
@@ -35,7 +34,7 @@ internal sealed partial class EnemyModule
             var courseNode = entry.Enemy.CourseNode;
             if (courseNode == null) throw Unknown("This life's course node does not read.");
             var zone = courseNode.m_zone;
-            if (zone == null) return null;
+            if (zone == null) throw Unknown("This life's course node names no zone.");
             if (zone.WasCollected) throw Unknown("This life's zone was collected before it could be read.");
             var layer = zone.m_layer;
             if (layer == null) throw Unknown("This life's zone names no layer.");

@@ -278,10 +278,16 @@ public sealed class NativeAdapterTests
             && i.Contains("target=" + enemy.Reference.Id, StringComparison.Ordinal)),
             "A candidate naming an enemy was not admitted: " + string.Join(" | ", w.Infos));
         // A player limb goes through the player domain's own key, which is the SNet_Player the agent belongs to.
+        // The lookup is read from the calls this hit itself made: the kernel resolves the equipment life's own
+        // owner after the fact is built, so the whole session's last lookup is the shooter's and not the target's.
+        var before = w.LookupInputs.Count;
         Hook(typeof(BulletHit), weapon, Hit(p.Agent, 1, 2, 3, other.Agent));
         Require(w.Session.Adapter.Published!.Outputs.GetProperty("target").GetProperty("id").GetString() == other.Reference.Id
-            && ReferenceEquals(w.LookupInputs.Last(), other.Net),
-            "A player hit did not name the player reference: " + w.Session.Adapter.Published.Outputs.GetRawText());
+            && w.LookupInputs.Skip(before).Any(input => ReferenceEquals(input, other.Net)),
+            "A player hit did not name the player reference: " + w.Session.Adapter.Published.Outputs.GetRawText()
+            + " lookups=[" + string.Join(",", w.LookupInputs.Select(i => i is SNet_Player player && w.PlayerRefs.TryGetValue(player, out var known)
+                ? known.Id : i.GetType().Name)) + "]"
+            + " expected=" + other.Reference.Id);
     }
 
     [Fact]

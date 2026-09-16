@@ -146,12 +146,10 @@ internal sealed class EnemyNodeValueReads
     }
 
     /// <summary>Position is the frame's own vector; the zone is the kernel's zone read, which answers through
-    /// this provider's registered `EntityZones` responder. A frame without three coordinates refuses. The zone
-    /// port is the family's one genuinely nullable port: an enemy standing outside every zone is answered as an
-    /// absent zone, because that is a fact about the world and a selector excludes such an entity rather than
-    /// dropping it. A read that could not be made — a life whose course node, zone or layer does not read — is
-    /// refused with the provider's own code, so "outside the zone I asked about" never collapses into "cannot be
-    /// placed".</summary>
+    /// this provider's registered `EntityZones` responder. A frame without three coordinates refuses, and so does
+    /// a life this provider cannot place — a course node, zone or layer that does not read, or a course node that
+    /// names no zone at all — with the provider's own code, so "cannot be placed" never arrives as an absent zone
+    /// a selector would drop the entity over.</summary>
     internal static JsonElement AnswerWhere(EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
     {
         if (snapshot.Position.Count != 3)

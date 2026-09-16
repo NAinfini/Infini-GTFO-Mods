@@ -30,6 +30,11 @@ namespace ForgeMapTests.DoorTerminalFacts;
 internal sealed class World : IDisposable
 {
     internal const string Kind = "gtfo.map_object";
+    /// <summary>The player kind the fixture's own players are named in, which is the namespace the player domain
+    /// owns in production. A weak-door fact names the player the callback carried, and the kernel checks every
+    /// entity a payload carries against the provider that owns its kind, so the fixture answers for this one
+    /// too.</summary>
+    internal const string PlayerKind = "gtfo.player";
     internal const long WorldEpoch = 11;
     internal const int Dimension = 0;
     internal const int Layer = 0;
@@ -43,6 +48,14 @@ internal sealed class World : IDisposable
     private readonly Dictionary<uint, LG_ComputerTerminal> _terminalsBySync = new();
     private readonly Dictionary<SNet_Player, EntityReference> _playerReferences = new();
     private readonly HashSet<EntityReference> _live = new();
+    /// <summary>The zones this synthetic level holds, as the `zone` resource kind's ids: the zone of every weak
+    /// door the fixture made. The production session owns that kind from the level's own zone table, and a payload
+    /// that carries a zone reference is resolved through its owner before the event is admitted, so a fixture with
+    /// no owner would refuse the very facts these cases read.</summary>
+    private readonly HashSet<string> _zones = new(StringComparer.Ordinal);
+    /// <summary>The world this fixture's level is in. It starts at <see cref="WorldEpoch"/> and advances with
+    /// <see cref="NextWorld"/>, which is what re-issues every reference the level holds.</summary>
+    private long _epoch = WorldEpoch;
 
     internal RuntimeKernel Kernel { get; }
     internal Facts Facts { get; }
@@ -71,7 +84,8 @@ internal sealed class World : IDisposable
         {
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
             {
-                [Kind] = reference => _live.Contains(reference)
+                [Kind] = reference => _live.Contains(reference),
+                [PlayerKind] = reference => _playerReferences.ContainsValue(reference)
             },
             EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>>(StringComparer.Ordinal)
             {
@@ -79,8 +93,16 @@ internal sealed class World : IDisposable
                 {
                     LG_SecurityDoor door when _doorReferences.TryGetValue(door, out var reference) => reference,
                     LG_ComputerTerminal terminal when _terminalReferences.TryGetValue(terminal, out var reference) => reference,
+                    LG_WeakDoor weak when _weakDoorReferences.TryGetValue(weak, out var reference) => reference,
                     _ => null
                 }
+            },
+            // The level's own `zone` resource kind, owned here the way the production session owns it from its
+            // zone table: a weak-door fact carries the zone its door stands in, and the kernel resolves that
+            // reference through the kind's owner before it admits the event.
+            ResourceProviders = new Dictionary<string, RuntimeResourceProvider>(StringComparer.Ordinal)
+            {
+                [RuntimeZones.ResourceKind] = RuntimeResourceProvider.Of(ZoneResources, ResolveZoneResource)
             },
             Shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
             {
@@ -141,9 +163,10 @@ internal sealed class World : IDisposable
     /// before its world has an authority, which is exactly the state both halves' gates refuse.</summary>
     internal void Start()
     {
-        // The observation point these cases assert on sits in the publisher, before the kernel is reached, so the
-        // module needs a subscriber for every row it publishes under or it builds no event at all.
-        SubscriptionGateFixture.Open(Kernel, _registration);
+        // The observation point these cases assert on is the publisher's own admitted-event count, so the module
+        // needs a subscriber for every row it publishes under *and* a plan that takes the events it subscribes to:
+        // without one the kernel answers `attachment-mismatch` and nothing is ever admitted.
+        SubscriptionGateFixture.Open(Kernel, _registration, claim: true);
         Kernel.StartRuntime(() => { });
         Kernel.Advance(0, Authoritative);
     }
@@ -154,6 +177,58 @@ internal sealed class World : IDisposable
     {
         Authoritative = false;
         Kernel.Advance(Kernel.CurrentTick + 1, false);
+    }
+
+    /// <summary>One world transition, the way the session drives it: the kernel enters the next world epoch, the
+    /// facts half drops every key of the world that ended, and this fixture's own tables are rebuilt — a reference
+    /// names a world, so the objects that survive the transition are the ones the level names again. One
+    /// authoritative tick is settled afterwards, because the kernel answers no entity reference before the new
+    /// world has an authority.</summary>
+    internal void NextWorld()
+    {
+        _epoch++;
+        Kernel.BeginWorld(_epoch);
+        Facts.BeginWorld();
+        Reissue();
+        Kernel.Advance(Kernel.CurrentTick + 1, Authoritative);
+    }
+
+    /// <summary>Every zone this synthetic level holds, as the `zone` resource kind's whole answer.</summary>
+    private IReadOnlyList<ResourceRef> ZoneResources()
+        => _zones.Select(id => new ResourceRef(RuntimeZones.ResourceKind, id)).ToArray();
+
+    /// <summary>The zone one resource id names, or null when this level has no zone at those coordinates. The id is
+    /// the level's own three coordinates, so an id of another shape names nothing here instead of being
+    /// reinterpreted.</summary>
+    private ResourceRef? ResolveZoneResource(string resourceId)
+        => _zones.Contains(resourceId) ? new ResourceRef(RuntimeZones.ResourceKind, resourceId) : null;
+
+    /// <summary>The fixture's tables after one world transition: every instance the level still holds is named by
+    /// the same address in the new epoch, so a fact about it is a fact about the world that is running.</summary>
+    private void Reissue()
+    {
+        var reissued = new Dictionary<EntityReference, object>(_byReference.Count);
+        foreach (var (door, reference) in _doorReferences.ToArray())
+        {
+            var issued = reference with { WorldEpoch = _epoch };
+            _doorReferences[door] = issued; reissued[issued] = door;
+        }
+        foreach (var (terminal, reference) in _terminalReferences.ToArray())
+        {
+            var issued = reference with { WorldEpoch = _epoch };
+            _terminalReferences[terminal] = issued; reissued[issued] = terminal;
+        }
+        foreach (var (weak, reference) in _weakDoorReferences.ToArray())
+        {
+            var issued = reference with { WorldEpoch = _epoch };
+            _weakDoorReferences[weak] = issued; reissued[issued] = weak;
+        }
+        foreach (var (player, reference) in _playerReferences.ToArray())
+            _playerReferences[player] = reference with { WorldEpoch = _epoch };
+        _byReference.Clear();
+        foreach (var entry in reissued) _byReference[entry.Key] = entry.Value;
+        _live.Clear();
+        foreach (var reference in reissued.Keys) _live.Add(reference);
     }
 
     /// <summary>One security door with the address it reads as, its own lock component and its own sync
@@ -210,6 +285,14 @@ internal sealed class World : IDisposable
         gate.m_nodes.Add(node);
         var door = new LG_WeakDoor { Gate = gate };
         door.transform.position = new UnityEngine.Vector3(x, y, z);
+        _zones.Add(RuntimeZones.Id(Dimension, Layer, zone));
+        // A weak door the level can place is an object of this world before any fact names it: the kernel refuses
+        // an event about an entity its own resolver does not know, and the fact's subject is this door.
+        if (Facts.WeakDoorReference(door) is { } reference)
+        {
+            _weakDoorReferences[door] = reference;
+            _live.Add(reference);
+        }
         return door;
     }
 
@@ -228,7 +311,7 @@ internal sealed class World : IDisposable
     internal SNet_Player Player(string name)
     {
         var player = new SNet_Player();
-        var reference = new EntityReference("gtfo.player:" + name, WorldEpoch, 1);
+        var reference = new EntityReference(PlayerKind + ":" + name, WorldEpoch, 1);
         _playerReferences[player] = reference;
         return player;
     }

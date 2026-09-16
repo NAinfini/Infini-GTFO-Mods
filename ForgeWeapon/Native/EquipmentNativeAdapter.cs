@@ -169,6 +169,18 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
             Array.Empty<string>(), point);
     }
 
+    /// <summary>Whether one deployed reference still names an open placement, read from this provider's own
+    /// placement table and from nothing else. Currency and observability are two questions: an observation has to
+    /// carry a world point, while a placement whose object cannot report one is still a placement this provider
+    /// holds — the deployment row's optional position says exactly that — so the kernel's currency check is
+    /// answered here rather than by the snapshot.</summary>
+    internal bool HoldsDeployable(EntityReference reference)
+    {
+        if (_identity == null || !Authoritative() || reference == null || reference.WorldEpoch != _world) return false;
+        return _placementsByEntity.TryGetValue(reference.Id, out var placement) && placement.Entity == reference
+            && placement.Instance.Pointer == placement.InstancePointer;
+    }
+
     /// <summary>Read-only snapshot of one deployed world instance. Null for a destroyed, reappeared or
     /// never-recorded instance, so a stale reference is refused instead of answered from a replaced object.</summary>
     internal RuntimeEntitySnapshot? ObserveDeployable(EntityReference reference)

@@ -24,6 +24,12 @@
     <Compile Include="../../AttackInstanceContract.cs" />
     <Compile Include="../../WeaponDeployableFactsContract.cs" />
     <Compile Include="../../WeaponMeleeHitContract.cs" />
+    <!-- The three action families the module's declaration names: its capability and binding lists are built from
+         these contracts whether or not a body is supplied for them, so the module cannot be compiled without
+         them. None of the three names a game type. -->
+    <Compile Include="../../WeaponSupplyContract.cs" />
+    <Compile Include="../../WeaponOverrideContract.cs" />
+    <Compile Include="../../InventoryActionContract.cs" />
     <Compile Include="../../ModuleDefinition.cs" />
     <Compile Include="PlacementWorld.cs;PlacementRowTests.cs;PlacementFactTests.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />

@@ -104,7 +104,7 @@ public static class TerminalObjectContract
     internal static object UnitField(string id, string type, string unit) => new { id, type, unit };
 
     /// <summary>The command row, spelled exactly as the catalog carries it.</summary>
-    public static object CommandRow() => Row(CommandCapability, "执行白名单的关卡终端动作", "执行白名单里的终端动作。",
+    public static object CommandRow() => Row(CommandCapability, "启用 / 禁用终端指令", "执行白名单里的终端动作。",
         new object[]
         {
             Port("in", "execution"),
@@ -129,8 +129,8 @@ public static class TerminalObjectContract
     /// is to appear or disappear; the terminal's own synchronized setters are what every peer reads back. The
     /// actor port is absent because the native setters carry no player, and the result row is the same one the
     /// run row answers with, so a plan reads a visibility request and a run the same way.</summary>
-    public static object VisibilityRow() => Row(VisibilityCapability, "显示或隐藏终端指令",
-        "让一条指令在终端上出现或消失。",
+    public static object VisibilityRow() => Row(VisibilityCapability, "启用或禁用终端指令",
+        "把终端上的一个自定义指令槽位显示出来或者藏起来。",
         new object[]
         {
             Port("in", "execution"),
@@ -152,7 +152,7 @@ public static class TerminalObjectContract
         }, "terminals", VisibilityPermission, "result");
 
     /// <summary>The printed-line row, spelled exactly as the catalog carries it.</summary>
-    public static object OutputRow() => Row(OutputCapability, "向指定终端输出本地化文本", "往终端上打一段可本地化的文字。",
+    public static object OutputRow() => Row(OutputCapability, "终端打印一行文字", "往终端上打一段可本地化的文字。",
         new object[]
         {
             Port("in", "execution"),

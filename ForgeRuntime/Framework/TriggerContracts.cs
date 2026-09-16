@@ -176,10 +176,10 @@ public static class TriggerContracts
           "id": "forge.trigger.enemy.death_started",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "死亡流程开始",
+          "label": "敌人死亡 · enemy death_started",
           "version": "2.0.0",
           "parameters": {
-            "description": "敌人的死亡流程开始。真正结算成击杀、带击杀归属的那一步是「该伤害事务导致击杀」。",
+            "description": "敌人的死亡流程开始。",
             "summary": "敌人的死亡流程开始。真正结算成击杀、带击杀归属的那一步是「该伤害事务导致击杀」。",
             "summaryEn": "Fires when an enemy starts dying. The settled kill, with the source it was credited to, is Killed.",
             "labelEn": "Death started",
@@ -216,7 +216,7 @@ public static class TriggerContracts
           "id": "forge.trigger.combat.limb_broken",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "可破坏部位破坏完成",
+          "label": "敌人部位被打爆",
           "version": "2.0.0",
           "parameters": {
             "description": "某个可破坏部位被打断了。",
@@ -257,10 +257,10 @@ public static class TriggerContracts
           "id": "forge.trigger.combat.shot_committed",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "一次射击已提交",
+          "label": "开火（每一发）",
           "version": "2.0.0",
           "parameters": {
-            "description": "确实打出了一发。整次攻击从起手到收招用「攻击开始」到「攻击完成」。",
+            "description": "确实打出了一发。",
             "summary": "确实打出了一发。整次攻击从起手到收招用「攻击开始」到「攻击完成」。",
             "summaryEn": "Fires when one shot has really been fired; the attack as a whole is Attack started through Attack completed.",
             "labelEn": "Shot committed",
@@ -491,10 +491,10 @@ public static class TriggerContracts
           "id": "forge.trigger.equipment.recall_completed",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "回收完成",
+          "label": "哨戒炮放下 / 收回",
           "version": "2.1.0",
           "parameters": {
-            "description": "部署物被收回，资源也还回来了。",
+            "description": "回收完成，资源也还回来了。",
             "summary": "回收完成。",
             "summaryEn": "Fires when a deployed device has been recalled.",
             "labelEn": "Recall completed",
@@ -738,7 +738,7 @@ public static class TriggerContracts
           "label": "玩家进入低血量",
           "version": "2.0.0",
           "parameters": {
-            "description": "玩家的生命值掉到了低血量档。",
+            "description": "一个玩家掉进低血量的那一刻。",
             "summary": "玩家进入低血量。",
             "summaryEn": "Fires when a player enters the low-health state.",
             "labelEn": "Player low health",
@@ -770,10 +770,10 @@ public static class TriggerContracts
           "id": "forge.trigger.player.infection_changed",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "玩家感染值变化",
+          "label": "感染值变化",
           "version": "2.0.0",
           "parameters": {
-            "description": "玩家的感染值被写入后。",
+            "description": "一个玩家的感染值发生变化。",
             "summary": "感染值变了。",
             "summaryEn": "Fires after a player's infection value is written.",
             "labelEn": "Player infection changed",
@@ -813,10 +813,10 @@ public static class TriggerContracts
           "id": "forge.trigger.player.supply_used",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "玩家使用补给",
+          "label": "使用补给包",
           "version": "2.0.0",
           "parameters": {
-            "description": "玩家用了医疗包、弹药包、消毒包或工具补给。",
+            "description": "一个玩家用掉一份补给。",
             "summary": "玩家使用补给。",
             "summaryEn": "Fires when a player applies a medical, ammunition, disinfection or tool supply.",
             "labelEn": "Player used a supply",
@@ -826,8 +826,8 @@ public static class TriggerContracts
             "domains": [
               "map",
               "room",
-              "player",
               "consumable",
+              "player",
               "logic"
             ],
             "execution": "host",
@@ -854,10 +854,10 @@ public static class TriggerContracts
           "id": "forge.trigger.player.item_picked_up",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "玩家捡起物品",
+          "label": "捡起消耗品或资源",
           "version": "2.0.0",
           "parameters": {
-            "description": "玩家捡起了消耗品或资源。",
+            "description": "一个玩家捡起消耗品或资源。",
             "summary": "玩家捡起物品。",
             "summaryEn": "Fires when a player picks up a consumable or a resource.",
             "labelEn": "Player picked an item up",
@@ -867,8 +867,8 @@ public static class TriggerContracts
             "domains": [
               "map",
               "room",
-              "player",
               "consumable",
+              "player",
               "logic"
             ],
             "execution": "host",
@@ -898,7 +898,7 @@ public static class TriggerContracts
           "label": "玩家发出标记（Ping）",
           "version": "2.0.0",
           "parameters": {
-            "description": "玩家按下了标记键。",
+            "description": "一个玩家按下标记键，带上他标出的位置。",
             "summary": "玩家发出标记。",
             "summaryEn": "Fires when a player pings.",
             "labelEn": "Player pinged",
@@ -1146,7 +1146,7 @@ public static class TriggerContracts
           "id": "forge.trigger.enemy.scout_detection",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "侦察触须感知事件",
+          "label": "侦察兵发现玩家 / 尖叫",
           "version": "2.0.0",
           "parameters": {
             "description": "侦察兵的触须扫到了东西。",
@@ -1192,7 +1192,7 @@ public static class TriggerContracts
           "id": "forge.trigger.enemy.scout_scream",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "侦察呼叫阶段变化",
+          "label": "侦察兵发现玩家 / 尖叫 · enemy scout_scream",
           "version": "2.0.0",
           "parameters": {
             "description": "侦察兵的呼叫进入新阶段。",
@@ -1273,7 +1273,7 @@ public static class TriggerContracts
           "label": "门的扫描开始或完成",
           "version": "1.0.0",
           "parameters": {
-            "description": "门上的扫描开始或完成。",
+            "description": "门的扫描开始或者完成。",
             "summary": "门上的扫描开始或完成。",
             "summaryEn": "Fires when a door's scan starts or completes.",
             "labelEn": "Door scan",
@@ -1357,10 +1357,10 @@ public static class TriggerContracts
           "id": "forge.trigger.interaction.door_broken",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "门被敌人攻击或打破",
+          "label": "门被攻击或被打破",
           "version": "1.0.0",
           "parameters": {
-            "description": "敌人能打破的门受到攻击，或被打坏。",
+            "description": "门被攻击，或者被打坏。",
             "summary": "门被敌人攻击或打破。",
             "summaryEn": "Fires when a door enemies can break is attacked or broken.",
             "labelEn": "Door attacked or broken",
@@ -1496,7 +1496,7 @@ public static class TriggerContracts
       "id": "forge.trigger.player.revive_started",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "救援开始",
+      "label": "开始救人 / 被救起",
       "version": "2.0.0",
       "parameters": {
         "description": "有人开始救人。",
@@ -1535,7 +1535,7 @@ public static class TriggerContracts
       "id": "forge.trigger.player.revive_cancelled",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "救援中断",
+      "label": "开始救人 / 被救起 · player revive_cancelled",
       "version": "2.0.0",
       "parameters": {
         "description": "救援被打断。",
@@ -1579,7 +1579,7 @@ public static class TriggerContracts
       "id": "forge.trigger.player.revived",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "玩家被救起",
+      "label": "开始救人 / 被救起 · player revived",
       "version": "2.0.0",
       "parameters": {
         "description": "玩家被救起来了。",
@@ -1744,7 +1744,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.reload_started",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "装填开始",
+      "label": "换弹开始 / 完成",
       "version": "2.0.0",
       "parameters": {
         "description": "开始装填。",
@@ -1784,7 +1784,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.reload_transferred",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "弹药实际进入弹匣",
+      "label": "换弹开始 / 完成 · combat reload_transferred",
       "version": "2.0.0",
       "parameters": {
         "description": "子弹真的进弹匣了。",
@@ -1828,7 +1828,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.reload_completed",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "装填结束",
+      "label": "换弹开始 / 完成 · combat reload_completed",
       "version": "2.0.0",
       "parameters": {
         "description": "装填结束。",
@@ -1868,7 +1868,7 @@ public static class TriggerContracts
       "id": "forge.trigger.equipment.refilled",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "补给完成",
+      "label": "使用补给包 · equipment refilled",
       "version": "2.0.0",
       "parameters": {
         "description": "补给完成。",
@@ -1910,7 +1910,7 @@ public static class TriggerContracts
       "id": "forge.trigger.equipment.stack_changed",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "消耗品堆叠数量变化",
+      "label": "工具能源 / 消耗品数量 · equipment stack_changed",
       "version": "2.0.0",
       "parameters": {
         "description": "消耗品的数量变了。",
@@ -1994,7 +1994,7 @@ public static class TriggerContracts
       "id": "forge.trigger.equipment.dropped",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "丢弃完成",
+      "label": "物品被捡起 / 放下",
       "version": "2.0.0",
       "parameters": {
         "description": "玩家丢下了东西。",
@@ -2190,7 +2190,7 @@ public static class TriggerContracts
       "label": "反应堆每一波",
       "version": "1.0.0",
       "parameters": {
-        "description": "反应堆目标推进到电闸链的下一格。"
+        "description": "反应堆目标推进到下一格。"
       },
       "graph": {
         "domains": [ "map", "room", "logic" ],
@@ -2211,7 +2211,7 @@ public static class TriggerContracts
       "label": "HSU 取样完成",
       "version": "1.0.0",
       "parameters": {
-        "description": "HSU 的目标物品已经被取出来。"
+        "description": "HSU 的目标物品已经被取出来了。"
       },
       "graph": {
         "domains": [ "map", "room", "logic" ],
@@ -2291,10 +2291,10 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.killed",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "该伤害事务导致击杀",
+      "label": "敌人死亡",
       "version": "2.0.0",
       "parameters": {
-        "description": "这次伤害把目标打死了。敌人刚进入死亡流程用「死亡流程开始」，那一步不一定真的结算成击杀。",
+        "description": "这次伤害把目标打死了。",
         "summary": "这次伤害把目标打死了。敌人刚进入死亡流程用「死亡流程开始」，那一步不一定真的结算成击杀。",
         "summaryEn": "Fires when this damage kills the target. An enemy entering its death is Death started, which may never settle as a kill.",
         "labelEn": "Killed",
@@ -2338,7 +2338,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.limb_damaged",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "指定命中部位受到伤害",
+      "label": "敌人部位被打爆 · combat limb_damaged",
       "version": "2.0.0",
       "parameters": {
         "description": "某个部位挨打了。",
@@ -2385,10 +2385,10 @@ public static class TriggerContracts
       "id": "forge.trigger.enemy.tagged",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "敌人被标记",
+      "label": "生物追踪器标记到敌人",
       "version": "1.0.0",
       "parameters": {
-        "description": "生物追踪器在敌人身上放了一个标记，或一个标记结束了。",
+        "description": "一个敌人被生物追踪器标记，或者标记消失。",
         "summary": "生物追踪器在敌人身上放了一个标记，或一个标记结束了。",
         "summaryEn": "Fires when the BioTracker places a tag on an enemy, and again when a live tag ends.",
         "labelEn": "Enemy tagged",
@@ -2429,7 +2429,7 @@ public static class TriggerContracts
       "label": "敌人被胶住",
       "version": "1.0.0",
       "parameters": {
-        "description": "胶真的挂到敌人身上了，数字是这次增加的胶量和它身上的总量。",
+        "description": "胶打到敌人身上，带上这一次和累计的胶量。",
         "summary": "胶真的挂到敌人身上了，数字是这次增加的胶量和它身上的总量。",
         "summaryEn": "Fires when glue really lands on an enemy; the numbers are what this hit added and what the enemy now carries.",
         "labelEn": "Enemy glued",
@@ -2483,8 +2483,8 @@ public static class TriggerContracts
         "domains": [
           "map",
           "room",
-          "logic",
-          "enemy"
+          "enemy",
+          "logic"
         ],
         "execution": "host",
         "inputs": [],
@@ -2515,7 +2515,7 @@ public static class TriggerContracts
       "id": "forge.trigger.objective.wave_spawned",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "该波次一批敌人生成完成",
+      "label": "一波敌人刷出",
       "version": "1.0.0",
       "parameters": {
         "description": "这一波的一批敌人已经刷出来了。",
@@ -2528,8 +2528,8 @@ public static class TriggerContracts
         "domains": [
           "map",
           "room",
-          "logic",
-          "enemy"
+          "enemy",
+          "logic"
         ],
         "execution": "host",
         "inputs": [],
@@ -2582,8 +2582,8 @@ public static class TriggerContracts
         "domains": [
           "map",
           "room",
-          "logic",
-          "enemy"
+          "enemy",
+          "logic"
         ],
         "execution": "host",
         "inputs": [],
@@ -2618,7 +2618,7 @@ public static class TriggerContracts
       "id": "forge.trigger.objective.wave_cleared",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "该波次存活敌人清零",
+      "label": "某个刷怪波次是否还在刷",
       "version": "1.0.0",
       "parameters": {
         "description": "这一波的敌人全被清光。",
@@ -2631,8 +2631,8 @@ public static class TriggerContracts
         "domains": [
           "map",
           "room",
-          "logic",
-          "enemy"
+          "enemy",
+          "logic"
         ],
         "execution": "host",
         "inputs": [],

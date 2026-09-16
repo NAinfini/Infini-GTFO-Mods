@@ -82,7 +82,7 @@ public static class EnemyNodeEffectContract
       "label": "直接杀死敌人",
       "version": "1.0.0",
       "parameters": {
-        "description": "无条件结束这些敌人的生命，走游戏自己的立即死亡入口。",
+        "description": "直接杀死目标敌人。",
         "summary": "无条件结束这些敌人的生命，走游戏自己的立即死亡入口。",
         "summaryEn": "Ends the target enemies' lives unconditionally through the game's own instant-death entry.",
         "labelEn": "Kill enemy",
@@ -170,7 +170,7 @@ public static class EnemyNodeEffectContract
       "label": "标记敌人",
       "version": "1.0.0",
       "parameters": {
-        "description": "在这些敌人身上放一个 Forge 自己的导航标记，颜色和时长由你定；生物追踪器自己的红色标记不受影响。",
+        "description": "给敌人打上标记，可以指定颜色和时长。",
         "summary": "在这些敌人身上放一个 Forge 自己的导航标记，颜色和时长由你定；生物追踪器自己的红色标记不受影响。",
         "summaryEn": "Puts Forge's own navigation marker on the target enemies, in the colour and for the time you ask for; the BioTracker's own red tag is untouched.",
         "labelEn": "Mark enemy",
@@ -287,10 +287,10 @@ public static class EnemyNodeEffectContract
       "id": "forge.action.enemy.target",
       "owner": "forge.module.gtfo.enemy",
       "kind": "action",
-      "label": "让敌人去追某个玩家",
+      "label": "让敌人去追某个目标",
       "version": "1.0.0",
       "parameters": {
-        "description": "让这些敌人把某个玩家当成目标，走游戏自己的目标传播。",
+        "description": "让敌人去追一个指定的目标。",
         "summary": "让这些敌人把某个玩家当成目标，走游戏自己的目标传播。",
         "summaryEn": "Points the target enemies at one player through the game's own target propagation.",
         "labelEn": "Target player",

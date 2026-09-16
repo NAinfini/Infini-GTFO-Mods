@@ -27,7 +27,7 @@ public static class ObservedSpaceDeclarations
 
     /// <summary>The declared rows in registration order, in the one table this family owns.</summary>
     public static ObservedFamily Family { get; } = ObservedFamily.Declare(
-        ObservedDeclaration.Node("forge.selector.target.shape_overlap", "query", "球、锥、盒、柱、胶囊范围查询", "从候选集合里按球、锥、盒、柱或胶囊筛选目标，不在范围内的候选被剔除。",
+        ObservedDeclaration.Node("forge.selector.target.shape_overlap", "query", "范围内的玩家 / 敌人", "用球、锥、盒、柱或胶囊圈一片范围找东西。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Vector("center", "m"),
                 ObservedDeclaration.Number("radius", "m"), ObservedDeclaration.Number("angle", "deg"),
                 ObservedDeclaration.Number("height", "m"), ObservedDeclaration.Vector("extents", "m")),
@@ -53,7 +53,7 @@ public static class ObservedSpaceDeclarations
                 ObservedDeclaration.Integer("max_targets"), ObservedDeclaration.Integer("seed")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
             new HandlerShape().Inputs("candidates", "weights", "max_targets", "seed").Outputs("targets").Parameters("empty"), WeightedHandler),
-        ObservedDeclaration.Node("forge.selector.target.filter", "query", "应用类型化条件过滤", "用一套目标规则筛掉不要的。",
+        ObservedDeclaration.Node("forge.selector.target.filter", "query", "某区域里的玩家 / 敌人", "用一套目标规则筛掉不要的。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Entity("anchor"), ObservedDeclaration.Many("candidates")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")),
             ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnum("relation", "recipient_relation"), ObservedDeclaration.EmptyPolicyParameter()),
@@ -63,7 +63,7 @@ public static class ObservedSpaceDeclarations
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("matched"), ObservedDeclaration.Many("rest")),
             ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnumValues("field", PartitionFields), ObservedDeclaration.EmptyPolicyParameter()),
             new HandlerShape().Inputs("candidates", "key").Outputs("matched", "rest").Parameters("field", "empty"), PartitionHandler),
-        ObservedDeclaration.Node("forge.selector.target.zone_members", "query", "区域内的人与敌人", "只留下站在指定 Zone 里的目标。",
+        ObservedDeclaration.Node("forge.selector.target.zone_members", "query", "某区域里的实体", "从候选里挑出位于指定区域内的实体。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"),
                 ObservedDeclaration.Resource("zone", RuntimeZones.ResourceKind, "forge.resource.zone")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),

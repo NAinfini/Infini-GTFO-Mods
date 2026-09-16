@@ -15,18 +15,21 @@ namespace ForgeMap.Tests.Support;
 /// has to give the module a subscriber first, which is what this helper does: one plan per binding the
 /// registration publishes under, the way an author's own plan would be mounted on the trigger it listens to.
 ///
-/// The plan is deliberately inert. Its one attachment is an `enemy-type` mount, a kind the helper registers for
-/// itself in <see cref="Open"/> and whose matcher answers false for everything, so the plan claims no event: the
-/// gate is open, the event is built and observed, and no step of the fixture ever runs. Every other field is the
-/// shape the plan loader proves — the trigger's own registered contract for the entry, the kernel's own `branch`
-/// for the one step an entrypoint requires, and the binding closure the pin table has to equal.
+/// The plan claims the events of the bindings it subscribes to when the caller asks for that and runs no author
+/// step either way. Its one attachment is an `enemy-type` mount, a kind the helper registers for itself in
+/// <see cref="Open"/>: a plan is only handed an event its own mount claims, so a fixture asserting what the kernel
+/// admitted asks for a matcher that answers true, while one asserting that an event reaches no plan leaves it
+/// answering false. The entry's one step is the kernel's own `branch`, the step every entrypoint requires, and
+/// both of its successors are absent, so nothing follows the event. Every other field is the shape the plan loader
+/// proves — the trigger's own registered contract for the entry and the binding closure the pin table has to
+/// equal.
 /// </summary>
 internal static class SubscriptionGateFixture
 {
     /// <summary>The mount kind this helper owns. None of the four kinds a plan may name is free by itself, so the
-    /// helper registers this one with a matcher that answers false: an inert mount target has to be one the
-    /// loader can resolve, and owning the kind is what keeps the fixture from depending on what a package under
-    /// test happens to have registered.</summary>
+    /// helper registers this one with a matcher of its own: an entry is handed every event of its binding only
+    /// when its own mount claims it, and owning the kind is what keeps the fixture from depending on what a
+    /// package under test happens to have registered.</summary>
     private const string MountKind = "enemy-type";
     private const string MountReference = "test.subscription-gate";
     private const string FixtureProvider = "forge.test.subscription_gates";
@@ -35,13 +38,6 @@ internal static class SubscriptionGateFixture
     /// registration per provider and one owner per kind, so a fixture that opens gates twice must not register
     /// the fixture module twice.</summary>
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<RuntimeKernel, object> Opened = new();
-
-    /// <summary>The bindings this helper could not open, accumulated across the worlds of one test process. A row
-    /// is listed here when no plan can be mounted on it at all — the plan loader requires a constant frame for
-    /// every required trigger parameter, and a resource parameter that declares no `resourceKind` cannot be
-    /// written: the loader resolves a resource constant through its kind's owner, and this one names no kind. A
-    /// fixture whose rows are listed here keeps its gate shut whatever this helper does.</summary>
-    internal static readonly List<string> Ungated = new();
 
     private const string BranchBinding = "forge.contract.control.binding.branch";
     private const string BranchCapability = "forge.control.flow.branch";
@@ -52,7 +48,12 @@ internal static class SubscriptionGateFixture
     /// `branch` — and this call has to happen while registration is still open, because it registers the mount
     /// and resource kinds the plans are attached to.
     /// </summary>
-    internal static void Open(RuntimeKernel kernel, RuntimeModuleHandle registration)
+    /// <param name="claim">Whether the mounted plans also take the events they subscribe to. A fixture whose
+    /// observation point is the module's own publication needs the subscriber alone and leaves this false, so an
+    /// event a case means to show reaching no plan still reaches none. A fixture that asserts what the kernel
+    /// admitted — a publisher's own admitted-event count — needs true: a subscriber by itself opens the gate but
+    /// leaves the kernel's answer for the event at `attachment-mismatch`.</param>
+    internal static void Open(RuntimeKernel kernel, RuntimeModuleHandle registration, bool claim = false)
     {
         ArgumentNullException.ThrowIfNull(kernel);
         ArgumentNullException.ThrowIfNull(registration);
@@ -86,21 +87,17 @@ internal static class SubscriptionGateFixture
         if (bindings.Length == 0) throw new InvalidOperationException("The registration publishes under no trigger binding.");
         var contracts = bindings.ToDictionary(id => id, id => kernel.ResolveGraphContract(
             pins[id].Capability, capabilities[pins[id].Capability].Version, RuntimeJson.EmptyObject), StringComparer.Ordinal);
-        var carrier = bindings.Where(id => contracts[id].GetProperty("parameters").EnumerateArray().All(Satisfiable)).ToArray();
-        foreach (var binding in bindings.Where(id => !carrier.Contains(id)))
-            Ungated.Add(binding);
-        if (carrier.Length == 0) throw new InvalidOperationException("No binding of this registration can carry a plan entrypoint: " + string.Join(" ", Ungated));
-        kernel.RegisterModule(Fixture(carrier.Select(id => contracts[id])), RuntimeLogLevel.Off);
+        kernel.RegisterModule(Fixture(bindings.Select(id => contracts[id]), claim), RuntimeLogLevel.Off);
         Opened.Add(kernel, Opened);
         var branchContract = kernel.ResolveGraphContract(BranchCapability, capabilities[BranchCapability].Version, RuntimeJson.EmptyObject);
-        var candidates = carrier.Select(binding => Plan(kernel, binding, pins, capabilities, providers, support,
+        var candidates = bindings.Select(binding => Plan(kernel, binding, pins, capabilities, providers, support,
             contracts[binding], branchContract)).ToArray();
         var refused = kernel.LoadPlans(candidates).Where(outcome => !outcome.Loaded).ToArray();
         if (refused.Length != 0) throw new RuntimeContractException(refused[0].Code!, refused[0].Code + ": " + refused[0].Detail);
         // A plan that loaded is not proof the gate moved: the gate is refreshed where the subscription table is
         // rebuilt, so a binding this helper mounted on must report a subscriber now. A helper that silently
         // subscribed to nothing would leave every fixture asserting on facts that were never built.
-        var shut = carrier.Where(binding => !registration.SubscriptionGate(binding).HasSubscribers).ToArray();
+        var shut = bindings.Where(binding => !registration.SubscriptionGate(binding).HasSubscribers).ToArray();
         if (shut.Length != 0) throw new InvalidOperationException("A mounted plan did not open these gates: " + string.Join(" ", shut));
     }
 
@@ -160,45 +157,42 @@ internal static class SubscriptionGateFixture
     }
 
     /// <summary>The plan's port layout, as the loader re-derives it from the registered contract. The constant
-    /// frame is one slot per declared parameter: null is the loader's own spelling of "no constant", and a
-    /// resource parameter — the one kind of constant an entrypoint can carry — gets the fixture's reference so
-    /// the loader does not refuse the frame as missing.</summary>
+    /// frame is one slot per declared parameter, in declaration order: a resource parameter — the one kind of
+    /// constant a row of this package carries — gets the fixture's own reference, and every other slot is null,
+    /// which is the loader's own spelling of "no author value".</summary>
     private static object Layout(JsonElement contract) => new
     {
         inputs = Sides(contract, "inputs"), outputs = Sides(contract, "outputs"),
         constants = contract.GetProperty("parameters").EnumerateArray()
-            .Select(parameter => ResourceKind(parameter) == null ? null : ResourceConstant).ToArray(),
+            .Select(parameter => parameter.GetProperty("type").GetString() == "resource" ? RuntimeConstant(parameter) : null).ToArray(),
         promoted = Array.Empty<int>()
     };
+
+    /// <summary>One compile-time reference, in the value form the loader's own frame encoder reads: the kind the
+    /// frame indexes and the id its owner answers with. A resource parameter names its own kind — that is what
+    /// makes the row self-describing — so this reads it rather than inventing one.</summary>
+    private static object RuntimeConstant(JsonElement parameter)
+        => new { resourceKind = ResourceKind(parameter), resourceId = FixtureResource };
 
     /// <summary>One mount target, since a plan declares at least one. A kind whose target is not an entity carries
     /// no category at all, which is the one shape the loader accepts for it.</summary>
     private static readonly object Attachment = new { kind = MountKind, reference = MountReference };
 
-    /// <summary>The compiled reference one resource parameter carries, in the document's own `{id, revision}`
-    /// form. The fixture's own provider answers for it below, so the reference resolves to the one resource that
-    /// provider holds.</summary>
-    private static readonly object ResourceConstant = new { id = FixtureResource, revision = "revision-1" };
+    /// <summary>The resource the helper's own provider holds, so a plan can carry the constant frame the gated
+    /// rows require without naming a resource the package under test does not have. No reading ever sees that
+    /// value — the plan's only step is the kernel's `branch` and it has no successors.</summary>
     private const string FixtureResource = "test.subscription-gate";
 
-    /// <summary>The resource kind a declared parameter reads, or null for a parameter that is not a resource:
-    /// only an entrypoint's compile-time constants are the frame this answers for.</summary>
+    /// <summary>The resource kind a declared parameter reads. Only an entrypoint's compile-time constants are the
+    /// frame this answers for, and a resource parameter always names its kind.</summary>
     private static string? ResourceKind(JsonElement parameter)
-        => parameter.GetProperty("type").GetString() == "resource"
-            && parameter.TryGetProperty("resourceKind", out var kind) && kind.ValueKind == JsonValueKind.String
-            ? kind.GetString() : null;
-
-    /// <summary>Whether a declared trigger parameter can be written in a plan's constant frame at all. A resource
-    /// parameter can be, but only through the kind it declares — the loader resolves a resource constant through
-    /// that kind's owner — so a resource parameter that declares none is one no plan can carry.</summary>
-    private static bool Satisfiable(JsonElement parameter)
-        => parameter.GetProperty("type").GetString() != "resource" || ResourceKind(parameter) != null;
+        => parameter.GetProperty("type").GetString() == "resource" ? parameter.GetProperty("resourceKind").GetString() : null;
 
     /// <summary>The provider this helper registers its own kinds under. It declares no capability and no binding:
-    /// the two things it owns are the mount kind, whose matcher is the answer that claims nothing, and a resource
-    /// provider for the kinds the gated triggers declare, so a plan can carry the constant frame those rows
-    /// require without naming a resource the package under test does not have.</summary>
-    private static RuntimeModule Fixture(IEnumerable<JsonElement> triggerContracts)
+    /// the two things it owns are the mount kind, whose matcher is this plan's answer about taking events, and a
+    /// resource provider for the kinds the gated triggers declare, so a plan can carry the constant frame those
+    /// rows require without naming a resource the package under test does not have.</summary>
+    private static RuntimeModule Fixture(IEnumerable<JsonElement> triggerContracts, bool claim)
     {
         var kinds = triggerContracts.SelectMany(contract => contract.GetProperty("parameters").EnumerateArray())
             .Select(ResourceKind).Where(kind => kind != null).Select(kind => kind!)
@@ -212,7 +206,7 @@ internal static class SubscriptionGateFixture
         {
             AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>(StringComparer.Ordinal)
             {
-                [MountKind] = AttachmentMatcherRegistration.ByScope((_, _) => false)
+                [MountKind] = AttachmentMatcherRegistration.ByScope((_, _) => claim)
             },
             ResourceProviders = kinds.ToDictionary(kind => kind,
                 kind => RuntimeResourceProvider.Of(Array.Empty<ResourceRef>, id => new ResourceRef(kind, id)), StringComparer.Ordinal)

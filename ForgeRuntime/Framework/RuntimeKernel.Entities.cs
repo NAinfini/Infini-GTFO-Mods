@@ -161,10 +161,10 @@ public sealed partial class RuntimeKernel
     /// <summary>
     /// The zone one entity stands in, answered by the provider that owns the entity's kind. The kernel itself
     /// tests no volume and reads no level: a kind whose owner registered no zone responder is
-    /// <see cref="EntityZoneResolution.UnavailableCode"/>, and a responder that answered null has answered that the
-    /// entity stands in no zone of this world — that is <see cref="EntityZoneResolution.OutsideCode"/> and not a
-    /// refusal, because an entity the level placed outside every zone is a fact a selector has to be able to
-    /// exclude by name. A read that could not be made is refused instead: a responder that throws a
+    /// <see cref="EntityZoneResolution.UnavailableCode"/>, and a responder that answered nothing has answered
+    /// that it cannot place the entity it owns right now — unknown, which is
+    /// <see cref="EntityZoneResolution.UnknownCode"/> and a refusal, never an entity standing outside every zone.
+    /// A read that could not be made is refused instead: a responder that throws a
     /// <see cref="RuntimeContractException"/> is reported with its own code, any other failure as
     /// <see cref="EntityZoneResolution.FailedCode"/>. The answer is checked to be of the zone kind before it is
     /// handed back, because a responder is a provider's own table like any other and a reference of another kind
@@ -187,10 +187,11 @@ public sealed partial class RuntimeKernel
         try { zone = responder.Zone(entity); }
         // A provider that cannot place an entity it owns says so in its own words: the code travels as the
         // provider spelled it, so "not current", "no course node" and "collected mid-read" stay tellable apart
-        // from the one answer that is not a failure.
+        // from the one answer that is not a failure. A responder that answered nothing said the same thing
+        // without its own code, so the kernel names it: the entity is unknown, not outside every zone.
         catch (RuntimeContractException error) { return Refused(error.Code); }
         catch (Exception) { return Refused(EntityZoneResolution.FailedCode); }
-        if (zone == null) return EntityZoneResolution.Outside();
+        if (zone == null) return Refused(EntityZoneResolution.UnknownCode);
         if (RuntimeJson.KindOf(zone.Id) != RuntimeZones.EntityKind) return Refused(EntityZoneResolution.KindCode);
         if (!ChargeEntityQuery(0)) return Refused("entity-query-tick-budget");
         return EntityZoneResolution.InZone(zone);

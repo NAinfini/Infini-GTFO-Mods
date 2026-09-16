@@ -52,6 +52,11 @@ public static class LevelObjectContract
     /// player, and `forge.trigger.equipment.picked_up`/`dropped` are the equipment half's rows about a player's
     /// inventory slots, not about a world item changing hands; both rows are therefore declared here, in the
     /// namespace the objects they report about actually live in.</summary>
+    /// <summary>The kind every row's structural `resource` parameter carries, so the row names what an author
+    /// points it at without a second table. The three scan rows read the chained puzzle the value row's input
+    /// already declares; the container row and the level item row both name the one `item` resource kind this
+    /// framework has for a thing the level placed. The kind is what a plan's constant frame is indexed by, so a
+    /// row that named none could not be compiled at all.</summary>
     public const string ContainerStateCapability = "forge.trigger.map.container_state";
     public const string ItemPickupCapability = "forge.trigger.map.item_pickup";
 
@@ -175,7 +180,7 @@ public static class LevelObjectContract
           { "id": "scan", "type": "handle", "handleKind": "effect", "lifetime": "encounter", "optional": true }
         ],
         "parameters": [
-          { "id": "resource", "type": "resource", "role": "structural", "required": true }
+          { "id": "resource", "type": "resource", "role": "structural", "required": true, "resourceKind": "chained-puzzle" }
         ]
       }
     }
@@ -207,7 +212,7 @@ public static class LevelObjectContract
           { "id": "count", "type": "integer" }
         ],
         "parameters": [
-          { "id": "resource", "type": "resource", "role": "structural", "required": true }
+          { "id": "resource", "type": "resource", "role": "structural", "required": true, "resourceKind": "chained-puzzle" }
         ]
       }
     }
@@ -236,7 +241,7 @@ public static class LevelObjectContract
           { "id": "scan", "type": "handle", "handleKind": "effect", "lifetime": "encounter", "optional": true }
         ],
         "parameters": [
-          { "id": "resource", "type": "resource", "role": "structural", "required": true }
+          { "id": "resource", "type": "resource", "role": "structural", "required": true, "resourceKind": "chained-puzzle" }
         ]
       }
     }
@@ -268,7 +273,7 @@ public static class LevelObjectContract
           { "id": "state", "type": "enum", "schema": "container_state" }
         ],
         "parameters": [
-          { "id": "resource", "type": "resource", "role": "structural", "required": true }
+          { "id": "resource", "type": "resource", "role": "structural", "required": true, "resourceKind": "item" }
         ]
       }
     }
@@ -299,7 +304,7 @@ public static class LevelObjectContract
           { "id": "actor", "type": "entity", "optional": true }
         ],
         "parameters": [
-          { "id": "resource", "type": "resource", "role": "structural", "required": true }
+          { "id": "resource", "type": "resource", "role": "structural", "required": true, "resourceKind": "item" }
         ]
       }
     }
@@ -320,7 +325,7 @@ public static class LevelObjectContract
       "label": "扫描状态与进度",
       "version": "1.0.0",
       "parameters": {
-        "description": "读一台扫描现在的状态和完成度。",
+        "description": "判断扫描的状态和站进去的人数。",
         "summary": "读一台扫描现在的状态和完成度。",
         "summaryEn": "Reads one scan's current state and completion fraction.",
         "labelEn": "Scan state",

@@ -104,23 +104,23 @@ public static class EnemyNodeValueContract
     /// values only — no `next`, no `result`, no handle, and no write.</summary>
     public static IReadOnlyList<object> ValueRows() => Array.AsReadOnly(new[]
     {
-        ValueRow(HealthCapability, "敌人生命值", "读一只敌人的当前生命值和生命上限，不改任何状态。",
+        ValueRow(HealthCapability, "敌人生命值", "读一个敌人当前与最大的生命值。",
             "Reads one enemy's current and maximum health without changing anything.",
             new object[]
             {
                 new { id = "value", type = "number", unit = "hp" },
                 new { id = "maximum", type = "number", unit = "hp" }
             }),
-        ValueRow(AliveCapability, "敌人是否存活", "读一只敌人是否还活着。",
+        ValueRow(AliveCapability, "敌人是否存活", "读一个敌人是否还活着。",
             "Reads whether one enemy is still alive.",
             new object[] { new { id = "value", type = "boolean" } }),
-        ValueRow(TypeCapability, "敌人类型", "读一只敌人的原版敌人类型 id（EnemyDataBlock 的 persistentID），十进制文本。",
+        ValueRow(TypeCapability, "敌人类型", "读一个敌人的类型标识。",
             "Reads one enemy's official type id (EnemyDataBlock.persistentID) as decimal text.",
             new object[] { new { id = "value", type = "string" } }),
-        ValueRow(SleepingCapability, "敌人是否休眠", "读一只敌人是不是还在睡。",
+        ValueRow(SleepingCapability, "敌人是否休眠", "读一个敌人是否处于休眠。",
             "Reads whether one enemy is still hibernating.",
             new object[] { new { id = "value", type = "boolean" } }),
-        ValueRow(WhereCapability, "敌人位置与所在区域", "读一只敌人的世界坐标和它所在的区域。",
+        ValueRow(WhereCapability, "敌人位置与所在区域", "读一个敌人的位置和它所在的区域。",
             "Reads one enemy's world position and the zone it stands in.",
             new object[]
             {
@@ -128,7 +128,7 @@ public static class EnemyNodeValueContract
                 new { id = "zone", type = "resource", resourceKind = RuntimeZones.ResourceKind,
                     schema = "forge.resource." + RuntimeZones.ResourceKind, nullable = true }
             }),
-        ValueRow(TaggedCapability, "敌人是否被标记", "读一只敌人身上还有没有生物追踪器的标记，以及还剩多少秒。",
+        ValueRow(TaggedCapability, "敌人是否被标记", "读一个敌人是否被生物追踪器标记，以及标记还剩多久。",
             "Reads whether one enemy still carries a BioTracker tag, and how many seconds of it are left.",
             new object[]
             {
@@ -180,7 +180,11 @@ public static class EnemyNodeValueContract
         parameters = new { description, descriptionEn },
         graph = new
         {
-            domains = new[] { "enemy", "map", "logic" },
+            domains = new[] {
+              "map",
+              "enemy",
+              "logic"
+            },
             execution = "query",
             inputs = new object[] { new { id = EnemyPort, type = "entity" } },
             outputs,

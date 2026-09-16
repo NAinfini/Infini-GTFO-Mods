@@ -5,11 +5,11 @@ using System.Text.Json;
 using ForgeRuntime.Framework;
 
 /// <summary>
-/// The kernel's zone read: which of the two things a null answer used to mean is which. A provider that answered
-/// has placed the entity — in a zone, or in no zone at all — and "this entity stands outside every zone" is an
-/// answer a selector can exclude by name, while a read nobody could make is refused with a code. The cases below
-/// drive the kernel's own entry point with responder doubles, because the two outcomes are decided there and not
-/// in any one package's table.
+/// The kernel's zone read: one outcome that answered and one that could not be made. A responder that named a zone
+/// placed the entity there; a responder that answered nothing, one that threw and one that belongs to no registered
+/// responder are all reads that could not be made and all refused with a code, so no caller can read an unplaceable
+/// entity as one standing outside every zone. The cases below drive the kernel's own entry point with responder
+/// doubles, because those outcomes are decided there and not in any one package's table.
 /// </summary>
 internal static class ZoneReadTests
 {
@@ -49,14 +49,14 @@ internal static class ZoneReadTests
             kernel.StopRuntime();
         }
 
-        // A responder that answers null has answered that the entity stands in no zone of this world. That is an
-        // answer and not a refusal, which is the whole point of the seam: a reader can tell it from "nobody could
-        // read this" without guessing.
+        // A responder that answers null has placed nothing: the kernel names that unknown and refuses it, because
+        // "I cannot place this entity" and "this entity stands in no zone" are the same nothing through this seam
+        // and a reader must never treat either as a placement.
         {
             var kernel = Kernel(_ => null, out var subject);
             var answer = kernel.ZoneOfEntity(subject);
-            Check(answer.Answered && answer.Zone == null && answer.Code == EntityZoneResolution.OutsideCode,
-                "an entity in no zone is answered, not refused [" + answer.Code + "]");
+            Check(!answer.Answered && answer.Zone == null && answer.Code == EntityZoneResolution.UnknownCode,
+                "a responder that answered nothing is refused as unknown [" + answer.Code + "]");
             kernel.StopRuntime();
         }
 

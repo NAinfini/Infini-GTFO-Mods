@@ -167,7 +167,7 @@ public static class GeneratorContract
       "label": "发电机是否插着电池 / 发电机组接通数",
       "version": "1.0.0",
       "parameters": {
-        "description": "读一台发电机插没插电池，以及它所在的那组接通了几台。",
+        "description": "判断供电通不通。",
         "summary": "读一台发电机插没插电池，以及它所在的那组接通了几台。",
         "summaryEn": "Reads whether one generator holds a power cell and how many generators of its group are powered.",
         "labelEn": "Generator state",

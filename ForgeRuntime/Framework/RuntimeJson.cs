@@ -210,7 +210,8 @@ public static class RuntimeJson
             // document's `{id, revision}` form, translated by the loader, and validated there.
             case "resource":
                 var resource = ResourceRefOf(value);
-                Require(resource.ResourceKind == Text(port, "resourceKind"), RuntimeAbiCodes.ResourceKind, resource.ResourceId);
+                Require(port.TryGetProperty("resourceKind", out var declared) && declared.GetString() == resource.ResourceKind,
+                    RuntimeAbiCodes.ResourceKind, resource.ResourceId);
                 break;
             // An event value is one dispatch's event row, written out as its index. Two things make it a value of
             // the port it arrives on and neither is a property of the number: the row has to exist in the table of

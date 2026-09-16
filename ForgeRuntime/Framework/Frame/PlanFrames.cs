@@ -284,7 +284,7 @@ internal sealed class PlanFrames
                 continue;
             }
             RuntimeJson.ValidateParameter(step.Constants[index], definition);
-            var slot = ConstantSlot(constants, step.Constants[index], definition, RuntimeJson.Text(definition, "id"));
+            var slot = ConstantSlot(constants, step.Constants[index], definition, RuntimeJson.Text(definition, "id"), true);
             var type = RuntimeJson.Text(definition, "type");
             parameters[index] = new PortSlot(slot, RuntimeFrames.KindOf(type), RuntimeFrames.ValueWidth(type), PortSource.Constant, slot);
         }
@@ -319,7 +319,7 @@ internal sealed class PlanFrames
                 RuntimeJson.Require(input != null || RuntimeJson.Flag(port, "optional"), "missing-input", step.NodeId + "." + name);
                 if (input != null)
                 {
-                    if (input.Literal is { } literal) sourceSlot = ConstantSlot(constants, literal, port, input.Name);
+                    if (input.Literal is { } literal) sourceSlot = ConstantSlot(constants, literal, port, input.Name, false);
                     else if (input.FromStep is { } from)
                     {
                         // D-017 R4-a: a pure step's output frame, addressed by its absolute step index and port order.
@@ -344,16 +344,18 @@ internal sealed class PlanFrames
 
     /// <summary>One value written into the constant pool, and the number of slots it consumed — one for every
     /// implemented kind but a vector3, which is three. The pool grows on demand: literals are rare and small, so
-    /// sizing it for a worst case that never occurs would waste the plan's byte budget.</summary>
-    private static int ConstantSlot(FrameSpace constants, JsonElement value, JsonElement port, string name)
+    /// sizing it for a worst case that never occurs would waste the plan's byte budget. A parameter carries the
+    /// reference a frame carries, written out; a step's input literal carries the plan's own compiled reference,
+    /// which the loader resolved before this point.</summary>
+    private static int ConstantSlot(FrameSpace constants, JsonElement value, JsonElement port, string name, bool parameterConstant)
     {
         var slot = constants.SlotCount;
         if (slot >= constants.SlotCapacity) constants.Grow(slot * 2 + 16);
-        constants.SlotCount = slot + Encode(constants, slot, value, port, name);
+        constants.SlotCount = slot + Encode(constants, slot, value, port, name, parameterConstant);
         return slot;
     }
 
-    private static int Encode(FrameSpace space, int slot, JsonElement value, JsonElement port, string name)
+    private static int Encode(FrameSpace space, int slot, JsonElement value, JsonElement port, string name, bool parameterConstant)
     {
         if (value.ValueKind == JsonValueKind.Null)
         {
@@ -384,11 +386,14 @@ internal sealed class PlanFrames
                 space.Slots[slot] = new FrameValue { Kind = ValueKind.Vector3, Count = RuntimeFrames.VectorWidth, Number = value[0].GetDouble() };
                 return RuntimeFrames.VectorWidth;
             case ValueKind.Resource:
-                // The one reference a plan may compile: the port names the kind, the literal names the instance.
-                // Two slots, exactly like every other resource anywhere in a frame.
-                var kindIndex = Array.IndexOf(RuntimeGraphContracts.ResourceKinds, RuntimeJson.Text(port, "resourceKind"));
+                // The one reference a plan may compile: the port names the kind, the value names the instance.
+                // Two slots, exactly like every other resource anywhere in a frame. A parameter is the frame's own
+                // reference written out (`resourceKind`/`resourceId`); a step's input literal is the document's
+                // `{id, revision}` form, already resolved through the kind's owner by the loader.
+                var kindIndex = port.TryGetProperty("resourceKind", out var declaredKind)
+                    ? Array.IndexOf(RuntimeGraphContracts.ResourceKinds, declaredKind.GetString()) : -1;
                 RuntimeJson.Require(kindIndex >= 0, RuntimeAbiCodes.ResourceKind, name);
-                var resourceId = RuntimeJson.Text(value, "id");
+                var resourceId = RuntimeJson.Text(value, parameterConstant ? "resourceId" : "id");
                 var (idOffset, idLength) = space.Strings.Add(FrameStrings.Hash(resourceId), resourceId);
                 space.Slots[slot + 1] = FrameValue.Of(idOffset, idLength);
                 space.Slots[slot] = FrameValue.OfResource(kindIndex);

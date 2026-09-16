@@ -22,7 +22,7 @@ public static class ObservedEntityDeclarations
         ObservedDeclaration.Node("forge.selector.target.source", "query", "直接效果来源实体", "选中直接造成这件事的东西。",
             ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
             new HandlerShape().Outputs("target"), context => Role(context, "source", required: false)),
-        ObservedDeclaration.Node("forge.selector.target.instigator", "query", "事件最初发起者", "选中最初挑起这件事的人。",
+        ObservedDeclaration.Node("forge.selector.target.instigator", "query", "让敌人去追某个玩家", "选中最初挑起这件事的人。",
             ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
             new HandlerShape().Outputs("target"), context => Role(context, "instigator", required: false)),
         ObservedDeclaration.Node("forge.selector.target.event_target", "query", "事件中的目标实体", "选中事件里被作用的那个对象。",

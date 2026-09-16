@@ -126,8 +126,16 @@ public sealed class EventFacts
         Assert.Equal(DoorTerminalEventContract.DoorPhaseIndex(DoorTerminalEventContract.BrokenPhase),
             Port(broken!.Value, "phase").GetInt32());
         Assert.False(Has(broken.Value, "attacker"));
-        Assert.Equal(2, world.Facts.Published);
+        Assert.True(world.Facts.Published == 2, "The weak door's two stages were not both admitted." + Diagnosis(world));
     }
+
+    /// <summary>What a case's own counters and the kernel's subscription table say about a fact that was not
+    /// admitted, so a failure names the answer instead of only the number.</summary>
+    private static string Diagnosis(World world)
+        => " published=" + world.Facts.Published + " tracked=" + world.Facts.Tracked
+            + " subscribed=[approach " + world.Kernel.HasSubscribers(DoorTerminalEventContract.Binding(DoorTerminalEventContract.DoorApproachFact))
+            + " broken " + world.Kernel.HasSubscribers(DoorTerminalEventContract.Binding(DoorTerminalEventContract.DoorBrokenFact)) + "]"
+            + " reports=[" + string.Join(" | ", world.Reports) + "]";
 
     [Fact]
     public void AWeakDoorTheLevelCannotPlacePublishesNothing()
@@ -169,7 +177,7 @@ public sealed class EventFacts
         world.Facts.WeakDoorAttacked(door, null);
         world.Facts.WeakDoorAttacked(door, null);
 
-        Assert.Equal(1, world.Facts.Published);
+        Assert.True(world.Facts.Published == 1, "The weak door's attack was not admitted." + Diagnosis(world));
     }
 
     [Fact]
@@ -331,12 +339,12 @@ public sealed class EventFacts
         world.Facts.DoorApproached(door);
         Assert.Equal(1, world.Facts.Tracked);
 
-        world.Facts.BeginWorld();
+        world.NextWorld();
 
         Assert.Equal(0, world.Facts.Tracked);
         // The same fact is new again in the next world, because no address of the old one survives.
         world.Facts.DoorApproached(door);
-        Assert.Equal(2, world.Facts.Published);
+        Assert.True(world.Facts.Published == 2, "The fact of the next world was not admitted." + Diagnosis(world));
     }
 
     [Fact]

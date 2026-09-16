@@ -518,11 +518,18 @@ internal static class RuntimeGraphContracts
     }
     private static void ValidateParameter(JsonElement parameter, JsonElement[] inputs, string id)
     {
-        RuntimeJson.Shape(parameter, "id type role required", "minimum maximum values set unit");
+        RuntimeJson.Shape(parameter, "id type role required", "minimum maximum values set unit resourceKind");
         var name = RuntimeJson.Text(parameter, "id"); var type = RuntimeJson.Text(parameter, "type"); var role = RuntimeJson.Text(parameter, "role");
         RuntimeJson.Require(IsName(name), "parameter-name", id);
         RuntimeJson.Require(ParameterTypes.Contains(type), "parameter-type", id);
         RuntimeJson.Require(role is "value" or "structural", "parameter-role", id);
+        // A resource parameter is the one compile-time reference a plan may write into a step's constant frame, so
+        // a row that names the kind makes itself compilable: the frame encoder indexes the kind table by it and the
+        // value validator checks the reference against it. A row that names none declares a parameter no plan can
+        // carry a reference for — the encoder refuses that constant by name — and a parameter of any other type
+        // names no kind at all.
+        if (Optional(parameter, "resourceKind") is { } kindName)
+            RuntimeJson.Require(type == "resource" && ResourceKinds.Contains(kindName), "parameter-resource-kind", id);
         RuntimeJson.Require(parameter.GetProperty("required").ValueKind is JsonValueKind.True or JsonValueKind.False, "parameter-required", id);
         foreach (var bound in new[] { "minimum", "maximum" }) if (parameter.TryGetProperty(bound, out var value))
         {

@@ -88,7 +88,7 @@ public static class ModuleDefinition
                 MapObjectContract.Row(MapObjectContract.TerminalCommandCapability, "终端命令被接受", "终端接受了一条命令。",
                     MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity"),
                     MapObjectContract.Optional("actor", "entity"), MapObjectContract.Port("command", "string")),
-                MapObjectContract.Row(MapObjectContract.TerminalSessionCapability, "进入或离开终端", "玩家进入或退出终端。",
+                MapObjectContract.Row(MapObjectContract.TerminalSessionCapability, "玩家登上 / 离开终端", "玩家进入或退出终端。",
                     MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity"),
                     MapObjectContract.Optional("actor", "entity"), MapObjectContract.Port("active", "boolean")),
                 // The level-object rows: their capability JSON is `LevelObjectContract`'s own, parsed here rather

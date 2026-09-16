@@ -118,8 +118,8 @@ public static class ObjectiveActionContract
         requires = Array.Empty<string>()
     };
 
-    private static object State() => Action(StateCapability, StateBindingId, StateHandlerName, "改变目标状态",
-        "按游戏自己的目标交互通道请求一个状态成员；状态本身由目标自己的规则推进。", new
+    private static object State() => Action(StateCapability, StateBindingId, StateHandlerName, "强制完成目标",
+        "改变任务目标的状态。", new
         {
             domains = Domains,
             execution = "host",
@@ -150,8 +150,8 @@ public static class ObjectiveActionContract
             }
         });
 
-    private static object Phase() => Action(PhaseCapability, PhaseBindingId, PhaseHandlerName, "切换目标阶段",
-        "按游戏自己的目标交互通道请求一个阶段成员，或完成整层目标链。", new
+    private static object Phase() => Action(PhaseCapability, PhaseBindingId, PhaseHandlerName, "推进进程目标一步",
+        "切换任务目标的阶段。", new
         {
             domains = Domains,
             execution = "host",

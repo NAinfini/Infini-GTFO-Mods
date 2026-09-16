@@ -124,6 +124,44 @@ static RuntimeModule MapModule()
         .Concat(TerminalObjectContract.Supports())
         .Concat(ObjectiveActionContract.Supports()).ToArray();
     var definition = ForgeMap.ModuleDefinition.Create(bindings, capabilities, support);
+    // The declaration carries the on-demand rows whose reading belongs to the game-bound half: the level's own
+    // zone table, the scan and container state, and the generator rows. A registration that declares them must
+    // resolve an evaluator for each, so every one gets the same refusing stand-in a game-bound body gets — the
+    // row, its shape and its handler name are the declaration's, and only the reading is absent here. The set is
+    // read from the declaration itself rather than restated: a row a later batch adds is exported, not dropped.
+    var evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal);
+    var shapes = new Dictionary<string, HandlerShape>(definition.Shapes, StringComparer.Ordinal)
+    {
+        [PlayerHealthContract.HandlerName] = PlayerHealthContract.Shape,
+        [TerminalObjectContract.CommandHandlerName] = TerminalObjectContract.CommandShape,
+        [TerminalObjectContract.VisibilityHandlerName] = TerminalObjectContract.VisibilityShape,
+        [TerminalObjectContract.OutputHandlerName] = TerminalObjectContract.OutputShape,
+        [ObjectiveActionContract.StateHandlerName] = ObjectiveActionContract.StateShape,
+        [ObjectiveActionContract.PhaseHandlerName] = ObjectiveActionContract.PhaseShape,
+        [ObjectiveActionContract.ExtractionHandlerName] = ObjectiveActionContract.ExtractionShape
+    };
+    using (var declared = JsonDocument.Parse(definition.RegistryJson))
+    {
+        var owned = declared.RootElement.GetProperty("capabilities").EnumerateArray()
+            .Where(row => row.GetProperty("owner").GetString() == ForgeMap.ModuleDefinition.ProviderId)
+            .ToDictionary(row => row.GetProperty("id").GetString()!, row => row.GetProperty("kind").GetString()!, StringComparer.Ordinal);
+        foreach (var row in declared.RootElement.GetProperty("bindings").EnumerateArray())
+        {
+            if (row.GetProperty("status").GetString() != "implemented") continue;
+            var role = row.GetProperty("role").GetString();
+            if (role != "observe" && role != "evaluate") continue;
+            // A row whose capability another provider owns resolves that provider's evaluator, and a trigger row
+            // is published rather than evaluated; only this provider's own on-demand rows are answered here.
+            if (!owned.TryGetValue(row.GetProperty("capabilityId").GetString()!, out var kind)) continue;
+            if (kind is not ("selector" or "condition" or "state")) continue;
+            var handler = row.GetProperty("handler").GetString()!;
+            evaluators[handler] = ExportOnlyEvaluator(handler);
+            if (shapes.ContainsKey(handler)) continue;
+            if (LevelObjectContract.Shapes().TryGetValue(handler, out var level)) shapes[handler] = level;
+            else if (GeneratorContract.Shapes().TryGetValue(handler, out var generator)) shapes[handler] = generator;
+            else if (PlayerStateContract.ValueShapes().TryGetValue(handler, out var value)) shapes[handler] = value;
+        }
+    }
     return definition with
     {
         Handlers = new[]
@@ -134,23 +172,15 @@ static RuntimeModule MapModule()
             }
             .Select(handler => (Handler: handler, Body: ExportOnlyHandler(handler)))
             .ToDictionary(row => row.Handler, row => row.Body, StringComparer.Ordinal),
-        Shapes = new Dictionary<string, HandlerShape>(definition.Shapes, StringComparer.Ordinal)
-        {
-            [PlayerHealthContract.HandlerName] = PlayerHealthContract.Shape,
-            [TerminalObjectContract.CommandHandlerName] = TerminalObjectContract.CommandShape,
-            [TerminalObjectContract.VisibilityHandlerName] = TerminalObjectContract.VisibilityShape,
-            [TerminalObjectContract.OutputHandlerName] = TerminalObjectContract.OutputShape,
-            [ObjectiveActionContract.StateHandlerName] = ObjectiveActionContract.StateShape,
-            [ObjectiveActionContract.PhaseHandlerName] = ObjectiveActionContract.PhaseShape,
-            [ObjectiveActionContract.ExtractionHandlerName] = ObjectiveActionContract.ExtractionShape
-        },
-        Evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
-        {
-            [PlayerSelectorContract.HandlerName] = static _ =>
-                throw new InvalidOperationException("The export process does not evaluate the player selector.")
-        }
+        Shapes = shapes,
+        Evaluators = evaluators
     };
 }
+
+/// <summary>The stand-in an evaluator whose reading belongs to a game-bound assembly is registered with: the row
+/// is exported, and this process answers no query at all, so the only honest body is one that refuses.</summary>
+static EvaluatorHandler ExportOnlyEvaluator(string handler) => _ =>
+    throw new InvalidOperationException("The export process does not evaluate the " + handler + " row.");
 
 /// <summary>The stand-in a handler whose body lives in a game-bound assembly is registered with here. The manifest
 /// is a declaration and nothing in this process dispatches a command, so the row must still be exported — but the

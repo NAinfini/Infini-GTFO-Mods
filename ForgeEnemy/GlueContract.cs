@@ -58,10 +58,10 @@ internal static class GlueContract
           "id": "forge.action.combat.foaming",
           "owner": "forge.module.gtfo.enemy",
           "kind": "action",
-          "label": "附加泡沫",
+          "label": "附加泡沫并保持敌人、门、地面不同规则",
           "version": "1.0.0",
           "parameters": {
-            "description": "给敌人上原版泡沫，按原版胶量单位写。",
+            "description": "给敌人、门或地面上泡沫，各自按不同规则。",
             "summary": "给敌人上原版泡沫，按原版胶量单位写。",
             "summaryEn": "Foams an enemy through the game's own glue, in the game's own volume unit.",
             "labelEn": "Apply foam",

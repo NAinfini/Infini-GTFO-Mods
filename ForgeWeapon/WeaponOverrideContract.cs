@@ -136,7 +136,7 @@ public static class WeaponOverrideContract
       "id": "forge.action.weapon.fire_rate",
       "owner": "forge.module.gtfo.weapon",
       "kind": "action",
-      "label": "有生命周期地修改射速",
+      "label": "替换武器数据（射速、散布、后坐力） · weapon fire_rate",
       "version": "1.0.0",
       "parameters": { "description": "临时改变射速。" },
       "graph": {
@@ -183,7 +183,7 @@ public static class WeaponOverrideContract
       "id": "forge.action.weapon.spread",
       "owner": "forge.module.gtfo.weapon",
       "kind": "action",
-      "label": "修改散布与精度",
+      "label": "替换武器数据（射速、散布、后坐力） · weapon spread",
       "version": "1.0.0",
       "parameters": { "description": "改变散布和精度。" },
       "graph": {
@@ -237,9 +237,9 @@ public static class WeaponOverrideContract
       "id": "forge.action.weapon.recoil",
       "owner": "forge.module.gtfo.weapon",
       "kind": "action",
-      "label": "应用后座配置或冲量",
+      "label": "替换武器数据（射速、散布、后坐力） · weapon recoil",
       "version": "1.0.0",
-      "parameters": { "description": "用实例级换块改写这一件装备的后座数值。" },
+      "parameters": { "description": "应用后座配置或一次冲击。" },
       "graph": {
         "domains": ["weapon", "tool", "consumable"],
         "execution": "host",

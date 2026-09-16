@@ -95,7 +95,7 @@ public static class ObservationContracts
           "label": "任意实体位置",
           "version": "1.0.0",
           "parameters": {
-            "description": "读任意一个实体的当前位置。"
+            "description": "读任意一个实体的位置，不只是玩家和敌人。"
           },
           "graph": {
             "domains": [ "map", "room", "enemy", "weapon", "tool", "consumable", "player", "logic" ],

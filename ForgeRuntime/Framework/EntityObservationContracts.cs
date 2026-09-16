@@ -167,18 +167,18 @@ public sealed record RuntimeEntityInspection(EntityReference Reference,
 /// resolution and not an inspection, because a zone is a place and not an entity with a snapshot of its own — the
 /// level's own coordinates name it, and one provider's responder is what puts an entity of its kind in it.
 ///
-/// The two outcomes a null used to collapse into one are told apart here by <see cref="Answered"/>: a provider that
-/// answered has placed the entity somewhere — in a zone, or in no zone at all — and a read nobody could make is
-/// refused with a code. An entity standing outside every zone is therefore an answer and never a refusal: a
-/// selector that read it as a refusal would drop the entity instead of excluding it from the zone it asked about.
+/// One read has exactly two outcomes and <see cref="Answered"/> tells them apart: a provider that placed the
+/// entity answered with its zone, and a read nobody could make is refused with a code. A responder that answers
+/// nothing has placed nothing — that is the unknown the kind's own contract names — so it is refused like any
+/// other unreadable entity and never reported as an entity standing outside every zone.
 /// </summary>
 public sealed record EntityZoneResolution
 {
     /// <summary>The code of a read that answered with the zone the entity stands in.</summary>
     public const string InZoneCode = "entity-zone";
-    /// <summary>The code of a read that answered with no zone: the entity stands outside every zone this world
-    /// has.</summary>
-    public const string OutsideCode = "entity-zone-outside";
+    /// <summary>The kernel's refusal for a responder that answered no zone: a provider that cannot place an
+    /// entity it owns right now has not placed it outside every zone, it has not placed it at all.</summary>
+    public const string UnknownCode = "entity-zone-unknown";
     /// <summary>The kernel's refusal for a kind whose owner registered no zone responder.</summary>
     public const string UnavailableCode = "entity-zone-unavailable";
     /// <summary>The kernel's refusal for a responder that failed without naming a reason of its own.</summary>
@@ -191,14 +191,12 @@ public sealed record EntityZoneResolution
 
     /// <summary>The entity stands in this zone.</summary>
     public static EntityZoneResolution InZone(EntityReference zone) => new(zone, InZoneCode, true);
-    /// <summary>The entity stands in no zone of this world. This is an answer, not a refusal.</summary>
-    public static EntityZoneResolution Outside() => new(null, OutsideCode, true);
     /// <summary>The read could not be made. The code is the kernel's own or the responder's, by name.</summary>
     public static EntityZoneResolution Refused(string code) => new(null, code, false);
 
-    /// <summary>The zone the entity stands in, or null when it stands in none.</summary>
+    /// <summary>The zone the entity stands in.</summary>
     public EntityReference? Zone { get; }
-    /// <summary>The answer's own code: <see cref="InZoneCode"/>/<see cref="OutsideCode"/> when the read answered,
+    /// <summary>The answer's own code: <see cref="InZoneCode"/> when the read answered,
     /// and the refusal's code when it did not.</summary>
     public string Code { get; }
     /// <summary>Whether a provider answered where the entity stands. False means <see cref="Code"/> says why the

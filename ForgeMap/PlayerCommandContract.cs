@@ -141,7 +141,7 @@ public static class PlayerCommandContract
       "id": "forge.action.combat.revive",
       "owner": "forge.contract.combat",
       "kind": "action",
-      "label": "执行有明确规则的救援",
+      "label": "救起倒地玩家",
       "version": "2.0.0",
       "parameters": {
         "description": "按明确规则把倒地的人救起来。",

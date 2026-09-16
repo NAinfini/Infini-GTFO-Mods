@@ -407,7 +407,7 @@ public static class AttackInstanceContract
       "id": "forge.trigger.combat.burst_started",
       "owner": "forge.module.gtfo.weapon",
       "kind": "trigger",
-      "label": "连发序列开始",
+      "label": "开始 / 停止开火",
       "version": "1.0.0",
       "parameters": { "description": "一串连发开始。" },
       "graph": {
@@ -447,7 +447,7 @@ public static class AttackInstanceContract
       "id": "forge.trigger.combat.burst_ended",
       "owner": "forge.module.gtfo.weapon",
       "kind": "trigger",
-      "label": "连发序列结束",
+      "label": "开始 / 停止开火 · combat burst_ended",
       "version": "1.0.0",
       "parameters": { "description": "一串连发结束。" },
       "graph": {
@@ -487,9 +487,9 @@ public static class AttackInstanceContract
       "id": "forge.trigger.combat.dry_fire",
       "owner": "forge.module.gtfo.weapon",
       "kind": "trigger",
-      "label": "有效攻击请求因弹药不足失败",
+      "label": "弹匣打空 / 全部没弹",
       "version": "1.0.0",
-      "parameters": { "description": "想开枪但没子弹。工具或消耗品本身被拒绝使用用「使用失败并给出原因」。" },
+      "parameters": { "description": "想开枪但没子弹。" },
       "graph": {
         "domains": [
           "enemy",

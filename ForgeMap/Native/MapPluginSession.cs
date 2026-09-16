@@ -531,9 +531,10 @@ internal sealed partial class MapPluginSession : IDisposable
         => ZoneIndex.Current(_kernel.WorldEpoch) is { HoldsLevel: true } table ? table : null;
 
     /// <summary>The zone a player life stands in: the zone its own course node belongs to, read through the
-    /// level's zone table so the answer is a zone this level really has. Null is the one answer that is a
-    /// placement — the life's own course node names no zone of this level — and every read this process cannot
-    /// make is refused with its own name instead of being answered as that placement: a world with no level zone
+    /// level's zone table so the answer is a zone this level really has. A null is not a placement — a course node
+    /// whose zone the level's own table does not hold is a life this provider cannot place, and the kernel reports
+    /// that as its own unknown rather than as an entity standing outside every zone — and every read this process
+    /// cannot make is refused with its own name instead of being answered as that null: a world with no level zone
     /// table, a reference this session is not holding as a current life, and a life whose course node does not
     /// read are three different failures, and a caller that read any of them as "stands in no zone" would exclude
     /// a player it simply could not place.</summary>

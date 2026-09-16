@@ -85,7 +85,7 @@ public static class WeaponSupplyContract
       "kind": "action",
       "label": "补充明确弹药池",
       "version": "1.0.0",
-      "parameters": { "description": "往指定弹药池里加子弹。量是发数，实际落进池子的数在结果里回读。" },
+      "parameters": { "description": "往指定弹药池里加子弹。" },
       "graph": {
         "domains": ["weapon", "tool", "consumable"],
         "execution": "host",
@@ -126,7 +126,7 @@ public static class WeaponSupplyContract
       "kind": "action",
       "label": "补充 / 扣除备用弹药",
       "version": "1.0.0",
-      "parameters": { "description": "从指定弹药池里扣子弹。只有本机持有的池子写得了，别机持有的按名拒绝。" },
+      "parameters": { "description": "从指定弹药池里扣子弹。" },
       "graph": {
         "domains": ["weapon", "tool", "consumable"],
         "execution": "host",

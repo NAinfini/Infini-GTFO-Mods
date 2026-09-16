@@ -112,15 +112,14 @@ internal static class ValueCases
             Check(zone.WorldEpoch == s.Kernel.WorldEpoch, "The zone belongs to another world.");
         });
 
-        Case("value.where-answers-null-when-the-enemy-stands-nowhere", () =>
+        Case("value.where-refuses-a-life-that-names-no-zone", () =>
         {
             using var s = new Scene();
             var enemy = Scene.NewEnemy();
             enemy.CourseNode = new AIG_CourseNode { m_zone = null };
             var reference = s.Track(enemy);
-            var answer = s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = reference });
-            Check(answer.GetProperty("zone").ValueKind == JsonValueKind.Null,
-                "An enemy outside every zone was not answered with null.");
+            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = reference }))
+                == EnemyModule.ZoneUnknownCode, "A life whose course node names no zone was answered instead of refused.");
         });
 
         Case("value.where-refuses-a-life-it-cannot-place", () =>
@@ -140,12 +139,11 @@ internal static class ValueCases
             nowhere.CourseNode = new AIG_CourseNode { m_zone = null };
             var nowhereReference = s.Track(nowhere);
             var standingNowhere = s.Kernel.ZoneOfEntity(nowhereReference);
-            Check(standingNowhere.Answered && standingNowhere.Zone == null
-                && standingNowhere.Code == EntityZoneResolution.OutsideCode,
-                "A life outside every zone was not answered as standing nowhere: " + standingNowhere.Code);
-            Check(s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = nowhereReference })
-                .GetProperty("zone").ValueKind == JsonValueKind.Null,
-                "The where row refused a life that simply stands nowhere.");
+            Check(!standingNowhere.Answered && standingNowhere.Zone == null
+                && standingNowhere.Code == EnemyModule.ZoneUnknownCode,
+                "A life whose course node names no zone was not refused by name: " + standingNowhere.Code);
+            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = nowhereReference }))
+                == EnemyModule.ZoneUnknownCode, "The where row answered a life whose course node names no zone.");
         });
 
         Case("value.tagged-answers-the-flag-and-the-time-left", () =>

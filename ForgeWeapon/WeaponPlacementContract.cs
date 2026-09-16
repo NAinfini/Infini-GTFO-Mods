@@ -111,7 +111,7 @@ public static class WeaponPlacementContract
       "id": "forge.trigger.equipment.recall_completed",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "回收完成",
+      "label": "哨戒炮放下 / 收回",
       "version": "2.1.0",
       "parameters": {
         "description": "把放下的装置收回背包了。",

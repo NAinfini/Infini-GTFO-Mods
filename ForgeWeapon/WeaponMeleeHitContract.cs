@@ -116,9 +116,9 @@ public static class WeaponMeleeHitContract
       "id": "forge.trigger.combat.melee_hit",
       "owner": "forge.module.gtfo.weapon",
       "kind": "trigger",
-      "label": "近战命中",
+      "label": "近战挥击命中",
       "version": "1.0.0",
-      "parameters": { "description": "一次近战挥击打中了目标。同一次挥击命中几个目标就发几次；推击和挥空都不发。" },
+      "parameters": { "description": "一次近战挥击打中了目标。" },
       "graph": {
         "domains": ["enemy", "weapon", "tool", "consumable", "player"],
         "execution": "host",

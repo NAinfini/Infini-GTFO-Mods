@@ -182,9 +182,9 @@ public static class WeaponHolderActionsContract
       "id": "forge.action.weapon.reload",
       "owner": "forge.module.gtfo.weapon.holder",
       "kind": "action",
-      "label": "请求装填",
+      "label": "强制换弹",
       "version": "1.0.0",
-      "parameters": { "description": "请求持有者本机装填这一件装备；决定由主机下达，写入由持枪者执行。" },
+      "parameters": { "description": "请求装填。" },
       "graph": {
         "domains": ["weapon", "tool", "consumable"],
         "execution": "owner",
@@ -228,7 +228,7 @@ public static class WeaponHolderActionsContract
       "kind": "action",
       "label": "设置弹匣子弹数",
       "version": "1.0.0",
-      "parameters": { "description": "把这一件装备的弹匣写成指定发数；写入在持枪者本机执行。" },
+      "parameters": { "description": "把武器的弹匣设成指定数量，或者直接装满。" },
       "graph": {
         "domains": ["weapon", "tool", "consumable"],
         "execution": "owner",

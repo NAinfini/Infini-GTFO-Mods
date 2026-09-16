@@ -15,6 +15,10 @@ public sealed class EquipmentIdentitySession : IDisposable
     private readonly Func<EquipmentObservation, bool> nativeIsCurrent;
     private readonly Func<EntityReference, bool> ownerIsCurrent;
     private readonly Func<EntityReference, RuntimeEntitySnapshot?>? deployedObserver;
+    /// <summary>Whether one deployed reference is still a placement the owning adapter holds. It is a separate
+    /// answer from <see cref="deployedObserver"/> because a snapshot has to carry a world point and a placement
+    /// does not.</summary>
+    private readonly Func<EntityReference, bool>? deployedCurrent;
     private readonly Action<RuntimeLifecycleEvent>? observe;
     private readonly RuntimeModuleHandle registration;
     private readonly IReadOnlyDictionary<string, RuntimeSubscriptionGate> gates;
@@ -25,6 +29,7 @@ public sealed class EquipmentIdentitySession : IDisposable
         Func<EntityReference, bool> ownerIsCurrent, int maxActive = 1024, int maxHistory = 8192,
         Func<EntityReference, RuntimeEntitySnapshot?>? equipmentObserver = null,
         Func<EntityReference, RuntimeEntitySnapshot?>? deployedObserver = null,
+        Func<EntityReference, bool>? deployedCurrent = null,
         Func<string, EntityReference, bool>? gearBlockMatcher = null,
         RuntimeModule? module = null,
         Action<RuntimeLifecycleEvent>? observe = null)
@@ -33,6 +38,7 @@ public sealed class EquipmentIdentitySession : IDisposable
         this.nativeIsCurrent = nativeIsCurrent ?? throw new ArgumentNullException(nameof(nativeIsCurrent));
         this.ownerIsCurrent = ownerIsCurrent ?? throw new ArgumentNullException(nameof(ownerIsCurrent));
         this.deployedObserver = deployedObserver;
+        this.deployedCurrent = deployedCurrent;
         this.observe = observe;
         index = new EquipmentIdentityIndex(maxActive, maxHistory);
         // `module` is the weapon provider declaration the native half built, already carrying the bodies this
@@ -100,10 +106,12 @@ public sealed class EquipmentIdentitySession : IDisposable
             [ModuleDefinition.GearBlockAttachmentKind] =
                 AttachmentMatcherRegistration.BySubject((_, reference, subject) => gearBlock(reference, subject))
         };
-    /// <summary>Deployed instances are not in the W1 index, so this answers only from the native adapter's own
-    /// placement table; an already-ended placement is not current, which is what refuses a stale identity.</summary>
+    /// <summary>Deployed instances are not in the W1 index, so this answers from the owning adapter's own placement
+    /// table through the currency predicate it supplies; an already-ended placement is not current, which is what
+    /// refuses a stale identity. The snapshot observer is not asked here: a placement whose object cannot report a
+    /// world point is unobservable, not ended.</summary>
     private bool IsDeployedInstanceCurrent(EntityReference reference)
-        => deployedObserver != null && reference != null && deployedObserver(reference) != null;
+        => deployedCurrent != null && reference != null && deployedCurrent(reference);
 
     public int Count { get { _ = kernel.Lifecycle; return index.Count; } }
     /// <summary>The world the recorded lives belong to. It only moves when the index observes a world change, so a

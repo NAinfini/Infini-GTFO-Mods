@@ -844,7 +844,7 @@ public sealed class MapNativeAdapterTests
     }
 
     [Fact]
-    public void zone_resolver_answers_outside_when_the_level_holds_no_zone_for_the_node()
+    public void zone_resolver_refuses_a_node_whose_zone_the_level_does_not_hold()
     {
         var kernel = Host.Runtime = Kernel(); var plugin = new MapPlugin();
         try
@@ -859,15 +859,15 @@ public sealed class MapNativeAdapterTests
             var reference = kernel.ResolveEntityInstance("gtfo.player", a.Player);
             Require(reference != null, "The spawned player life was not recorded.");
 
-            // A zone the level no longer holds is a placement this provider cannot make, which is the answer the
-            // kernel reports as "outside every zone" and not as a refusal: a selector can exclude it by name.
+            // A zone the level no longer holds is a placement this provider cannot make, and the kernel refuses it
+            // as unknown: a life nobody could place is never answered as one standing outside every zone.
             var absent = new LG_Zone { m_layer = new LG_Layer { m_type = LG_LayerType.MainLayer }, LocalIndex = eLocalZoneIndex.Zone_5 };
             a.Agent.CourseNode = new AIGraph.AIG_CourseNode { m_zone = absent };
             var answer = kernel.ZoneOfEntity(reference!);
-            Require(answer.Answered && answer.Zone == null && answer.Code == EntityZoneResolution.OutsideCode,
-                "A zone the level does not hold was not answered as outside: " + answer.Code);
+            Require(!answer.Answered && answer.Zone == null && answer.Code == EntityZoneResolution.UnknownCode,
+                "A zone the level does not hold was not refused as unknown: " + answer.Code);
         }
-        finally { Outputs.AddRange(plugin.Log.Infos); Outputs.AddRange(plugin.Log.Warnings); Privacy(nameof(zone_resolver_answers_outside_when_the_level_holds_no_zone_for_the_node)); }
+        finally { Outputs.AddRange(plugin.Log.Infos); Outputs.AddRange(plugin.Log.Warnings); Privacy(nameof(zone_resolver_refuses_a_node_whose_zone_the_level_does_not_hold)); }
     }
 
     [Fact]

@@ -186,27 +186,45 @@ namespace ForgeWeapon.Tests.NativeAdapter;
                 .Select(b => b.GetProperty("id").GetString()!).OrderBy(id => id, StringComparer.Ordinal).ToArray();
             if (rows.Length == 0) throw new InvalidOperationException("The weapon provider declared no trigger binding.");
             var sink = Graph(Sink_);
-            var plans = rows.Select(id => (object)new
+            // The permissions a plan may hold are exactly the ones its pinned rows require, as the registry
+            // declares them: the rows of this package carry three different read permissions, so the set is read
+            // from the support table rather than written into the fixture.
+            var support = RuntimeJson.Parse(Kernel.ExportManifest()).GetProperty("bindingSupport").EnumerateArray()
+                .ToDictionary(s => s.GetProperty("bindingId").GetString()!,
+                    s => s.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!).ToArray(), StringComparer.Ordinal);
+            // A row whose own ports cannot feed the sink's recipient has no plan this fixture could dispatch:
+            // the sink's recipient is the one input the action contract requires, and a trigger that carries no
+            // non-nullable entity publishes a fact this world's own plan cannot consume either. The despawn row is
+            // the one ending fact whose subject is its own `entity` port, so that name is a source like the others:
+            // without it no plan is mounted on the despawn row and the ending is never built at all.
+            var dispatchable = rows.Where(id => Wiring(sink, GraphOf(id)).ContainsKey(Slot(sink.GetProperty("inputs"), "target"))).ToArray();
+            var plans = dispatchable.Select(id => (object)new
             {
                 schemaVersion = 4, kind = "forge-runtime-plan", planId = "fixture.weapon.gate." + id,
                 resource = new { id = "fixture.resource", revision = "r1" },
                 runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
-                permissions = new[] { RecordPermission, ModuleDefinition.WieldReadPermission }, dependencies = Array.Empty<string>(),
+                permissions = support[SinkBinding].Concat(support[id]).Distinct(StringComparer.Ordinal).OrderBy(p => p, StringComparer.Ordinal).ToArray(),
+                dependencies = Array.Empty<string>(),
                 // A reference that parses as a level and is not the one this world runs: the mount is judged and
-                // answers false, so nothing is ever claimed through it.
+                // answers false, so the gate opens and nothing is ever claimed through it. Every case that means to
+                // read an event through the sink mounts its own plan; a gate plan that claimed would run the sink
+                // for events the cases about unpublished facts assert never reached anybody.
                 attachments = new object[] { new { kind = "level", reference = "1:A:0" } },
                 limits = new { maxEventsPerTick = 16, maxCommandsPerTick = 16, maxQueuedEvents = 16, maxCausalDepth = 4 },
                 bindings = new[] { Pinned(SinkBinding, Sink_), Pinned(id) },
                 entrypoints = new[] { new
                 {
-                    nodeId = "Entry", binding = 1, layout = Layout(GraphOf(id)), start = 0,
-                    steps = new[] { new { nodeId = "Entry_sink", nodeKind = "action", binding = 0, layout = Layout(sink),
-                        inputs = Wiring(sink, GraphOf(id)), successors = Array.Empty<int?>() } }
+                    nodeId = "Entry", binding = 1, layout = Resolved(GraphOf(id), 0), start = 0,
+                    steps = new[] { new { nodeId = "Entry_sink", nodeKind = "action", binding = 0, layout = Resolved(SinkContract(), 0),
+                        inputs = Wiring(sink, GraphOf(id)).Select(wire => (object)new { slot = wire.Key, fromEventSlot = wire.Value }).ToArray(),
+                        successors = Array.Empty<int?>() } }
                 } }
             }).ToArray();
-            var refused = Kernel.LoadPlans(plans.Select(json => PlanCandidate.Loaded("fixture.weapon.gate.plan.json", RuntimeJson.From(json).GetRawText())).ToArray())
+            var candidates = plans.Select(json => (Json: RuntimeJson.From(json).GetRawText(), Id: (string)json.GetType().GetProperty("planId")!.GetValue(json)!)).ToArray();
+            var refused = Kernel.LoadPlans(candidates.Select(candidate => PlanCandidate.Loaded(candidate.Id + ".plan.json", candidate.Json)).ToArray())
                 .Where(outcome => !outcome.Loaded).ToArray();
-            if (refused.Length != 0) throw new RuntimeContractException(refused[0].Code!, refused[0].Code + ": " + refused[0].Detail);
+            if (refused.Length != 0) throw new RuntimeContractException(refused[0].Code!, refused[0].Code + ": " + refused[0].Detail
+                + " [" + refused[0].Path + "]");
         }
 
         /// <summary>One binding lock for a binding this world's own providers declare: the capability, provider
@@ -238,35 +256,40 @@ namespace ForgeWeapon.Tests.NativeAdapter;
             => RuntimeJson.Parse(Kernel.ExportManifest()).GetProperty("registry").GetProperty("bindings")
                 .EnumerateArray().Single(b => b.GetProperty("id").GetString() == bindingId);
 
-        private JsonElement GraphOf(string bindingId) => Graph(Row(bindingId).GetProperty("capabilityId").GetString()!);
+        private JsonElement GraphOf(string bindingId) => Row(bindingId).GetProperty("capabilityId").GetString() is var id
+            ? Kernel.ResolveGraphContract(id, CapabilityVersion(id), RuntimeJson.EmptyObject) : default;
 
-        /// <summary>The sink's inputs, wired from the trigger's own ports where the row has them. Both entity
-        /// inputs are optional in this fixture's sink, so a row that carries no actor and no equipment-shaped
-        /// subject is dispatched with nothing wired rather than refused; which port feeds `target` is the first
-        /// one of the row's own that the sink's contract accepts, in the order below.</summary>
-        private static object[] Wiring(JsonElement sink, JsonElement trigger)
+        /// <summary>The sink's own contract, resolved the way the loader resolves the entry's: through the
+        /// registered row and the kernel, never through a restated shape.</summary>
+        private JsonElement SinkContract() => Kernel.ResolveGraphContract(Sink_, CapabilityVersion(Sink_), RuntimeJson.EmptyObject);
+
+        /// <summary>The sink's inputs, wired from the trigger's own ports where the row has them, keyed by the
+        /// sink's own input slot. The sink's recipient input is required and non-nullable by contract, so only a
+        /// trigger port that is neither may feed it — an optional event port cannot be read by a step that always
+        /// runs; which port feeds `target` is the first of the row's own that the order below accepts. An empty
+        /// table is a row this fixture cannot dispatch into the sink.</summary>
+        private static Dictionary<int, int> Wiring(JsonElement sink, JsonElement trigger)
         {
             var sources = new Dictionary<string, string[]>(StringComparer.Ordinal)
             {
-                ["target"] = new[] { "target", "equipment", "deployed", "source", "item" },
+                ["target"] = new[] { "target", "equipment", "instance", "item", "deployed", "entity", "actor" },
                 ["actor"] = new[] { "actor" }
-            };            var offered = trigger.GetProperty("outputs").EnumerateArray()
-                .Where(port => port.GetProperty("type").GetString() == "entity")
+            };
+            var offered = trigger.GetProperty("outputs").EnumerateArray()
+                .Where(port => port.GetProperty("type").GetString() == "entity"
+                    && !(port.TryGetProperty("nullable", out var nullable) && nullable.GetBoolean())
+                    && !(port.TryGetProperty("optional", out var optional) && optional.GetBoolean()))
                 .Select(port => port.GetProperty("id").GetString()!).ToHashSet(StringComparer.Ordinal);
-            var wiring = new List<object>();
+            var wiring = new Dictionary<int, int>();
             foreach (var input in sink.GetProperty("inputs").EnumerateArray())
             {
                 var name = input.GetProperty("id").GetString()!;
                 if (!sources.TryGetValue(name, out var candidates)) continue;
                 var port = candidates.FirstOrDefault(offered.Contains);
                 if (port == null) continue;
-                wiring.Add(new
-                {
-                    slot = Slot(sink.GetProperty("inputs"), name),
-                    fromEventSlot = Slot(trigger.GetProperty("outputs"), port)
-                });
+                wiring[Slot(sink.GetProperty("inputs"), name)] = Slot(trigger.GetProperty("outputs"), port);
             }
-            return wiring.ToArray();
+            return wiring;
         }
 
         internal void Tick(bool host = true) => Kernel.Advance(++tick, host);
@@ -379,7 +402,11 @@ namespace ForgeWeapon.Tests.NativeAdapter;
 
         private CommandResult Record(CommandContext context)
         {
-            Sink.Add((context.EventId, context.GetEntityInput("target")!, context.GetEntityInput("actor")!));
+            // The sink's recipient is always wired; its actor is not, because several of the rows this world's
+            // gate plans subscribe to carry no actor at all. A recorder reads what the event wired.
+            Sink.Add((context.EventId, context.GetEntityInput("target")!,
+                context.Inputs.TryGetProperty("actor", out var actor) && actor.ValueKind == JsonValueKind.Object
+                    ? RuntimeJson.Entity(actor) : new EntityReference("fixture.absent", Kernel.WorldEpoch, 1)));
             return CommandResult.Succeeded(RuntimeJson.From(new { fixtureOnly = true }));
         }
 
@@ -401,7 +428,7 @@ namespace ForgeWeapon.Tests.NativeAdapter;
                     {
                         new { id = "enter", type = "execution" },
                         new { id = "target", type = "entity" },
-                        new { id = "actor", type = "entity" }
+                        new { id = "actor", type = "entity", optional = true }
                     },
                     outputs = new[] { new { id = "result", type = "result", schema = "fixture.consumer.result", fields = IdentityRow } }, parameters = Array.Empty<object>(),
                     recipients = new { input = "target", target = "entity", cardinality = "one", requires = Array.Empty<string>(), result = "result" }
@@ -429,6 +456,22 @@ namespace ForgeWeapon.Tests.NativeAdapter;
             cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0, valueSet = -1, lifetime = -1,
             optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(), nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean()
         }).ToArray();
+
+        /// <summary>The layout the loader re-derives, read through the framework's own rule. A row whose ports
+        /// name a value set — an enum, a resource kind, a handle kind — carries that set's index here, and only
+        /// the framework's own table can say which index a schema has, so this is read rather than restated.</summary>
+        private static JsonElement Sides(JsonElement contract, string side)
+            => (JsonElement)typeof(RuntimeKernel).Assembly.GetType("ForgeRuntime.Framework.RuntimeGraphContracts")!
+                .GetMethod("Layout", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(null, new object[] { contract, side })!;
+
+        /// <summary>One plan port layout over an already-resolved contract.</summary>
+        private static object Resolved(JsonElement contract, int constants) => new
+        {
+            inputs = Sides(contract, "inputs"), outputs = Sides(contract, "outputs"),
+            constants = new object?[constants], promoted = Array.Empty<int>()
+        };
+
         private static object Layout(JsonElement graph) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")),
             constants = Array.Empty<object>(), promoted = Array.Empty<int>() };
         private static int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;

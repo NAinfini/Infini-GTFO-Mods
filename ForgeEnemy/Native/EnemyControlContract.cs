@@ -36,7 +36,7 @@ internal static class EnemyControlContract
           "id": "forge.action.enemy.awaken",
           "owner": "forge.module.gtfo.enemy",
           "kind": "action",
-          "label": "唤醒敌人",
+          "label": "唤醒敌人 / 让敌人休眠",
           "version": "1.0.0",
           "parameters": {
             "description": "把睡着的敌人叫醒。",
@@ -145,7 +145,7 @@ internal static class EnemyControlContract
           "id": "forge.action.enemy.sleep",
           "owner": "forge.module.gtfo.enemy",
           "kind": "action",
-          "label": "在明确能力支持时请求休眠",
+          "label": "唤醒敌人 / 让敌人休眠 · enemy sleep",
           "version": "1.0.0",
           "parameters": {
             "description": "在能力支持时让敌人休眠。",
@@ -258,7 +258,7 @@ internal static class EnemyControlContract
           "id": "forge.action.enemy.move_to",
           "owner": "forge.module.gtfo.enemy",
           "kind": "action",
-          "label": "请求导航至合法位置",
+          "label": "让敌人移动到某处",
           "version": "1.0.0",
           "parameters": {
             "description": "让敌人导航到一个合法位置。",

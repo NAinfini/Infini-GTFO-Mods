@@ -23,7 +23,7 @@ public static class CombatContracts
           "id": "forge.action.combat.heal",
           "owner": "forge.contract.combat",
           "kind": "action",
-          "label": "恢复生命并限制溢出",
+          "label": "治疗玩家",
           "version": "2.0.0",
           "parameters": {
             "description": "给你选中的目标回血。溢出规则：截断只回到上限；丢弃是会溢出就整次不治疗；溢出允许超过上限，做不到的目标会拒绝。",
@@ -283,7 +283,7 @@ public static class CombatContracts
           "id": "forge.action.combat.revive",
           "owner": "forge.contract.combat",
           "kind": "action",
-          "label": "执行有明确规则的救援",
+          "label": "救起倒地玩家",
           "version": "2.0.0",
           "parameters": {
             "description": "按明确规则把倒地的人救起来。",

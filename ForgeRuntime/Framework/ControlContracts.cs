@@ -67,31 +67,31 @@ public static class ControlContracts
 
     private static readonly Dictionary<string, string> Labels = new(StringComparer.Ordinal)
     {
-        ["branch"] = "条件分支",
-        ["sequence"] = "顺序执行",
-        ["parallel_all"] = "同时执行并等待全部结束",
-        ["random_branch"] = "随机走一个分支",
-        ["delay"] = "延迟进入",
-        ["interval"] = "周期脉冲",
-        ["repeat"] = "有限重复",
-        ["for_each"] = "逐目标",
-        ["cancel"] = "取消任务",
-        ["restart"] = "重启计时器",
+        ["branch"] = "分支",
+        ["sequence"] = "按顺序执行",
+        ["parallel_all"] = "同时执行",
+        ["random_branch"] = "随机数",
+        ["delay"] = "延时",
+        ["interval"] = "有次数或终止条件的周期任务",
+        ["repeat"] = "重复 / 每隔 N 秒",
+        ["for_each"] = "对列表里每一个执行",
+        ["cancel"] = "结束流程",
+        ["restart"] = "重启计时器（滚动窗口）",
         ["present"] = "有值时"
     };
     private static readonly Dictionary<string, string> Descriptions = new(StringComparer.Ordinal)
     {
         ["branch"] = "条件成立走一边，不成立走另一边。",
-        ["sequence"] = "按输出顺序深度优先逐个走完。",
-        ["parallel_all"] = "同时从每个分支后继开始，全部结束后走 next。",
-        ["random_branch"] = "主机在执行时挑一个分支后继，只走那一个；作者不填种子，结果随这次执行确定。",
-        ["delay"] = "计时结束时进入 next；timer 句柄在进入时写出。",
-        ["interval"] = "立即进入 next，每跳从 pulse 后继走一遍；脉冲不派发新事件。省略 count 表示一直跑到取消或作用域结束。",
-        ["repeat"] = "同一派发内循环 count 轮，每轮写 index 后走 body。",
-        ["for_each"] = "按候选集合逐目标循环，每轮写 item 与 index 后走 body。",
-        ["cancel"] = "取消 task 句柄持有的调度，输出实际取消数。",
-        ["restart"] = "把 task 句柄持有的计时器从现在起重排一次，句柄继续有效；排期已结束的句柄按名拒绝。",
-        ["present"] = "值存在时走 present，不存在时走 missing；present 分支里的步骤可以把这个值当非空值用。"
+        ["sequence"] = "按你排好的顺序一步步往下执行。",
+        ["parallel_all"] = "几条分支一起跑，全跑完再继续。",
+        ["random_branch"] = "等概率随机走一条分支，同种子同结果。",
+        ["delay"] = "等一段时间再继续。",
+        ["interval"] = "按周期反复执行，可以设次数或终止条件。",
+        ["repeat"] = "重复固定次数。",
+        ["for_each"] = "对集合里的每个目标各跑一遍，带预算上限。",
+        ["cancel"] = "取消一个正在跑的任务和它的后代。",
+        ["restart"] = "把一个还在跑的计时器从现在重新开始，用来做滚动窗口。",
+        ["present"] = "只有当这个值真的存在时才走这条路；不存在时走另一条。"
     };
 
     /// <summary>One control's declared graph, port order included: the plan's successor table is indexed by the

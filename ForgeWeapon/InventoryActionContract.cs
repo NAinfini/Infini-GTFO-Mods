@@ -65,7 +65,7 @@ public static class InventoryActionContract
       "kind": "action",
       "label": "给予 / 扣除物品（消耗品、资源包）",
       "version": "1.0.0",
-      "parameters": { "description": "在容量和权限允许时给出物品。一次一件；口袋格被占或资源无法绑定都按名拒绝。" },
+      "parameters": { "description": "在容量和权限允许时给出物品。" },
       "graph": {
         "domains": ["map", "tool", "consumable", "player"],
         "execution": "host",
@@ -111,7 +111,7 @@ public static class InventoryActionContract
       "kind": "action",
       "label": "给予 / 扣除物品（消耗品、资源包） · inventory consume",
       "version": "1.0.0",
-      "parameters": { "description": "按事务扣掉堆叠或使用次数。原版入口一次移除一件，数量循环调用；charges 不读。" },
+      "parameters": { "description": "按事务扣掉堆叠或使用次数。" },
       "graph": {
         "domains": ["map", "tool", "consumable", "player"],
         "execution": "host",

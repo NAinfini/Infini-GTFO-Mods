@@ -91,6 +91,7 @@ internal sealed class WeaponNativeSession : IDisposable
             // Duplicate provider registration throws here, before any detour is attempted.
             session.Identity = new EquipmentIdentitySession(kernel, logLevel, session.Adapter.IsNativeCurrent, kernel.IsEntityCurrent,
                 equipmentObserver: session.Adapter.ObserveEquipment, deployedObserver: session.Adapter.ObserveDeployable,
+                deployedCurrent: session.Adapter.HoldsDeployable,
                 gearBlockMatcher: session.Adapter.MatchesGearBlock,
                 module: ModuleDefinition.Create(
                     ammoAdd: session.Supply.HandleAdd, ammoConsume: session.Supply.HandleConsume,
