@@ -11,9 +11,7 @@ namespace ForgeEnemy.Native;
 /// writes the world: it only reads one registered enemy and publishes the transitions it observed.</summary>
 internal sealed partial class EnemyModule
 {
-    internal const string StateChangedBinding = ProviderId + ".binding.state_changed";
     internal const string AwakenedBinding = ProviderId + ".binding.awakened";
-    internal const string AlertChangedBinding = ProviderId + ".binding.alert_changed";
     internal const string TargetAcquiredBinding = ProviderId + ".binding.target_acquired";
     internal const string TargetLostBinding = ProviderId + ".binding.target_lost";
     internal const string ScoutDetectionBinding = ProviderId + ".binding.scout_detection";
@@ -24,15 +22,8 @@ internal sealed partial class EnemyModule
     /// to read the AI, and a fact omitted here would be published never instead of once.</summary>
     internal static readonly string[] BehaviorBindings =
     {
-        StateChangedBinding, AwakenedBinding, AlertChangedBinding, TargetAcquiredBinding, TargetLostBinding,
-        ScoutDetectionBinding, ScoutScreamBinding
+        AwakenedBinding, TargetAcquiredBinding, TargetLostBinding, ScoutDetectionBinding, ScoutScreamBinding
     };
-
-    /// <summary>The alert level is `EnemyDetection.m_biggestDetectionBuildup`, which `UpdateData` clamps with
-    /// `Mathf.Clamp01`, so the published value is a 0..1 quantity. It is quantized to this step so a continuous
-    /// ramp publishes on crossings instead of every behaviour update.</summary>
-    internal const double AlertStep = 0.25;
-    internal const double MaximumAlert = 1.0;
 
     /// <summary>Native `EB_States.Hibernating` (0) and `EB_States.SquidBoss_Hibernating` (12): the sleeping
     /// baselines the awakened fact leaves. Both sides of the transition are tested, so hibernating to
@@ -44,7 +35,6 @@ internal sealed partial class EnemyModule
     private sealed class Behavior
     {
         internal int State;
-        internal int AlertBucket = -1;
         internal int ScoutPhase = -1;
         /// <summary>The life's last observed target lock: whether the AI held a valid target, and which entity it
         /// held. The reference is the one the kernel resolved for the sample, or null when the sample's target was
@@ -58,7 +48,6 @@ internal sealed partial class EnemyModule
         {
             if (EnemyBehaviorFactsObserver.Read(enemy, reference) is not { } sample) return;
             State = sample.BehaviourState;
-            AlertBucket = AlertBucket(sample.Alert);
             ScoutPhase = sample.ScoutScreamPhase;
             TargetValid = sample.HasValidTarget;
         }
@@ -79,7 +68,6 @@ internal sealed partial class EnemyModule
         if (sample == null || sample.Reference != reference || Resolve(reference) != entry
             || entry.EnemyPointer != entryPointer) return;
         ObserveStateChange(entry, behavior, sample);
-        ObserveAlertChange(reference, behavior, sample);
         ObserveTargetChange(reference, behavior, sample);
         ObserveScoutScream(reference, behavior, sample);
     }
@@ -101,14 +89,12 @@ internal sealed partial class EnemyModule
         PublishBehavior(ScoutDetectionBinding, entry.Reference, ports);
     }
 
+    /// <summary>The one state edge this module still publishes: leaving a hibernating state is the wake-up. The
+    /// per-life state watermark is what decides it, so a life that never leaves hibernation publishes nothing and
+    /// a state change between two awake states is not a fact here.</summary>
     private void ObserveStateChange(Entry entry, Behavior behavior, EnemyBehaviorFactsObserver.Sample sample)
     {
         if (sample.BehaviourState == behavior.State) return;
-        var ports = Ports();
-        ports["enemy"] = entry.Reference;
-        ports["state"] = AiState(sample.BehaviourState);
-        ports["previous"] = AiState(behavior.State);
-        PublishBehavior(StateChangedBinding, entry.Reference, ports);
         if (Hibernating(behavior.State) && !Hibernating(sample.BehaviourState))
         {
             // Wake-up itself carries no verifiable cause in the behaviour machine.
@@ -117,18 +103,6 @@ internal sealed partial class EnemyModule
             PublishBehavior(AwakenedBinding, entry.Reference, awake);
         }
         behavior.State = sample.BehaviourState;
-    }
-
-    private void ObserveAlertChange(EntityReference reference, Behavior behavior, EnemyBehaviorFactsObserver.Sample sample)
-    {
-        int bucket = AlertBucket(sample.Alert);
-        if (bucket == behavior.AlertBucket) return;
-        var ports = Ports();
-        ports["enemy"] = reference;
-        ports["alert"] = sample.Alert;
-        ports["rising"] = bucket > behavior.AlertBucket;
-        behavior.AlertBucket = bucket;
-        PublishBehavior(AlertChangedBinding, reference, ports);
     }
 
     /// <summary>
@@ -214,42 +188,4 @@ internal sealed partial class EnemyModule
     // kernel's event shape check rejects any name the capability does not declare.
     private static Dictionary<string, object> Ports() => new(StringComparer.Ordinal);
 
-    private static int AlertBucket(double alert)
-        => (int)Math.Floor(Math.Clamp(alert, 0, MaximumAlert) / AlertStep);
-
-    /// <summary>Native `EB_States` to the catalog's `ai_state` member index. Every declared native member has
-    /// one entry, so no observed state is silently folded into an unrelated one.</summary>
-    private static int AiState(int nativeState) => nativeState switch
-    {
-        0 => 0,   // Hibernating
-        1 => 2,   // Patrolling
-        2 => 3,   // Patrolling_Investigate
-        3 => 4,   // FollowingGroup
-        4 => 4,   // FollowingGroup_MoveToNode
-        5 => 5,   // InCombat
-        6 => 5,   // InCombat_MoveToPoint
-        7 => 5,   // InCombat_MoveToTarget
-        8 => 5,   // InCombat_MoveToNextNode
-        9 => 5,   // InCombat_MoveToNextNode_PathBlocked
-        10 => 5,  // InCombat_MoveToNextNode_PathOpen
-        11 => 5,  // InCombat_MoveToNextNode_DestroyDoor
-        12 => 0,  // SquidBoss_Hibernating
-        13 => 1,  // SquidBoss_Intro: the boss leaving its hibernation
-        14 => 6,  // SquidBoss_Combat
-        15 => 6,  // SquidBoss_Raging: a combat phase
-        16 => 6,  // SquidBoss_Spawning: spawning adds is an attack
-        17 => 7,  // SquidBoss_Cooldown
-        18 => 7,  // SquidBoss_RageTransition
-        19 => 9,  // Dead
-        20 => 6,  // InCombat_ChargedAttack
-        21 => 5,  // Incombat_GraphTraversal_Flyer
-        22 => 5,  // Incombat_FlyOutOfBoss_Flyer
-        23 => 5,  // InCombat_Dash
-        24 => 6,  // InCombat_HeldPlayer
-        25 => 6,  // InCombat_AfterHeldPlayer
-        26 => 6,  // InCombat_Consume
-        27 => 6,  // InCombat_SpitOut
-        28 => 7,  // InCombat_Stagger
-        _ => 8    // Disabled: no mapped native member is an observed state.
-    };
 }

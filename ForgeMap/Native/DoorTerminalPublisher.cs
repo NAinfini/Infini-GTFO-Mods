@@ -63,13 +63,6 @@ internal sealed class DoorTerminalPublisher
     /// the ledger is emptied rather than kept.</summary>
     internal void BeginWorld() => _ledger.Clear();
 
-    /// <summary>One door approach. The door is the subject and the actor is absent: the approach callback
-    /// carries no player and the door's own replicated state carries none either, so the port stays out instead
-    /// of being published as a player that was never observed.</summary>
-    internal bool Approach(MapObjectReference address)
-        => Publish(DoorTerminalEventContract.DoorApproachFact, address, "approached", Payload(
-            ("door", RuntimeJson.From(Reference(address)))));
-
     /// <summary>One scan transition. The phase is the transition and the status is the native value the phase
     /// was derived from, so a plan can read either.</summary>
     internal bool Scan(MapObjectReference address, int phase, int status)
@@ -116,19 +109,8 @@ internal sealed class DoorTerminalPublisher
             ("slot", slot is { } value and > 0 ? RuntimeJson.From(value) : (JsonElement?)null),
             ("input", DoorTerminalDerivations.InputLine(input) is { } line ? RuntimeJson.From(line) : (JsonElement?)null)));
 
-    /// <summary>One log a terminal read. The log's name is the interpreter's own first parameter, and both the
-    /// name and the raw line are left out when the interpreter produced none.</summary>
-    internal bool TerminalLog(MapObjectReference address, string? log, string? line)
-    {
-        if (DoorTerminalDerivations.LogName(log) is not { } name) return false;
-        return Publish(DoorTerminalEventContract.TerminalLogFact, address, "log:" + name, Payload(
-            ("terminal", RuntimeJson.From(Reference(address))),
-            ("log", RuntimeJson.From(name)),
-            ("line", DoorTerminalDerivations.InputLine(line) is { } raw ? RuntimeJson.From(raw) : (JsonElement?)null)));
-    }
-
     /// <summary>Whether any fact of one address is new under its own state key. The key is the fact's own
-    /// binding id rather than the capability, so the two categories and the five facts cannot collide. The
+    /// binding id rather than the capability, so the two categories and the three facts cannot collide. The
     /// subject text is the entity id the address is named by — kind included — so the published event id and the
     /// reference a plan reads back are one spelling of one thing.</summary>
     private bool Publish(string fact, MapObjectReference address, string stateKey, JsonElement outputs)

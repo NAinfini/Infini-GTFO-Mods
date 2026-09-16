@@ -9,9 +9,8 @@ namespace ForgeWeapon.Tests.AttackInstance;
 
 /// <summary>The hook-to-native mapping, checked against the interop metadata rather than against the doubles this
 /// project compiles: every `HarmonyPatch` declaration in the slice's hook set has to name a type and a method this
-/// build's `Modules-ASM.dll` really declares, and the four `Fire` bodies have to exist as four distinct methods on
-/// four distinct types. A member this build does not have fails here, which is the check a hook set assembled by
-/// attribute cannot make for itself at compile time.
+/// build's `Modules-ASM.dll` really declares. A member this build does not have fails here, which is the check a
+/// hook set assembled by attribute cannot make for itself at compile time.
 ///
 /// The hook set is read as source, not compiled: its bodies reach `WeaponNativeSession`, whose registration
 /// belongs to the package's own plugin, and a second copy of that session inside this fixture would check nothing.
@@ -24,15 +23,12 @@ public sealed class NativeMemberTests
     /// the source so the list cannot drift from what the plugin installs.</summary>
     private static readonly (string Type, string Method)[] Patched = Declarations();
 
-    /// <summary>The natives the module and the adapter read by name, each on the type that declares it: the
-    /// weapon's own burst counters, and the weapon the archetype was set up on.</summary>
+    /// <summary>The natives the module and the hooks read by name, each on the type that declares it: the
+    /// weapon's own burst length, and the weapon the archetype was set up on.</summary>
     private static readonly (string Type, string Member)[] Read =
     {
         ("Gear.BulletWeapon", "m_burstMax"),
-        ("Gear.BulletWeapon", "m_burstCurrentCount"),
-        ("Gear.BulletWeaponArchetype", "m_weapon"),
-        ("Gear.BWA_Burst", "m_burstMax"),
-        ("Gear.BWA_Burst", "m_burstCurrentCount")
+        ("Gear.BulletWeaponArchetype", "m_weapon")
     };
 
     [Fact]
@@ -62,38 +58,6 @@ public sealed class NativeMemberTests
             Assert.NotNull(Type(assembly, type));
     }
 
-    /// <summary>The four ranged firing bodies are four distinct methods on four distinct types, which is what
-    /// makes one patch per body publish exactly one attack scope per trigger pull; and the two rifle classes
-    /// declare no `Fire` of their own, which is why they carry no hook.</summary>
-    [Fact]
-    public void TheFourFireBodiesAreFourDistinctMethods()
-    {
-        using var assembly = Interop();
-        var bodies = new[] { "Gear.BulletWeapon", "Gear.Shotgun", "Gear.BulletWeaponSynced", "Gear.ShotgunSynced" }
-            .Select(type => (Type: type, Method: Type(assembly, type).Methods.Single(candidate => candidate.Name == "Fire")))
-            .ToArray();
-        Assert.Equal(4, bodies.Select(body => body.Method.FullName).Distinct(StringComparer.Ordinal).Count());
-        foreach (var inherited in new[] { "Gear.RifleWeapon", "Gear.RifleWeaponSynced" })
-            Assert.DoesNotContain(Type(assembly, inherited).Methods, candidate => candidate.Name == "Fire");
-    }
-
-    /// <summary>The two melee callbacks the swing half is built on exist on the melee family, and the melee state
-    /// enum is a real enum whose attack states this build declares.</summary>
-    [Fact]
-    public void TheMeleeEntryAndItsEndExist()
-    {
-        using var assembly = Interop();
-        var melee = Type(assembly, "Gear.MeleeWeaponFirstPerson");
-        Assert.Contains(melee.Methods, candidate => candidate.Name == "DoTriggerAttack");
-        Assert.Contains(melee.Methods, candidate => candidate.Name == "OnAttackHitDone");
-        var state = Type(assembly, "Gear.eMeleeWeaponState");
-        Assert.True(state.IsEnum, "Gear.eMeleeWeaponState is a real enum in this build.");
-        var members = state.Fields.Select(field => field.Name).ToArray();
-        Assert.Contains("AttackMissLeft", members);
-        Assert.Contains("AttackHitLeft", members);
-        Assert.Contains("AttackChargeReleaseLeft", members);
-    }
-
     /// <summary>The empty-clip and burst-sequence members the hooks are installed on are declared on the two
     /// burst-capable archetypes, and the semi-burst archetype declares no sequence end of its own — which is why
     /// it carries no burst hook.</summary>
@@ -113,33 +77,16 @@ public sealed class NativeMemberTests
         Assert.DoesNotContain(semiBurst.Methods, candidate => candidate.Name == "OnFireShotEmptyClip");
     }
 
-    /// <summary>The weapon members the module reads are declared with the types it reads them as. The interop
-    /// generator exposes a native field as a property of the field's own name, so the member is looked up as
-    /// either and its declared type is what the read is checked against.</summary>
+    /// <summary>The weapon members the module and the hooks read are declared with the types they read them as.
+    /// The interop generator exposes a native field as a property of the field's own name, so the member is looked
+    /// up as either and its declared type is what the read is checked against.</summary>
     [Fact]
     public void TheMembersTheModuleReadsAreDeclaredWithTheirTypes()
     {
         using var assembly = Interop();
         Assert.Equal("System.Int32", Member(assembly, "Gear.BulletWeapon", "m_burstMax").Type);
-        Assert.Equal("System.Int32", Member(assembly, "Gear.BulletWeapon", "m_burstCurrentCount").Type);
         Assert.Equal("Gear.BulletWeapon", Member(assembly, "Gear.BulletWeaponArchetype", "m_weapon").Type);
         foreach (var (type, member) in Read) Member(assembly, type, member);
-    }
-
-    /// <summary>The `Fire` body the hooks patch carries the game's own optional parameter, which is what the hook
-    /// bodies' `nameof` binding and Harmony's own resolution rely on.</summary>
-    [Fact]
-    public void TheFireBodiesCarryTheirOwnSignature()
-    {
-        using var assembly = Interop();
-        foreach (var type in new[] { "Gear.BulletWeapon", "Gear.Shotgun", "Gear.BulletWeaponSynced", "Gear.ShotgunSynced" })
-        {
-            var fire = Type(assembly, type).Methods.Single(candidate => candidate.Name == "Fire");
-            Assert.True(fire.HasParameters);
-            Assert.Single(fire.Parameters);
-            Assert.Equal("System.Boolean", fire.Parameters[0].ParameterType.FullName);
-            Assert.Equal("System.Void", fire.ReturnType.FullName);
-        }
     }
 
     /// <summary>The patch declarations as the hook source spells them: `[HarmonyPatch(typeof(Target), nameof(Target.Member))]`.

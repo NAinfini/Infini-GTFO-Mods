@@ -150,6 +150,13 @@ internal sealed class EnvironmentWorld : IDisposable
         LevelGeneration.LG_LevelBuilder.Current = new LevelGeneration.LG_LevelBuilder { m_currentFloor = floor };
     }
 
+    /// <summary>The light objects one zone of the standing level holds, in the order the level placed them. A case
+    /// reads and writes a light's own category and what a transition left on it through this list, which is the
+    /// same list the light-colour row writes into.</summary>
+    internal static List<LevelGeneration.LG_Light> Lights(int zone)
+        => LevelGeneration.LG_LevelBuilder.Current?.m_currentFloor?.allZones?[zone]?.m_lightsInZone
+            ?? new List<LevelGeneration.LG_Light>();
+
     internal static void Reset()
     {
         WorldEventManager.Reset();
@@ -159,6 +166,9 @@ internal sealed class EnvironmentWorld : IDisposable
         GuiManager.Reset();
         PlayerIdentityModule.Reset();
         TeammateOverhead.Clear();
+        // The light transitions are the one thing this package keeps between frames, so a case starts from a world
+        // with none in flight rather than from whatever the case before it scheduled.
+        LightColorFades.Clear();
         UnityEngine.Object.ForgetAll();
         LevelGeneration.LG_LevelBuilder.Current = null;
     }

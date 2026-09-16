@@ -30,6 +30,15 @@ internal readonly struct EnvironmentZone
     internal int Layer { get; }
     internal int Zone { get; }
 
+    /// <summary>The address of a native zone this level already holds, or null when one of its three coordinates is
+    /// outside the enum the game indexes that axis with. It is how a zone the level's own table answered is named
+    /// again without going back through the reference grammar.</summary>
+    internal static EnvironmentZone? Of(int dimension, int layer, int zone)
+    {
+        var address = new EnvironmentZone(dimension, layer, zone);
+        return address.InRange ? address : null;
+    }
+
     /// <summary>Whether each of the three coordinates is inside the enum the game indexes that axis with. The
     /// check is made here rather than at the cast, because a cast of an out-of-range integer produces a member
     /// the game never assigned and the entry would then read a zone that does not exist.</summary>
@@ -74,6 +83,11 @@ internal readonly struct EnvironmentZone
 /// `ExecuteEvent` returns nothing, so an argument that cannot be carried has to be refused before the entry is
 /// reached rather than reported afterwards. That is also why every handler's result is a row per named zone with
 /// the commit the entry was invoked under, and never a claim about the state the effect will end in.
+///
+/// The light-colour row is the one exception to the split above and says so: the game has no entry that carries a
+/// colour or an intensity for a light, so that row's write is this package's own, on the light objects of the zone
+/// it names, over the frames the transition lasts (`LightColorFade`). It is also the one row whose request is
+/// judged in full before anything is written, because it can write immediately.
 /// </summary>
 internal sealed class EnvironmentActions
 {
@@ -98,6 +112,23 @@ internal sealed class EnvironmentActions
     internal const string PositionCode = "environment-position-invalid";
     /// <summary>A negative `count`. The entry reads it as a light budget, so a negative one is refused.</summary>
     internal const string CountCode = "environment-count-invalid";
+    /// <summary>A light-colour request that names neither a colour nor a brightness: it asks for a transition to
+    /// what the lights already are, which is not a request this row can carry.</summary>
+    internal const string LightColorCode = "light-color-required";
+    /// <summary>A `color` port that is present and not three numbers, or three numbers outside the unit range the
+    /// game's own `Color` means here. It is refused rather than clamped, because a clamped colour is a different
+    /// colour than the one the plan asked for.</summary>
+    internal const string ColorCode = "light-color-invalid";
+    /// <summary>A `brightness` multiplier that is present and not a finite number, or one below zero.</summary>
+    internal const string BrightnessCode = "light-brightness-invalid";
+    /// <summary>A `transition` that is present and not a finite number of seconds, or a negative one.</summary>
+    internal const string TransitionCode = "light-transition-invalid";
+    /// <summary>A `category` that is not one of the game's own seven light categories.</summary>
+    internal const string CategoryCode = "light-category-unsupported";
+    /// <summary>A named zone the request would change no light in: the level has no zone at the address, the zone
+    /// holds no light object at all, or none of its lights is of the category the request named. A row that
+    /// reported success for such a zone would claim a write nobody could see.</summary>
+    internal const string NoLightsCode = "light-color-no-lights";
     /// <summary>The game's own maximum for `WorldEventObjectFilter`: a name longer than this cannot be one.</summary>
     internal const int MaximumFilterLength = 512;
 
@@ -119,6 +150,7 @@ internal sealed class EnvironmentActions
         => new(canExecute, () => WorldEventManager.Current, report);
 
     internal CommandResult HandleLighting(CommandContext context) => Lighting(context);
+    internal CommandResult HandleLightColor(CommandContext context) => LightColor(context);
     internal CommandResult HandleFog(CommandContext context) => Fog(context);
     internal CommandResult HandleFogCycle(CommandContext context) => FogCycle(context);
     internal CommandResult HandleNavMarker(CommandContext context) => NavMarker(context);
@@ -172,6 +204,159 @@ internal sealed class EnvironmentActions
             }
         }
         return Issued(rows);
+    }
+
+    /// <summary>The `forge.action.presentation.light_color` command: the colour and intensity transition over the
+    /// light objects the named zones hold.
+    ///
+    /// This is the one row of this file the game has no entry for. Lights have no level event that carries a colour
+    /// or an intensity and no state replicator that would carry one — `EnvironmentStateManager`'s light entries are
+    /// the two on/off flips, which is what the `lighting` row above runs — so the write is this package's own and
+    /// is made on the light objects of the zone itself, frame by frame, through `LG_Light.ChangeColor` and
+    /// `LG_Light.ChangeIntensity`. Nothing is claimed about any other machine: what this row changes is the light
+    /// objects of the process it runs in.
+    ///
+    /// The whole request is judged before the first light is touched: every named zone has to be a zone of this
+    /// level that holds at least one light of the requested category, and both a malformed colour, brightness or
+    /// transition and a request naming neither a colour nor a brightness are refused by name rather than served as
+    /// a transition to what the lights already are. Only then is a transition scheduled, one per zone, and the row
+    /// reports the zone it was scheduled for and the commit it carries — the write of a transition of no length is
+    /// already made by then, and one with a length is made by the frames that follow.</summary>
+    internal CommandResult LightColor(CommandContext context)
+    {
+        if (!Authoritative(context)) return CommandResult.Rejected(AuthorityCode);
+        string? scope = Text(context.Parameters, "scope");
+        if (scope != "zones" && scope != "expedition") return CommandResult.Rejected(ScopeCode);
+        string? category = Text(context.Parameters, "category");
+        // A `category` that is present and not one of the members is refused rather than read as "every
+        // category": an absent port already means that, and a value nobody declared must not mean the same thing.
+        bool declaredCategory = context.Parameters.ValueKind == JsonValueKind.Object
+            && context.Parameters.TryGetProperty("category", out var declared)
+            && declared.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
+        if (declaredCategory && category == null) return CommandResult.Rejected(CategoryCode);
+        int categoryIndex = category == null
+            ? LightColorFade.EveryCategory
+            : Array.IndexOf(EnvironmentContract.LightCategories, category);
+        if (category != null && categoryIndex < 0) return CommandResult.Rejected(CategoryCode);
+        if (!Targets(context, "zones", out var named, out var refusal)) return refusal;
+        if (!TryColor(context, out var color, out refusal)) return refusal;
+        if (!TryBrightness(context, out var brightness, out refusal)) return refusal;
+        if (color == null && brightness == null) return CommandResult.Rejected(LightColorCode);
+        if (!TryTransition(context, out float transition, out refusal)) return refusal;
+
+        // `expedition` is every zone the standing level holds — the same scope the level-wide light entry means —
+        // and `zones` is exactly the places the request named. The request names its recipients either way, which
+        // the recipient contract requires; the difference is only which zones the write lands on.
+        var plan = new List<(EnvironmentZone Address, List<LG_Light> Lights)>();
+        if (scope == "expedition")
+        {
+            foreach (var zone in EnvironmentZoneTable.Standing())
+            {
+                var layer = zone.m_layer;
+                if (layer == null) continue;
+                if (EnvironmentZone.Of((int)zone.m_dimensionIndex, (int)layer.m_type, (int)zone.LocalIndex)
+                    is not { } address) continue;
+                plan.Add((address, Lights(zone)));
+            }
+            if (plan.Count == 0) return CommandResult.Rejected(UnavailableCode);
+        }
+        else
+        {
+            foreach (var address in named)
+            {
+                if (EnvironmentZoneTable.At(address) is not { } zone)
+                    return CommandResult.Rejected(EnvironmentQuery.ZoneMissingCode);
+                plan.Add((address, Lights(zone)));
+            }
+        }
+        foreach (var (_, lights) in plan)
+            if (!lights.Any(light => categoryIndex == LightColorFade.EveryCategory
+                || (int)light.m_category == categoryIndex))
+                return CommandResult.Rejected(NoLightsCode);
+
+        var rows = new List<EnvironmentRow>(plan.Count);
+        foreach (var (address, lights) in plan)
+        {
+            var target = RuntimeZones.Reference(context.WorldEpoch, address.Dimension, address.Layer, address.Zone);
+            LightColorFade? fade;
+            try
+            {
+                fade = LightColorFade.Between(lights, color, brightness, categoryIndex, transition);
+                LightColorFades.Schedule(context.WorldEpoch,
+                    new LightColorFade.Key(address.Dimension, address.Layer, address.Zone, categoryIndex), fade);
+            }
+            catch (Exception error)
+            {
+                // A light object the level already took throws on the write. It is recorded as an unknown commit
+                // rather than a clean refusal: part of the zone's lights may already carry the new value.
+                Report("map.light-color-failed: " + error.GetType().Name + ": " + error.Message);
+                rows.Add(EnvironmentRow.For(target, CommandStatuses.Failed, CommitStates.Unknown, "light-color-exception"));
+                continue;
+            }
+            rows.Add(EnvironmentRow.For(target, CommandStatuses.Succeeded, CommitStates.Confirmed, "light-color-scheduled"));
+        }
+        return Issued(rows);
+    }
+
+    /// <summary>The light objects one zone holds, as this package's own list: the zone's own `m_lightsInZone` is
+    /// the one place the level records them, and the entries that are not lights are dropped rather than carried
+    /// into a transition that would write at them.</summary>
+    private static List<LG_Light> Lights(LG_Zone zone)
+    {
+        var lights = new List<LG_Light>();
+        var native = zone.m_lightsInZone;
+        if (native == null) return lights;
+        for (var index = 0; index != native.Count; index++)
+        {
+            var light = native[index];
+            if (light != null) lights.Add(light);
+        }
+        return lights;
+    }
+
+    /// <summary>A `color` port as the game's own colour, or null when the plan named none. Three numbers outside
+    /// the unit range are refused rather than clamped, and a vector that is present and not three finite numbers
+    /// is refused rather than narrowed, exactly as the `position` port of the lighting row is.</summary>
+    private static bool TryColor(CommandContext context, out UnityEngine.Color? color, out CommandResult refusal)
+    {
+        color = null;
+        refusal = CommandResult.Rejected(ColorCode);
+        bool present = TryVector(context.Inputs, "color", out var vector, out bool malformed);
+        if (malformed) return false;
+        if (!present) return true;
+        if (vector.x is < 0f or > 1f || vector.y is < 0f or > 1f || vector.z is < 0f or > 1f) return false;
+        color = new UnityEngine.Color(vector.x, vector.y, vector.z, 1f);
+        return true;
+    }
+
+    /// <summary>A `brightness` multiplier, or null when the plan named none. Zero is a light driven dark and is
+    /// carried; a negative or non-finite multiplier is refused.</summary>
+    private static bool TryBrightness(CommandContext context, out float? brightness, out CommandResult refusal)
+    {
+        brightness = null;
+        refusal = CommandResult.Rejected(BrightnessCode);
+        if (context.Inputs.ValueKind != JsonValueKind.Object
+            || !context.Inputs.TryGetProperty("brightness", out var value)
+            || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return true;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out double number)
+            || !double.IsFinite(number) || number < 0) return false;
+        brightness = (float)number;
+        return true;
+    }
+
+    /// <summary>The `transition` length in seconds, zero when the plan named none — the write itself. A negative or
+    /// non-finite length is refused: there is no frame it could mean.</summary>
+    private static bool TryTransition(CommandContext context, out float transition, out CommandResult refusal)
+    {
+        transition = 0f;
+        refusal = CommandResult.Rejected(TransitionCode);
+        if (context.Inputs.ValueKind != JsonValueKind.Object
+            || !context.Inputs.TryGetProperty("transition", out var value)
+            || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return true;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out double number)
+            || !double.IsFinite(number) || number < 0) return false;
+        transition = (float)number;
+        return true;
     }
 
     /// <summary>The `forge.action.presentation.fog` command: the game's own fog transition, whose three

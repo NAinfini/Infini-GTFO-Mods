@@ -233,32 +233,6 @@
       }
     },
     {
-      "hook": "ObjectiveStatusReadback",
-      "assembly": "Modules-ASM.dll",
-      "type": "WardenObjective",
-      "name": "OnStatusChange",
-      "signature": "System.Void WardenObjective::OnStatusChange(System.Boolean,pWardenObjectiveState,eWardenObjectiveStatus,eWardenObjectiveStatus,eWardenSubObjectiveStatus,eWardenSubObjectiveStatus)",
-      "isVirtual": true,
-      "isStatic": false,
-      "rva": null,
-      "patch": "postfix",
-      "session": "on",
-      "postfix": {
-        "instanceParameter": null,
-        "arguments": [
-          {
-            "name": "isRecall",
-            "type": "System.Boolean"
-          }
-        ],
-        "reads": [
-          "isRecall"
-        ],
-        "writes": [],
-        "guard": "GuardLevelEvents"
-      }
-    },
-    {
       "hook": "PlayerBulletDamageKind",
       "assembly": "Modules-ASM.dll",
       "type": "Dam_PlayerDamageBase",
@@ -945,21 +919,12 @@
           {
             "name": "inputString",
             "type": "System.String"
-          },
-          {
-            "name": "param1",
-            "type": "System.String"
-          },
-          {
-            "name": "param2",
-            "type": "System.String"
           }
         ],
         "reads": [
           "terminalID",
           "command",
-          "inputString",
-          "param1"
+          "inputString"
         ],
         "writes": [],
         "guard": "Guard"

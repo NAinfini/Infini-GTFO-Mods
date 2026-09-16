@@ -46,6 +46,10 @@ public static class RuntimeLogCodes
     public const string EntryStopped = "entry.stopped";
     public const string ObserverFailed = "observer.failed";
     public const string RuntimeSuspended = "runtime.suspended";
+    /// <summary>The one layout-bearing code. It is written by the kernel on behalf of the authoring layer that
+    /// observed the generated level, because the per-package record point does not exist yet; the layout itself
+    /// is <see cref="RuntimeLogLayout"/>.</summary>
+    public const string MapLayoutGenerated = "map.layout-generated";
 }
 
 /// <summary>Kernel reason codes that are not one of the surfaced contract codes (value validation, plan, registration,
@@ -98,6 +102,9 @@ public readonly struct RuntimeLogRecord
     public string? Entry { get; init; }
     public string? Step { get; init; }
     public string? Binding { get; init; }
+    /// <summary>The actual generated level layout. Only ever set for <see cref="RuntimeLogCodes.MapLayoutGenerated"/>;
+    /// the writer serializes it as the record's own `layout` object and the website validates that shape strictly.</summary>
+    public RuntimeLogLayout? Layout { get; init; }
     public RuntimeLogResult? Result { get; init; }
     /// <summary>Free-text detail folded into the writer's composed message only; it is never its own JSON field.
     /// Carries the comma-joined, ordinal-sorted paths of every file in a plan-conflict group.</summary>

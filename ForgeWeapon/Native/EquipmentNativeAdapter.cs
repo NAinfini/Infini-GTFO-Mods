@@ -37,14 +37,12 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
         /// object, so a `with` copy never loses the shot count, the placement count or the open world instance.</summary>
         internal Life Life { get; } = new();
     }
-    /// <summary>Per-life mutable state: shots of this equipment life, hit candidates published for it, world
-    /// instances this life has placed, and the placement that is currently open. A new Handle is made whenever a
-    /// life starts, so none of it leaks across a recall, a redeploy or a slot change; a shotgun's several hits
-    /// still share the one shot.</summary>
+    /// <summary>Per-life mutable state: shots of this equipment life, world instances this life has placed, and
+    /// the placement that is currently open. A new Handle is made whenever a life starts, so none of it leaks
+    /// across a recall, a redeploy or a slot change; a shotgun's several hits still share the one shot.</summary>
     internal sealed class Life
     {
         internal long Shots;
-        internal long Hits;
         internal long Placements;
         internal PlacedObject? Placed;
     }
@@ -124,27 +122,18 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
         return (handle.Entity, handle.Life.Shots);
     }
 
-    /// <summary>The readback one attack scope needs and no other caller has: the equipment life a weapon
-    /// belongs to, the player reference its owner resolves to, and the life's own shot counter as it stands
-    /// right now. The counter is read and never written here — <see cref="RecordShot"/> owns it — so an attack
-    /// scope can tell whether the native body between two of its own calls registered a shot without keeping a
-    /// second tally of shots anywhere. Null for a weapon this build has not recorded, or when the owner has no
-    /// current reference in its own domain: the same gate a fact needs, because an attack without its actor is
-    /// not a fact.</summary>
-    public (EntityReference Source, EntityReference Equipment, long Shots)? AttackTarget(Item? weapon)
+    /// <summary>The readback the attack-instance rows need and no other caller has: the equipment life a weapon
+    /// belongs to and the player reference its owner resolves to. Null for a weapon this build has not recorded,
+    /// or when the owner has no current reference in its own domain: the same gate a fact needs, because a fact
+    /// without its actor is not a fact.</summary>
+    public (EntityReference Source, EntityReference Equipment)? AttackTarget(Item? weapon)
     {
         if (weapon == null || _identity == null || !Authoritative()) return null;
         SyncWorld();
         if (!_byInstance.TryGetValue(weapon.Pointer, out var handle)) return null;
         var owner = OwnerOf(weapon);
-        return owner == null ? null : (owner, handle.Entity, handle.Life.Shots);
+        return owner == null ? null : (owner, handle.Entity);
     }
-
-    /// <summary>How many hit candidates have been published for one equipment life. The attack scope reads it
-    /// before and after the native body that resolves its hits, so "this attack hit something" is answered by
-    /// the candidates the hit observer already published and never by a second reading of the same hit.</summary>
-    public long HitCount(EntityReference equipment)
-        => _byEntity.TryGetValue(equipment.Id, out var handle) && handle.Entity == equipment ? handle.Life.Hits : 0;
 
     /// <summary>Read-only snapshot of one recorded equipment life. This is the `gtfo.equipment` observer: it
     /// only ever answers for a life the index already holds, and it re-checks the native object first.</summary>
@@ -423,15 +412,11 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
 
     /// <summary>The one publication path, including for the facts the adapter builds itself. `Published` is the
     /// adapter's own record of what it handed to Runtime, so a caller can tell published facts from suppressed
-    /// ones without reading a log line; it is not an event ledger and Runtime remains the only source of ordering.
-    /// A hit candidate is counted against the equipment life its own scope names, which is what lets an attack
-    /// scope ask whether it hit anything without re-reading a hit.</summary>
+    /// ones without reading a log line; it is not an event ledger and Runtime remains the only source of ordering.</summary>
     internal DispatchResult PublishEvent(RuntimeEvent value)
     {
         Published = value;
         Observed?.Invoke(value);
-        if (string.Equals(value.BindingId, ModuleDefinition.HitCandidateBinding, StringComparison.Ordinal)
-            && HitLife(value.ScopeId) is { } life) life.Hits++;
         return _identity!.Publish(value);
     }
 
@@ -439,20 +424,6 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
     /// it. The packages register nothing here: it is the seam a focused test project uses to read the facts an
     /// observation produced without a log line, and it carries no state of the adapter's own.</summary>
     internal Action<RuntimeEvent>? Observed { get; set; }
-
-    /// <summary>The equipment life named by a fact's own scope. A hit candidate is published inside
-    /// `gtfo.weapon.shot:<equipment>:<index>`, so the life is read from the scope the hit observer stamped and
-    /// never from a second lookup of the weapon. Null for any scope this package did not mint, which is a
-    /// candidate the attack scope must not count.</summary>
-    private Life? HitLife(string? scope)
-    {
-        const string prefix = "gtfo.weapon.shot:";
-        if (scope == null || !scope.StartsWith(prefix, StringComparison.Ordinal)) return null;
-        var id = scope.Substring(prefix.Length);
-        var separator = id.LastIndexOf(':');
-        if (separator <= 0) return null;
-        return _byEntity.TryGetValue(id.Substring(0, separator), out var handle) ? handle.Life : null;
-    }
 
     /// <summary>The last fact this adapter published. Replaced, never appended.</summary>
     internal RuntimeEvent? Published { get; private set; }

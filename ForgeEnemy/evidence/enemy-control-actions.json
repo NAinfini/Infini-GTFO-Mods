@@ -96,7 +96,7 @@
       "observations": [
         "the body calls CommonEnter (0x17FE7FB), which sets the agent's position from the transform (EnemyAgent.set_Position 0x17FE138) and cross-fades the hibernation animation (Animator.CrossFadeInFixedTime 0x17FE1BD); the whole state object is the sleeper's presentation and detection",
         "entering it is a locomotion transition: the state machine dispatches the entered state's Enter, and no rel32 edge into ES_Hibernate.Enter exists because the call is virtual",
-        "it is NOT the write the sleep row submits: the row's own member is EB_States.Hibernating on the behaviour machine, which is the state state_changed observes and EnemySync replicates. The locomotion state follows it."
+        "it is NOT the write the sleep row submits: the row's own member is EB_States.Hibernating on the behaviour machine, which is the state the awakened fact samples and EnemySync replicates. The locomotion state follows it."
       ],
       "usedBy": "evidence only: the sleep row keeps the behaviour machine as its one write, so a plan's result reports the state the row names"
     },
@@ -121,7 +121,7 @@
     { "type": "EnemyAI", "declaration": "Vector3 NavmeshAgentGoal", "offset": "0x? (property)", "note": "the move_to write and readback" },
     { "type": "Agents.AgentAI", "declaration": "INavigation m_navMeshAgent", "offset": "0x18", "note": "the navigation interface a requested speed is written through" },
     { "type": "Agents.AgentAI", "declaration": "AgentMode m_mode", "offset": "0x20", "note": "when_idle's idle check: AgentMode.Patrolling with no valid target and no detection build-up" },
-    { "type": "Enemies.EnemyDetection", "declaration": "float m_biggestDetectionBuildup", "offset": "0x50", "note": "when_idle's idle check; the same field alert_changed publishes" }
+    { "type": "Enemies.EnemyDetection", "declaration": "float m_biggestDetectionBuildup", "offset": "0x50", "note": "when_idle's idle check; no fact samples it" }
   ],
   "enumValues": [
     { "type": "EB_States", "name": "Hibernating", "value": 0 },
@@ -206,7 +206,7 @@
       },
       "evidence": [
         "ChangeState writes the field only when it differs, so the write the action submits is a transition",
-        "the behaviour state is the one state_changed observes and the one EnemySync captures and replicates"
+        "the behaviour state is the one the awakened fact samples and the one EnemySync captures and replicates"
       ],
       "unverified": [
         "the locomotion machine is not forced into ES_Hibernate by this action: the behaviour machine is the row's own member, and ES_HibernateWakeUp.Exit shows the game driving the behaviour state from the locomotion state, not the other way round. Whether the sleeping behaviour also pulls the locomotion machine into ES_Hibernate in the same frame is a game-in confirmation."

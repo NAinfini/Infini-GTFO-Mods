@@ -20,11 +20,11 @@ internal class Item
     internal IntPtr Pointer { get; }
 }
 
-/// <summary>The weapon root. Its `Fire` exists for the hook set's `nameof` binding and for
-/// <see cref="NativeMemberTests"/>, which checks the member against this build's interop metadata.</summary>
+/// <summary>The weapon root, and the family the four ranged firing bodies belong to. The doubles exist so the
+/// production module and the hook set have the game types to name; no member of these families is read by the
+/// rows this project drives.</summary>
 internal class Weapon : Item
 {
-    internal virtual void Fire(bool resetRecoilSimilarity = true) { }
 }
 
 namespace Gear
@@ -38,8 +38,6 @@ namespace Gear
         internal int m_burstMax { get; set; }
         internal int m_burstCurrentCount { get; set; }
         internal bool IsCurrentlyBurstFiring { get; set; }
-
-        internal override void Fire(bool resetRecoilSimilarity = true) { }
     }
 
     internal class BulletWeaponSynced : BulletWeapon { }
@@ -48,23 +46,9 @@ namespace Gear
 
     internal class RifleWeaponSynced : BulletWeaponSynced { }
 
-    internal class Shotgun : BulletWeapon
-    {
-        internal override void Fire(bool resetRecoilSimilarity = true) { }
-    }
+    internal class Shotgun : BulletWeapon { }
 
-    internal class ShotgunSynced : BulletWeaponSynced
-    {
-        internal override void Fire(bool resetRecoilSimilarity = true) { }
-    }
-
-    /// <summary>The melee family: no `Fire` at all, one attack entry and one end-of-swing callback, which is what
-    /// the melee half of the hook set patches.</summary>
-    internal class MeleeWeaponFirstPerson : ItemEquippable
-    {
-        internal void DoTriggerAttack(bool charged = false) { }
-        internal void OnAttackHitDone() { }
-    }
+    internal class ShotgunSynced : BulletWeaponSynced { }
 
     /// <summary>The archetype base every burst-capable behaviour derives from: the weapon it was set up on is what
     /// the empty-clip and burst hooks hand to the module.</summary>

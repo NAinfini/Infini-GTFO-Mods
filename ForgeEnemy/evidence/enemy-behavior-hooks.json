@@ -9,7 +9,7 @@
   "verification": "metadata-static-native-call-sites",
   "nativeRvaLock": {
     "owner": null,
-    "note": "The behaviour hooks are Harmony patches declared by interop type and member name, so no test locks these RVAs. This file is the build-specific record of the members the behaviour facts read."
+    "note": "The behaviour hooks are Harmony patches declared by interop type and member name, so no test locks these RVAs. This file is the build-specific record of the members the behaviour facts read and of the native detection methods reviewed alongside them."
   },
   "extraction": {
     "tool": "scratch extractor outside the repository (Il2CppDumper dump.cs + Iced)",
@@ -88,7 +88,7 @@
         "calls Mathf.Clamp01 at 0x156A16E, so the detection build-up it maintains is a 0..1 quantity",
         "2 callers: EnemyDetection.UpdateHibernationDetection at 0x156AD0C and EnemyDetection.UpdateInCombatDetection at 0x156BADC"
       ],
-      "usedBy": "alert_changed publishes m_biggestDetectionBuildup quantized at 0.25"
+      "usedBy": "documents the field the sleep action's when_idle check reads; no behaviour fact samples it"
     },
     {
       "id": "EnemyDetection.UpdateHibernationDetection",
@@ -103,7 +103,7 @@
         "3 callers: EB_Hibernating.UpdateDetection at 0x166C60B, EB_Patrolling.UpdateDetection at 0x17F29AD, EB_Patrolling_Investigate.UpdateDetection at 0x17F1CFA",
         "this is the detection path a hibernating enemy runs; it never reaches UpdateTargets"
       ],
-      "usedBy": "documents why a sleeper's alert watermark only advances when it next runs the frame pump"
+      "usedBy": "documents the detection path a sleeping enemy runs: it never reaches UpdateTargets, the pump's own hook"
     },
     {
       "id": "EnemyDetection.UpdateInCombatDetection",
@@ -117,7 +117,7 @@
       "observations": [
         "calls UpdateData at 0x156BADC, EnemyDetection.IsTargetValid at 0x156BC78, Mathf.Clamp at 0x156BD5E and 0x156BE2F"
       ],
-      "usedBy": "documents that the alert quantity stays bounded in the combat path as well"
+      "usedBy": "documents that the detection quantity stays bounded in the combat path as well"
     },
     {
       "id": "EnemyDetection.IsTargetValid",
@@ -298,9 +298,9 @@
   ],
   "readFields": [
     { "type": "EnemyBehaviour", "declaration": "EnemyAI m_ai", "offset": "0x90", "note": "sample validity: the behaviour must belong to the same AI" },
-    { "type": "EnemyBehaviour", "declaration": "EB_States m_currentStateName", "offset": "0x99", "note": "the state_changed/awakened source" },
+    { "type": "EnemyBehaviour", "declaration": "EB_States m_currentStateName", "offset": "0x99", "note": "the awakened source" },
     { "type": "EnemyDetection", "declaration": "EnemyAI m_ai", "offset": "0x18", "note": "the pump's entry point into the enemy" },
-    { "type": "EnemyDetection", "declaration": "float m_biggestDetectionBuildup", "offset": "0x50", "note": "the alert_changed source" },
+    { "type": "EnemyDetection", "declaration": "float m_biggestDetectionBuildup", "offset": "0x50", "note": "the sleep action's when_idle check; no fact samples it" },
     { "type": "EnemyDetection", "declaration": "AgentTarget m_biggestDetectionTarget", "offset": "0x58", "note": "not published: it is an internal best-candidate scratch value" },
     { "type": "EnemyAI", "declaration": "EnemyAgent m_enemyAgent", "offset": "0x30", "note": "identity: the tracked EnemyAgent behind the AI" },
     { "type": "EnemyAI", "declaration": "EnemyLocomotion m_locomotion", "offset": "0x40", "note": "the scout scream state machine" },
@@ -537,16 +537,6 @@
   },
   "conclusions": [
     {
-      "fact": "forge.trigger.enemy.state_changed",
-      "member": "EnemyBehaviour.m_currentStateName (+0x99), sampled by EnemyDetection.UpdateTargets",
-      "ports": { "enemy": "the tracked gtfo.enemy reference", "state": "EB_States mapped to the catalog ai_state member", "previous": "the previous mapped member" },
-      "evidence": [
-        "ChangeState writes the field only when the value differs, so a native write is a transition",
-        "the spawn state is a baseline, not a transition, because EnemyAI.Setup and EnemyDetection.Setup call UpdateTargets once before any behaviour update",
-        "one publish per observed transition; a repeated identical read publishes nothing"
-      ]
-    },
-    {
       "fact": "forge.trigger.enemy.awakened",
       "member": "the same state field, published only when the previous sampled state was EB_States.Hibernating (0) or EB_States.SquidBoss_Hibernating (12) and the new one is not",
       "ports": { "enemy": "the tracked gtfo.enemy reference" },
@@ -555,16 +545,6 @@
         "EB_Hibernating.UpdateBehaviour never calls UpdateTargets, so the sample that carries the wake-up is the first awake behaviour update"
       ],
       "catalogGap": "the catalog declares a cause entity port; no native member names a wake-up cause, so the port is not registered"
-    },
-    {
-      "fact": "forge.trigger.enemy.alert_changed",
-      "member": "EnemyDetection.m_biggestDetectionBuildup (+0x50), quantized to 0.25 steps over 0..1",
-      "ports": { "enemy": "the tracked gtfo.enemy reference", "alert": "the sampled build-up", "rising": "true when the bucket rose" },
-      "evidence": [
-        "EnemyDetection.UpdateData clamps the build-up with Mathf.Clamp01 at 0x156A16E, so the value is a 0..1 quantity",
-        "quantization keeps a continuous ramp from publishing on every behaviour update"
-      ],
-      "catalogGap": "the catalog declares a threshold input; a trigger may not declare input ports (RuntimePlan 'trigger-shape'), so the threshold belongs in the consuming plan as a comparison step"
     },
     {
       "fact": "forge.trigger.enemy.target_acquired",
@@ -614,7 +594,7 @@
     {
       "catalogId": "forge.trigger.enemy.attack_active",
       "status": "no-evidence",
-      "note": "no attack-active member was found; the closest observable signal is a behaviour state change into an attacking state, which state_changed already publishes"
+      "note": "no attack-active member was found; the closest observable signal is a behaviour state change into an attacking state, which no fact publishes"
     },
     {
       "catalogId": "forge.trigger.enemy.attack_recovery",
@@ -639,7 +619,7 @@
     {
       "catalogId": "forge.trigger.enemy.phase_changed",
       "status": "partial-evidence",
-      "note": "EB_States carries boss phases (SquidBoss_Intro 13, SquidBoss_Combat 14, SquidBoss_Raging 15, SquidBoss_Spawning 16, SquidBoss_Cooldown 17, SquidBoss_RageTransition 18) and state_changed publishes them as ai_state, but no native phase ordinal is exposed, so a phase integer port would be invented"
+      "note": "EB_States carries boss phases (SquidBoss_Intro 13, SquidBoss_Combat 14, SquidBoss_Raging 15, SquidBoss_Spawning 16, SquidBoss_Cooldown 17, SquidBoss_RageTransition 18), but no native phase ordinal is exposed and no fact publishes the state, so a phase integer port would be invented"
     },
     {
       "catalogId": "forge.trigger.enemy.enrage_changed",
@@ -679,7 +659,7 @@
         "staggerDamageMulti is a parameter of Dam_EnemyDamageBase.ProcessReceivedDamage",
         "EnemyDamageInfo.StaggerDamageMulti at +0x34",
         "ES_Hitreact.DoHitReact calls EnemyBehaviour.ChangeState at 0x16E2F73, so a forced hit reaction shows up as a behaviour state change",
-        "EB_States.InCombat_Stagger (28) is observable through state_changed"
+        "EB_States.InCombat_Stagger (28) is a behaviour state, but no fact publishes it"
       ],
       "gap": "no duration and no stagger-specific event exist; a staggered fact would have to be derived from damage parameters plus a state observation",
       "status": "partial-evidence-not-implemented"

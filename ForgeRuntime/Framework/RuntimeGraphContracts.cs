@@ -524,12 +524,12 @@ internal static class RuntimeGraphContracts
         RuntimeJson.Require(ParameterTypes.Contains(type), "parameter-type", id);
         RuntimeJson.Require(role is "value" or "structural", "parameter-role", id);
         // A resource parameter is the one compile-time reference a plan may write into a step's constant frame, so
-        // a row that names the kind makes itself compilable: the frame encoder indexes the kind table by it and the
-        // value validator checks the reference against it. A row that names none declares a parameter no plan can
-        // carry a reference for — the encoder refuses that constant by name — and a parameter of any other type
-        // names no kind at all.
-        if (Optional(parameter, "resourceKind") is { } kindName)
-            RuntimeJson.Require(type == "resource" && ResourceKinds.Contains(kindName), "parameter-resource-kind", id);
+        // it names the kind that reference is read through: the frame encoder indexes the kind table by it and the
+        // value validator checks the reference against it, so a reference that named no kind could not compile at
+        // all. A parameter of any other type names no kind.
+        var resourceKind = Optional(parameter, "resourceKind");
+        RuntimeJson.Require(type == "resource" ? resourceKind != null && ResourceKinds.Contains(resourceKind) : resourceKind == null,
+            "parameter-resource-kind", id);
         RuntimeJson.Require(parameter.GetProperty("required").ValueKind is JsonValueKind.True or JsonValueKind.False, "parameter-required", id);
         foreach (var bound in new[] { "minimum", "maximum" }) if (parameter.TryGetProperty(bound, out var value))
         {

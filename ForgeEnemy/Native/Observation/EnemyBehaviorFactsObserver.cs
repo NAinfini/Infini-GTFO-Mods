@@ -7,15 +7,15 @@ namespace ForgeEnemy.Native.Observation;
 
 /// <summary>Build-specific, read-only AI behaviour sample of one registered enemy. It never requests a
 /// transition, never writes the world and never infers allegiance; every value is read back from the native
-/// behaviour, detection and locomotion objects of the same life, and a sample is dropped rather than returned
-/// when the instance identity moves while it is being read.</summary>
+/// behaviour and locomotion objects of the same life and from the AI's own target, and a sample is dropped rather
+/// than returned when the instance identity moves while it is being read.</summary>
 internal static class EnemyBehaviorFactsObserver
 {
     internal sealed record Sample(EntityReference Reference, int BehaviourState, bool HasValidTarget,
-        AgentTarget? Target, float Alert, int ScoutScreamPhase);
+        AgentTarget? Target, int ScoutScreamPhase);
 
-    private sealed record Reading(IntPtr EnemyPointer, ushort EnemyId, IntPtr BehaviourPointer, IntPtr DetectionPointer,
-        int BehaviourState, bool HasValidTarget, AgentTarget? Target, float Alert, int ScoutScreamPhase);
+    private sealed record Reading(IntPtr EnemyPointer, ushort EnemyId, IntPtr BehaviourPointer,
+        int BehaviourState, bool HasValidTarget, AgentTarget? Target, int ScoutScreamPhase);
 
     internal static Sample? Read(EnemyAgent enemy, EntityReference reference)
     {
@@ -24,7 +24,7 @@ internal static class EnemyBehaviorFactsObserver
         if (first == null || first != ReadOnce(enemy)) return null;
         if (reference.Id != "gtfo.enemy:" + first.EnemyId.ToString(System.Globalization.CultureInfo.InvariantCulture))
             return null;
-        return new(reference, first.BehaviourState, first.HasValidTarget, first.Target, first.Alert, first.ScoutScreamPhase);
+        return new(reference, first.BehaviourState, first.HasValidTarget, first.Target, first.ScoutScreamPhase);
     }
 
     private static Reading? ReadOnce(EnemyAgent enemy)
@@ -34,19 +34,15 @@ internal static class EnemyBehaviorFactsObserver
         var ai = enemy.AI;
         if (ai == null || ai.m_enemyAgent == null || ai.m_enemyAgent.Pointer != pointer) return null;
         var behaviour = ai.m_behaviour;
-        var detection = ai.m_detection;
         var locomotion = ai.m_locomotion;
-        if (behaviour == null || detection == null || locomotion == null) return null;
+        if (behaviour == null || locomotion == null) return null;
         if (behaviour.m_ai == null || behaviour.m_ai.Pointer != ai.Pointer) return null;
-        if (detection.m_ai == null || detection.m_ai.Pointer != ai.Pointer) return null;
         int state = (int)behaviour.m_currentStateName;
         // A native getter may re-enter; anything it can invalidate is re-read before the sample is returned.
         bool hasTarget = TryTarget(ai, out var target);
-        float alert = detection.m_biggestDetectionBuildup;
         int phase = ScoutScreamPhase(locomotion);
-        if (!float.IsFinite(alert)) return null;
         if (enemy.Pointer != pointer || enemy.GlobalID != id || !enemy.IsSetup || !enemy.Alive) return null;
-        return new(pointer, id, behaviour.Pointer, detection.Pointer, state, hasTarget, target, alert, phase);
+        return new(pointer, id, behaviour.Pointer, state, hasTarget, target, phase);
     }
 
     private static bool TryTarget(EnemyAI ai, out AgentTarget? target)

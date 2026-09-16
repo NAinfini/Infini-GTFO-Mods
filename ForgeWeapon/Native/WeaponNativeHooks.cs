@@ -19,13 +19,8 @@ internal static class WeaponNativeHooks
         typeof(LocalItemWielded), typeof(LocalItemUnwielded), typeof(SyncedItemEquipped), typeof(SyncedItemUnwielded),
         typeof(WeaponFired), typeof(ShotgunFired), typeof(SyncedWeaponFired), typeof(SyncedShotgunFired), typeof(BulletHit),
         typeof(GearPartsSpawned), typeof(GearOffersForSlot), typeof(GearPoolLoading),
-        // The attack-instance family: one scope per firing body, around the same four Fire bodies the shot
-        // facts come from, plus the melee swing, the game's two empty-clip paths and the burst sequence ends.
-        typeof(AttackFireRequested), typeof(AttackFireCompleted),
-        typeof(AttackShotgunRequested), typeof(AttackShotgunCompleted),
-        typeof(AttackSyncedFireRequested), typeof(AttackSyncedFireCompleted),
-        typeof(AttackSyncedShotgunRequested), typeof(AttackSyncedShotgunCompleted),
-        typeof(AttackMeleeRequested), typeof(AttackMeleeCompleted),
+        // The attack-instance family: the game's two empty-clip paths and the two ends of a burst sequence on the
+        // two burst-capable archetypes.
         typeof(AttackAutoFiredEmptyClip), typeof(AttackBurstFiredEmptyClip),
         typeof(AttackBurstStarted), typeof(AttackBurstEnded), typeof(AttackAutoStarted), typeof(AttackAutoEnded),
         // The deployed-device and tool facts: one firing update pair on the sentry, the glue gun's two launch

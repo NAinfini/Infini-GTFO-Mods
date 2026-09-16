@@ -802,7 +802,7 @@ public sealed class MapNativeAdapterTests
             typeof(WeakDoorBrokenReadback),
             typeof(ScanProgressReadback), typeof(ScanStateReadback), typeof(GeneratorCellReadback),
             typeof(GeneratorClusterStateReadback), typeof(ResourceContainerStateReadback), typeof(ItemPickupReadback),
-            typeof(ExpeditionStartedReadback), typeof(ObjectiveStatusReadback), typeof(ReactorWaveReadback),
+            typeof(ExpeditionStartedReadback), typeof(ReactorWaveReadback),
             typeof(HsuSampledReadback), typeof(CheckpointRestoredReadback),
             typeof(ZoneEnteredReadback), typeof(PortalWarpedReadback),
             typeof(TriggerZoneTick),

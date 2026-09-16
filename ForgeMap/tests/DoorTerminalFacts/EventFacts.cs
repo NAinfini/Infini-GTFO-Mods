@@ -6,45 +6,12 @@ using LevelGeneration;
 
 namespace ForgeMapTests.DoorTerminalFacts;
 
-/// <summary>The five event rows: what each one publishes, which ports it carries, the three facts read from the
+/// <summary>The three event rows: what each one publishes, which ports it carries, the facts read from the
 /// terminal's one command entry, the two stages of a weak door, the absence semantics, the authority rule and
 /// the cleanup on a world transition. Every case drives the production `DoorTerminalFacts` the Harmony patches
 /// call, so a rule that only lived in a patch would not be reached here.</summary>
 public sealed class EventFacts
 {
-    [Fact]
-    public void ApproachPublishesTheDoorAndNoActor()
-    {
-        using var world = new World();
-        world.Start();
-        var door = world.Door();
-
-        world.Facts.DoorApproached(door);
-
-        var published = world.Facts.Last(DoorTerminalEventContract.DoorApproachFact, World.AddressOf(door));
-        Assert.NotNull(published);
-        Assert.Equal(DoorTerminalEventContract.Binding(DoorTerminalEventContract.DoorApproachFact), published!.Value.Binding);
-        Assert.Equal(1, world.Facts.Published);
-        Assert.Equal(world.ReferenceOf(door).Id, Port(published.Value, "door").GetProperty("id").GetString());
-        // The approach callback carries no player and the door's replicated state carries none either, so the
-        // actor port is absent rather than written as a player that was never observed.
-        Assert.False(Has(published.Value, "actor"));
-    }
-
-    [Fact]
-    public void RepeatedApproachOfOneDoorPublishesOnce()
-    {
-        using var world = new World();
-        world.Start();
-        var door = world.Door();
-
-        world.Facts.DoorApproached(door);
-        world.Facts.DoorApproached(door);
-
-        Assert.Equal(1, world.Facts.Published);
-        Assert.Equal(1, world.Facts.Tracked);
-    }
-
     [Fact]
     public void ScanStartedAndCompletedCarryTheirOwnPhases()
     {
@@ -133,7 +100,7 @@ public sealed class EventFacts
     /// admitted, so a failure names the answer instead of only the number.</summary>
     private static string Diagnosis(World world)
         => " published=" + world.Facts.Published + " tracked=" + world.Facts.Tracked
-            + " subscribed=[approach " + world.Kernel.HasSubscribers(DoorTerminalEventContract.Binding(DoorTerminalEventContract.DoorApproachFact))
+            + " subscribed=[scan " + world.Kernel.HasSubscribers(DoorTerminalEventContract.Binding(DoorTerminalEventContract.DoorScanFact))
             + " broken " + world.Kernel.HasSubscribers(DoorTerminalEventContract.Binding(DoorTerminalEventContract.DoorBrokenFact)) + "]"
             + " reports=[" + string.Join(" | ", world.Reports) + "]";
 
@@ -181,25 +148,19 @@ public sealed class EventFacts
     }
 
     [Fact]
-    public void CommandsArePublishedWithTheirOwnSlotAndALogReadPublishesBothFacts()
+    public void CommandsArePublishedWithTheirOwnSlotAndInputLine()
     {
         using var world = new World();
         world.Start();
         var terminal = world.Terminal(4242);
 
-        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.UniqueCommand3, "boom now", null);
-        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.ReadLog, "read_log FILE_1", "FILE_1");
+        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.UniqueCommand3, "boom now");
 
         var command = world.Facts.Last(DoorTerminalPublisher.CommandFact, World.AddressOf(terminal));
         Assert.NotNull(command);
-        // The command fact is keyed by the command, so the last one is the second: the read.
-        Assert.Equal("read_log", Port(command!.Value, "command").GetString());
-        Assert.False(Has(command.Value, "slot"));
-
-        var log = world.Facts.Last(DoorTerminalEventContract.TerminalLogFact, World.AddressOf(terminal));
-        Assert.NotNull(log);
-        Assert.Equal("FILE_1", Port(log!.Value, "log").GetString());
-        Assert.Equal("read_log FILE_1", Port(log.Value, "line").GetString());
+        Assert.Equal("unique_command_3", Port(command!.Value, "command").GetString());
+        Assert.Equal(3, Port(command.Value, "slot").GetInt32());
+        Assert.Equal("boom now", Port(command.Value, "input").GetString());
     }
 
     [Fact]
@@ -209,7 +170,7 @@ public sealed class EventFacts
         world.Start();
         var terminal = world.Terminal(4242);
 
-        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.UniqueCommand3, "boom now", null);
+        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.UniqueCommand3, "boom now");
         var slot = world.Facts.Last(DoorTerminalPublisher.CommandFact, World.AddressOf(terminal));
         Assert.NotNull(slot);
         Assert.Equal("unique_command_3", Port(slot!.Value, "command").GetString());
@@ -220,7 +181,7 @@ public sealed class EventFacts
         // The same command twice in one world is one fact: the ledger keys it by the command value, so the
         // second entry is remembered under the same key and never reaches the kernel.
         long queued = world.Facts.Published;
-        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.UniqueCommand3, "boom now", null);
+        world.Facts.TerminalCommandEntry(4242, (int)TERM_Command.UniqueCommand3, "boom now");
         Assert.Equal(queued, world.Facts.Published);
     }
 
@@ -231,27 +192,12 @@ public sealed class EventFacts
         world.Start();
         var terminal = world.Terminal(7);
 
-        world.Facts.TerminalCommandEntry(7, (int)TERM_Command.DisableAlarm, "disable_alarm", null);
+        world.Facts.TerminalCommandEntry(7, (int)TERM_Command.DisableAlarm, "disable_alarm");
 
         var command = world.Facts.Last(DoorTerminalPublisher.CommandFact, World.AddressOf(terminal));
         Assert.NotNull(command);
         Assert.Equal("disable_alarm", Port(command!.Value, "command").GetString());
         Assert.False(Has(command.Value, "slot"));
-    }
-
-    [Fact]
-    public void ALogReadWithoutANamePublishesNoLogFact()
-    {
-        using var world = new World();
-        world.Start();
-        var terminal = world.Terminal(9);
-
-        world.Facts.TerminalCommandEntry(9, (int)TERM_Command.ReadLog, "read_log", "   ");
-
-        // The command fact is published — the terminal did accept the read — but a log with no name is absence,
-        // so no log fact is published rather than one carrying an empty name.
-        Assert.NotNull(world.Facts.Last(DoorTerminalPublisher.CommandFact, World.AddressOf(terminal)));
-        Assert.Null(world.Facts.Last(DoorTerminalEventContract.TerminalLogFact, World.AddressOf(terminal)));
     }
 
     [Fact]
@@ -261,7 +207,7 @@ public sealed class EventFacts
         world.Start();
         world.Terminal(1);
 
-        world.Facts.TerminalCommandEntry(2, (int)TERM_Command.Help, "help", null);
+        world.Facts.TerminalCommandEntry(2, (int)TERM_Command.Help, "help");
 
         Assert.Equal(0, world.Facts.Published);
     }
@@ -309,7 +255,6 @@ public sealed class EventFacts
         // grammar: no fact is published for an address that does not exist.
         door.AddressNow = null;
 
-        world.Facts.DoorApproached(door);
         world.Facts.ScanTransition(World.Locks(door), DoorScanStage.Activated);
         world.Facts.WeakLockChanged(World.WeakLock(door, eWeakLockType.Melee, eWeakLockStatus.Unlocked));
 
@@ -324,7 +269,7 @@ public sealed class EventFacts
         var door = world.Door();
         world.LoseAuthority();
 
-        world.Facts.DoorApproached(door);
+        world.Facts.WeakLockChanged(World.WeakLock(door, eWeakLockType.Melee, eWeakLockStatus.Unlocked));
 
         Assert.Equal(0, world.Facts.Published);
         Assert.Contains(world.Reports, report => report.Contains("non-authoritative", StringComparison.Ordinal));
@@ -336,14 +281,14 @@ public sealed class EventFacts
         using var world = new World();
         world.Start();
         var door = world.Door();
-        world.Facts.DoorApproached(door);
+        world.Facts.WeakLockChanged(World.WeakLock(door, eWeakLockType.Melee, eWeakLockStatus.Unlocked));
         Assert.Equal(1, world.Facts.Tracked);
 
         world.NextWorld();
 
         Assert.Equal(0, world.Facts.Tracked);
         // The same fact is new again in the next world, because no address of the old one survives.
-        world.Facts.DoorApproached(door);
+        world.Facts.WeakLockChanged(World.WeakLock(door, eWeakLockType.Melee, eWeakLockStatus.Unlocked));
         Assert.True(world.Facts.Published == 2, "The fact of the next world was not admitted." + Diagnosis(world));
     }
 
@@ -354,10 +299,10 @@ public sealed class EventFacts
         world.Start();
         var door = world.Door();
 
-        world.Facts.DoorApproached(door);
+        world.Facts.WeakLockChanged(World.WeakLock(door, eWeakLockType.Melee, eWeakLockStatus.Unlocked));
 
-        var eventId = world.Facts.Last(DoorTerminalEventContract.DoorApproachFact, World.AddressOf(door))!.Value.EventId;
-        Assert.StartsWith(World.Kind + ".door_approach:" + World.WorldEpoch + ":", eventId, StringComparison.Ordinal);
+        var eventId = world.Facts.Last(DoorTerminalEventContract.LockBrokenFact, World.AddressOf(door))!.Value.EventId;
+        Assert.StartsWith(World.Kind + ".lock_broken:" + World.WorldEpoch + ":", eventId, StringComparison.Ordinal);
         Assert.Contains(World.AddressOf(door).ToString(), eventId, StringComparison.Ordinal);
         Assert.EndsWith(":1", eventId, StringComparison.Ordinal);
     }
@@ -374,7 +319,7 @@ public sealed class EventFacts
         Assert.Contains(world.Reports, report => report.Contains("disabled until restart", StringComparison.Ordinal));
 
         // Every later callback is a no-op rather than a second failure or a half-published fact.
-        world.Facts.Guard(_ => world.Facts.DoorApproached(door));
+        world.Facts.Guard(_ => world.Facts.WeakLockChanged(World.WeakLock(door, eWeakLockType.Melee, eWeakLockStatus.Unlocked)));
         Assert.Equal(0, world.Facts.Published);
     }
 

@@ -15,7 +15,7 @@ namespace ForgeMapTests.DoorTerminalFacts;
 
 /// <summary>One case's world: a kernel with the one `gtfo.map_object` kind registered exactly the way the Map
 /// provider registers it — a namespace resolver plus the instance resolver that maps a live instance back to its
-/// reference — the real four event rows and two action rows of this slice, and one production
+/// reference — the real three event rows and two action rows of this slice, and one production
 /// `DoorTerminalFacts` and `DoorTerminalActions` over both.
 ///
 /// The facts half, its pure derivation, the publisher, the action half, the two contracts and the terminal

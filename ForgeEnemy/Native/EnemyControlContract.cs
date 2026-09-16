@@ -145,7 +145,7 @@ internal static class EnemyControlContract
           "id": "forge.action.enemy.sleep",
           "owner": "forge.module.gtfo.enemy",
           "kind": "action",
-          "label": "唤醒敌人 / 让敌人休眠 · enemy sleep",
+          "label": "让敌人休眠",
           "version": "1.0.0",
           "parameters": {
             "description": "在能力支持时让敌人休眠。",

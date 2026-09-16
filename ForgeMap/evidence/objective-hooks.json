@@ -387,14 +387,9 @@
       "side": "both", "harmony": "postfix on status transition into Scanning; Activate is the master-side entry", "verifiedInGame": false
     },
     {
-      "row": "forge.trigger.objective.scan_progress", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
-      "identity": { "runtimeInstance": "pBioscanState.progress on the owning bioscan core" },
-      "side": "both", "harmony": "postfix; both oldState and newState carry progress", "verifiedInGame": false
-    },
-    {
       "row": "forge.trigger.objective.scan_membership", "entry": { "kind": "hook", "id": "BioscanSyncStateChange" },
-      "identity": { "runtimeInstance": "pBioscanState.playersInScan, playersMax, playerInScan1..4" },
-      "side": "both", "harmony": "postfix; CP_PlayerScanner.StartScan is the local-only half and must not be the authority", "verifiedInGame": false
+      "identity": { "runtimeInstance": "pBioscanState.playersInScan, playersMax, playerInScan1..4 and pBioscanState.progress on the owning bioscan core" },
+      "side": "both", "harmony": "postfix; both oldState and newState carry progress, and CP_PlayerScanner.StartScan is the local-only half and must not be the authority", "verifiedInGame": false
     },
     {
       "row": "forge.trigger.objective.scan_paused", "entry": { "kind": "member", "id": "bioscan-time-out" },

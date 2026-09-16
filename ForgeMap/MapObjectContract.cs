@@ -59,6 +59,23 @@ public static class MapObjectContract
             graph = new { domains = Domains, execution = "host", inputs = Array.Empty<object>(), outputs, parameters = Array.Empty<object>() }
         };
 
+    /// <summary>One trigger row of a named map object: the same row as <see cref="Row"/>, plus the optional
+    /// structural `address` literal the catalog carries for it (ruling 143.10/11). A plan that fills the address
+    /// receives only that object's events, an empty one receives every event of the binding, and the kernel's own
+    /// plan loader reads the parameter back through its `object-address` branch — so dropping it at registration
+    /// would make every plan that names a door or a terminal unloadable.</summary>
+    internal static object AddressedRow(string capability, string label, string description, params object[] outputs)
+        => new
+        {
+            id = capability, owner = ModuleDefinition.ProviderId, kind = "trigger", label, version = "1.0.0",
+            parameters = new { description },
+            graph = new
+            {
+                domains = Domains, execution = "host", inputs = Array.Empty<object>(), outputs,
+                parameters = new object[] { new { id = "address", type = "object-address", role = "structural", required = false } }
+            }
+        };
+
     internal static object Port(string id, string type) => new { id, type };
 
     internal static object Optional(string id, string type) => new { id, type, optional = true };

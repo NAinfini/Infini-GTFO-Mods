@@ -11,7 +11,7 @@ namespace ForgeEnemy.Native;
 /// same contracts `EnemyModule.Registry` composes them from — and every body is left to the caller: the export
 /// process hands over a stand-in that refuses to run, a harness hands over its own double.
 ///
-/// The base family (the five combat rows, the six enemy lifecycle rows, the two scout rows and the damage action) is
+/// The base family (the five combat rows, the four enemy lifecycle rows, the two scout rows and the damage action) is
 /// the one half that is not spelled in a contract file: it is declared as the JSON block `Native/EnemyModule.cs`
 /// carries, and it is reproduced here verbatim because the export set has no other source for it. A row changed
 /// there has to be changed here; the website's own catalog comparison catches the drift, because a plan is compiled
@@ -51,9 +51,7 @@ internal static class EnemyDeclaration
         {"id":"forge.module.gtfo.enemy.binding.health_changed","capabilityId":"forge.trigger.combat.health_changed","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.health_changed","role":"observe","status":"implemented","dependencies":[],"requires":[]},
         {"id":"forge.module.gtfo.enemy.binding.death_started","capabilityId":"forge.trigger.enemy.death_started","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.death_started","role":"observe","status":"implemented","dependencies":[],"requires":[]},
         {"id":"forge.module.gtfo.enemy.binding.limb_broken","capabilityId":"forge.trigger.combat.limb_broken","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.limb_broken","role":"observe","status":"implemented","dependencies":[],"requires":[]},
-        {"id":"forge.module.gtfo.enemy.binding.state_changed","capabilityId":"forge.trigger.enemy.state_changed","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.state_changed","role":"observe","status":"implemented","dependencies":[],"requires":[]},
         {"id":"forge.module.gtfo.enemy.binding.awakened","capabilityId":"forge.trigger.enemy.awakened","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.awakened","role":"observe","status":"implemented","dependencies":[],"requires":[]},
-        {"id":"forge.module.gtfo.enemy.binding.alert_changed","capabilityId":"forge.trigger.enemy.alert_changed","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.alert_changed","role":"observe","status":"implemented","dependencies":[],"requires":[]},
         {"id":"forge.module.gtfo.enemy.binding.target_acquired","capabilityId":"forge.trigger.enemy.target_acquired","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.target_acquired","role":"observe","status":"implemented","dependencies":[],"requires":[]},
         {"id":"forge.module.gtfo.enemy.binding.target_lost","capabilityId":"forge.trigger.enemy.target_lost","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.target_lost","role":"observe","status":"implemented","dependencies":[],"requires":[]},
         {"id":"forge.module.gtfo.enemy.binding.scout_detection","capabilityId":"forge.trigger.enemy.scout_detection","providerId":"forge.module.gtfo.enemy","handler":"gtfo.enemy.scout_detection","role":"observe","status":"implemented","dependencies":[],"requires":[]},
@@ -70,9 +68,7 @@ internal static class EnemyDeclaration
         (Binding("health_changed"), new[] { "gtfo.enemy.health.read" }),
         (Binding("death_started"), new[] { "gtfo.enemy.lifecycle.read" }),
         (Binding("limb_broken"), new[] { "gtfo.enemy.limbs.read" }),
-        (Binding("state_changed"), new[] { "gtfo.enemy.behavior.read" }),
         (Binding("awakened"), new[] { "gtfo.enemy.behavior.read" }),
-        (Binding("alert_changed"), new[] { "gtfo.enemy.detection.read" }),
         (Binding("target_acquired"), new[] { "gtfo.enemy.targeting.read" }),
         (Binding("target_lost"), new[] { "gtfo.enemy.targeting.read" }),
         (Binding("scout_detection"), new[] { "gtfo.enemy.detection.read" }),

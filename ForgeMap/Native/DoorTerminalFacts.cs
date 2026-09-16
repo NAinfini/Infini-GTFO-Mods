@@ -113,14 +113,6 @@ internal sealed class DoorTerminalFacts
     internal bool IsCurrentWeakDoor(EntityReference reference)
         => reference.WorldEpoch == _world && _weakDoors.ContainsKey(reference.Id);
 
-    /// <summary>One door the game's own approach callback reported. The callback carries no player and the
-    /// door's replicated state carries none either, so the fact has no actor.</summary>
-    internal void DoorApproached(object door)
-    {
-        if (door is not LG_SecurityDoor instance || !Addressable(instance, out var address)) return;
-        _publisher.Approach(address);
-    }
-
     /// <summary>One chained-puzzle transition on a door. The callback names which of the lock's two
     /// notifications ran, and the puzzle instance the lock holds is asked for its own reading afterwards:
     /// `ChainedPuzzleToSolve.IsSolved` is the puzzle's own answer to "is it solved", so a solved notification
@@ -147,18 +139,15 @@ internal sealed class DoorTerminalFacts
     }
 
     /// <summary>One terminal command the terminal manager's own entry carried. The command value is the
-    /// accepted command, the input line is what the player typed, and the interpreter's first parameter names
-    /// the log when the command is a read. One entry therefore serves `e-term-cmd` (through the command and its
-    /// unique slot), `e-term-alarm` (through `DisableAlarm`) and `e-term-log` (through `ReadLog` and its
-    /// parameter), which is what the native side really offers: there is one command entry and no separate event
-    /// for any of the three.</summary>
-    internal void TerminalCommandEntry(uint terminalId, int command, string? input, string? param1)
+    /// accepted command and the input line is what the player typed. One entry therefore serves `e-term-cmd`
+    /// (through the command and its unique slot) and `e-term-alarm` (through `DisableAlarm`), which is what the
+    /// native side really offers: there is one command entry and no separate event for either.</summary>
+    internal void TerminalCommandEntry(uint terminalId, int command, string? input)
     {
         var terminal = _terminals(terminalId);
         if (terminal == null) return;
         if (_address(terminal) is not { } address) return;
         _publisher.TerminalCommand(address, command, input, DoorTerminalDerivations.UniqueSlot(command));
-        if (DoorTerminalDerivations.LogName(param1) is { } log) _publisher.TerminalLog(address, log, input);
     }
 
     /// <summary>One weak lock's replicated state. A lock is broken when its own status reads `Unlocked`, and

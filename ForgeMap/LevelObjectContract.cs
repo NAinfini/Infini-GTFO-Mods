@@ -41,23 +41,23 @@ public static class LevelObjectContract
     public const string ScanStartedCapability = "forge.trigger.objective.scan_started";
     public const string ScanCompletedCapability = "forge.trigger.objective.scan_completed";
 
-    /// <summary>The progress row `e-scan-progress` needs. The catalog has no row for it — it carries
-    /// `scan_membership`, which reports who is standing in the scan and not how far it is — so the row is new
-    /// and shaped from the one native value the master computes: the `scanProgress` argument of
-    /// `ChainedPuzzleInstance.Master_OnPlayerScanChanged`.</summary>
-    public const string ScanProgressCapability = "forge.trigger.objective.scan_progress";
+    /// <summary>The progress row `e-scan-progress` needs, on the website catalog's own id
+    /// `forge.trigger.objective.scan_membership`. One `ChainedPuzzleInstance.Master_OnPlayerScanChanged`
+    /// callback carries both the `scanProgress` the master computed and the players standing in the scan, so
+    /// the two facts are one row and the catalog row carries this registration's ports (181.3).</summary>
+    public const string ScanProgressCapability = "forge.trigger.objective.scan_membership";
 
-    /// <summary>The container row `e-container` needs and the level item row `e-pickup` needs. The catalog's
-    /// `forge.trigger.interaction.container_state` reports a container's status without the container or the
-    /// player, and `forge.trigger.equipment.picked_up`/`dropped` are the equipment half's rows about a player's
-    /// inventory slots, not about a world item changing hands; both rows are therefore declared here, in the
-    /// namespace the objects they report about actually live in.</summary>
+    /// <summary>The container row `e-container` needs and the level item row `e-pickup` needs. The container row
+    /// is the catalog's `forge.trigger.interaction.container_state`: the publish is this provider's, so the
+    /// catalog row carries this registration's ports, status set and copy, and the row id follows the catalog's
+    /// namespace (181.3/177.2). `forge.trigger.equipment.picked_up`/`dropped` are the equipment half's rows about
+    /// a player's inventory slots, not about a world item changing hands, so the level item row stays here.</summary>
     /// <summary>The kind every row's structural `resource` parameter carries, so the row names what an author
     /// points it at without a second table. The three scan rows read the chained puzzle the value row's input
     /// already declares; the container row and the level item row both name the one `item` resource kind this
     /// framework has for a thing the level placed. The kind is what a plan's constant frame is indexed by, so a
     /// row that named none could not be compiled at all.</summary>
-    public const string ContainerStateCapability = "forge.trigger.map.container_state";
+    public const string ContainerStateCapability = "forge.trigger.interaction.container_state";
     public const string ItemPickupCapability = "forge.trigger.map.item_pickup";
 
     /// <summary>The container statuses this provider publishes, as the game's own `eResourceContainerStatus`
@@ -188,15 +188,15 @@ public static class LevelObjectContract
 
     public const string ScanProgressCapabilityJson = """
     {
-      "id": "forge.trigger.objective.scan_progress",
+      "id": "forge.trigger.objective.scan_membership",
       "owner": "forge.module.gtfo.map",
       "kind": "trigger",
       "label": "扫描进度变化",
       "version": "1.0.0",
       "parameters": {
-        "description": "扫描的完成度变了。",
-        "summary": "扫描的完成度变了。",
-        "summaryEn": "Fires when a scan's completion fraction changes.",
+        "description": "扫描的完成度变了，站进扫描圈的人也一并报出。",
+        "summary": "扫描的完成度变了，站进扫描圈的人也一并报出。",
+        "summaryEn": "Fires when a scan's completion fraction changes, together with who is standing in the scan.",
         "labelEn": "Scan progress",
         "support": "implementation-only"
       },
@@ -251,7 +251,7 @@ public static class LevelObjectContract
     /// carries the game's own status enum rather than a state name this provider invented.</summary>
     public const string ContainerStateCapabilityJson = """
     {
-      "id": "forge.trigger.map.container_state",
+      "id": "forge.trigger.interaction.container_state",
       "owner": "forge.module.gtfo.map",
       "kind": "trigger",
       "label": "储物柜 / 资源箱状态变化",
@@ -264,7 +264,7 @@ public static class LevelObjectContract
         "support": "implementation-only"
       },
       "graph": {
-        "domains": [ "map", "room", "logic" ],
+        "domains": [ "map", "room", "tool", "consumable" ],
         "execution": "host",
         "inputs": [],
         "outputs": [

@@ -6,8 +6,7 @@ using ForgeRuntime.Framework;
 namespace ForgeMap;
 
 /// <summary>The level-lifecycle, objective-transition and dimension rows of the checklist: the elevator landing that
-/// starts an expedition, the two per-layer objective transitions the checklist calls "objective started" and
-/// "objective won", the objective chain step a reactor wave is, the HSU's own "the sample is in" transition, the
+/// starts an expedition, the objective chain step a reactor wave is, the HSU's own "the sample is in" transition, the
 /// checkpoint reload, the zone a player walks into, the dimension a portal sends them to — and the two actions that
 /// ride the same native entry: the objective's own countdown, and the team's dimension moves.
 ///
@@ -21,7 +20,7 @@ namespace ForgeMap;
 /// (20403457): `AddToTimer` 24, `ResetTimer` 25, `WinOnDeath` 26, `ForceInstantWin` 27, `DimensionFlashTeam` 7,
 /// `DimensionWarpTeam` 8, `ClearDimension` 30.
 ///
-/// Every capability row this family observes is the runtime's own: the eight `forge.trigger.*` ids below are
+/// Every capability row this family observes is the runtime's own: the six `forge.trigger.*` ids below are
 /// declared by the trigger contract (`forge.contract.trigger`, `ForgeRuntime/Framework/TriggerContracts.cs`,
 /// ruling 148.3), because the catalog row for these transitions carries no port this row cannot be bound to and
 /// an id has exactly one owner. This file therefore declares no trigger capability row at all — it names the
@@ -40,11 +39,6 @@ public static class LevelEventContract
     /// a `map` resource output; the runtime's own trigger contract leaves it out, so this provider declares it and
     /// publishes the level it stands in as the reference the `level` attachment matcher already compares.</summary>
     public const string ExpeditionStartedCapability = "forge.trigger.session.expedition_started";
-    /// <summary>A layer's objective entering `eWardenObjectiveStatus.Started`.</summary>
-    public const string ObjectiveActivatedCapability = "forge.trigger.objective.activated";
-    /// <summary>A layer's objective entering `eWardenObjectiveStatus.WardenObjectiveItemSolved` — the checklist's
-    /// "objective done, extraction begins", which is the same transition the game's `OnGotoWin` mount fires on.</summary>
-    public const string ObjectiveWonCapability = "forge.trigger.objective.won";
     /// <summary>The reactor objective's own chain step. A reactor's waves are the objective's event chain, so what
     /// makes a new wave is the chain index the objective machine already reports; there is no author-defined wave
     /// instance to name and publishing one would invent an identity the game does not have.</summary>
@@ -65,8 +59,6 @@ public static class LevelEventContract
     public const string PortalWarpedCapability = "forge.trigger.map.portal_warped";
 
     public const string ExpeditionStartedFact = "session.expedition_started";
-    public const string ObjectiveActivatedFact = "objective.activated";
-    public const string ObjectiveWonFact = "objective.won";
     public const string ReactorWaveFact = "objective.reactor_wave";
     public const string HsuSampledFact = "objective.hsu_sampled";
     public const string CheckpointRestoredFact = "session.checkpoint_restored";
@@ -127,21 +119,6 @@ public static class LevelEventContract
     /// the next wipe the win the objective's own completion check looks for.</summary>
     public static readonly string[] ExpeditionOutcomes = { "instant_win", "win_on_death" };
 
-    /// <summary>The `eWardenObjectiveStatus` members the two objective rows report, by the wire index the port
-    /// carries. The names are the enum's own, and the values are its own numbering, read from the build.</summary>
-    public const int StatusNotDiscovered = 0, StatusDiscovered = 10, StatusStarted = 20;
-    public const int StatusPartiallySolved = 30, StatusItemSolved = 40;
-
-    public static string? StatusName(int status) => status switch
-    {
-        StatusNotDiscovered => "NotDiscovered",
-        StatusDiscovered => "Discovered",
-        StatusStarted => "Started",
-        StatusPartiallySolved => "WardenObjectivePartiallySolved",
-        StatusItemSolved => "WardenObjectiveItemSolved",
-        _ => null
-    };
-
     // ---- handler shapes -----------------------------------------------------------------------------
 
     /// <summary>No trigger row carries an input: every one of them is a native callback's own report.</summary>
@@ -171,8 +148,6 @@ public static class LevelEventContract
     public static readonly IReadOnlyList<(string Fact, string Capability)> Triggers = Array.AsReadOnly(new[]
     {
         (ExpeditionStartedFact, ExpeditionStartedCapability),
-        (ObjectiveActivatedFact, ObjectiveActivatedCapability),
-        (ObjectiveWonFact, ObjectiveWonCapability),
         (ReactorWaveFact, ReactorWaveCapability),
         (HsuSampledFact, HsuSampledCapability),
         (CheckpointRestoredFact, CheckpointRestoredCapability),
@@ -194,7 +169,7 @@ public static class LevelEventContract
             : throw new RuntimeContractException("level-event-capability", capabilityId);
 
     /// <summary>One output port of an action row. A trigger row's ports are not built here any more: the
-    /// eight trigger capability rows are the runtime's trigger contract's own text (ruling 148.3), so this file
+    /// six trigger capability rows are the runtime's trigger contract's own text (ruling 148.3), so this file
     /// carries no second spelling of them.</summary>
     public static object Port(string id, string type) => new { id, type };
     /// <summary>One resource input port: the kind and the schema name the provider answers for, so a plan that
@@ -257,7 +232,7 @@ public static class LevelEventContract
         _ => ObjectiveWritePermission
     };
 
-    /// <summary>The eight trigger binding rows, in the same order.</summary>
+    /// <summary>The six trigger binding rows, in the same order.</summary>
     public static object[] TriggerBindings()
     {
         var rows = new object[Triggers.Count];
@@ -265,7 +240,7 @@ public static class LevelEventContract
         return rows;
     }
 
-    /// <summary>The eight registration support rows, in the same order.</summary>
+    /// <summary>The six registration support rows, in the same order.</summary>
     public static BindingSupport[] TriggerSupports()
     {
         var rows = new BindingSupport[Triggers.Count];
@@ -326,7 +301,7 @@ public static class LevelEventContract
         return rows;
     }
 
-    /// <summary>Every capability row this file declares, which is the three action rows: the eight trigger rows
+    /// <summary>Every capability row this file declares, which is the three action rows: the six trigger rows
     /// are the trigger contract's own declaration and this file adds no second copy of them (ruling 148.3).</summary>
     public static object[] CapabilityRows() => ActionRows();
 
@@ -350,7 +325,7 @@ public static class LevelEventContract
 
     /// <summary>The shape table of this family: the three action handlers and nothing else. An observation binding
     /// carries no handler table entry, so it declares no shape — a table entry the registration does not have a
-    /// handler for is refused, and the eight trigger rows add none.</summary>
+    /// handler for is refused, and the six trigger rows add none.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> Shapes()
         => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
         {

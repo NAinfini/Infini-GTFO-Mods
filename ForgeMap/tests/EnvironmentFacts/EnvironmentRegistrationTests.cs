@@ -15,7 +15,8 @@ public sealed class EnvironmentRegistrationTests
 {
     private static readonly string[] CommandHandlerNames =
     {
-        EnvironmentContract.LightingHandler, EnvironmentContract.FogHandler, EnvironmentContract.FogCycleHandler,
+        EnvironmentContract.LightingHandler, EnvironmentContract.LightColorHandler,
+        EnvironmentContract.FogHandler, EnvironmentContract.FogCycleHandler,
         EnvironmentContract.AudioHandler, EnvironmentContract.AudioStopHandler, EnvironmentContract.IntelHandler,
         EnvironmentContract.DialogueHandler,
         EnvironmentContract.NavMarkerHandler, EnvironmentContract.AnimationHandler,
@@ -48,6 +49,7 @@ public sealed class EnvironmentRegistrationTests
         var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
         {
             [EnvironmentContract.LightingHandler] = world.Host.HandleLighting,
+            [EnvironmentContract.LightColorHandler] = world.Host.HandleLightColor,
             [EnvironmentContract.FogHandler] = world.Host.HandleFog,
             [EnvironmentContract.FogCycleHandler] = world.Host.HandleFogCycle,
             [EnvironmentContract.NavMarkerHandler] = world.Host.HandleNavMarker,
@@ -103,7 +105,7 @@ public sealed class EnvironmentRegistrationTests
         foreach (var name in CommandHandlerNames) Assert.True(module.Handlers.ContainsKey(name), name);
         // The two read-only rows: the environment state and the zone's own light count.
         Assert.Equal(2, module.Evaluators!.Count);
-        Assert.Equal(13, module.Handlers.Count + module.Evaluators!.Count);
+        Assert.Equal(14, module.Handlers.Count + module.Evaluators!.Count);
     }
 
     [Fact]
@@ -124,7 +126,8 @@ public sealed class EnvironmentRegistrationTests
     {
         foreach (var capability in new[]
         {
-            EnvironmentContract.LightingCapability, EnvironmentContract.FogCapability,
+            EnvironmentContract.LightingCapability, EnvironmentContract.LightColorCapability,
+            EnvironmentContract.FogCapability,
             EnvironmentContract.FogCycleCapability, EnvironmentContract.NavMarkerCapability,
             EnvironmentContract.AnimationCapability
         })
@@ -169,7 +172,7 @@ public sealed class EnvironmentRegistrationTests
         var capabilities = EnvironmentContract.Rows().Keys
             .Append(HudContract.ValueCapability).ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal(13, bindings.Length);
+        Assert.Equal(14, bindings.Length);
         foreach (var binding in bindings)
         {
             Assert.Contains(binding.GetProperty("capabilityId").GetString()!, capabilities);

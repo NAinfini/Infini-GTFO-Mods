@@ -9,7 +9,7 @@ using ForgeRuntime.Framework;
 namespace ForgeMap.Tests.LevelEventFacts;
 
 /// <summary>
-/// One live world for the cases below: a kernel in its own world epoch with the eleven rows registered under the
+/// One live world for the cases below: a kernel in its own world epoch with the nine rows registered under the
 /// contract's own declaration, and the module under test publishing through that registration. Nothing here
 /// depends on the game: the level-event module is game-independent by design, so every port a fact carries is
 /// asserted against the value a case put in rather than against a native read.
@@ -32,8 +32,8 @@ internal sealed class LevelEventWorld : IDisposable
 
     /// <summary>Starts one world with the contract's own rows registered. The kernel refuses an implemented
     /// binding whose handler the module does not supply, so each of the three action rows is registered with a
-    /// stand-in handler and the eight observation rows carry the fact name their binding publishes under —
-    /// exactly the table <c>MapPluginSession.Definition()</c> composes. The eight trigger capability rows are the
+    /// stand-in handler and the six observation rows carry the fact name their binding publishes under —
+    /// exactly the table <c>MapPluginSession.Definition()</c> composes. The six trigger capability rows are the
     /// trigger contract's own declarations, so the contract registers beside this provider exactly as the host
     /// registers its built-in providers (ruling 148.3).</summary>
     internal static LevelEventWorld Start(long worldEpoch = 1)

@@ -8,8 +8,8 @@ namespace ForgeWeapon;
 /// player reference owned by the player domain and is never created here. Most bindings are observe-only, and
 /// most capabilities they name are declared by the runtime's own `TriggerContracts` provider, so this module
 /// carries no second copy of a shape that contract owns. The exceptions are owned here, row for row: the
-/// three deployed-device fact rows, the melee-hit row and the seven implemented
-/// attack-instance rows, whose canonical ids are this provider's own; and the actions it executes itself — the
+/// three deployed-device fact rows, the melee-hit row and the three attack-instance rows, whose canonical ids
+/// are this provider's own; and the actions it executes itself — the
 /// ammunition pair, the three instance-override rows and the inventory give/consume pair — each
 /// declared with the native body this machine supplies. The reload rows are this provider's bindings but not its
 /// capabilities — their owner is `forge.contract.trigger`, which declares every one of their shapes. The rows are

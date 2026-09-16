@@ -8,10 +8,9 @@ namespace ForgeWeapon;
 /// <summary>
 /// The one row the node list's `e-w-melee` names and this build did not have: a melee swing that <b>landed on a
 /// target</b>. The catalog's melee vocabulary is the action `forge.action.combat.melee_swing` (a swing is asked
-/// for) plus the attack-instance facts this package already declares (`attack_requested` / `attack_completed` /
-/// `attack_missed`), and none of them says "this swing hit this thing": the attack scope closes the same way
-/// whether the swing connected or not, and `hit_candidate` is published before any damage is worked out, so it
-/// carries no limb and no damage. The node list's example — a hammer that heals its wielder when it connects —
+/// for) plus the `hit_candidate` fact this package already declares for a swing's target, and that fact does not
+/// say "this swing hit this thing": it is published before any damage is worked out, so it carries no limb and no
+/// damage. The node list's example — a hammer that heals its wielder when it connects —
 /// needs the connected hit itself, once per target, with the damage the hit really dealt.
 ///
 /// <b>Where the row is read.</b> Every port here is a read of the swing's own hit entry on the machine that

@@ -10,12 +10,6 @@ namespace ForgeMap;
 ///
 /// Each row's ports are the facts the native side really carries, and nothing else:
 ///
-/// - `door_approach` is the door's own approach callback. The native evidence for this build is
-///   `LevelGeneration.LG_SecurityDoor_Locks.OnApproached` (an `Action`, `LevelGeneration.LG_SecurityDoor_Locks`,
-///   `Modules-ASM.dll`) plus `pDoorState.hasBeenApproached` (`[FieldOffset(21)]`, the replicated state that makes
-///   the fact a host-visible one). The callback carries no actor, and the port is declared optional for exactly
-///   that reason: an absent port is how this framework says "not observable", where a null would claim the actor
-///   was observed and happened to be nobody.
 /// - `door_scan` is the door's own chained-puzzle lock. The two callbacks the lock component owns —
 ///   `LG_SecurityDoor_Locks.OnPlayerActivateChainedPuzzle` and `OnChainedPuzzleSolved` — are the game's own
 ///   notifications that the puzzle on the door was activated and that it was solved, which is exactly the
@@ -36,29 +30,20 @@ namespace ForgeMap;
 ///   replication layer raises on the door — `LG_Door_Sync.OnDoorGotDamage` while it is being hit and
 ///   `LG_Door_Sync.OnDoorGotDestroyed` when it breaks. Both carry the `SNet_Player` that caused the damage, which
 ///   is the `attacker` port; it is optional because an environmental or enemy hit names no player.
-/// - `terminal_log` is one log a terminal read, taken from the command entry that already carries the accepted
-///   command and the two parameter strings the terminal's own interpreter produced
-///   (`LG_ComputerTerminalCommandInterpreter.TryGetCommand`, 0x1292CB0). `TERM_Command.ReadLog` (29) is what makes
-///   a read a read; the log's own name is the interpreter's first parameter, so the port is absent when the
-///   command carried none instead of being published as an empty name.
 ///
 /// Every row is `host` execution and publishes only on the authoritative peer, which is the rule the package's
 /// existing map-object rows already follow.</summary>
 public static class DoorTerminalEventContract
 {
-    public const string DoorApproachCapability = "forge.trigger.interaction.door_approach";
     public const string DoorScanCapability = "forge.trigger.interaction.door_scan";
     public const string LockBrokenCapability = "forge.trigger.interaction.lock_broken";
     public const string DoorBrokenCapability = "forge.trigger.interaction.door_broken";
-    public const string TerminalLogCapability = "forge.trigger.interaction.terminal_log";
 
-    /// <summary>The five fact kinds these rows carry, in the order the module declares them. A binding or a
+    /// <summary>The three fact kinds these rows carry, in the order the module declares them. A binding or a
     /// fact key names one of these, never the capability again, so the two cannot drift apart.</summary>
-    public const string DoorApproachFact = "door_approach";
     public const string DoorScanFact = "door_scan";
     public const string LockBrokenFact = "lock_broken";
     public const string DoorBrokenFact = "door_broken";
-    public const string TerminalLogFact = "terminal_log";
 
     /// <summary>The two stages of `forge.trigger.interaction.door_broken`, in checklist order. A weak door is
     /// attacked first and broken second; the two are one author node's two phases rather than two rows, because
@@ -77,11 +62,9 @@ public static class DoorTerminalEventContract
 
     public static string Capability(string fact) => fact switch
     {
-        DoorApproachFact => DoorApproachCapability,
         DoorScanFact => DoorScanCapability,
         LockBrokenFact => LockBrokenCapability,
         DoorBrokenFact => DoorBrokenCapability,
-        TerminalLogFact => TerminalLogCapability,
         _ => throw new RuntimeContractException("door-terminal-event-fact", "Unknown door or terminal event fact.")
     };
 
@@ -102,16 +85,6 @@ public static class DoorTerminalEventContract
     internal static object ZonePort(string id) => new { id, type = "resource", resourceKind = "zone", schema = "forge.resource.zone" };
     internal static object OptionalZonePort(string id) => new { id, type = "resource", resourceKind = "zone", schema = "forge.resource.zone", optional = true };
     internal static object PositionPort(string id) => new { id, type = "vector3", unit = "m" };
-
-    /// <summary>The approach row: the door that was approached and, when the callback or the instigator field
-    /// names one, the actor. Both an approach and its actor are facts the door's own replicated state carries,
-    /// so the row is the door's and not a generic proximity event's.</summary>
-    public static object ApproachRow() => Row(DoorApproachCapability, "玩家靠近门", "有人靠近门。", new object[]
-    {
-        Port("next", "execution"),
-        Port("door", "entity"),
-        Optional("actor", "entity")
-    });
 
     /// <summary>The scan row: the door whose chained-puzzle lock changed, the phase the status is, and the door
     /// status the phase was derived from. `status` is published as well as `phase`, because the derivation is
@@ -152,26 +125,12 @@ public static class DoorTerminalEventContract
         Optional("attacker", "entity")
     });
 
-    /// <summary>The terminal-log row: the terminal that read a log, the log's own name as the terminal's
-    /// interpreter named it, and the raw input line the player typed. The line is carried because the name is
-    /// the interpreter's reading of it, and a plan that wants what was really typed should not have to
-    /// reconstruct it from a parse.</summary>
-    public static object TerminalLogRow() => Row(TerminalLogCapability, "读取终端日志", "某个终端日志被读取。", new object[]
-    {
-        Port("next", "execution"),
-        Port("terminal", "entity"),
-        Port("log", "string"),
-        Optional("line", "string")
-    });
-
-    /// <summary>The five rows in the order this module declares them, paired with the fact each one carries.</summary>
+    /// <summary>The three rows in the order this module declares them, paired with the fact each one carries.</summary>
     internal static readonly (string Fact, object Row)[] RowTable =
     {
-        (DoorApproachFact, ApproachRow()),
         (DoorScanFact, ScanRow()),
         (LockBrokenFact, LockBrokenRow()),
-        (DoorBrokenFact, DoorBrokenRow()),
-        (TerminalLogFact, TerminalLogRow())
+        (DoorBrokenFact, DoorBrokenRow())
     };
 
     /// <summary>Every row, in the table's order.</summary>
@@ -192,7 +151,7 @@ public static class DoorTerminalEventContract
         dependencies = Array.Empty<string>(), requires = Array.Empty<string>()
     };
 
-    /// <summary>The five binding rows in the same order as <see cref="Rows"/>.</summary>
+    /// <summary>The three binding rows in the same order as <see cref="Rows"/>.</summary>
     public static object[] Bindings()
     {
         var bindings = new object[RowTable.Length];
@@ -205,7 +164,7 @@ public static class DoorTerminalEventContract
     public static BindingSupport Support(string fact)
         => new(Binding(fact), "implementation-only", new[] { MapObjectContract.MapObjectReadPermission });
 
-    /// <summary>The five registration rows in the same order as <see cref="Bindings"/>.</summary>
+    /// <summary>The three registration rows in the same order as <see cref="Bindings"/>.</summary>
     public static BindingSupport[] Supports()
     {
         var support = new BindingSupport[RowTable.Length];

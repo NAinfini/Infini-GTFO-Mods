@@ -30,28 +30,6 @@
       "notes": "The catalog row forge.trigger.session.expedition_started exists (canonicalVocabulary) with exactly the next + map(resource, forge.resource.map) shape; TriggerContracts.cs deliberately leaves it out because it declares a port no provider can publish. The Map provider publishes it here, so the row is declared in ForgeMap/LevelObjectiveContract.cs instead of the runtime contract module. The runtime has no resource VALUE, so the map reference is carried as the resource-reference frame form ({resourceKind, resourceId}) that RuntimeGraphContracts already accepts for a resource port; resourceId is the level identity string the level matcher already reads (RundownManager.ActiveExpeditionUniqueKey), so the port and the mount cannot disagree."
     },
     {
-      "row": "forge.trigger.objective.activated",
-      "checklist": "e-obj-activate",
-      "entry": { "kind": "hook", "id": "ObjectiveStateChange" },
-      "nativeCall": "WardenObjectiveManager.OnStateChange(pWardenObjectiveState, pWardenObjectiveState, bool) postfix diff",
-      "evidence": "objective-hooks.json hooks[ObjectiveStateChange] rva 0x151B2D0 slot 14, reads old and new state for all three layers; stateVocabulary[eWardenObjectiveStatus]: NotDiscovered 0 / Discovered 10 / Started 20 / WardenObjectiveItemSolved 40. eWardenObjectiveInteractionType.StartObjective = 1 is the interaction the native machine itself uses to enter Started.",
-      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
-      "identity": { "authorReference": "WardenObjectiveDataBlock per LG_LayerType (WardenObjectiveManager.TryGetActiveWardenObjectiveData)", "runtimeInstance": "the layer key", "invalidatedBy": "level cleanup/recall" },
-      "ports": { "objective": "resource, resourceKind objective, schema forge.resource.objective" },
-      "notes": "The catalog has no dedicated 'objective activated' row; the nearest existing row forge.trigger.objective.state_changed carries a free-form string state and would make every author filter the string. This row publishes the one transition the checklist node names, as a structural layer parameter plus the objective resource reference."
-    },
-    {
-      "row": "forge.trigger.objective.won",
-      "checklist": "e-obj-win",
-      "entry": { "kind": "hook", "id": "ObjectiveStateChange" },
-      "nativeCall": "WardenObjectiveManager.OnStateChange postfix, transition of pWardenObjectiveState.<layer>_status into eWardenObjectiveStatus.WardenObjectiveItemSolved (40)",
-      "evidence": "objective-hooks.json layerCompletionEvidence[main/secondary/third completion]: per-layer completion is the status transition to WardenObjectiveItemSolved, forced through AttemptInteract/ForceCompleteObjective; ObjectiveStatusCheck calls ActivateWinCondition 0x150F710 (verified edge). The win-condition arming itself is frozen as ExitWinConditionActivated in the same file.",
-      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false },
-      "identity": { "authorReference": "WardenObjectiveDataBlock per layer", "runtimeInstance": "the layer key", "invalidatedBy": "level cleanup/recall" },
-      "ports": { "objective": "resource, resourceKind objective, schema forge.resource.objective" },
-      "notes": "The checklist's 'objective complete, extraction starts' is the layer's own completion, which is WardenObjectiveItemSolved plus the win-condition activation. The row publishes on the completion transition; whether the landing's ActivateWinCondition always follows in the same callback is not proven, so the row does not claim it."
-    },
-    {
       "row": "forge.trigger.objective.reactor_wave",
       "checklist": "e-reactor-wave",
       "entry": { "kind": "hook", "id": "ObjectiveChainUpdated" },
@@ -142,9 +120,7 @@
   ],
   "unproven": [
     "Every host/client claim: no body was executed and no runtime log was captured.",
-    "Whether WardenObjectiveManager.OnStateChange runs before or after the native state is applied on a client, and whether it is invoked on the host for locally produced changes.",
     "Whether the reactor objective's wave boundary is exactly the chain-index change, or whether a wave can advance without one.",
-    "Whether eWardenObjectiveStatus.WardenObjectiveItemSolved for a layer always precedes the landing's ActivateWinCondition.",
     "The signature, RVA and completion callback of LG_HSU.m_pickupSampleInteraction (Interact_Timed).",
     "The member table of LG_DimensionPortal and the callback that runs after a warp, and the callback of pPlayerDimensionChange.",
     "Any native 'player entered zone' entry: the game's own Zones[].EventsOnEnter list is empty in every vanilla layout on this machine.",
@@ -152,7 +128,6 @@
   ],
   "inGameVerificationPlan": [
     "Load R8_E2 (reactor) and log ObjectiveChainUpdated with the layer, the chain index and TryGetActiveWardenObjectiveData's ReactorWaves length: confirm one chain change per reactor wave and record the order relative to the wave's own Events running.",
-    "Log OnStateChange for a normal objective and record the exact status sequence into Started and into WardenObjectiveItemSolved, and whether ActivateWinCondition runs in the same callback.",
     "Load a level with an HSU objective and log every LG_HSU member that runs during a held sample interaction; decode the component type from that log and freeze the completion callback before implementing forge.trigger.objective.hsu_sampled.",
     "Load R8_A2 and log LG_DimensionPortal plus the local player's dimension field across a portal warp; freeze the portal state struct and the warp callback before implementing the dimension rows.",
     "Load a level with zones and log whether Zones[].EventsOnEnter or any per-zone enter callback runs when the local player crosses a zone boundary, on host and client.",

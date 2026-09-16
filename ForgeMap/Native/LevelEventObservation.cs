@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using GameData;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
@@ -15,12 +14,11 @@ namespace ForgeMap.Native;
 ///
 /// Every member below is read from the build's own interop assemblies (20403457):
 ///
-/// - `WardenObjectiveManager.CurrentState` / `GetLayerStatus` / `GetCurrentChainIndex` for the two objective
-///   transitions and the reactor's chain step; `WardenObjectiveManager.OnLocalPlayerStartExpedition` for the
-///   landing. `pWardenObjectiveState` keeps three fixed layer slots (`main_status` 0 / `second_status` 1 /
-///   `third_status` 2), which is why a row about one layer carries the layer name and not an instance id.
-/// - `IWardenObjective.OnStatusChange` is the objective's own status callback; `WO_HSUFindTakeSample` overrides
-///   `OnLocalPlayerSolvedObjectiveItem` for the HSU's own "the sample is in" transition.
+/// - `WardenObjectiveManager.CurrentState` / `GetChainIndexForLayer` for the objective chain step a reactor wave
+///   is; `WardenObjectiveManager.OnLocalPlayerStartExpedition` for the landing. `pWardenObjectiveState` keeps three
+///   fixed layer slots (`main_status` 0 / `second_status` 1 / `third_status` 2), which is why a row about one layer
+///   carries the layer name and not an instance id.
+/// - `WO_HSUFindTakeSample.OnLocalPlayerSolvedObjectiveItem` is the HSU's own "the sample is in" transition.
 /// - `CheckpointManager.OnRecallComplete` is the end of a recall, which is the row's "read a checkpoint back".
 /// - `WardenObjectiveManager.OnLocalPlayerEnterZone(PlayerAgent, LG_Zone)` is the game's own zone-entry entry;
 ///   `LG_Zone` carries `m_dimensionIndex` and `m_layer`, and `ZoneIndex` already resolves the world's zone table
@@ -35,24 +33,7 @@ namespace ForgeMap.Native;
 /// game's own replication path stays the only writer, exactly as a vanilla mount point does it.</summary>
 internal static class LevelEventObservation
 {
-    // ---- objective transitions ----------------------------------------------------------------------
-
-    /// <summary>Reads the three fixed layer slots and reports the one whose status is a boundary row. A status
-    /// outside the two the rows name is no fact: the two intermediate members are the objective's own progress
-    /// and the checklist's rows are its start and its win.</summary>
-    internal static void ReadObjectiveStatus(bool isRecall, Action<string, int, int, bool> report)
-    {
-        var state = WardenObjectiveManager.CurrentState;
-        if (state == null) return;
-        foreach (var (layer, type) in LayerSlots)
-        {
-            if (!WardenObjectiveManager.HasWardenObjectiveDataForLayer(type)) continue;
-            int status = (int)state.GetLayerStatus(type);
-            int chain = state.GetChainIndexForLayer(type);
-            if (status is not (LevelEventContract.StatusStarted or LevelEventContract.StatusItemSolved)) continue;
-            report(layer, status, chain, isRecall);
-        }
-    }
+    // ---- the objective machine ----------------------------------------------------------------------
 
     /// <summary>The objective's chain index for one layer, which is what a reactor wave advances. Read from the
     /// objective machine's own state rather than from a counter this provider keeps.</summary>
@@ -65,16 +46,9 @@ internal static class LevelEventObservation
         return state.GetChainIndexForLayer(type.Value);
     }
 
-    /// <summary>The layer members this provider names, in the order the checklist's own vocabulary lists them.
-    /// `LG_LayerType` declares exactly these three, so a layer this table cannot spell is a layer the game does
-    /// not have rather than one that gets folded into the nearest.</summary>
-    internal static readonly IReadOnlyList<(string Layer, LG_LayerType Type)> LayerSlots = Array.AsReadOnly(new[]
-    {
-        ("main", LG_LayerType.MainLayer),
-        ("secondary", LG_LayerType.SecondaryLayer),
-        ("third", LG_LayerType.ThirdLayer)
-    });
-
+    /// <summary>The layer members this provider names. `LG_LayerType` declares exactly these three, so a layer
+    /// this table cannot spell is a layer the game does not have rather than one that gets folded into the
+    /// nearest.</summary>
     internal static LG_LayerType? LayerType(string layer) => layer switch
     {
         "main" => LG_LayerType.MainLayer,

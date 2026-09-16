@@ -233,4 +233,18 @@ public sealed partial class RuntimeKernel
             Tick = CurrentTick, WorldEpoch = WorldEpoch, Detail = detail,
             Result = new RuntimeLogResult { Status = CommandStatuses.Failed, Reason = code } });
     }
+
+    /// <summary>The record point for the level-layout observation (`map.layout-generated`, contract §3.2). The
+    /// caller is the authoring layer that watched the level generator; it owns the facts, the kernel owns the
+    /// provider, the level gate, the single-thread rule and the sink. A disabled or unreadable observation writes
+    /// nothing and throws nothing: a level that generated is not a runtime error, and an unreadable layout is
+    /// refused by <see cref="RuntimeLogLayoutCheck"/> with a <c>log-record</c> instead of reaching the file.</summary>
+    public void ReportGeneratedLayout(in RuntimeLogLayout layout)
+    {
+        ReadThread();
+        if (logSink == null || !LogGate(Identity.Id).IsEnabled(RuntimeLogLevel.Info)) return;
+        RuntimeLogLayoutCheck.Require(in layout);
+        WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Info, Code = RuntimeLogCodes.MapLayoutGenerated, Provider = Identity.Id,
+            Tick = CurrentTick < 0 ? 0 : CurrentTick, WorldEpoch = WorldEpoch, Layout = layout });
+    }
 }

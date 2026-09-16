@@ -29,7 +29,6 @@ namespace ForgeMap.Native;
 internal enum DoorTerminalDoorEvent
 {
     None,
-    Approach,
     Broken,
     Unlocked,
     Opened
@@ -69,7 +68,6 @@ internal static class DoorTerminalDerivations
 
     /// <summary>The `TERM_Command` members this derivation names, as the byte values the native enum declares
     /// them with. They are written as the enum's own indices because the values are what a hook receives.</summary>
-    internal const int CommandReadLog = 29;
     internal const int CommandUniqueSlot1 = 38;
     internal const int CommandUniqueSlot5 = 42;
 
@@ -110,11 +108,6 @@ internal static class DoorTerminalDerivations
     internal static string LockCause(bool smashed, bool hacked)
         => smashed ? "smashed" : hacked ? "hacked" : "unlocked";
 
-    /// <summary>Whether a native command read a terminal log. `TERM_Command.ReadLog` is what the terminal's own
-    /// interpreter produces for a typed read, so a log read is one command value rather than a member the
-    /// terminal would have to be watched for.</summary>
-    internal static bool IsLogRead(int command) => command == CommandReadLog;
-
     /// <summary>The custom-command slot a native command is, one-based, or 0 for a command that is not one of
     /// the five slots. This is the slot `e-term-cmd` asks a plan to be able to tell apart, and it is the game's
     /// own member order rather than a Forge table.</summary>
@@ -123,14 +116,8 @@ internal static class DoorTerminalDerivations
             ? command - CommandUniqueSlot1 + 1
             : 0;
 
-    /// <summary>The log's own name out of the interpreter's first parameter string. The interpreter produces the
-    /// two parameter strings and the command entry carries them; a read that named no log publishes no log name
-    /// instead of an empty one, which is why this answers null rather than "".</summary>
-    internal static string? LogName(string? param1)
-        => string.IsNullOrWhiteSpace(param1) ? null : param1;
-
     /// <summary>The raw input line a plan may want back: the line the terminal's interpreter parsed. Blank is
-    /// absence, the same rule the log name follows.</summary>
+    /// absence.</summary>
     internal static string? InputLine(string? line)
         => string.IsNullOrWhiteSpace(line) ? null : line;
 

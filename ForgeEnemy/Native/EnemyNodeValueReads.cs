@@ -24,9 +24,9 @@ namespace ForgeEnemy.Native;
 /// A value that cannot be read is a refusal with a code, never a zero and never an empty answer: a snapshot
 /// without health means the provider does not publish health for that life (`health-unavailable`), a behaviour
 /// state no `ai_state` member covers is `aiState == "disabled"` and is refused rather than reported as awake, and
-/// a life whose type block does not read has no type (`enemy-type-unavailable`). The one port that is genuinely
-/// nullable is `where`'s `zone`: an enemy standing outside every zone is answered with JSON null, which is an
-/// observation, and a zone read that could not be made refuses before the frame is built.
+/// a life whose type block does not read has no type (`enemy-type-unavailable`). A zone read that cannot be made
+/// is a refusal of the same kind — an enemy the provider cannot place never arrives as an absent zone — so no port
+/// in this family is nullable.
 ///
 /// The evaluator table is built here and handed to the module's own registration, so the row names and the
 /// handlers that answer them cannot drift apart.</summary>

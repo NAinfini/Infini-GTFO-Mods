@@ -205,8 +205,8 @@ internal sealed partial class EnemyModule
 
     /// <summary>The sleep the catalog asks for, submitted as the one native transition that means it:
     /// `EnemyBehaviour.ChangeState(EB_States.Hibernating)`. `ChangeState` writes `m_currentStateName` only when
-    /// the incoming state differs (0x1567380), so the write is a real transition, and the behaviour state is what
-    /// `forge.trigger.enemy.state_changed` observes and what `EnemySync` replicates.
+    /// the incoming state differs (0x1567380), so the write is a real transition, and the behaviour state it
+    /// writes is what `EnemySync` replicates and what the awakened fact samples.
     ///
     /// A sleep the game has no timer for is refused by name rather than faked: `duration` is a plan-side
     /// composition (`delay` then `awaken`), not a native field, and `interrupt_policy: damage_only` asks for a

@@ -8,25 +8,24 @@ using LevelGeneration;
 
 namespace ForgeMapTests.DoorTerminalFacts;
 
-/// <summary>What the three contract files declare: the five event rows, the two action rows and the one value
+/// <summary>What the three contract files declare: the three event rows, the two action rows and the one value
 /// row, their bindings, their registration support and their handler port shapes. A case here is the one that
 /// fails when a row is renamed on the production side, which is what keeps a binding id, a capability id and a
 /// handler name from drifting apart between the declaration and the native half.</summary>
 public sealed class ContractFacts
 {
     [Fact]
-    public void TheFiveEventRowsAreDeclaredWithTheirOwnFactsAndBindings()
+    public void TheThreeEventRowsAreDeclaredWithTheirOwnFactsAndBindings()
     {
         var rows = DoorTerminalEventContract.Rows();
-        Assert.Equal(5, rows.Length);
-        Assert.Equal(5, DoorTerminalEventContract.Bindings().Length);
-        Assert.Equal(5, DoorTerminalEventContract.Supports().Length);
+        Assert.Equal(3, rows.Length);
+        Assert.Equal(3, DoorTerminalEventContract.Bindings().Length);
+        Assert.Equal(3, DoorTerminalEventContract.Supports().Length);
 
         foreach (var fact in new[]
         {
-            DoorTerminalEventContract.DoorApproachFact, DoorTerminalEventContract.DoorScanFact,
-            DoorTerminalEventContract.LockBrokenFact, DoorTerminalEventContract.DoorBrokenFact,
-            DoorTerminalEventContract.TerminalLogFact
+            DoorTerminalEventContract.DoorScanFact, DoorTerminalEventContract.LockBrokenFact,
+            DoorTerminalEventContract.DoorBrokenFact
         })
         {
             var capability = DoorTerminalEventContract.Capability(fact);
@@ -50,16 +49,12 @@ public sealed class ContractFacts
     [Fact]
     public void EveryEventRowPublishesThePortsItsFactCarries()
     {
-        var approach = RowPorts(DoorTerminalEventContract.DoorApproachCapability);
-        Assert.Equal(new[] { "next", "door", "actor" }, approach);
         var scan = RowPorts(DoorTerminalEventContract.DoorScanCapability);
         Assert.Equal(new[] { "next", "door", "phase", "status" }, scan);
         var broken = RowPorts(DoorTerminalEventContract.LockBrokenCapability);
         Assert.Equal(new[] { "next", "door", "cause", "lock_kind" }, broken);
         var weak = RowPorts(DoorTerminalEventContract.DoorBrokenCapability);
         Assert.Equal(new[] { "next", "door", "phase", "zone", "position", "attacker" }, weak);
-        var log = RowPorts(DoorTerminalEventContract.TerminalLogCapability);
-        Assert.Equal(new[] { "next", "terminal", "log", "line" }, log);
     }
 
     [Fact]
@@ -85,13 +80,8 @@ public sealed class ContractFacts
     }
 
     [Fact]
-    public void TheApproachRowsActorPortIsOptionalAndTheScanPhaseIsAnInteractionPhase()
+    public void TheScanPhaseIsAnInteractionPhase()
     {
-        var row = DoorTerminalEventContract.Rows().Single(row => Id(row) == DoorTerminalEventContract.DoorApproachCapability);
-        var actor = Property(row, "graph").GetProperty("outputs").EnumerateArray()
-            .Single(port => port.GetProperty("id").GetString() == "actor");
-        Assert.True(actor.GetProperty("optional").GetBoolean());
-
         var scan = DoorTerminalEventContract.Rows().Single(row => Id(row) == DoorTerminalEventContract.DoorScanCapability);
         var phase = Property(scan, "graph").GetProperty("outputs").EnumerateArray()
             .Single(port => port.GetProperty("id").GetString() == "phase");
@@ -325,15 +315,11 @@ public sealed class ContractFacts
     [Fact]
     public void TheDerivationNamesTheCommandsTheNativeEnumDeclares()
     {
-        Assert.True(DoorTerminalDerivations.IsLogRead(29));
-        Assert.False(DoorTerminalDerivations.IsLogRead(28));
         Assert.Equal(1, DoorTerminalDerivations.UniqueSlot(38));
         Assert.Equal(5, DoorTerminalDerivations.UniqueSlot(42));
         Assert.Equal(0, DoorTerminalDerivations.UniqueSlot(37));
         Assert.Equal(0, DoorTerminalDerivations.UniqueSlot(43));
         Assert.Equal(5, DoorTerminalDerivations.UniqueCommandSlots);
-        Assert.Null(DoorTerminalDerivations.LogName("  "));
-        Assert.Equal("FILE_1", DoorTerminalDerivations.LogName("FILE_1"));
         Assert.Null(DoorTerminalDerivations.InputLine(""));
         Assert.Equal("unlocked", DoorTerminalDerivations.LockCause(smashed: false, hacked: false));
         Assert.Equal("hacked", DoorTerminalDerivations.LockCause(smashed: false, hacked: true));

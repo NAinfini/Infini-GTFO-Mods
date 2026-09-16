@@ -7,20 +7,15 @@ namespace ForgeWeapon.Tests.AttackInstance;
 
 /// <summary>The declaration half of the slice: every row the catalog publishes is carried as its own document,
 /// and the integration batch is what moves them into the framework's trigger contract and registers the binding
-/// rows. These cases assert the declaration against the catalog's own port list and against the one gap the slice
-/// reports, so a drifted port or a silently implemented gap fails here.</summary>
+/// rows. These cases assert the declaration against the catalog's own port list, so a drifted port fails
+/// here.</summary>
 public sealed class ContractTests
 {
-    /// <summary>The eight ids the slice's row in `slices.tsv` names, in the order it names them, each with the
+    /// <summary>The three ids the slice's row in `slices.tsv` names, in the order it names them, each with the
     /// output ports the catalog declares. The ports are written out rather than re-read from the same documents
     /// they are declared in: a case that compared the contract with itself would prove nothing.</summary>
     private static readonly (string Id, string[] Ports)[] CatalogRows =
     {
-        ("forge.trigger.combat.attack_requested", new[] { "next", "source", "equipment", "phase" }),
-        ("forge.trigger.combat.attack_accepted", new[] { "next", "source", "equipment" }),
-        ("forge.trigger.combat.attack_completed", new[] { "next", "source", "equipment" }),
-        ("forge.trigger.combat.attack_cancelled", new[] { "next", "source", "equipment", "reason" }),
-        ("forge.trigger.combat.attack_missed", new[] { "next", "source", "equipment" }),
         ("forge.trigger.combat.burst_started", new[] { "next", "source", "equipment", "count" }),
         ("forge.trigger.combat.burst_ended", new[] { "next", "source", "equipment", "count" }),
         ("forge.trigger.combat.dry_fire", new[] { "next", "actor", "equipment" })
@@ -37,32 +32,30 @@ public sealed class ContractTests
         }
     }
 
-    /// <summary>The three ports that carry more than a type — the two nullable equipment ports and the request's
-    /// `command_phase` script — are declared as the catalog declares them.</summary>
+    /// <summary>The three ports that carry more than a type — the equipment port and the burst count — are
+    /// declared as the catalog declares them.</summary>
     [Fact]
     public void TheRowsCarryTheCatalogsOwnCarriers()
     {
-        Assert.Equal(new[] { "next:execution", "source:entity", "equipment:entity?", "phase:enum:command_phase" },
-            AttackInstanceContract.OutputPorts(AttackInstanceContract.AttackRequestedCapability));
-        Assert.Equal(new[] { "next:execution", "source:entity", "equipment:entity?", "reason:string" },
-            AttackInstanceContract.OutputPorts(AttackInstanceContract.AttackCancelledCapability));
+        Assert.Equal(new[] { "next:execution", "source:entity", "equipment:entity", "count:integer" },
+            AttackInstanceContract.OutputPorts(AttackInstanceContract.BurstStartedCapability));
         Assert.Equal(new[] { "next:execution", "source:entity", "equipment:entity", "count:integer" },
             AttackInstanceContract.OutputPorts(AttackInstanceContract.BurstEndedCapability));
         Assert.Equal(new[] { "next:execution", "actor:entity", "equipment:entity" },
             AttackInstanceContract.OutputPorts(AttackInstanceContract.DryFireCapability));
     }
 
-    /// <summary>One binding per implemented row and none for a row the slice reports as a gap: a binding with no
-    /// body would advertise a promise this package does not keep.</summary>
+    /// <summary>One binding per declared row: the declaration set and the binding set are the same set, and a
+    /// binding with no body would advertise a promise this package does not keep.</summary>
     [Fact]
-    public void OnlyTheImplementedRowsCarryBindings()
+    public void EveryDeclaredRowCarriesExactlyOneBinding()
     {
-        var gaps = AttackInstanceContract.Gaps.Select(gap => gap.Capability).ToArray();
-        Assert.Equal(new[] { AttackInstanceContract.AttackCancelledCapability }, gaps);
-        Assert.Equal(AttackInstanceContract.CapabilityIds.Except(gaps).OrderBy(id => id, StringComparer.Ordinal),
-            AttackInstanceContract.ImplementedCapabilityIds.OrderBy(id => id, StringComparer.Ordinal));
-        Assert.Equal(AttackInstanceContract.ImplementedCapabilityIds.Count, AttackInstanceContract.Bindings().Count);
-        Assert.Equal(AttackInstanceContract.ImplementedCapabilityIds.Count, AttackInstanceContract.Support().Count);
+        Assert.Equal(AttackInstanceContract.CapabilityIds.Count, AttackInstanceContract.Bindings().Count);
+        Assert.Equal(AttackInstanceContract.CapabilityIds.Count, AttackInstanceContract.Support().Count);
+        Assert.Equal(AttackInstanceContract.CapabilityIds.OrderBy(id => id, StringComparer.Ordinal),
+            AttackInstanceContract.Bindings()
+                .Select(row => RuntimeJson.From(row).GetProperty("capabilityId").GetString()!)
+                .OrderBy(id => id, StringComparer.Ordinal));
     }
 
     /// <summary>Every binding names the provider's own namespace, the catalog capability and an `observe` role,
@@ -77,7 +70,7 @@ public sealed class ContractTests
             Assert.StartsWith(ModuleDefinition.ProviderId + ".binding.", id, StringComparison.Ordinal);
             Assert.Equal(ModuleDefinition.ProviderId, binding.GetProperty("providerId").GetString());
             Assert.Contains(binding.GetProperty("capabilityId").GetString(),
-                AttackInstanceContract.ImplementedCapabilityIds);
+                AttackInstanceContract.CapabilityIds);
             Assert.Equal("observe", binding.GetProperty("role").GetString());
             Assert.Equal("implemented", binding.GetProperty("status").GetString());
         }
@@ -115,18 +108,5 @@ public sealed class ContractTests
             Assert.Equal("host", row.GetProperty("graph").GetProperty("execution").GetString());
             Assert.Empty(row.GetProperty("graph").GetProperty("inputs").EnumerateArray());
         }
-    }
-
-    /// <summary>The gap is spelled as one concrete absence and names the row it keeps unregistered.</summary>
-    [Fact]
-    public void TheCancelledRowIsReportedAsAGapAndNotBound()
-    {
-        var gap = AttackInstanceContract.Gaps.Single();
-        Assert.Equal(AttackInstanceContract.AttackCancelledCapability, gap.Capability);
-        Assert.Equal(AttackInstanceContract.AttackCancelledBinding, gap.Binding);
-        Assert.Contains("missing native cancellation signal", gap.Gap, StringComparison.Ordinal);
-        Assert.DoesNotContain(gap.Binding, AttackInstanceContract.Bindings()
-            .Select(row => RuntimeJson.From(row).GetProperty("id").GetString()));
-        Assert.Throws<ArgumentOutOfRangeException>(() => AttackInstanceContract.Handler(gap.Capability));
     }
 }

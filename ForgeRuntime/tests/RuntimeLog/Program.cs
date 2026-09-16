@@ -346,6 +346,36 @@ Case("valid UTF-8 JSONL without BOM or CR", () => {
     Check(Text(lines[1], "message")!.Contains("test.full", StringComparison.Ordinal) && Text(lines[1], "level") == "error", "message or level text");
 });
 
+Case("map.layout-generated carries the generated layout and refuses an unreadable one", () => {
+    var directory = NewDirectory(); var (writer, _, _) = Writer(directory);
+    var zones = new[] { new RuntimeLogLayoutZone { Zone = "0/1/1", Dimension = 0, Layer = 1, LocalIndex = 1, Floor = 2, Tiles = new[] { "geo_a" } } };
+    var connections = new[] { new RuntimeLogLayoutConnection { From = "0/1/1", To = "0/1/2", Direction = RuntimeLogLayoutDirections.North } };
+    // A provider level below info writes nothing and throws nothing: a generated level is not an error.
+    Kernel(writer, RuntimeLogLevel.Error).ReportGeneratedLayout(new RuntimeLogLayout { Complete = true, ElevatorLandedTick = 7, Zones = zones, Connections = connections });
+    var kernel = Kernel(writer, RuntimeLogLevel.Info);
+    RejectCode("log-record", () => kernel.ReportGeneratedLayout(new RuntimeLogLayout { Complete = true, ElevatorLandedTick = null, Zones = zones,
+        Connections = new[] { new RuntimeLogLayoutConnection { From = "0/1/1", To = "0/1/2", Direction = "sideways" } } }), "unknown direction accepted");
+    RejectCode("log-record", () => kernel.ReportGeneratedLayout(new RuntimeLogLayout { Complete = false, ElevatorLandedTick = null, Zones = zones,
+        Connections = Array.Empty<RuntimeLogLayoutConnection>() }), "an incomplete observation carried a zone");
+    RejectCode("log-record", () => kernel.ReportGeneratedLayout(new RuntimeLogLayout { Complete = true, ElevatorLandedTick = -1, Zones = zones,
+        Connections = Array.Empty<RuntimeLogLayoutConnection>() }), "a negative landing tick accepted");
+    kernel.ReportGeneratedLayout(new RuntimeLogLayout { Complete = true, ElevatorLandedTick = 7, Zones = zones, Connections = connections });
+    writer.Dispose();
+    var lines = Lines(writer);
+    var layout = lines.Single(line => Text(line, "code") == RuntimeLogCodes.MapLayoutGenerated);
+    string[] Names(JsonElement line) => line.EnumerateObject().Select(p => p.Name).ToArray();
+    Check(Names(layout).SequenceEqual(new[] { "schema", "origin", "seq", "tick", "worldEpoch", "level", "code", "provider", "layout", "message" }),
+        "map.layout-generated field order: " + string.Join(",", Names(layout)));
+    var body = layout.GetProperty("layout");
+    Check(body.GetProperty("complete").GetBoolean() && body.GetProperty("elevatorLandedTick").GetInt64() == 7
+        && Text(body.GetProperty("zones")[0], "zone") == "0/1/1" && body.GetProperty("zones")[0].GetProperty("tiles")[0].GetString() == "geo_a"
+        && body.GetProperty("zones")[0].GetProperty("floor").GetInt32() == 2
+        && Text(body.GetProperty("connections")[0], "direction") == "north" && Text(lines[^1], "code") == RuntimeLogCodes.MapLayoutGenerated,
+        "layout values did not round-trip");
+    var started = new RuntimeLogLayout { Complete = false, ElevatorLandedTick = null, Zones = Array.Empty<RuntimeLogLayoutZone>(), Connections = Array.Empty<RuntimeLogLayoutConnection>() };
+    Check(RuntimeLogLayoutDirections.IsKnown(started.Connections is null ? null : "same") && !RuntimeLogLayoutDirections.IsKnown("sideways"), "direction vocabulary");
+});
+
 Case("plan.loaded and plan.rejected carry path and permissions", () => {
     var directory = NewDirectory(); var (writer, _, _) = Writer(directory);
     var kernel = Kernel(writer, RuntimeLogLevel.Info);
@@ -624,7 +654,7 @@ Case("privacy: no Steam64-shaped numbers", () => {
     lock (console) Check(console.Count > 0 && !console.Any(steam.IsMatch), "Steam64-shaped number in console mirror");
     Check(typeof(RuntimeLogRecord).GetProperties().All(p => p.PropertyType == typeof(string) || p.PropertyType == typeof(long) || p.PropertyType == typeof(long?)
         || p.PropertyType == typeof(RuntimeLogLevel) || p.PropertyType == typeof(RuntimeLogPlan?) || p.PropertyType == typeof(RuntimeLogResult?)
-        || p.PropertyType == typeof(IReadOnlyList<string>))
+        || p.PropertyType == typeof(RuntimeLogLayout?) || p.PropertyType == typeof(IReadOnlyList<string>))
         && !typeof(RuntimeLogRecord).GetProperties().Any(p => p.Name.Contains("Player", StringComparison.OrdinalIgnoreCase)
             || p.Name.Contains("Steam", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Name", StringComparison.OrdinalIgnoreCase)),
         "log record gained a player identity field");

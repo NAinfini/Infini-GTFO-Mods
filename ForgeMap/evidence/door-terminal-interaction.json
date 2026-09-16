@@ -2,7 +2,7 @@
  "schemaVersion": 1,
  "slice": "nl-doorterm",
  "family": "door-terminal-interaction",
- "purpose": "Type and member level evidence for the door and terminal interaction events and actions: the five native callback entry points the new rows publish from, the door's synchronized interaction entry the two lock rows write through, the two command values the terminal rows derive from, and the two members that make a door approach and a scan completion observable on the host.",
+ "purpose": "Type and member level evidence for the door and terminal interaction events and actions: the native callback entry points the new rows publish from, the door's synchronized interaction entry the two lock rows write through, the command values the terminal rows derive from, and the member that makes a scan completion observable on the host.",
  "verification": "read-only decompilation of the installed interop assembly; no game was started",
  "gameVerified": false,
  "gameVerifiedNote": "Every member below is read from the interop assembly of build 20403457 through its IL2CPP wrapper (signatures, member kinds, offsets and the native method-info tokens). The wrapper bodies are `il2cpp_runtime_invoke` stubs, so the runtime behaviour of each member - who calls it, on which peer, and what the game does with the lock it just set - is a game-verification item and is listed in `inGameVerificationPlan`.",
@@ -19,25 +19,6 @@
   }
  ],
  "hooks": [
-  {
-   "hook": "DoorApproachReadback",
-   "type": "LevelGeneration.LG_SecurityDoor_Locks",
-   "member": "OnApproached",
-   "kind": "public virtual add_OnApproached(Il2CppSystem.Action) / remove_OnApproached(Il2CppSystem.Action)",
-   "signature": "System.Void LevelGeneration.LG_SecurityDoor_Locks::add_OnApproached(Il2CppSystem.Action)",
-   "nativeMethodInfoToken": 100687510,
-   "rows": [
-    "forge.trigger.interaction.door_approach"
-   ],
-   "reads": "the patched component's own m_door to reach the door, then the door's LastStatus and the level's zone table for the address",
-   "harmony": "postfix with HarmonyPriority(Priority.Last), SNet.IsMaster first; the callback carries no argument at all, so the door is re-read from the component and the fact carries no actor",
-   "side": {
-    "execution": "both",
-    "basis": "replicated-lock-component",
-    "verified": false
-   },
-   "note": "the door's own pDoorState carries `hasBeenApproached` ([FieldOffset(21)]) and `instigator` (SNetStructs.pPlayer, [FieldOffset(24)]), which is what makes an approach a host-visible replicated fact rather than a client-local one; the actor port is left absent because this callback carries no player and the instigator field's player resolution is not established"
-  },
   {
    "hook": "DoorScanStartedReadback",
    "type": "LevelGeneration.LG_SecurityDoor_Locks",
@@ -82,11 +63,10 @@
    "signature": "System.Void LevelGeneration.LG_ComputerTerminalManager::WantToSendTerminalCommand(System.UInt32,LevelGeneration.TERM_Command,System.String,System.String,System.String)",
    "nativeMethodInfoToken": 100686913,
    "rows": [
-    "forge.trigger.interaction.terminal_command",
-    "forge.trigger.interaction.terminal_log"
+    "forge.trigger.interaction.terminal_command"
    ],
-   "replaces": "Native/MapObjectHooks.cs's TerminalCommandReadback, whose postfix is declared as `(uint terminalID, TERM_Command command)` while the native member takes three more arguments. Harmony binds a postfix by signature, so that patch is never invoked and no terminal command row has ever published. This slice declares the whole native signature in a new file; the integration batch removes the old patch class and registers this one.",
-   "reads": "the terminal is found from the carried sync id through the level's own terminal table, then the command value, the raw input line and the interpreter's first parameter are the facts",
+   "replaces": "Native/MapObjectHooks.cs's TerminalCommandReadback, whose postfix is declared as `(uint terminalID, TERM_Command command)` while the native member takes three more arguments, so that patch is never invoked and no terminal command row has ever published. This slice declares the entry's postfix in a new file; the integration batch removes the old patch class and registers this one.",
+   "reads": "the terminal is found from the carried sync id through the level's own terminal table, then the command value and the raw input line are the facts",
    "harmony": "postfix, SNet.IsMaster first; the terminal's sync id is what the entry carries and is never part of an address",
    "side": {
     "execution": "both",
@@ -168,23 +148,6 @@
   }
  ],
  "members": [
-  {
-   "id": "door-approach-flag",
-   "type": "LevelGeneration.pDoorState",
-   "member": "hasBeenApproached",
-   "kind": "public bool field",
-   "offset": 21,
-   "evidence": "pDoorState field table: status(0), animProgress(4), damageTaken(8), glueRel(12), markedOnMap(16), sourcePosZ(17), triggerTryOpenStuckInGlue(18), triggerTryOpenBroken(19), hasBeenOpenedDuringGame(20), hasBeenApproached(21), instigator(24)",
-   "usedFor": "the fact that a door approach is part of the door's replicated state, which is why the host can publish it"
-  },
-  {
-   "id": "door-instigator",
-   "type": "LevelGeneration.pDoorState",
-   "member": "instigator",
-   "kind": "public SNetStructs.pPlayer field",
-   "offset": 24,
-   "usedFor": "the candidate actor of a door interaction; not published, because resolving it to a gtfo.player reference is not established by this evidence"
-  },
   {
    "id": "door-status",
    "type": "LevelGeneration.LG_SecurityDoor",
@@ -333,13 +296,6 @@
    "usedFor": "the manager's own registry lookup by sync id, the counterpart of the level table the observation half searches"
   },
   {
-   "id": "terminal-interpreter-parse",
-   "type": "LevelGeneration.LG_ComputerTerminalCommandInterpreter",
-   "member": "TryGetCommand",
-   "signature": "bool TryGetCommand(string inputString, out TERM_Command command, out string param1, out string param2)",
-   "usedFor": "the two parameter strings the command entry carries; `ReadLog`'s first parameter is the log's own name, which is why the terminal-log row has a `log` port at all"
-  },
-  {
    "id": "terminal-state",
    "type": "LevelGeneration.LG_ComputerTerminal",
    "member": "OnStateChange",
@@ -432,7 +388,6 @@
    "assembly": "Modules-ASM.dll",
    "usedMembers": {
     "DisableAlarm": 14,
-    "ReadLog": 29,
     "UniqueCommand1": 38,
     "UniqueCommand5": 42
    },
@@ -449,22 +404,15 @@
    "derivation": "LG_WeakLock.Status becomes `Unlocked`; the lock's own `m_lockType` names the cause (`Melee` -> `smashed`, otherwise `hacked`). The subject is the door the lock's holder belongs to."
   },
   {
-   "fact": "forge.trigger.interaction.terminal_log",
-   "derivation": "the accepted command is `TERM_Command.ReadLog` (29); the log's name is the interpreter's first parameter string and the raw input line is what the entry carried. Neither is published when blank."
-  },
-  {
    "fact": "forge.query.map.door_state",
    "derivation": "`DoorQueryContract.StateOf(int)` maps `eDoorStatus` onto the checklist's five states: 11 Destroyed -> `broken`; 4, 5 and 15 (the alarm puzzle, the scan puzzle and the bulkhead controller) -> `needs_scan`; 10 Open and 16 Opening -> `open`; 3, 6 and 7 (key item, power generator, no key) -> `locked`; 0, 1, 2, 8, 9, 12, 13 and 14 -> `closed`. A value outside the enum is refused by name (`door-state-status`) instead of being mapped to the nearest member. The native member name travels beside the coarse state as `detail`, and the lock component's own answer as `locked` / `key`, so a plan that needs the exact status does not have to infer it back from the five-member derivation. `Unlocked` (9) reads as `closed`: it is an unlocked but still shut door, which is closed for the author's question, and the exact status stays readable through `detail`."
   }
  ],
  "unproven": [
-  "whether LG_SecurityDoor_Locks.OnApproached fires on the host only or on every peer: the event is a C# event on a replicated component and this evidence set does not establish which side invokes it, so the hook keeps the package's `SNet.IsMaster` gate and the host-only publish rule",
   "which peer runs LG_ComputerTerminalManager.WantToSendTerminalCommand: the entry is static and the evidence carries no side, so `host` is a publish rule and not a claim that clients never call it",
-  "whether the door's `instigator` field is populated for an approach, and how a SNetStructs.pPlayer resolves to a gtfo.player reference: the actor port stays absent rather than being filled from a guess",
   "whether `LG_Door_Sync.AttemptDoorInteraction(Unlock)` releases a lock the level generation set up (a gate key, a chained puzzle, a generator) or only a lock this provider wrote: the interaction type is a member of the game's own enum and the private body it dispatches into was not byte-verified",
   "whether `LG_SecurityDoor_Locks.SetupSimpleLock` on a running level produces the replicated state the game's own `Setup` produces, or only writes the component's local state",
   "whether a weak lock's holder climb (`m_holder` -> Component -> GetComponentInParent<LG_SecurityDoor>) finds the door for every weak lock placement, including a lock spawned on a weak door that is not a security door",
-  "whether a terminal log read reaches this command entry once per player or once per terminal, which decides whether the terminal-log row can fire twice for one read in a multiplayer game",
   "whether `eWeakLockInteractionType.Melt` is distinguishable from a melee smash at the state level: both end in `Unlocked`, and this slice publishes `smashed` for a melee lock only",
   "whether `LG_Door_Sync.OnDoorGotDamage` / `OnDoorGotDestroyed` fire on the host as well as on clients: they are the state replicator's own local apply callbacks on the door, and the host computes the damage, so the host runs them too — but the wrapper bodies are `il2cpp_runtime_invoke` stubs and this evidence set cannot show the invocation list. The hook keeps the package's `SNet.IsMaster` gate, so a host that never sees the callback publishes nothing rather than publishing on a client",
   "whether `LG_WeakDoor.Gate` is set for every weak door the level generator spawns, and whether the gate's course node always names a zone: the walk answers no zone when either is missing, and a door with no zone publishes nothing",
@@ -503,11 +451,10 @@
   }
  ],
  "inGameVerificationPlan": [
-  "place a security door in a test level, walk a player towards it, and confirm the approach fact is published once by the host",
   "put a chained-puzzle (scan) lock on a door and confirm `door_scan` publishes `started` on activation and `completed` on solving, and that no other door status publishes a scan fact",
   "hack a weak lock and confirm `lock_broken` publishes `hacked`, then smash one and confirm `smashed`",
   "confirm a weak lock's holder climb finds the door for every weak-lock placement the level generator makes",
-  "type a unique command at a terminal and confirm the command fact carries the right slot; type `read_log <name>` and confirm both the command and the log facts",
+  "type a unique command at a terminal and confirm the command fact carries the right slot",
   "run `door_lock` with `key_policy=none` on an unlocked door, then `door_unlock`, and confirm the door really locks and unlocks for every peer and that the game's own `EventsOnUnlockDoor` fires",
   "confirm a door locked by `door_lock` survives a level reload the way a level-generated lock does",
   "confirm the `door_lock_cause` enum set is registered on both sides (framework and website) before a plan using the row can be exported",

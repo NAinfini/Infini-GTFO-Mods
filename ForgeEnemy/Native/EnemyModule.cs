@@ -113,9 +113,7 @@ internal sealed partial class EnemyModule : IDisposable
             new BindingSupport(HealthChangedBinding, "implementation-only", new[] { "gtfo.enemy.health.read" }),
             new BindingSupport(DeathStartedBinding, "implementation-only", new[] { "gtfo.enemy.lifecycle.read" }),
             new BindingSupport(LimbBrokenBinding, "implementation-only", new[] { "gtfo.enemy.limbs.read" }),
-            new BindingSupport(StateChangedBinding, "implementation-only", new[] { "gtfo.enemy.behavior.read" }),
             new BindingSupport(AwakenedBinding, "implementation-only", new[] { "gtfo.enemy.behavior.read" }),
-            new BindingSupport(AlertChangedBinding, "implementation-only", new[] { "gtfo.enemy.detection.read" }),
             // The target pair reads `AgentAI.Target`/`IsTargetValid`, which is the targeting read every other
             // fact of that pair declares; without these two rows the registration has implemented bindings no
             // support row answers, which the kernel refuses outright.
@@ -726,30 +724,10 @@ internal sealed partial class EnemyModule : IDisposable
           "requires": []
         },
         {
-          "id": "forge.module.gtfo.enemy.binding.state_changed",
-          "capabilityId": "forge.trigger.enemy.state_changed",
-          "providerId": "forge.module.gtfo.enemy",
-          "handler": "gtfo.enemy.state_changed",
-          "role": "observe",
-          "status": "implemented",
-          "dependencies": [],
-          "requires": []
-        },
-        {
           "id": "forge.module.gtfo.enemy.binding.awakened",
           "capabilityId": "forge.trigger.enemy.awakened",
           "providerId": "forge.module.gtfo.enemy",
           "handler": "gtfo.enemy.awakened",
-          "role": "observe",
-          "status": "implemented",
-          "dependencies": [],
-          "requires": []
-        },
-        {
-          "id": "forge.module.gtfo.enemy.binding.alert_changed",
-          "capabilityId": "forge.trigger.enemy.alert_changed",
-          "providerId": "forge.module.gtfo.enemy",
-          "handler": "gtfo.enemy.alert_changed",
           "role": "observe",
           "status": "implemented",
           "dependencies": [],

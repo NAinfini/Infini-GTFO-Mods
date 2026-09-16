@@ -78,14 +78,15 @@ public static class ModuleDefinition
                 // The three map-object observations below are published by this provider's own native callbacks,
                 // but the shape the catalog carries is not the shape this provider publishes: `door_state` leaves
                 // its phase port out when the status is not a transition, and the two terminal rows leave the
-                // actor port out when the native callback carries no player. They keep their own declaration until
-                // the catalog says which shape those ports really have; every row whose shape the runtime's
+                // actor port out when the native callback carries no player. The door and terminal-command rows
+                // carry the catalog's optional `address` literal (ruling 143.10/11), so the shape is the catalog's
+                // own and a plan may name the one object it subscribes to; every row whose shape the runtime's
                 // `TriggerContracts` already owns is bound here without a second copy.
-                MapObjectContract.Row(MapObjectContract.DoorStateCapability, "门状态阶段变化", "门的开关状态变了。",
+                MapObjectContract.AddressedRow(MapObjectContract.DoorStateCapability, "门状态阶段变化", "门的开关状态变了。",
                     MapObjectContract.Port("next", "execution"), MapObjectContract.Port("door", "entity"),
                     MapObjectContract.Port("state", "string"),
                     new { id = "phase", type = "enum", schema = "interaction_phase", optional = true }),
-                MapObjectContract.Row(MapObjectContract.TerminalCommandCapability, "终端命令被接受", "终端接受了一条命令。",
+                MapObjectContract.AddressedRow(MapObjectContract.TerminalCommandCapability, "终端命令被接受", "终端接受了一条命令。",
                     MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity"),
                     MapObjectContract.Optional("actor", "entity"), MapObjectContract.Port("command", "string")),
                 MapObjectContract.Row(MapObjectContract.TerminalSessionCapability, "玩家登上 / 离开终端", "玩家进入或退出终端。",

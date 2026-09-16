@@ -20,26 +20,6 @@
       "unverified": "whether the game calls this entry once per level or once per local player session was not read from the method body; the row's own publication is idempotent per world, so a second call publishes nothing"
     },
     {
-      "capability": "forge.trigger.objective.activated",
-      "checklistRow": "e-obj-activate",
-      "nativeEntry": "WardenObjective.OnStatusChange(bool isRecall, pWardenObjectiveState newState, eWardenObjectiveStatus oldStatus, eWardenObjectiveStatus newStatus, eWardenSubObjectiveStatus oldSub, eWardenSubObjectiveStatus newSub)",
-      "memberKind": "public virtual void on the base class every WO_* objective component derives from (WO_HSUFindTakeSample : WardenObjective); the state the callback carries is `pWardenObjectiveState`",
-      "ports": ["next", "objective (resource, kind objective)", "status (integer)", "chain (integer)"],
-      "derivation": "the fact is the transition into `eWardenObjectiveStatus.Started` (20) on one of the three fixed layer slots (`main_status` 0 / `second_status` 10 / `third_status` 20 of pWardenObjectiveState, in LG_LayerType order); the chain index is the same state's `*_chainIndex`",
-      "authority": "host only: WardenObjectiveManager is an SNet_StateReplicatorProvider (pWardenObjectiveState)",
-      "clients": "pWardenObjectiveState replicates through M_WardenObjectiveState.MarshalToBytes, so a client reading the same slot would see the same status",
-      "unverified": "nothing: the two boundary members are the enum's own (eWardenObjectiveStatus.cs: NotDiscovered 0, Discovered 10, Started 20, WardenObjectivePartiallySolved 30, WardenObjectiveItemSolved 40)"
-    },
-    {
-      "capability": "forge.trigger.objective.won",
-      "checklistRow": "e-obj-win",
-      "nativeEntry": "same callback; the transition into `eWardenObjectiveStatus.WardenObjectiveItemSolved` (40)",
-      "ports": ["next", "objective (resource, kind objective)", "status (integer)", "chain (integer)"],
-      "derivation": "the vanilla mount point this row answers for is the objective's `EventsOnGotoWin` list (179 entries across the shipped objectives); the state the list hangs off is the same status transition",
-      "authority": "host only, same provider as the row above",
-      "catalogNote": "the website's candidate row for this checklist line is `forge.trigger.objective.extraction_state` (ports phase/participants), which is the extraction's own state, not the objective's. The row the checklist describes is this transition."
-    },
-    {
       "capability": "forge.trigger.objective.reactor_wave",
       "checklistRow": "e-reactor-wave",
       "nativeEntry": "WardenObjective.OnStartInChain(), read together with WardenObjectiveManager.CurrentState.GetChainIndexForLayer(LG_LayerType)",
@@ -131,16 +111,10 @@
       "unverified": "whether ForceInstantWin ends the expedition immediately or arms the objective's own completion check was not read from the method body"
     }
   ],
-  "notImplemented": [
-    {
-      "row": "forge.trigger.objective.extraction_state",
-      "reason": "the website's row for the checklist line e-obj-win is the extraction's own state (ports command_phase + participants), and no native entry this provider can reach publishes that transition independently of the objective's own win condition; the checklist line is answered by forge.trigger.objective.won instead. The catalog batch decides whether extraction_state stays as its own row."
-    }
-  ],
   "wiring": {
     "hooksFile": "ForgeMap/Native/LevelEventHooks.cs",
     "hookTypes": [
-      "ExpeditionStartedReadback", "ObjectiveStatusReadback", "ReactorWaveReadback", "HsuSampledReadback",
+      "ExpeditionStartedReadback", "ReactorWaveReadback", "HsuSampledReadback",
       "CheckpointRestoredReadback", "ZoneEnteredReadback", "PortalWarpedReadback"
     ],
     "installList": "ForgeMap/Native/MapNativeHooks.cs Types — listed in %TEMP%\\fan\\nl-level\\integration.json"

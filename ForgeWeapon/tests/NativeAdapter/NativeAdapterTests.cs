@@ -117,8 +117,6 @@ public sealed class NativeAdapterTests
             ModuleDefinition.DeployCompletedBinding, ModuleDefinition.RecallCompletedBinding,
             WeaponDeployableFactsContract.FiredBinding, WeaponDeployableFactsContract.AmmoDepletedBinding,
             WeaponDeployableFactsContract.DetonatedBinding, WeaponMeleeHitContract.MeleeHitBinding,
-            AttackInstanceContract.AttackRequestedBinding, AttackInstanceContract.AttackAcceptedBinding,
-            AttackInstanceContract.AttackCompletedBinding, AttackInstanceContract.AttackMissedBinding,
             AttackInstanceContract.BurstStartedBinding, AttackInstanceContract.BurstEndedBinding,
             AttackInstanceContract.DryFireBinding,
             // The action rows the session's own registration carries beside the observations: the ammunition

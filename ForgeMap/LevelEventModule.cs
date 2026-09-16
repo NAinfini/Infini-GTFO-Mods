@@ -10,9 +10,9 @@ namespace ForgeMap;
 /// it produces, and the transition that makes it new. Everything that is a decision about publishing lives here;
 /// the game-bound half only reports what it read and never decides whether that is news.
 ///
-/// Two of the eight rows repeat within one world — a reactor objective advances its chain more than once, and a
+/// Two of the six rows repeat within one world — a reactor objective advances its chain more than once, and a
 /// player walks into zone after zone — so a fact's identity is built from the state the report carries as well as
-/// its subject: the same reading twice is one event, and a different reading is its own. The remaining six are
+/// its subject: the same reading twice is one event, and a different reading is its own. The remaining four are
 /// one transition per world, and the row says so by publishing on the transition alone.
 ///
 /// The module is game-independent on purpose. It takes the level reference as the string its provider already
@@ -98,33 +98,6 @@ public sealed class LevelEventModule : IDisposable
         if (string.IsNullOrEmpty(levelReference)) return;
         Publish(LevelEventContract.ExpeditionStartedFact, LevelEventContract.ExpeditionStartedCapability, "session",
             "started", Payload(("map", RuntimeJson.From(LevelEventContract.MapReference(levelReference!)))));
-    }
-
-    /// <summary>One layer's objective changed status. The two rows are the same report's two readings, which is
-    /// why one entry point answers both: `Started` is the checklist's "objective started" and
-    /// `WardenObjectiveItemSolved` is its "objective won". A status the rows do not name publishes nothing — the
-    /// two intermediate members are the objective's own progress, not the boundaries the checklist asks for.
-    /// `isRecall` is the game's own flag: a status the reload re-announced is the checkpoint row's business, not a
-    /// second activation.</summary>
-    public void ObjectiveStatusChanged(string layer, int status, int chain, bool isRecall)
-    {
-        CheckThread();
-        if (isRecall) return;
-        if (string.IsNullOrEmpty(layer)) return;
-        if (status == LevelEventContract.StatusStarted)
-            Publish(LevelEventContract.ObjectiveActivatedFact, LevelEventContract.ObjectiveActivatedCapability, layer,
-                "activated:" + chain.ToString(CultureInfo.InvariantCulture),
-                Payload(
-                    ("objective", RuntimeJson.From(LevelEventContract.ObjectiveReference(layer))),
-                    ("status", RuntimeJson.From(status)),
-                    ("chain", RuntimeJson.From(chain))));
-        else if (status == LevelEventContract.StatusItemSolved)
-            Publish(LevelEventContract.ObjectiveWonFact, LevelEventContract.ObjectiveWonCapability, layer,
-                "won:" + chain.ToString(CultureInfo.InvariantCulture),
-                Payload(
-                    ("objective", RuntimeJson.From(LevelEventContract.ObjectiveReference(layer))),
-                    ("status", RuntimeJson.From(status)),
-                    ("chain", RuntimeJson.From(chain))));
     }
 
     /// <summary>A reactor objective advanced to the next entry of its own event chain. The report is the chain

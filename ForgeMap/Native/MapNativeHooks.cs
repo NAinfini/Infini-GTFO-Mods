@@ -31,14 +31,16 @@ internal static class MapNativeHooks
         typeof(WeakDoorBrokenReadback),
         typeof(ScanProgressReadback), typeof(ScanStateReadback), typeof(GeneratorCellReadback),
         typeof(GeneratorClusterStateReadback), typeof(ResourceContainerStateReadback), typeof(ItemPickupReadback),
-        // The eight session/objective/zone/portal readbacks of the level-event half. The expedition start row is
+        // The seven session/objective/zone/portal readbacks of the level-event half. The expedition start row is
         // the one that reports to every peer; the rest publish host-side, which the callback itself decides.
-        typeof(ExpeditionStartedReadback), typeof(ObjectiveStatusReadback), typeof(ReactorWaveReadback),
+        typeof(ExpeditionStartedReadback), typeof(ReactorWaveReadback),
         typeof(HsuSampledReadback), typeof(CheckpointRestoredReadback),
         typeof(ZoneEnteredReadback), typeof(PortalWarpedReadback),
         // The one tick of the trigger-zone half. A hook is installed exactly when it is listed here, and the
         // judging module answers nothing until the session that owns it exists.
         typeof(TriggerZoneTick),
+        // The one tick of the light-colour row: the frames a colour/intensity transition is spread over.
+        typeof(LightColorTick),
         typeof(TeammateOverheadRender), typeof(TeammateOverheadRemoved), typeof(TeammateOverheadVisibility)
     });
 }

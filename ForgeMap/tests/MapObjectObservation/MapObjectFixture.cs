@@ -380,7 +380,12 @@ internal sealed class MapObjectFixture : IDisposable
     {
         inputs = Sides(contract, "inputs"),
         outputs = Sides(contract, "outputs"),
-        constants = Array.Empty<object>(),
+        // One constant slot per declared parameter, even when the case leaves an optional one unauthored: the
+        // loader requires the frame to be exactly as long as the contract's parameter list, and null is the
+        // compiled spelling of "not authored" — the same slot the website's compiler emits for a door or
+        // terminal trigger that names no object.
+        constants = contract.TryGetProperty("parameters", out var parameters)
+            ? parameters.EnumerateArray().Select(_ => (object?)null).ToArray() : Array.Empty<object?>(),
         promoted = Array.Empty<int>()
     };
 

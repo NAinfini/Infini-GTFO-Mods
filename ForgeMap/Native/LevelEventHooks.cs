@@ -1,5 +1,4 @@
 using System;
-using GameData;
 using HarmonyLib;
 using LevelGeneration;
 using Player;
@@ -34,18 +33,6 @@ internal static class ExpeditionStartedReadback
         // The level's own identity is already read for the `level` attachment matcher; the row publishes the same
         // string, so a plan mounted on a level and a plan reading this row agree about which level they are in.
         session.GuardLevelEvents(module => module.ExpeditionStarted(session.LevelReference()));
-    }
-}
-
-[HarmonyPatch(typeof(WardenObjective), nameof(WardenObjective.OnStatusChange), new[] { typeof(bool), typeof(pWardenObjectiveState), typeof(eWardenObjectiveStatus), typeof(eWardenObjectiveStatus), typeof(eWardenSubObjectiveStatus), typeof(eWardenSubObjectiveStatus) })]
-internal static class ObjectiveStatusReadback
-{
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void Postfix(bool isRecall)
-    {
-        if (!SNet.IsMaster) return;
-        Plugin.Session?.GuardLevelEvents(module =>
-            LevelEventObservation.ReadObjectiveStatus(isRecall, module.ObjectiveStatusChanged));
     }
 }
 

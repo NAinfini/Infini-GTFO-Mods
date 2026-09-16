@@ -18,7 +18,7 @@ Off 模式下插件不注册也不打 Hook。Load 是单次尝试，失败后必
 
 ## 当前 binding（全部 implementation-only）
 
-Native 插件持有 **15 个** binding 与 **9 个** Harmony Hook；Runtime 保留 4 个世界与会话 Hook。共享的 canonical 定义在 SDK 的 `CombatContracts` 里，共 6 个。可执行的绑定清单以 `EnemyModule` 注册表与导出的运行清单为准，下表是同一份清单的可读说明。
+Native 插件持有 **13 个** binding 与 **9 个** Harmony Hook；Runtime 保留 4 个世界与会话 Hook。共享的 canonical 定义在 SDK 的 `CombatContracts` 里，共 6 个。可执行的绑定清单以 `EnemyModule` 注册表与导出的运行清单为准，下表是同一份清单的可读说明。
 
 | binding | 已实现范围 | canonical / 权限 |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ Native 插件持有 **15 个** binding 与 **9 个** Harmony Hook；Runtime 保�
 | `health_changed` | 两个来源：本 Forge 治疗读回的正生命变化；同一 `ProcessReceivedDamage` 调用窗口里观察到的实际 HP 损失（`value` 为调用后夹到 ≥0 的生命，`delta` 为负损失）。窗口里生命不变或上升不发布；其他模组、原生回复、`SetHealth` 等窗口外的变化不覆盖 | `forge.trigger.combat.health_changed` / `gtfo.enemy.health.read` |
 | `death_started` | 同生命的 `OnDead` 正常返回且原生状态为 dead | `forge.trigger.enemy.death_started` / `gtfo.enemy.lifecycle.read` |
 | `limb_broken` | 同生命、同 receiver 的索引部位在 `DestroyLimb` 窗口中由未破坏变为已破坏 | `forge.trigger.combat.limb_broken` / `gtfo.enemy.limbs.read`；输出 target 与 limb（可空） |
-| `state_changed` / `awakened` / `alert_changed` / `target_acquired` / `target_lost` | 由 `EnemyDetection.UpdateTargets` 的帧泵采样 `EnemyBehaviour.m_currentStateName`、`EnemyDetection.m_biggestDetectionBuildup` 与 `AgentAI.Target`/`IsTargetValid` 得出的行为事实；首次采样是基线，不是转换 | `forge.trigger.enemy.*` / `gtfo.enemy.behavior.read`、`gtfo.enemy.detection.read`、`gtfo.enemy.targeting.read` |
+| `awakened` / `target_acquired` / `target_lost` | 由 `EnemyDetection.UpdateTargets` 的帧泵采样 `EnemyBehaviour.m_currentStateName` 的休眠边与 `AgentAI.Target`/`IsTargetValid` 得出的行为事实；首次采样是基线，不是转换 | `forge.trigger.enemy.awakened`、`forge.trigger.enemy.target_acquired`、`forge.trigger.enemy.target_lost` / `gtfo.enemy.behavior.read`、`gtfo.enemy.targeting.read` |
 | `scout_detection` / `scout_scream` | `ES_ScoutDetection.OnTargetRegistered` 的发现事实，以及 `ES_ScoutScream.m_state` 的阶段变化（只在 `ES_StateEnum.ScoutScream` 下读） | 模块自有 capability（目录暂无行）/ `gtfo.enemy.detection.read`、`gtfo.enemy.behavior.read` |
 | `attack_windup` | `ES_EnemyAttackBase.OnAttackWindUp`（vtable slot 33）被游戏分派：前摇开始，目标经内核实例解析器解析，解析不出来就不带该端口 | `forge.trigger.enemy.attack_windup` / `gtfo.enemy.targeting.read`；**目录行声明的 `ability` 端口不注册也不发布**（背后没有 `forge.resource.ability` 实体） |
 | `attack_active` | `ES_EnemyAttackBase.OnAttackPerform`（slot 35）被游戏分派：攻击释放。零长度前摇时两个成员可在同一次调用里连发 | 模块自有 capability（目录暂无行）/ `gtfo.enemy.targeting.read` |

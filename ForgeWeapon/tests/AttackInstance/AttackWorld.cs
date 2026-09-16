@@ -7,16 +7,15 @@ using ForgeWeapon.Native;
 
 namespace ForgeWeapon.Tests.AttackInstance;
 
-/// <summary>One case's world: a kernel carrying the framework contract module the eight rows belong to, the
-/// fixture's own registration of the attack bindings, and the production <see cref="AttackInstanceModule"/> over
-/// the fixture's own <see cref="IAttackNativeReads"/>.
+/// <summary>One case's world: a kernel carrying the framework contract module the three rows belong to, the
+/// fixture's own registration of the attack-instance bindings, and the production
+/// <see cref="AttackInstanceModule"/> over the fixture's own <see cref="IAttackNativeReads"/>.
 ///
 /// The reads are a fixture rather than the production equipment adapter on purpose. The adapter's own job —
-/// turning a backpack readback into an equipment life and counting the shots and hit candidates its observers
-/// publish — is what the package's own suites cover; what this slice adds is the scope's decisions over those
-/// counters, and the narrow interface is exactly that boundary. A case therefore drives the counters directly:
-/// one firing body registers a shot or does not, publishes hit candidates or does not, and the facts the module
-/// publishes are read from the one publication path.</summary>
+/// turning a backpack readback into an equipment life and recording a shot against it — is what the package's
+/// own suites cover; what this slice adds is the burst and dry-fire decisions over that life, and the narrow
+/// interface is exactly that boundary. A case therefore drives a life directly and reads the facts the module
+/// publishes from the one publication path.</summary>
 internal sealed class AttackWorld : IDisposable
 {
     internal const string PlayerKind = "gtfo.player";
@@ -24,7 +23,7 @@ internal sealed class AttackWorld : IDisposable
     internal const long WorldEpoch = 7;
 
     private readonly RuntimeModuleHandle _attackRegistration, _entities;
-    private long _facts, _equipment;
+    private long _equipment;
 
     internal RuntimeKernel Kernel { get; }
     internal Reads Native { get; }
@@ -40,7 +39,7 @@ internal sealed class AttackWorld : IDisposable
         Kernel = new RuntimeKernel(new("fixture.attack.instance", "1.0.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
         Kernel.BeginWorld(WorldEpoch);
         // The framework contract module every `forge.trigger.*` row belongs to in this build. A package module
-        // may not declare a capability another provider owns, which is why the eight declarations travel to the
+        // may not declare a capability another provider owns, which is why the three declarations travel to the
         // integration batch as a fragment and this fixture restamps their owner for its own registration.
         Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         Native = new Reads(this);
@@ -85,25 +84,6 @@ internal sealed class AttackWorld : IDisposable
 
     internal Equipment Rig(Gear.BulletWeapon weapon, Speaker owner) => Native.Rig(weapon, owner);
 
-    /// <summary>One native firing body, exactly as the hook set drives the module: the request before the body,
-    /// the body itself, then the close. What happens inside the body is the case's to choose — a shot registered,
-    /// a hit candidate published, both or neither — which is what makes the accepted and missed rules testable
-    /// without the game.</summary>
-    internal void Fire(Equipment equipment, bool registersShot = true, int hits = 0)
-    {
-        Attack.Request(equipment.Weapon, AttackInstanceModule.AttackMode.Ranged);
-        if (registersShot) Native.RecordShot(equipment);
-        for (var index = 0; index < hits; index++) Native.PublishHit(equipment);
-        Attack.Complete(equipment.Weapon);
-    }
-
-    /// <summary>One hit candidate as the hit observer publishes it: inside the open shot's own scope.</summary>
-    internal void PublishHit(Equipment equipment) => Native.PublishHit(equipment);
-
-    /// <summary>The equipment life goes away the way a recall, a slot change or a world change ends it: no attack
-    /// can be attributed to it any more.</summary>
-    internal void Forget(Equipment equipment) => Native.Forget(equipment);
-
     /// <summary>Publishes one fact through the fixture's own path, the way the adapter's `Publish` does: recorded
     /// locally, then handed to the module's registration so the runtime answers with a real dispatch result.</summary>
     private DispatchResult Publish(RuntimeEvent value)
@@ -114,7 +94,7 @@ internal sealed class AttackWorld : IDisposable
         return result;
     }
 
-    /// <summary>The fixture's registration: one provider, the eight catalog documents with their owner restamped
+    /// <summary>The fixture's registration: one provider, the three catalog documents with their owner restamped
     /// for this fixture, and the contract's own binding and support rows.</summary>
     private string AttackRegistry()
     {
@@ -150,13 +130,12 @@ internal sealed class AttackWorld : IDisposable
         capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()
     }).GetRawText();
 
-    /// <summary>The slice's native facts as a fixture: which equipment life a weapon belongs to, that life's own
-    /// shot counter, and how many hit candidates have been published for it. The module is the only reader.</summary>
+    /// <summary>The slice's native facts as a fixture: which equipment life a weapon belongs to and the player
+    /// reference its owner resolves to. The module is the only reader.</summary>
     internal sealed class Reads : IAttackNativeReads
     {
         private readonly AttackWorld _world;
         private readonly Dictionary<IntPtr, (Equipment Equipment, Speaker Owner)> _lives = new();
-        private readonly Dictionary<string, long> _hits = new(StringComparer.Ordinal);
         private long _players;
 
         internal Reads(AttackWorld world) => _world = world;
@@ -168,13 +147,10 @@ internal sealed class AttackWorld : IDisposable
         /// ready runtime"; the fixture's is the same question asked of the case.</summary>
         public bool Authoritative() => _world.Authoritative;
 
-        public (EntityReference Source, EntityReference Equipment, long Shots)? AttackTarget(Item? weapon)
+        public (EntityReference Source, EntityReference Equipment)? AttackTarget(Item? weapon)
             => weapon is not null && _lives.TryGetValue(weapon.Pointer, out var life)
-                ? (life.Owner.Reference, life.Equipment.Reference, life.Equipment.Shots)
+                ? (life.Owner.Reference, life.Equipment.Reference)
                 : null;
-
-        public long HitCount(EntityReference equipment)
-            => _hits.TryGetValue(equipment.Id, out var hits) ? hits : 0;
 
         public DispatchResult Publish(RuntimeEvent value) => _world.Publish(value);
 
@@ -197,28 +173,6 @@ internal sealed class AttackWorld : IDisposable
             LiveEquipment.Add(equipment.Reference);
             return equipment;
         }
-
-        /// <summary>One committed shot, the way the production adapter counts it from the `Fire` body that
-        /// registered it.</summary>
-        internal void RecordShot(Equipment equipment) => equipment.Shots++;
-
-        /// <summary>The life is no longer recorded, the way a recall, a slot change or a world change ends it.</summary>
-        internal void Forget(Equipment equipment)
-        {
-            _lives.Remove(equipment.Weapon.Pointer);
-            LiveEquipment.Remove(equipment.Reference);
-        }
-
-        /// <summary>One published hit candidate, counted against the life its own scope names.</summary>
-        internal void PublishHit(Equipment equipment)
-        {
-            _hits[equipment.Reference.Id] = HitCount(equipment.Reference) + 1;
-            _world.Publish(new RuntimeEvent(
-                "gtfo.weapon.hit:" + WorldEpoch + ":" + (++_world._facts), ModuleDefinition.HitCandidateBinding,
-                WorldEpoch, Math.Max(0, _world.Kernel.CurrentTick),
-                "gtfo.weapon.shot:" + equipment.Reference.Id + ":" + equipment.Shots,
-                RuntimeJson.From(new { source = (EntityReference?)equipment.Reference, equipment = equipment.Reference })));
-        }
     }
 
     /// <summary>One player and the reference the fixture's own kind answers for it.</summary>
@@ -228,7 +182,7 @@ internal sealed class AttackWorld : IDisposable
         internal EntityReference Reference { get; }
     }
 
-    /// <summary>One recorded equipment life and the counters behind it.</summary>
+    /// <summary>One recorded equipment life.</summary>
     internal sealed class Equipment
     {
         internal Equipment(Gear.BulletWeapon weapon, Speaker owner, EntityReference reference)
@@ -241,16 +195,10 @@ internal sealed class AttackWorld : IDisposable
         internal Gear.BulletWeapon Weapon { get; }
         internal Speaker Owner { get; }
         internal EntityReference Reference { get; }
-        internal long Shots { get; set; }
     }
-
-    internal static string Text(RuntimeEvent value, string port)
-        => value.Outputs.GetProperty(port).GetString() ?? "";
 
     internal static string ReferenceOf(RuntimeEvent value, string port)
         => value.Outputs.GetProperty(port).GetProperty("id").GetString() ?? "";
-
-    internal static bool Has(RuntimeEvent value, string port) => value.Outputs.TryGetProperty(port, out _);
 
     public void Dispose()
     {

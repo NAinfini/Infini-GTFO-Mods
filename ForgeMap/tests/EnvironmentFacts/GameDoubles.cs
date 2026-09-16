@@ -52,6 +52,9 @@ namespace UnityEngine
         public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; }
         public float r, g, b, a;
         public static Color white => new(1f, 1f, 1f, 1f);
+        public static Color Lerp(Color from, Color to, float progress) => new(
+            from.r + (to.r - from.r) * progress, from.g + (to.g - from.g) * progress,
+            from.b + (to.b - from.b) * progress, from.a + (to.a - from.a) * progress);
         public bool SameAs(Color other) => r == other.r && g == other.g && b == other.b && a == other.a;
     }
 
@@ -232,10 +235,28 @@ namespace LevelGeneration
 {
     public enum LG_LayerType : byte { MainLayer = 0, SecondaryLayer = 1, ThirdLayer = 2 }
 
-    /// <summary>One native light object of a zone. The slice reads nothing off a light itself: the count of the
-    /// zone's own list is the fact `v-zone-lights` answers, and no runtime entry switches one light at a time.</summary>
+    /// <summary>One native light object of a zone. The count of the zone's own list is the fact `v-zone-lights`
+    /// answers, and the three writes the light-colour row makes are the ones the game's own `LG_Light` carries:
+    /// `GetIntensity`, `ChangeIntensity` and `ChangeColor`, beside the `m_color` and `m_category` a light is read
+    /// for.</summary>
     public sealed class LG_Light
     {
+        public LightCategory m_category { get; set; }
+        public UnityEngine.Color m_color { get; set; } = UnityEngine.Color.white;
+        public float Intensity { get; private set; } = 1f;
+        public bool Enabled { get; private set; } = true;
+
+        public float GetIntensity() => Intensity;
+        public void ChangeIntensity(float intensity) => Intensity = intensity;
+        public void ChangeColor(UnityEngine.Color color) => m_color = color;
+        public void SetEnabled(bool enabled) => Enabled = enabled;
+
+        /// <summary>The game's own seven light categories, in the order the interop enum declares them, so a case
+        /// can address the same member the contract's `category` vocabulary names.</summary>
+        public enum LightCategory
+        {
+            General = 0, Special = 1, Emergency = 2, Independent = 3, Door = 4, Sign = 5, DoorImportant = 6
+        }
     }
 
     /// <summary>The zone's own layer. The address's layer coordinate is this object's own m_type.</summary>

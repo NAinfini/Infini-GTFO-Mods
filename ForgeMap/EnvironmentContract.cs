@@ -5,16 +5,20 @@ using ForgeRuntime.Framework;
 namespace ForgeMap;
 
 /// <summary>
-/// The twelve checklist rows this batch owns whose native half is the game's own level-event system: the nine
-/// environment actions (`a-lights`, `a-fog`, `a-fog-repeat`, `a-sound`, `a-sound-stop`, `a-intel`, `a-dialogue`,
-/// `a-navmarker`, `a-anim`), the player line (`a-p-say`) and the read-only environment value row (`v-env`). Every
-/// one of them executes the game's own entry rather than re-implementing its effect: lights, fog, the repeating-fog
+/// The thirteen checklist rows this batch owns: the twelve whose native half is the game's own level-event system
+/// — the nine environment actions (`a-lights`, `a-fog`, `a-fog-repeat`, `a-sound`, `a-sound-stop`, `a-intel`,
+/// `a-dialogue`, `a-navmarker`, `a-anim`), the player line (`a-p-say`) and the read-only environment value row
+/// (`v-env`) — and the light-colour row (`a-lights-color`), whose effect the game has no entry for at all. Every
+/// one of the twelve executes the game's own entry rather than re-implementing its effect: lights, fog, the
+/// repeating-fog
 /// pair, sound, its paired stop, intel, dialogue, the nav marker and the animation trigger are all
 /// `eWardenObjectiveEventType` members
 /// of `WardenObjectiveEventData`, and the host hands one built event to `WorldEventManager.ExecuteEvent` /
 /// `AttemptTriggerSustainedEventMaster` / `AttemptClearSustainedEventMaster`; a player line is
 /// `PlayerVoiceManager.WantToSay`. The two value reads are `EnvironmentStateManager.GetCurrentFogID` and
-/// `GetLightMode`.
+/// `GetLightMode`. The light-colour row is the exception the checklist's own row asked for: it writes the zone's
+/// light objects itself, because no event carries a colour or an intensity and no state replicator would carry
+/// one.
 ///
 /// The rows live in the game-independent assembly because the runtime module, the manifest and the website read
 /// them there; the handlers are the native assembly's `EnvironmentActions`, `EnvironmentPresentation`,
@@ -44,6 +48,10 @@ public static class EnvironmentContract
     /// `v-env`'s id spells the query tier it runs in (`forge.query.environment.state`), the same way the player
     /// value rows spell theirs.</summary>
     public const string LightingCapability = "forge.action.presentation.lighting";
+    /// <summary>`a-lights-color`: the one environment row whose effect the game has no entry for. Lights carry no
+    /// level event with a colour or an intensity and no state replicator that would carry one, so the transition
+    /// is written by the mod itself on the light objects of the zone the request names.</summary>
+    public const string LightColorCapability = "forge.action.presentation.light_color";
     public const string FogCapability = "forge.action.presentation.fog";
     public const string FogCycleCapability = "forge.action.presentation.fog_cycle";
     public const string AudioCapability = "forge.action.presentation.audio_play";
@@ -68,6 +76,7 @@ public static class EnvironmentContract
     public const string ZoneLightsCapability = "forge.query.map.zone_lights";
 
     public const string LightingBindingId = ModuleDefinition.ProviderId + ".binding.lighting";
+    public const string LightColorBindingId = ModuleDefinition.ProviderId + ".binding.light_color";
     public const string FogBindingId = ModuleDefinition.ProviderId + ".binding.fog";
     public const string FogCycleBindingId = ModuleDefinition.ProviderId + ".binding.fog_cycle";
     public const string AudioBindingId = ModuleDefinition.ProviderId + ".binding.audio_play";
@@ -81,6 +90,7 @@ public static class EnvironmentContract
     public const string ZoneLightsBindingId = ModuleDefinition.ProviderId + ".binding.zone_lights";
 
     public const string LightingHandler = "gtfo.map.lighting";
+    public const string LightColorHandler = "gtfo.map.light_color";
     public const string FogHandler = "gtfo.map.fog";
     public const string FogCycleHandler = "gtfo.map.fog_cycle";
     public const string AudioHandler = "gtfo.map.audio_play";
@@ -121,6 +131,13 @@ public static class EnvironmentContract
     /// than served as a read-then-write that would not be atomic.</summary>
     public static readonly string[] LightingModes = { "on", "off", "toggle" };
 
+    /// <summary>`category` members, in the order `LG_Light.LightCategory` declares them: the seven kinds of light
+    /// the game's own `LightSettings` blocks are written per, so the member an author picks is the category the
+    /// game would have picked. The order is the enum's own, which is what lets the index of a member here be the
+    /// value the game indexes a light's `m_category` with. A request that names none drives every category.</summary>
+    public static readonly string[] LightCategories =
+        { "general", "special", "emergency", "independent", "door", "sign", "door_important" };
+
     /// <summary>`mode` members of the repeating-fog row: the game's own start/stop pair over one sustained-event
     /// slot. They are one author node because the slot, not the mode, is what the two entries share.</summary>
     public static readonly string[] FogCycleModes = { "start", "stop" };
@@ -153,6 +170,8 @@ public static class EnvironmentContract
     // one names exactly the ports and parameters its row declares, so the shape and the row cannot drift.
     public static readonly HandlerShape LightingShape = new HandlerShape()
         .Inputs("zones", "transition", "position", "count").Outputs("result").Parameters("scope", "mode");
+    public static readonly HandlerShape LightColorShape = new HandlerShape()
+        .Inputs("zones", "color", "brightness", "transition").Outputs("result").Parameters("scope", "category");
     public static readonly HandlerShape FogShape = new HandlerShape()
         .Inputs("zone", "fog", "transition").Outputs("result");
     public static readonly HandlerShape FogCycleShape = new HandlerShape()
@@ -181,6 +200,7 @@ public static class EnvironmentContract
     /// parses this text and validates the row's own graph, and no built-in contract module declares these eleven, so
     /// the Map provider is where they live. The text is built from <see cref="Graphs"/> rather than written twice.</summary>
     public static string LightingCapabilityJson => CapabilityJson(LightingCapability);
+    public static string LightColorCapabilityJson => CapabilityJson(LightColorCapability);
     public static string FogCapabilityJson => CapabilityJson(FogCapability);
     public static string FogCycleCapabilityJson => CapabilityJson(FogCycleCapability);
     public static string AudioCapabilityJson => CapabilityJson(AudioCapability);
@@ -193,7 +213,7 @@ public static class EnvironmentContract
     public static string EnvironmentStateCapabilityJson => CapabilityJson(EnvironmentStateCapability);
     public static string ZoneLightsCapabilityJson => CapabilityJson(ZoneLightsCapability);
 
-    /// <summary>The eleven rows in declaration order, for a reader that wants the whole set at once.</summary>
+    /// <summary>The thirteen rows in declaration order, for a reader that wants the whole set at once.</summary>
     public static string CapabilitiesJson => "[\n" + string.Join(",\n", CapabilityOrder().ConvertAll(CapabilityJson)) + "\n]";
 
     private static string CapabilityJson(string capabilityId)
@@ -201,17 +221,18 @@ public static class EnvironmentContract
 
     private static List<string> CapabilityOrder() => new()
     {
-        LightingCapability, FogCapability, FogCycleCapability, AudioCapability, AudioStopCapability, IntelCapability,
-        DialogueCapability, NavMarkerCapability, AnimationCapability, PlayerVoiceCapability,
+        LightingCapability, LightColorCapability, FogCapability, FogCycleCapability, AudioCapability, AudioStopCapability,
+        IntelCapability, DialogueCapability, NavMarkerCapability, AnimationCapability, PlayerVoiceCapability,
         EnvironmentStateCapability, ZoneLightsCapability
     };
 
-    /// <summary>The eleven execute and observe binding rows, in the order the module declares its own action
+    /// <summary>The thirteen execute and observe binding rows, in the order the module declares its own action
     /// bindings. A binding names the canonical capability it implements; the capability row itself is the one
     /// this contract declares above, because no contract module owns it.</summary>
     public static object[] Bindings() => new object[]
     {
         Row(LightingBindingId, LightingCapability, LightingHandler, "execute"),
+        Row(LightColorBindingId, LightColorCapability, LightColorHandler, "execute"),
         Row(FogBindingId, FogCapability, FogHandler, "execute"),
         Row(FogCycleBindingId, FogCycleCapability, FogCycleHandler, "execute"),
         Row(AudioBindingId, AudioCapability, AudioHandler, "execute"),
@@ -230,6 +251,7 @@ public static class EnvironmentContract
     public static BindingSupport[] Supports() => new[]
     {
         new BindingSupport(LightingBindingId, "implementation-only", new[] { LightingPermission }),
+        new BindingSupport(LightColorBindingId, "implementation-only", new[] { LightingPermission }),
         new BindingSupport(FogBindingId, "implementation-only", new[] { FogPermission }),
         new BindingSupport(FogCycleBindingId, "implementation-only", new[] { FogPermission }),
         new BindingSupport(AudioBindingId, "implementation-only", new[] { AudioPermission }),
@@ -248,6 +270,7 @@ public static class EnvironmentContract
     public static IReadOnlyDictionary<string, HandlerShape> Shapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
         [LightingHandler] = LightingShape,
+        [LightColorHandler] = LightColorShape,
         [FogHandler] = FogShape,
         [FogCycleHandler] = FogCycleShape,
         [AudioHandler] = AudioShape,
@@ -267,6 +290,7 @@ public static class EnvironmentContract
     public static IReadOnlyDictionary<string, object> Rows() => new Dictionary<string, object>(StringComparer.Ordinal)
     {
         [LightingCapability] = Lighting(),
+        [LightColorCapability] = LightColor(),
         [FogCapability] = Fog(),
         [FogCycleCapability] = FogCycle(),
         [AudioCapability] = Audio(),
@@ -334,6 +358,39 @@ public static class EnvironmentContract
             {
                 Enum("scope", LightingScopes, required: true),
                 Enum("mode", LightingModes, required: true)
+            },
+            recipients = new
+            {
+                input = "zones", target = "entity", cardinality = "many",
+                requires = new[] { LightingPermission }, result = "result"
+            }
+        });
+
+    /// <summary>`a-lights-color`: the colour and intensity transition over a zone's light objects. The scope is
+    /// the lighting row's own — `zones` is the places the request names and `expedition` is every zone the level
+    /// holds — and the named zones are the request's recipients for the same reason: an action with no target is
+    /// not an action. `color` is the three unit-range channels of the game's own colour, `brightness` is a
+    /// multiplier of each light's current intensity, `transition` is the seconds the write is spread over and
+    /// `category` narrows it to one of the seven kinds of light. `viewers` is deliberately not a port: what this
+    /// row writes is the light objects of the process it runs in, and it makes no claim about any other one.</summary>
+    private static object LightColor() => Capability(LightColorCapability, "action", "设置区域灯颜色与亮度",
+        "把指定区域的灯在若干秒内过渡到新的颜色和亮度倍率，可只改某一类灯。", new
+        {
+            domains = Domains,
+            execution = "host",
+            inputs = new object[]
+            {
+                Port("in", "execution"),
+                Many("zones", "entity"),
+                Optional("color", "vector3"),
+                Optional("brightness", "number"),
+                Optional("transition", "number")
+            },
+            outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.light_color") },
+            parameters = new object[]
+            {
+                Enum("scope", LightingScopes, required: true),
+                Enum("category", LightCategories)
             },
             recipients = new
             {

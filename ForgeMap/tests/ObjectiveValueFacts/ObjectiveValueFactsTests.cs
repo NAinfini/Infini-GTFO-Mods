@@ -57,10 +57,10 @@ public sealed class ObjectiveValueFactsTests
         Assert.Equal("resource", port.GetProperty("type").GetString());
         Assert.Equal(ObjectiveResourceKind, port.GetProperty("resourceKind").GetString());
         Assert.Equal(ObjectiveResourceSchema, port.GetProperty("schema").GetString());
-        // The kind and schema are the level-event rows' own, asserted here so the two families cannot drift. The
-        // row itself is the runtime trigger contract's declaration (ruling 148.3), which is the one the level
-        // event's binding is resolved against.
-        var trigger = TriggerContracts.Rows(new[] { LevelEventContract.ObjectiveActivatedCapability })[0]
+        // The kind and schema are the level-event rows' own — the HSU row carries the objective resource port —
+        // asserted here so the two families cannot drift. The row itself is the runtime trigger contract's
+        // declaration (ruling 148.3), which is the one the level event's binding is resolved against.
+        var trigger = TriggerContracts.Rows(new[] { LevelEventContract.HsuSampledCapability })[0]
             .GetProperty("graph").GetProperty("outputs")
             .EnumerateArray()
             .First(output => output.GetProperty("id").GetString() == "objective");

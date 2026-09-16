@@ -22,9 +22,8 @@ internal sealed class WeaponNativeSession : IDisposable
     internal EquipmentNativeAdapter Adapter { get; private set; } = null!;
     internal EquipmentIdentitySession Identity { get; private set; } = null!;
     internal WeaponCombatObserver Combat { get; private set; } = null!;
-    /// <summary>The attack instance around each native firing body: one scope per trigger pull, accepted when
-    /// the body registers the shot and closed when it returns. It reads the same equipment life the shot
-    /// observer counts and never counts a shot itself.</summary>
+    /// <summary>The attack-instance rows: the game's own empty-clip paths and the two ends of a burst sequence,
+    /// each naming the same equipment life the shot observer counts and never counting a shot itself.</summary>
     internal AttackInstanceModule Attack { get; private set; } = null!;
     /// <summary>The deployed-device facts: one sentry firing pair, the glue gun's two launch bodies and the mine's
     /// own trigger, read against the placement table this session's adapter owns.</summary>
@@ -101,8 +100,8 @@ internal sealed class WeaponNativeSession : IDisposable
                 observe: value => ObserveOverrides(session.Overrides.Ledger, value));
             session.Adapter.Attach(session.Identity);
             session.Combat = new WeaponCombatObserver(session.Adapter, () => kernel, report, info);
-            // The attack scope shares the shot observer's own equipment life and reads its counters; it keeps no
-            // tally of shots and no ledger of hits of its own.
+            // The attack-instance rows name the shot observer's own equipment life for their actor and equipment
+            // ports; the module keeps no tally of shots and no ledger of hits of its own.
             session.Attack = new AttackInstanceModule(session.Adapter, () => kernel, report, info);
             // The deployed-device facts answer from the same placement table the life-cycle observation uses, so
             // the adapter's own lookups are handed in rather than a second index kept here.

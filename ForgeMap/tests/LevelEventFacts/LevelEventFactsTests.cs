@@ -8,7 +8,7 @@ using ForgeRuntime.Framework;
 namespace ForgeMap.Tests.LevelEventFacts;
 
 /// <summary>
-/// The focused cases for the level-event family: the declaration a registration installs, what each of the eight
+/// The focused cases for the level-event family: the declaration a registration installs, what each of the six
 /// observation rows publishes and when, the absence a row with no reading produces, the refusal path of each of
 /// the three actions, and the world-epoch cleanup. Nothing here touches the game: the module under test is the
 /// game-independent half, so every port is asserted against the value a case supplied.
@@ -21,7 +21,7 @@ public sealed class LevelEventFactsTests
     public void TheContractDeclaresTheProvidersOwnId()
     {
         Assert.Equal(ModuleDefinition.ProviderId, LevelEventContract.ProviderId);
-        Assert.Equal(8, LevelEventContract.Triggers.Count);
+        Assert.Equal(6, LevelEventContract.Triggers.Count);
         Assert.Equal(3, LevelEventContract.Actions.Count);
     }
 
@@ -77,9 +77,9 @@ public sealed class LevelEventFactsTests
         var expedition = Ports(rows[Array.IndexOf(ids, LevelEventContract.ExpeditionStartedCapability)]);
         Assert.Equal("map", Assert.Single(expedition, port => port.GetProperty("type").GetString() == "resource")
             .GetProperty("resourceKind").GetString());
-        var activated = Ports(rows[Array.IndexOf(ids, LevelEventContract.ObjectiveActivatedCapability)]);
-        Assert.Equal(new[] { "next", "objective", "status", "chain" },
-            activated.Select(port => port.GetProperty("id").GetString()).ToArray());
+        var hsu = Ports(rows[Array.IndexOf(ids, LevelEventContract.HsuSampledCapability)]);
+        Assert.Equal(new[] { "next", "objective", "container" },
+            hsu.Select(port => port.GetProperty("id").GetString()).ToArray());
     }
 
     private static JsonElement[] Ports(JsonElement row)
@@ -134,39 +134,6 @@ public sealed class LevelEventFactsTests
         // The same expedition starting twice is one fact: the second report repeats the state it already carried.
         world.Module.ExpeditionStarted("31:A:0");
         Assert.Equal(1, world.Count(capability));
-    }
-
-    [Fact]
-    public void ObjectiveTransitionsPublishOnlyTheTwoBoundariesAndNeverOnRecall()
-    {
-        using var world = LevelEventWorld.Start();
-        string activated = LevelEventWorld.Capability(LevelEventContract.ObjectiveActivatedFact);
-        string won = LevelEventWorld.Capability(LevelEventContract.ObjectiveWonFact);
-
-        // The two intermediate members are the objective's own progress, not a boundary row.
-        world.Module.ObjectiveStatusChanged("main", LevelEventContract.StatusDiscovered, 0, false);
-        world.Module.ObjectiveStatusChanged("main", LevelEventContract.StatusPartiallySolved, 1, false);
-        Assert.Null(world.Last(activated));
-        Assert.Null(world.Last(won));
-
-        world.Module.ObjectiveStatusChanged("main", LevelEventContract.StatusStarted, 1, false);
-        var start = world.Last(activated)!;
-        Assert.Equal("layer:main", start.Outputs.GetProperty("objective").GetProperty("resourceId").GetString());
-        Assert.Equal(LevelEventContract.StatusStarted, start.Outputs.GetProperty("status").GetInt32());
-        Assert.Equal(1, start.Outputs.GetProperty("chain").GetInt32());
-
-        world.Module.ObjectiveStatusChanged("main", LevelEventContract.StatusItemSolved, 2, false);
-        Assert.NotNull(world.Last(won));
-        Assert.Equal(2, world.Last(won)!.Outputs.GetProperty("chain").GetInt32());
-
-        // A recall re-announces the status the world already had; it is the checkpoint row's business.
-        world.Module.ObjectiveStatusChanged("secondary", LevelEventContract.StatusStarted, 0, true);
-        Assert.Equal(2, world.Total);
-
-        // Another layer is its own fact, and the binding is the one the capability owns.
-        world.Module.ObjectiveStatusChanged("secondary", LevelEventContract.StatusStarted, 0, false);
-        Assert.Equal(3, world.Total);
-        Assert.Equal(LevelEventContract.Binding(activated), world.Last(activated)!.BindingId);
     }
 
     [Fact]

@@ -75,36 +75,10 @@ internal static class EnvironmentQuery
             throw new RuntimeContractException(StaleZoneCode, "The zone belongs to another world: " + reference.Id);
         if (EnvironmentStateManager.Current == null)
             throw new RuntimeContractException(UnavailableCode, "No environment state manager is loaded.");
-        var zone = ZoneAt(coordinates)
+        var zone = EnvironmentZoneTable.At(coordinates)
             ?? throw new RuntimeContractException(ZoneMissingCode, "This level has no zone at " + reference.Id);
         bool on = EnvironmentStateManager.GetLightMode(coordinates.Global);
         return RuntimeJson.From(new { on, count = (long)(zone.m_lightsInZone?.Count ?? 0) });
-    }
-
-    /// <summary>The one zone of the standing level that answers to a coordinate triple, or null when no single zone
-    /// does. A zone whose layer or dimension does not read has no coordinates and is skipped rather than matched by
-    /// a guessed address, exactly as the level's own zone table resolves one.</summary>
-    private static LG_Zone? ZoneAt(EnvironmentZone coordinates)
-    {
-        var builder = LG_LevelBuilder.Current;
-        var floor = builder == null ? null : builder.m_currentFloor;
-        var zones = floor == null ? null : floor.allZones;
-        if (zones == null) return null;
-        LG_Zone? found = null;
-        for (var index = 0; index != zones.Count; index++)
-        {
-            var zone = zones[index];
-            if (zone == null) continue;
-            var layer = zone.m_layer;
-            if (layer == null) continue;
-            if ((int)zone.m_dimensionIndex != coordinates.Dimension || (int)layer.m_type != coordinates.Layer
-                || (int)zone.LocalIndex != coordinates.Zone) continue;
-            // Two zones answering to one address make that address ambiguous, so neither of them is reachable
-            // through it.
-            if (found != null) return null;
-            found = zone;
-        }
-        return found;
     }
 
     /// <summary>The row's one required input, refused by name when the plan left it out: an absent zone answered as

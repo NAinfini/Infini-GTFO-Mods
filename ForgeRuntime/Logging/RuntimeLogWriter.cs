@@ -317,6 +317,7 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
             json.WriteString("reason", result.Reason);
             json.WriteEndObject();
         }
+        if (r.Layout is RuntimeLogLayout layout) WriteLayout(json, in layout);
         if (r.Code == RuntimeLogCodes.LogDropped) json.WriteNumber("count", entry.Count);
         if (entry.Levels is { } levels)
         {
@@ -339,6 +340,43 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
 
     private static void Optional(Utf8JsonWriter json, string name, string? value)
     { if (value != null) json.WriteString(name, value); }
+
+    /// <summary>The layout object of `map.layout-generated`. Every array is written even when empty: the website
+    /// reader requires the four keys, and an attempt that built nothing says so with `complete:false` rather than
+    /// with a missing field.</summary>
+    private static void WriteLayout(Utf8JsonWriter json, in RuntimeLogLayout layout)
+    {
+        json.WriteStartObject("layout");
+        json.WriteBoolean("complete", layout.Complete);
+        if (layout.ElevatorLandedTick is long landed) json.WriteNumber("elevatorLandedTick", landed);
+        else json.WriteNull("elevatorLandedTick");
+        json.WriteStartArray("zones");
+        foreach (var zone in layout.Zones ?? Array.Empty<RuntimeLogLayoutZone>())
+        {
+            json.WriteStartObject();
+            json.WriteString("zone", zone.Zone);
+            json.WriteNumber("dimension", zone.Dimension);
+            json.WriteNumber("layer", zone.Layer);
+            json.WriteNumber("localIndex", zone.LocalIndex);
+            json.WriteNumber("floor", zone.Floor);
+            json.WriteStartArray("tiles");
+            foreach (var tile in zone.Tiles ?? Array.Empty<string>()) json.WriteStringValue(tile);
+            json.WriteEndArray();
+            json.WriteEndObject();
+        }
+        json.WriteEndArray();
+        json.WriteStartArray("connections");
+        foreach (var connection in layout.Connections ?? Array.Empty<RuntimeLogLayoutConnection>())
+        {
+            json.WriteStartObject();
+            json.WriteString("from", connection.From);
+            json.WriteString("to", connection.To);
+            json.WriteString("direction", connection.Direction);
+            json.WriteEndObject();
+        }
+        json.WriteEndArray();
+        json.WriteEndObject();
+    }
 
     private static string Message(in Entry entry)
     {
@@ -365,6 +403,11 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
             if (result.Commit != null) text.Append('/').Append(result.Commit);
             text.Append(':').Append(result.Reason);
         }
+        if (r.Layout is RuntimeLogLayout layout)
+            text.Append(" layout=").Append(layout.Complete ? "complete" : "started")
+                .Append(" zones=").Append((layout.Zones?.Count ?? 0).ToString(CultureInfo.InvariantCulture))
+                .Append(" connections=").Append((layout.Connections?.Count ?? 0).ToString(CultureInfo.InvariantCulture))
+                .Append(" elevator=").Append(layout.ElevatorLandedTick?.ToString(CultureInfo.InvariantCulture) ?? "not-observed");
         return text.ToString();
     }
 

@@ -18,7 +18,7 @@ namespace ForgeEnemy.Native;
 /// publications — is the production source, unchanged, including the nested `Behavior` class that source declares.
 ///
 /// The registration this shim builds is the provider's own declaration with exactly this family's rows in it. The
-/// seven observation bindings are lifted out of the production registry text by id, so a row this suite
+/// five observation bindings are lifted out of the production registry text by id, so a row this suite
 /// registered cannot differ from the row the provider ships; the capabilities they name stay where they belong,
 /// in the kernel's trigger contract, which registers before any domain package.
 ///
@@ -101,7 +101,7 @@ internal sealed partial class EnemyModule : IDisposable
     }
 
     /// <summary>The provider's declaration with exactly this family's rows in it: the provider itself and the
-    /// seven observation bindings the behaviour facts publish through. The ids and the handler names are the
+    /// five observation bindings the behaviour facts publish through. The ids and the handler names are the
     /// module's own constants, so a row this suite registers cannot name a binding the provider does not; the
     /// capabilities they name stay where they belong, in the kernel's trigger contract, which registers before any
     /// domain package. Nothing else the production registration carries is compiled here at all: this suite's
@@ -129,7 +129,7 @@ internal sealed partial class EnemyModule : IDisposable
     /// unreachable one.</summary>
     private static readonly string[] BehaviorBindingIds =
     {
-        StateChangedBinding, AwakenedBinding, AlertChangedBinding, TargetAcquiredBinding, TargetLostBinding,
+        AwakenedBinding, TargetAcquiredBinding, TargetLostBinding,
         ScoutDetectionBinding, ScoutScreamBinding
     };
 

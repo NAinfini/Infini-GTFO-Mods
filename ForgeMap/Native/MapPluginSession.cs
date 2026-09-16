@@ -196,6 +196,7 @@ internal sealed partial class MapPluginSession : IDisposable
         var capabilities = new List<object>
         {
             RuntimeJson.Parse(EnvironmentContract.LightingCapabilityJson),
+            RuntimeJson.Parse(EnvironmentContract.LightColorCapabilityJson),
             RuntimeJson.Parse(EnvironmentContract.FogCapabilityJson),
             RuntimeJson.Parse(EnvironmentContract.FogCycleCapabilityJson),
             RuntimeJson.Parse(EnvironmentContract.AudioCapabilityJson),
@@ -286,6 +287,7 @@ internal sealed partial class MapPluginSession : IDisposable
                 [DoorTerminalActionContract.LockHandlerName] = doors.HandleLock,
                 [DoorTerminalActionContract.UnlockHandlerName] = doors.HandleUnlock,
                 [EnvironmentContract.LightingHandler] = environment.HandleLighting,
+                [EnvironmentContract.LightColorHandler] = environment.HandleLightColor,
                 [EnvironmentContract.FogHandler] = environment.HandleFog,
                 [EnvironmentContract.FogCycleHandler] = environment.HandleFogCycle,
                 [EnvironmentContract.NavMarkerHandler] = environment.HandleNavMarker,
@@ -838,6 +840,9 @@ internal sealed partial class MapPluginSession : IDisposable
         // before native detours or session flags can be changed.
         var errors = new List<Exception>();
         DetachHalves(errors);
+        // The light transitions this session scheduled are frames of this session's world: a patch that still runs
+        // for one frame after teardown must find nothing to write into.
+        LightColorFades.Clear();
         MapObjects?.Dispose();
         Module.Dispose();
         _faulted = true;

@@ -176,11 +176,11 @@ public static class TriggerContracts
           "id": "forge.trigger.enemy.death_started",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "敌人死亡 · enemy death_started",
+          "label": "敌人开始死亡",
           "version": "2.0.0",
           "parameters": {
             "description": "敌人的死亡流程开始。",
-            "summary": "敌人的死亡流程开始。真正结算成击杀、带击杀归属的那一步是「该伤害事务导致击杀」。",
+            "summary": "敌人的死亡流程开始。",
             "summaryEn": "Fires when an enemy starts dying. The settled kill, with the source it was credited to, is Killed.",
             "labelEn": "Death started",
             "support": "authoring-contract-only"
@@ -938,51 +938,6 @@ public static class TriggerContracts
           }
         },
         {
-          "id": "forge.trigger.enemy.state_changed",
-          "owner": "forge.contract.trigger",
-          "kind": "trigger",
-          "label": "敌人行为状态变化",
-          "version": "2.0.0",
-          "parameters": {
-            "description": "敌人的行为状态换了。",
-            "summary": "敌人的行为状态换了。",
-            "summaryEn": "Fires when an enemy changes behaviour state.",
-            "labelEn": "Enemy state changed",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "enemy",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "enemy",
-                "type": "entity"
-              },
-              {
-                "id": "state",
-                "type": "enum",
-                "schema": "ai_state"
-              },
-              {
-                "id": "previous",
-                "type": "enum",
-                "schema": "ai_state"
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
           "id": "forge.trigger.enemy.awakened",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
@@ -1012,49 +967,6 @@ public static class TriggerContracts
               {
                 "id": "enemy",
                 "type": "entity"
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
-          "id": "forge.trigger.enemy.alert_changed",
-          "owner": "forge.contract.trigger",
-          "kind": "trigger",
-          "label": "警觉度跨越阈值",
-          "version": "2.0.0",
-          "parameters": {
-            "description": "敌人的警觉度越过了你设的线。",
-            "summary": "敌人的警觉度越过了你设的线。",
-            "summaryEn": "Fires when an enemy's alertness crosses the level you set.",
-            "labelEn": "Alert crossed threshold",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "enemy",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "enemy",
-                "type": "entity"
-              },
-              {
-                "id": "alert",
-                "type": "number"
-              },
-              {
-                "id": "rising",
-                "type": "boolean"
               }
             ],
             "parameters": []
@@ -1192,7 +1104,7 @@ public static class TriggerContracts
           "id": "forge.trigger.enemy.scout_scream",
           "owner": "forge.contract.trigger",
           "kind": "trigger",
-          "label": "侦察兵发现玩家 / 尖叫 · enemy scout_scream",
+          "label": "侦察兵尖叫",
           "version": "2.0.0",
           "parameters": {
             "description": "侦察兵的呼叫进入新阶段。",
@@ -1222,45 +1134,6 @@ public static class TriggerContracts
               {
                 "id": "phase",
                 "type": "integer"
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
-          "id": "forge.trigger.interaction.door_approach",
-          "owner": "forge.contract.trigger",
-          "kind": "trigger",
-          "label": "玩家靠近门",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "有人靠近门。",
-            "summary": "有人靠近门。",
-            "summaryEn": "Fires when someone comes near a door.",
-            "labelEn": "Door approached",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "door",
-                "type": "entity"
-              },
-              {
-                "id": "actor",
-                "type": "entity",
-                "optional": true
               }
             ],
             "parameters": []
@@ -1409,49 +1282,6 @@ public static class TriggerContracts
             "parameters": []
           }
         },
-        {
-          "id": "forge.trigger.interaction.terminal_log",
-          "owner": "forge.contract.trigger",
-          "kind": "trigger",
-          "label": "读取终端日志",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "某个终端日志被读取。",
-            "summary": "读取终端日志。",
-            "summaryEn": "Fires when a terminal log is read.",
-            "labelEn": "Terminal log read",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "terminal",
-                "type": "entity"
-              },
-              {
-                "id": "log",
-                "type": "string"
-              },
-              {
-                "id": "line",
-                "type": "string",
-                "optional": true
-              }
-            ],
-            "parameters": []
-          }
-        },
     {
       "id": "forge.trigger.player.downed",
       "owner": "forge.contract.trigger",
@@ -1535,7 +1365,7 @@ public static class TriggerContracts
       "id": "forge.trigger.player.revive_cancelled",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "开始救人 / 被救起 · player revive_cancelled",
+      "label": "救援被打断",
       "version": "2.0.0",
       "parameters": {
         "description": "救援被打断。",
@@ -1579,7 +1409,7 @@ public static class TriggerContracts
       "id": "forge.trigger.player.revived",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "开始救人 / 被救起 · player revived",
+      "label": "玩家被救起",
       "version": "2.0.0",
       "parameters": {
         "description": "玩家被救起来了。",
@@ -1784,7 +1614,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.reload_transferred",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "换弹开始 / 完成 · combat reload_transferred",
+      "label": "弹药进入弹匣",
       "version": "2.0.0",
       "parameters": {
         "description": "子弹真的进弹匣了。",
@@ -1828,7 +1658,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.reload_completed",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "换弹开始 / 完成 · combat reload_completed",
+      "label": "换弹完成",
       "version": "2.0.0",
       "parameters": {
         "description": "装填结束。",
@@ -1868,7 +1698,7 @@ public static class TriggerContracts
       "id": "forge.trigger.equipment.refilled",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "使用补给包 · equipment refilled",
+      "label": "装备补给完成",
       "version": "2.0.0",
       "parameters": {
         "description": "补给完成。",
@@ -1910,7 +1740,7 @@ public static class TriggerContracts
       "id": "forge.trigger.equipment.stack_changed",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "工具能源 / 消耗品数量 · equipment stack_changed",
+      "label": "堆叠数量变化",
       "version": "2.0.0",
       "parameters": {
         "description": "消耗品的数量变了。",
@@ -2079,8 +1909,8 @@ public static class TriggerContracts
       "label": "使用失败并给出原因",
       "version": "2.0.0",
       "parameters": {
-        "description": "使用失败，并告诉你原因。开枪时因为没子弹打不出去用「有效攻击请求因弹药不足失败」。",
-        "summary": "使用失败，并告诉你原因。开枪时因为没子弹打不出去用「有效攻击请求因弹药不足失败」。",
+        "description": "使用失败，并告诉你原因。弹匣空了打不出去走「弹匣打空 / 全部没弹」，不是这一条。",
+        "summary": "使用失败，并告诉你原因。弹匣空了打不出去走「弹匣打空 / 全部没弹」，不是这一条。",
         "summaryEn": "Fires when a use fails, and reports why. A shot refused for an empty magazine is Dry fire.",
         "labelEn": "Use failed",
         "support": "authoring-contract-only"
@@ -2135,50 +1965,6 @@ public static class TriggerContracts
         "outputs": [
           { "id": "next", "type": "execution" },
           { "id": "map", "type": "resource", "resourceKind": "map", "schema": "forge.resource.map" }
-        ],
-        "parameters": []
-      }
-    },
-    {
-      "id": "forge.trigger.objective.activated",
-      "owner": "forge.contract.trigger",
-      "kind": "trigger",
-      "label": "目标开始",
-      "version": "1.0.0",
-      "parameters": {
-        "description": "某一层的主目标正式开始。"
-      },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "objective", "type": "resource", "resourceKind": "objective", "schema": "forge.resource.objective" },
-          { "id": "status", "type": "integer" },
-          { "id": "chain", "type": "integer" }
-        ],
-        "parameters": []
-      }
-    },
-    {
-      "id": "forge.trigger.objective.won",
-      "owner": "forge.contract.trigger",
-      "kind": "trigger",
-      "label": "目标完成、开始撤离",
-      "version": "1.0.0",
-      "parameters": {
-        "description": "某一层的主目标已经完成。"
-      },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "objective", "type": "resource", "resourceKind": "objective", "schema": "forge.resource.objective" },
-          { "id": "status", "type": "integer" },
-          { "id": "chain", "type": "integer" }
         ],
         "parameters": []
       }
@@ -2338,7 +2124,7 @@ public static class TriggerContracts
       "id": "forge.trigger.combat.limb_damaged",
       "owner": "forge.contract.trigger",
       "kind": "trigger",
-      "label": "敌人部位被打爆 · combat limb_damaged",
+      "label": "敌人部位受伤",
       "version": "2.0.0",
       "parameters": {
         "description": "某个部位挨打了。",
@@ -2506,7 +2292,8 @@ public static class TriggerContracts
             "id": "resource",
             "type": "resource",
             "role": "structural",
-            "required": true
+            "required": true,
+            "resourceKind": "wave"
           }
         ]
       }
@@ -2560,7 +2347,8 @@ public static class TriggerContracts
             "id": "resource",
             "type": "resource",
             "role": "structural",
-            "required": true
+            "required": true,
+            "resourceKind": "wave"
           }
         ]
       }
@@ -2609,7 +2397,8 @@ public static class TriggerContracts
             "id": "resource",
             "type": "resource",
             "role": "structural",
-            "required": true
+            "required": true,
+            "resourceKind": "wave"
           }
         ]
       }
@@ -2654,7 +2443,8 @@ public static class TriggerContracts
             "id": "resource",
             "type": "resource",
             "role": "structural",
-            "required": true
+            "required": true,
+            "resourceKind": "wave"
           }
         ]
       }

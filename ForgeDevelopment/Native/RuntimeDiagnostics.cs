@@ -68,6 +68,11 @@ internal static class RuntimeDiagnostics
     private static int _steps;
 
     internal static DiagnosticsReport? Report => _report;
+    /// <summary>Whether this run's <see cref="LG_Factory.FactoryDone"/> has already been observed.</summary>
+    internal static bool StructureComplete => _structureComplete;
+    /// <summary>Records a one-line observation about the diagnostics themselves in the run's report, so a failure
+    /// inside the layout record is visible where every other diagnostics failure is.</summary>
+    internal static void Note(string code, string message) => _report?.Issue(code, "diagnostics", message);
     internal static long WorldEpoch => HostPlugin.Runtime?.WorldEpoch ?? 0;
     internal static long? SimulationTick => HostPlugin.Runtime is { CurrentTick: >= 0 } runtime ? runtime.CurrentTick : null;
     internal static string Number(double n) => n.ToString("R", CultureInfo.InvariantCulture);
@@ -153,6 +158,7 @@ internal static class RuntimeDiagnostics
         var tick = SimulationTick;
         var scan = ProjectChecks.Load(_report, epoch, tick, ProjectRoomSource.Resolve);
         _inspectionSession = new ProjectInspectionSession(_report, scan, epoch);
+        GeneratedLayoutRecord.AttemptStarted();
         Export("generating");
     }
     private static void CaptureGenerationIdentity(string phase)
@@ -242,12 +248,14 @@ internal static class RuntimeDiagnostics
         _structureComplete = true;
         _report?.Check("structure", "factory", "observed_complete", "Native FactoryDone returned; objectives and scripts remain unverified.");
         _report?.Event("generation", "factory_done", "factory", new() { ["random"] = RandomState() });
+        GeneratedLayoutRecord.AttemptCompleted();
         _inspection = WorldInspection.Capture(session).GetEnumerator();
         Export("structure_complete_inspection_pending");
     }
     internal static void Tick()
     {
         if (_stopped) return;
+        GeneratedLayoutRecord.PollLanding();
         if (_inspectionSession is { IsClosed: false } current && !current.AcceptWorld(WorldEpoch, SimulationTick))
         {
             CancelInspection("world_epoch_changed");

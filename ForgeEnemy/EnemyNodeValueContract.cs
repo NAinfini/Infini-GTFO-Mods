@@ -126,7 +126,7 @@ public static class EnemyNodeValueContract
             {
                 new { id = "position", type = "vector3", unit = "m" },
                 new { id = "zone", type = "resource", resourceKind = RuntimeZones.ResourceKind,
-                    schema = "forge.resource." + RuntimeZones.ResourceKind, nullable = true }
+                    schema = "forge.resource." + RuntimeZones.ResourceKind }
             }),
         ValueRow(TaggedCapability, "敌人是否被标记", "读一个敌人是否被生物追踪器标记，以及标记还剩多久。",
             "Reads whether one enemy still carries a BioTracker tag, and how many seconds of it are left.",

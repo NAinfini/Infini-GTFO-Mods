@@ -109,7 +109,7 @@ public static class InventoryActionContract
       "id": "forge.action.inventory.consume",
       "owner": "forge.module.gtfo.weapon",
       "kind": "action",
-      "label": "给予 / 扣除物品（消耗品、资源包） · inventory consume",
+      "label": "扣除物品",
       "version": "1.0.0",
       "parameters": { "description": "按事务扣掉堆叠或使用次数。" },
       "graph": {

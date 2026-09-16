@@ -19,7 +19,7 @@ internal static class ConditionDeclarations
 {
     internal static IReadOnlyList<PureNode> Nodes { get; } = new[]
     {
-        PureModule.Row("forge.condition.predicate.not", "condition", "与 / 或 / 非 · predicate not", "把条件反过来。",
+        PureModule.Row("forge.condition.predicate.not", "condition", "条件取反", "把条件反过来。",
             PureModule.Inputs(PureModule.Bool("input")), PureModule.Outputs(PureModule.Bool("value")),
             PureModule.Parameters(), (JsonElement?)null,
             new HandlerShape().Inputs("input").Outputs("value"), PureModule.Not)

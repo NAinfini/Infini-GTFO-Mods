@@ -3,8 +3,8 @@ using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 using SNetwork;
 
-/// <summary>Enemy AI behaviour facts: state, wake-up, alert crossings, target lock and scout events, driven by
-/// managed doubles of the native pump. No GTFO code runs.</summary>
+/// <summary>Enemy AI behaviour facts: wake-up, target lock and scout events, driven by managed doubles of the
+/// native pump. No GTFO code runs.</summary>
 internal static class BehaviorFacts
 {
     internal static List<Row> Run()
@@ -18,77 +18,73 @@ internal static class BehaviorFacts
         }
         void Require(bool condition, string detail) { if (!condition) throw new InvalidOperationException(detail); }
 
-        Case("state.change-publishes-once", () =>
+        // The pump's own discipline: what it reads, what it refuses to publish and which life a fact belongs to.
+        // The awakened fact is the one state-derived fact, so leaving hibernation is the transition each case
+        // drives the pump with.
+        Case("pump.client-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
-            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
-            Require(Scene.Dispatched(s.Frame()) == 1, "A state change did not publish exactly once.");
-            Require(Scene.Dispatched(s.Frame()) == 0, "The unchanged state published again.");
-        });
-        Case("state.repeat-write-is-silent", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
-            for (var i = 0; i < 4; i++) s.Frame();
-            Require(Scene.Dispatched(s.Frame()) == 0, "A repeated identical state published.");
-            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Dead;
-            Require(Scene.Dispatched(s.Frame()) == 1, "A real transition after repeats did not publish.");
-        });
-        Case("state.spawn-state-is-not-a-transition", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
-            Require(Scene.Dispatched(s.Frame()) == 0, "The spawn state was published as a change.");
-        });
-        Case("state.client-does-not-publish", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
+            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Hibernating;
+            Require(Scene.Dispatched(s.Frame()) == 0, "Entering hibernation published a wake-up.");
             SNet.IsMaster = false;
             s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             Require(Scene.Dispatched(s.Frame()) == 0, "A client published host-owned behaviour facts.");
         });
-        Case("state.gate-denied-does-not-publish", () =>
+        Case("pump.gate-denied-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start(); s.Allowed = false;
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
+            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Hibernating;
+            Require(Scene.Dispatched(s.Frame()) == 0, "Entering hibernation published a wake-up.");
+            s.Allowed = false;
             s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             Require(Scene.Dispatched(s.Frame()) == 0, "A denied authority gate published.");
         });
-        Case("state.dead-enemy-does-not-publish", () =>
+        Case("pump.dead-enemy-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
-            s.Enemy.Alive = false; s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Dead;
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
+            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Hibernating;
+            s.Frame();
+            s.Enemy.Alive = false; s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             Require(Scene.Dispatched(s.Frame()) == 0, "A dead enemy published a behaviour fact.");
         });
-        Case("state.world-change-clears-watermarks", () =>
+        Case("pump.old-world-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
+            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Hibernating;
+            s.Frame();
             s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
-            Require(Scene.Dispatched(s.Frame()) == 1, "The first transition did not publish.");
-            s.Kernel.BeginWorld(2); s.Module.TrackSpawn(s.Enemy);
-            Require(Scene.Dispatched(s.Frame()) == 0, "A new world reused the previous life's state watermark.");
+            Require(Scene.Dispatched(s.Frame()) == 1, "Leaving hibernation did not publish the awakened fact.");
+            s.Kernel.BeginWorld(2);
+            Require(Scene.Dispatched(s.Frame()) == 0, "A retired world published a wake-up.");
         });
-        Case("state.stale-life-does-not-publish", () =>
+        Case("pump.stale-life-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
+            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Hibernating;
+            s.Frame();
             var retired = s.Module.CaptureDespawn(s.Enemy); s.Module.CompleteDespawn(retired);
             s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             Require(Scene.Dispatched(s.Frame()) == 0, "A retired life published a behaviour fact.");
         });
-        Case("state.foreign-instance-does-not-publish", () =>
+        Case("pump.foreign-instance-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
+            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.Hibernating;
+            s.Frame();
             var foreign = Scene.NewEnemy(9, 40); foreign.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             s.Module.ObserveEnemyBehavior(foreign.AI);
             Require(Scene.Dispatched(s.Tick()) == 0, "An untracked enemy instance published.");
         });
-        Case("state.no-subscriber-skips-the-read", () =>
+        Case("pump.no-subscriber-skips-the-read", () =>
         {
             using var s = new Scene();
             s.Enemy.AI.m_behaviour = null!;
             s.Module.ObserveEnemyBehavior(s.Enemy.AI);
             Require(Scene.Dispatched(s.Tick()) == 0, "The pump read native AI with no subscriber.");
         });
-        Case("state.disposed-module-skips-the-read", () =>
+        Case("pump.disposed-module-skips-the-read", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
             s.Module.Dispose();
             s.Enemy.AI.m_behaviour = null!;
             s.Module.ObserveEnemyBehavior(s.Enemy.AI);
@@ -123,29 +119,6 @@ internal static class BehaviorFacts
             using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
             s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             Require(Scene.Dispatched(s.Frame()) == 0, "A non-hibernating state change published the awakened fact.");
-        });
-        Case("alert.crossing-publishes-and-does-not-repeat", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.AlertChangedBinding); s.Start();
-            s.Enemy.AI.m_detection.m_biggestDetectionBuildup = 0.3f;
-            Require(Scene.Dispatched(s.Frame()) == 1, "An alert crossing did not publish.");
-            Require(Scene.Dispatched(s.Frame()) == 0, "The same alert bucket published again.");
-            s.Enemy.AI.m_detection.m_biggestDetectionBuildup = 0.1f;
-            Require(Scene.Dispatched(s.Frame()) == 1, "A falling alert crossing did not publish.");
-        });
-        Case("alert.same-bucket-is-silent", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.AlertChangedBinding); s.Start();
-            s.Enemy.AI.m_detection.m_biggestDetectionBuildup = 0.3f;
-            Require(Scene.Dispatched(s.Frame()) == 1, "The first crossing did not publish.");
-            s.Enemy.AI.m_detection.m_biggestDetectionBuildup = 0.4f;
-            Require(Scene.Dispatched(s.Frame()) == 0, "A value inside the same bucket published.");
-        });
-        Case("alert.non-finite-value-is-not-a-fact", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.AlertChangedBinding); s.Start();
-            s.Enemy.AI.m_detection.m_biggestDetectionBuildup = float.NaN;
-            Require(Scene.Dispatched(s.Frame()) == 0, "A non-finite detection value published.");
         });
         Case("target.acquired-with-resolvable-target", () =>
         {
@@ -212,15 +185,9 @@ internal static class BehaviorFacts
             s.Module.ObserveScoutDetection(s.Enemy, target);
             Require(Scene.Dispatched(s.Tick()) == 0, "A non-finite scout position published.");
         });
-        Case("port.declared-state-values-are-mapped", () =>
-        {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
-            s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat_Stagger;
-            Require(Scene.Dispatched(s.Frame()) == 1, "A mapped native state did not publish.");
-        });
         Case("gate.unregistered-module-does-not-publish", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
             s.Module.Dispose();
             s.Enemy.AI.m_behaviour.m_currentStateName = EB_States.InCombat;
             s.Module.ObserveEnemyBehavior(s.Enemy.AI);
@@ -228,7 +195,7 @@ internal static class BehaviorFacts
         });
         Case("gate.thread-off-pump-is-refused", () =>
         {
-            using var s = new Scene(); s.Subscribe(EnemyModule.StateChangedBinding); s.Start();
+            using var s = new Scene(); s.Subscribe(EnemyModule.AwakenedBinding); s.Start();
             Exception? caught = null;
             try { Task.Run(() => s.Module.ObserveEnemyBehavior(s.Enemy.AI)).GetAwaiter().GetResult(); }
             catch (RuntimeContractException error) { caught = error; }
