@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <AssemblyName>Perf</AssemblyName>
+    <RootNamespace>ForgeRuntime.Tests.Perf</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The kernel sources are compiled in, exactly as the other harness projects do it: measuring an assembly
+         boundary would measure the wrong thing, and this project must not add a package reference. -->
+    <Compile Include="../../Framework/**/*.cs" Exclude="../../Framework/bin/**/*.cs;../../Framework/obj/**/*.cs" Link="Framework/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

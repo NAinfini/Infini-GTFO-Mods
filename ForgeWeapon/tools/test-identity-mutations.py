@@ -5,6 +5,21 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import xml.etree.ElementTree as ElementTree
+
+TRX_NAMESPACE = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
+
+
+def trx_outcomes(path: Path) -> list[tuple[str, str]]:
+    """(test name, outcome) for every recorded result in a dotnet test TRX report."""
+    root = ElementTree.parse(path).getroot()
+    definitions = {d.get("id"): d.get("name") for d in root.iter(TRX_NAMESPACE + "UnitTest")}
+    return [(definitions.get(r.get("testId"), ""), r.get("outcome", ""))
+            for r in root.iter(TRX_NAMESPACE + "UnitTestResult")]
+
+
+def trx_failed_tests(path: Path) -> list[str]:
+    return [name for name, outcome in trx_outcomes(path) if outcome != "Passed"]
 
 weapon = Path(__file__).resolve().parents[1]
 repo = weapon.parent
@@ -27,29 +42,29 @@ def sources() -> dict[str, bytes]:
 mutations = [
     ("ignore-ticket-revision", "EquipmentIdentitySession.cs",
      "Check(entry.Revision == ticket.Revision,", "Check(true,",
-     "FAIL: expected rejection equipment.observation-changed"),
+     "transfer_invalidates_old_owner_and_aba"),
     ("allow-retired-life", "EquipmentIdentityIndex.cs",
      "Check(!retiredLives.TryGetValue(value.Entity.Id, out var life) || value.Entity.LifeEpoch > life,",
-     "Check(true,", "FAIL: expected rejection equipment.retired-life"),
+     "Check(true,", "replicator_key_reuse_and_delayed_despawn"),
     ("ignore-owner-probe", "EquipmentIdentitySession.cs",
      "Check(ownerIsCurrent(value.Owner),", "Check(true,",
-     "FAIL: expected rejection equipment.owner-not-current"),
+     "owner_respawn_and_live_owner_probe"),
     ("ignore-world-change", "EquipmentIdentitySession.cs",
      "value.Kind is RuntimeLifecycleKind.Snapshot or RuntimeLifecycleKind.WorldChanged",
-     "value.Kind == RuntimeLifecycleKind.Snapshot", "FAIL: world flush"),
+     "value.Kind == RuntimeLifecycleKind.Snapshot", "world_reuse"),
     ("ignore-native-probe", "EquipmentIdentitySession.cs",
-     "Check(nativeIsCurrent(value),", "Check(true,", "FAIL: stale native rejected"),
+     "Check(nativeIsCurrent(value),", "Check(true,", "native_probe_reread_and_fail_closed"),
     ("ignore-life-equality", "EquipmentIdentityIndex.cs",
      "entry.Value.Entity == reference ? entry : null", "entry.Value.Entity.Id == reference.Id ? entry : null",
-     "FAIL: late despawn cannot remove replacement"),
+     "replicator_key_reuse_and_delayed_despawn"),
 ]
 acceptance_failures = {
-    "ignore-ticket-revision": "ABA-transfer-never-revives-old-ticket",
-    "allow-retired-life": "retired-and-older-lives-cannot-return",
-    "ignore-owner-probe": "owner-disappearance-rejects-captured-use",
-    "ignore-world-change": "world-change-invalidates-old-ticket",
-    "ignore-native-probe": "native-disappearance-rejects-captured-use",
-    "ignore-life-equality": "late-remove-does-not-delete-replacement",
+    "ignore-ticket-revision": "ABA_transfer_never_revives_old_ticket",
+    "allow-retired-life": "retired_and_older_lives_cannot_return",
+    "ignore-owner-probe": "owner_disappearance_rejects_captured_use",
+    "ignore-world-change": "world_change_invalidates_old_ticket",
+    "ignore-native-probe": "native_disappearance_rejects_captured_use",
+    "ignore-life-equality": "late_remove_does_not_delete_replacement",
 }
 original = sources()
 receipt = {"verification": "isolated-managed-mutations", "gameExecuted": False,
@@ -60,10 +75,10 @@ receipt = {"verification": "isolated-managed-mutations", "gameExecuted": False,
 def invoke(name: str, argv: list[str], cwd: Path) -> int:
     with (output / (name + ".log")).open("w", encoding="utf-8") as log:
         return subprocess.run(argv, cwd=cwd, stdout=log, stderr=subprocess.STDOUT,
-                              timeout=180, check=False).returncode
+                              timeout=900, check=False).returncode
 
 try:
-    for name, file, old, new, expected in [("baseline", "", "", "", "RESULT ")] + mutations:
+    for name, file, old, new, expected in [("baseline", "", "", "", "")] + mutations:
         print("RUN", name, flush=True)
         workspace = output / name / "src"
         for relative, data in original.items():
@@ -78,29 +93,24 @@ try:
             target.write_text(text.replace(old, new), encoding="utf-8")
         build = output / name / "build"
         project = workspace / "ForgeWeapon/tests/Identity/Identity.csproj"
-        build_code = invoke(name + "-build", ["dotnet", "build", str(project), "-c", "Release",
-                                             "--artifacts-path", str(build)], workspace)
-        if build_code != 0:
-            raise RuntimeError(name + " failed to compile; not credited as a detected mutation")
-        test_code = invoke(name + "-tests", ["dotnet", str(build / "bin/Identity/release/Identity.dll")], workspace)
-        text = (output / (name + "-tests.log")).read_text(encoding="utf-8")
-        detected = (test_code == 0 if name == "baseline" else test_code != 0) and expected in text
-        receipt["results"].append({"name": name, "buildExit": build_code, "testExit": test_code,
-                                   "expectedEvidence": expected, "passed": detected})
+        results = output / name / "results"
+        test_code = invoke(name + "-tests", ["dotnet", "test", str(project), "-c", "Release",
+                                             "--artifacts-path", str(build), "--results-directory", str(results)], workspace)
+        failed = trx_failed_tests(results / (name + "-tests.trx"))
+        detected = test_code == 0 and not failed if name == "baseline" else test_code != 0 and expected in failed
+        receipt["results"].append({"name": name, "testExit": test_code, "expectedFailedTest": expected,
+                                   "failedTests": failed, "passed": detected})
         if not detected:
             raise RuntimeError("Expected regression evidence missing: " + name)
         independent = workspace / "ForgeWeapon/tests/IdentityAcceptance/IdentityAcceptance.csproj"
-        code = invoke(name + "-acceptance-build", ["dotnet", "build", str(independent), "-c", "Release",
-                       "--artifacts-path", str(build)], workspace)
-        if code != 0:
-            raise RuntimeError(name + " independent consumer did not compile; no mutation credit")
-        report_path = output / (name + "-acceptance.json")
-        code = invoke(name + "-acceptance-tests", ["dotnet", str(build / "bin/IdentityAcceptance/release/IdentityAcceptance.dll"),
-                       "--report", str(report_path)], workspace)
-        report = json.loads(report_path.read_text(encoding="utf-8"))
-        failed = [row["name"] for row in report["tests"] if row["status"] == "failed"]
+        acceptance_results = output / name / "acceptance-results"
+        code = invoke(name + "-acceptance-tests", ["dotnet", "test", str(independent), "-c", "Release",
+                       "--artifacts-path", str(build), "--results-directory", str(acceptance_results)], workspace)
+        acceptance_trx = acceptance_results / (name + "-acceptance-tests.trx")
+        acceptance_outcomes = trx_outcomes(acceptance_trx)
+        failed = [test for test, outcome in acceptance_outcomes if outcome != "Passed"]
         valid = code == 0 and not failed if name == "baseline" else code != 0 and acceptance_failures[name] in failed
-        receipt["results"][-1]["independentAcceptance"] = {"testExit": code, "testCount": len(report["tests"]),
+        receipt["results"][-1]["independentAcceptance"] = {"testExit": code, "testCount": len(acceptance_outcomes),
                                                           "failedTests": failed, "passed": valid}
         if not valid:
             raise RuntimeError("Independent acceptance did not detect required regression: " + name)

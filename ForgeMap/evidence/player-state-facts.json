@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "family": "player-state",
+  "slice": "nl-player",
+  "verification": "metadata-and-interop-signatures-only",
+  "gameVerified": false,
+  "buildId": "20403457",
+  "evidenceSource": "%TEMP%\\covtrigb\\ilspy (Modules-ASM.dll interop, build 20403457) and %TEMP\\nativeinv\\_d-*.txt",
+  "capabilities": [
+    {
+      "id": "forge.trigger.combat.damage_applied",
+      "subject": "gtfo.player",
+      "status": "implemented",
+      "hooks": [
+        "Dam.Dam_PlayerDamageBase.OnIncomingDamage(System.Single damage, System.Single originalDamage, Agents.Agent sourceAgent) : System.Boolean (declared private on this build, exposed as a public wrapper by the interop; CallerCount 27 = the one accept path every receive entry funnels through)",
+        "the receive entries that name their kind, each patched as a prefix/postfix pair around the accept path: ReceiveBulletDamage(pBulletDamageData), ReceiveShooterProjectileDamage(pMediumDamageData), ReceiveMeleeDamage(pFullDamageData), ReceiveExplosionDamage(pExplosionDamageData), ReceiveFallDamage(pMiniDamageData), ReceiveFireDamage(pSmallDamageData), ReceiveStickyDamage(pStickyDamageData), ReceiveParasiteDamage(pMiniDamageData), ReceivePushDamage(pFullDamageData)"
+      ],
+      "publishRule": "The accept path's postfix publishes only when its own answer was true, so an application the receiver refused (IgnoreAllDamage, god mode, an already-dead life) is not an application. `amount` is the value the accept path was handed, which is the number the game applies; `target` is the life read back through the identity from the damage base's own Owner. The damage base is reached from the hook's instance, never from a table.",
+      "ports": {
+        "source": "EntityReference of the attacker when a domain can name it: this package's own identity for a player attacker, the `gtfo.enemy` kind's resolver for an enemy attacker, JSON null when the attacker is unnamed, and absent when no domain answers",
+        "target": "EntityReference of the damaged player life (required)",
+        "amount": "the damage the accept path accepted, in the receiver's own unit (hp)",
+        "damage_kind": "the `damage_kind` member INDEX (an enum port carries the member's index, never its name), absent for a receive entry this half cannot name",
+        "limb": "not carried by this half; a player's receive entries hand no limb index it reads",
+        "friendly_fire": "a DERIVATION, requested as a new optional port: true when the attacker resolves in this package's player identity, false when another domain names it, absent when nobody names it"
+      },
+      "damageKindMapping": {
+        "ReceiveBulletDamage": "direct(0)",
+        "ReceiveShooterProjectileDamage": "direct(0)",
+        "ReceiveMeleeDamage": "melee(1)",
+        "ReceiveExplosionDamage": "explosion(2)",
+        "ReceiveFireDamage": "dot(3)",
+        "ReceiveStickyDamage": "dot(3)",
+        "ReceiveParasiteDamage": "dot(3)",
+        "ReceivePushDamage": "collision(5)",
+        "ReceiveFallDamage": "fall(6)",
+        "notNamed": [
+          "ReceiveTentacleAttackDamage(pMediumDamageData)",
+          "ReceiveTentacleTrapGrabDamage(pStaticEnemyDamageData)",
+          "ReceiveParasiteTrapDamage(pStaticEnemyDamageData)",
+          "ReceiveTentacleTankGrabDamage(pSmallDamageData)",
+          "ReceiveTentacleGrabStop(pMiniDamageData)",
+          "ReceiveNoAirDamage(pMiniDamageData)"
+        ],
+        "notNamedReason": "The declared set has no member that honestly describes a tentacle attack, a grab, a trap or suffocation. A kind outside the set is not published; the entry sets no token, so the fact carries the port absent instead of a guess."
+      },
+      "preCommitRewrite": {
+        "question": "Can a native pre-commit stage rewrite the damage (shield / damage_redirect / hit_cancel / life_steal)?",
+        "answer": "No. OnIncomingDamage takes `damage` and `originalDamage` BY VALUE and returns only System.Boolean, so the one thing a hook can change is accept/reject; the amount that reaches the health field is the value the body already holds. The receive entries take their own data structs (pBulletDamageData and siblings) by value as well. There is no entry that takes the amount by reference, and no damage-pipeline stage is exposed for a rewrite.",
+        "consequence": "The shield template must use the authored order the node list already settles on — react to this fact and heal the difference back (post-heal) — and a pre-commit rewrite would need a native entry this build does not have. This half implements no rewrite and hooks no original-damage path.",
+        "whatIsPossible": "A prefix may return false to cancel the application entirely (the accept path's own refusal), and the postfix observes the accepted amount. Neither is a rewrite and neither is implemented here."
+      }
+    },
+    {
+      "id": "forge.trigger.player.low_health",
+      "status": "implemented",
+      "hooks": [
+        "GameEvent.GameEventManager.PostEvent(GameEvent.eGameEvent e, Player.PlayerAgent player, System.Single floatVal, System.String stringVal, Il2CppSystem.Collections.Generic.Dictionary<System.String,System.String> customAnalyticsPayload) (public static, prefix; the 5-argument overload is the one that carries the player)"
+      ],
+      "publishRule": "The game posts `eGameEvent.player_low_health` with the player it is about; the fact is published from that call and carries nothing the game did not name. The event's own floatVal is not published: this build's metadata does not say what it holds, and a threshold the game owns is not re-derived here.",
+      "ports": { "player": "EntityReference of the player the game named (required)" },
+      "hostClientVisibility": "The posting code runs where the player's own state is evaluated; the host is the only publisher, so a client's copy is dropped and reported once per reason."
+    },
+    {
+      "id": "forge.trigger.player.infection_changed",
+      "status": "implemented",
+      "hooks": [
+        "Dam.Dam_PlayerDamageBase.ModifyInfection(pInfection data, System.Boolean sync, System.Boolean updatePageMap) (public virtual; patched as prefix+postfix pair)",
+        "Dam.Dam_PlayerDamageBase.Infection (System.Single, property; read by both halves of the pair)",
+        "Dam.Dam_PlayerDamageBase.ReceiveModifyInfection(pInfection) (private receive half behind m_receiveModifyInfectionPacket; not patched — the write entry is the one callers reach and the one that runs on the writing machine)"
+      ],
+      "publishRule": "The prefix reads the value the receiver holds, the postfix publishes the value it holds after, and `delta` is the difference the write really made. A write that changed nothing publishes nothing. Both the value and the delta are in the receiver's own unit; the game publishes no unit for infection and this row claims none.",
+      "ports": {
+        "player": "EntityReference of the life whose receiver was written (required)",
+        "value": "the receiver's infection after the write",
+        "delta": "value minus the value the prefix read"
+      },
+      "hostClientVisibility": "The action layer submits through this same entry with `sync` set, so the writing machine is the host; a client's receive half does not publish."
+    }
+  ],
+  "sharedRules": [
+    "Only the host publishes: runtime ready, registration live, this peer authoritative. A refusal is recorded once per reason in the journal and reported to the package log.",
+    "One native transition is one event id: fact, world epoch, life and a per-life transition number claimed before the publish. The kernel's own ledger answers a repeated id with `duplicate`.",
+    "A required port that cannot be read publishes nothing; a nullable port the native side answered with nobody is JSON null; a port this half cannot observe is left out of the payload, which is why `damage_kind`, `limb` and `friendly_fire` are declared optional in the row this slice publishes."
+  ],
+  "limits": [
+    "No game run: every conclusion is from interop metadata and signatures. The two in-game checks this family carries: (1) that a client-taken hit reaches the host's accept path so the host publishes it, (2) that the transition number restarts per world epoch after a checkpoint reload."
+  ]
+}

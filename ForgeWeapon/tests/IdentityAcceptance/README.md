@@ -11,15 +11,18 @@ python ForgeWeapon/tools/verify-identity-acceptance.py
 python ForgeWeapon/tools/test-identity-mutations.py
 ```
 
-The first command builds the actual module and executes the independent consumer.
+The first command builds the actual module and runs the suite through `dotnet test`.
 The second builds an unmodified isolated copy first, then intentionally breaks six
 identity checks in separate `.artifacts` copies. A compilation error is not counted
-as successful mutation detection. Each mutant must fail its named regression test.
-Neither command changes production C#, user game files, profile settings or Git state.
+as successful mutation detection. Each mutant must fail its named test in the TRX
+report. Neither command changes production C#, user game files, profile settings or
+Git state.
 
 Every run uses a new output directory. `receipt.json` retains source hashes and
-command exit codes; `tests.json` contains individual results. Input changes during
-a run invalidate its stable acceptance claim. Existing evidence is not overwritten.
+command exit codes; the retained `dotnet test` log and `results/*.trx` hold the
+individual test outcomes (`--report` and `tests.json` no longer exist). Input changes
+during a run invalidate its stable acceptance claim. Existing evidence is not
+overwritten.
 
 ## Coverage and limits
 

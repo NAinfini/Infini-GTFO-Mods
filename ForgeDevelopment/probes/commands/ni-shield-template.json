@@ -1,0 +1,55 @@
+[
+  {
+    "id": "damage-rewrite-arm-50",
+    "title": "伤害生效前改写：把本机玩家受到的伤害乘 0.5，等下一次受伤后读回血量",
+    "points": ["player.health-pool-client-view"],
+    "host": "any",
+    "target": "localPlayer",
+    "before": {
+      "snapshot": ["Damage.Health", "Damage.HealthMax", "Damage.GetHealthRel", "Damage.Infection"],
+      "screenshot": true
+    },
+    "steps": [
+      { "call": "ArmDamage", "args": [0.5], "target": "static:ForgeDevelopment.Native.ExperimentHelper" },
+      { "read": ["Damage.Health", "Damage.HealthMax"], "target": "localPlayer" },
+      { "wait": { "path": "Damage.Health", "changed": true, "timeoutFrames": 3600 } },
+      { "read": ["Damage.Health", "Damage.HealthMax", "Damage.GetHealthRel"], "target": "localPlayer", "screenshot": true }
+    ],
+    "cleanup": [
+      { "call": "DisarmDamage", "target": "static:ForgeDevelopment.Native.ExperimentHelper" },
+      { "read": ["Damage.Health"], "target": "localPlayer", "screenshot": true }
+    ]
+  },
+  {
+    "id": "damage-rewrite-arm-zero",
+    "title": "伤害生效前改写：把本机玩家受到的伤害乘 0，验证这一次伤害完全不生效",
+    "points": ["player.health-pool-client-view"],
+    "host": "any",
+    "target": "localPlayer",
+    "before": {
+      "snapshot": ["Damage.Health", "Damage.HealthMax"],
+      "screenshot": true
+    },
+    "steps": [
+      { "call": "ArmDamage", "args": [0.0], "target": "static:ForgeDevelopment.Native.ExperimentHelper" },
+      { "wait": { "seconds": 20.0 } },
+      { "read": ["Damage.Health", "Damage.HealthMax", "Damage.Infection"], "target": "localPlayer", "screenshot": true }
+    ],
+    "cleanup": [
+      { "call": "DisarmDamage", "target": "static:ForgeDevelopment.Native.ExperimentHelper" },
+      { "read": ["Damage.Health"], "target": "localPlayer" }
+    ]
+  },
+  {
+    "id": "damage-rewrite-disarm",
+    "title": "确认伤害改写已经卸载（不应再有任何补丁生效）",
+    "points": ["player.health-pool-client-view"],
+    "host": "any",
+    "target": "localPlayer",
+    "steps": [
+      { "call": "DisarmDamage", "target": "static:ForgeDevelopment.Native.ExperimentHelper" },
+      { "read": ["Damage.Health", "Damage.HealthMax"], "target": "localPlayer" },
+      { "screenshot": "after-disarm" }
+    ]
+  }
+]

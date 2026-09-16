@@ -89,7 +89,7 @@ check(ids.length===8, 'eight existing collection primitives');
 const versions = {};
 for(const id of ids) {
     const definition=logicPrimitiveDefinitions.find(row=>row.id===id);
-    check(definition?.graph.execution==='pure', 'website pure collection contract '+id+'@'+definition?.version);
+    check(definition?.graph.execution==='query', 'website query collection contract '+id+'@'+definition?.version);
     versions[id] = definition.version;
 }
 // The website does not preserve an identical endpoint; the C# helpers do. Recorded, not hidden.

@@ -1,8 +1,121 @@
 # ForgeTrigger 验证记录
 
-**上次更新：2026-09-14**（由原 `VALIDATION.md` 与 `VALIDATION-CURRENT.md` 合并而成，另并入 T1-CONTRACT-MAP、T1-T7-STATUS 与四份 T2 交接记录的实际结果）。
+**上次更新：2026-09-15**（由原 `VALIDATION.md` 与 `VALIDATION-CURRENT.md` 合并而成，另并入 T1-CONTRACT-MAP、T1-T7-STATUS 与四份 T2 交接记录的实际结果）。
 
 计划与状态见两仓统一框架第 6 节 U-TRIGGER（链接见[仓库 README](../README.md)）；本文只记带日期的运行记录。
+
+## 观察条件、集合选择器与事件角色选择器注册 16 行；exists 三态读取（2026-09-15）
+
+`Targeting/ObservedQueryModule.cs` 成为第二张声明表：16 行 `execution: query` 的能力，每行给出目录形状、`observe` binding 与 handler，`ModuleDefinition.Create()` 组合 `PureModule` 与它；纯计算 23 行未改。框架侧在 `Contracts.cs` 的 `RuntimeQuerySession` 段新增 `EntityPresence` 与 `TryPresence`：活着的引用 `Current`、kernel 已证明失效或缺失（`stale-world`/`stale-entity`）`Absent` 且**不记 refusal**、观察无法完成 `Unknown` 且照常记 refusal；该读取与 `TrySnapshot` 共用同一每 tick 查询预算，只有 `forge.condition.predicate.exists` 的 handler 使用它，没有放宽其它语义。
+
+角色选择器（`self`/`owner`/`source`/`instigator`/`event_target`）只从求值上下文 `EvaluationContext.Actors` 读角色，本包不重建角色→端口映射。缺席语义按网站断言：`owner`/`source`/`instigator`/`event_target` 输出 null，`self` 由 handler 以 `actor-missing` 拒绝该步。
+
+实际运行的命令与结果：
+
+| 命令 | 结果 |
+| --- | --- |
+| `dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $env:TEMP\trigobs\build` | 成功，0 警告 0 错误，exit 0 |
+| `dotnet build ForgeTrigger/ForgeTrigger.csproj -c Release …` | 成功，0 警告 0 错误，exit 0 |
+| `dotnet build ForgeTrigger/Native/ForgeTrigger.Native.csproj -c Release … -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -p:ForgeRuntimeAssembly=$env:TEMP\trigobs\build\bin\ForgeRuntime\release\ForgeRuntime.dll` | 成功，0 警告 0 错误，exit 0 |
+| `dotnet build Release/export-runtime-manifest -c Release …` | 成功，exit 0（上一轮记录的 `EnemyModule*.cs` 与 Unity 引用冲突本轮不再出现） |
+| `dotnet run --project ForgeRuntime/tests/Framework -c Release` | `Framework checks: 532 passed`，exit 0；其中 5 条是注册的 `forge.condition.predicate.exists` 行经 kernel 派发的端到端用例（Current 为 true、Absent 为 false 且步骤不拒绝、Unknown 以原错误码拒绝、每 tick 预算 64 次读取后第 65 次 `query-budget`），另 45 条是同一张声明表其余 15 行的 handler 用例（`count` 的六个比较成员与候选预算边界、七个集合选择器的有序/去重/种子/`empty` 策略、`entity_type` 与 `has_tag` 的观察读取、五个角色各有与缺席） |
+| `dotnet run --project ForgeRuntime/tests/Architecture -c Release` | 无输出（全绿），exit 0 |
+| `dotnet run --project ForgeRuntime/tests/RuntimeLog -c Release -- --root $env:TEMP\trigobs\runlog` | `Runtime log: 239 assertions passed; 0 scenarios failed`，exit 0 |
+| `dotnet run --project ForgeRuntime/tests/Network -c Release` | `network suite: 393 passed, 0 failed`，exit 0 |
+| `dotnet run --project ForgeRuntime/tests/GameBindings -c Release`（无参） | `37 native-module boundary assertions; BLOCKED 2`（宿主拒绝子进程创建 NTFS junction），exit 0 |
+| `python ForgeTrigger/tools/validate-pure.py --site <网站仓> --out $env:TEMP\trigobs\pure3` | exit 0：`pure-vectors` 1355 断言 / 293 组、`collection-vectors` 814 断言 / 272 组、`PureTests` **1697 断言 0 失败** |
+| `node ForgeTrigger/tools/spatial-vectors.mjs` / `recipient-filter-vectors.mjs` | exit 0：360 断言 / 117 组、628 断言 / 164 组 |
+| `dotnet … ForgeTrigger.ContractTests.dll export <ForgeTrigger> <输出> <网站仓>` | exit 0，**124 断言全部 PASS**：39 行逐行有 capability/binding/evaluator/shape/support，且 kind、label、description、graph 与网站目录逐字段一致（`collection-vectors.mjs` 的档位断言与既有向量期望未改） |
+| `dotnet … ForgeTrigger.R3ConsumerTests.dll <结果> <spatial-reference> <recipient-filter-reference>` | exit 0，**1992 断言 0 失败**（含 exists 三态、count 边界、集合有序/去重、random/shuffle 种子确定性、五个角色各有与缺席） |
+| `dotnet … export-runtime-manifest.dll --release Release/release.json --output $env:TEMP\trigobs\runtime-manifest.json` | exit 0：`5 player packages, runtime 1.2.0 on game build 20403457` |
+| `node --import ./Tools/register-typescript.ts %TEMP%\trigobs\compare-catalog.mjs <网站仓> $env:TEMP\trigobs\runtime-manifest.json` | exit 0，`status passed`：可授权行（按 id）33 → 73，可运行行（按目录档位对应的 binding role）2 → 40，形状不符 0 处 |
+| `python ForgeTrigger/tools/validate-t1.py --site <网站仓> --out $env:TEMP\trigobs\t1` | **exit 1**：C# `export` 段通过；TypeScript 段仍在 `SDK canonical must equal the locked website definition: forge.action.combat.damage` 失败（C# `1.0.0` / 网站 `2.0.0`，该契约在 `ForgeRuntime/Framework/CombatContracts.cs`，属伤害任务，本批未改），因此 `check` 段与 29 条 wire 断言本轮仍未执行 |
+
+覆盖对比的余量：网站目录本轮已扩到 577 行（上一任务记录时是 62 行），可运行 40 行；仍缺 537 行，按档位是 host 426、presentation 7、pure 27、query 77，按类别是 trigger 192、action 178、condition 53、control 45、selector 30、modifier 20、event 7、state 5、variable 7。除本表注册的 16 行外，selector/condition 的余量属空间、筛选、控制等其它任务的行。
+
+## 验证入口修复：目录档位、t1 结果行与挂载目标、证据目录（2026-09-15）
+
+三处入口与网站当前合同不一致，逐个对齐后重跑；产物全部写在 `%TEMP%\trigfix`（本任务禁写 `ForgeTrigger/artifacts/**`）。
+
+| 命令 | 结果 |
+| --- | --- |
+| `dotnet build ForgeTrigger/ForgeTrigger.csproj -c Release --artifacts-path $env:TEMP\trigfix\build` | 成功，0 警告 0 错误 |
+| `node ForgeTrigger/tools/collection-vectors.mjs <网站仓> <输出目录>` | 修复前 exit 1（断言目录行 `execution === 'pure'`，`forge.condition.predicate.count` 已是 `query`）；改断言后 `{"status":"passed","assertions":814,"cases":272,"primitiveCount":8}`，exit 0，写出 `collections-reference.json` 与 `website-numeric-boundary.json` |
+| `python ForgeTrigger/tools/validate-pure.py --out $env:TEMP\trigfix\pure` | exit 0：`pure-vectors` 1355 断言 / 293 组、`collection-vectors` 814 断言 / 272 组、`PureTests` 1697 断言 0 失败 |
+| `dotnet … ForgeTrigger.ContractTests.dll export <ForgeTrigger> <输出> <网站仓>` | exit 0，76 断言全部 PASS；`test.trigger.record` 的结果端口补齐 `fields` 后 t1 seed 能注册，导出不再被 `ValidateResultFields` 拒绝 |
+| `node ForgeTrigger/tools/spatial-vectors.mjs` / `recipient-filter-vectors.mjs` / `collection-vectors.mjs` | exit 0：360 断言 / 117 组（2 组 recorded 形状）、628 断言 / 164 组、814 断言 / 272 组 |
+| `dotnet … ForgeTrigger.R3ConsumerTests.dll …` | exit 0：1858 断言 0 失败 |
+| `python ForgeTrigger/tools/validate-t1.py --site <网站仓> --out $env:TEMP\trigfix\t1` | exit 1：C# `export` 段 76 断言通过；TypeScript 段在“SDK canonical must equal the locked website definition: forge.action.combat.damage”失败（见下） |
+
+本批改动与原因：
+
+- `collection-vectors.mjs`：八行集合定义的档位断言由 `pure` 改为 `query`，与网站目录一致。
+- `tests/fixtures/t1/seed.json`：`test.trigger.record` 的结果端口按结果行规则补 `fields`——前四列固定为 `target`/`status`/`committed`/`code`，其后是该动作自己写出的领域列 `value`（number，与它同名输出端口一致）。没有放宽校验。
+- `tools/validate-t1.py`：`Contracts` 的 `export`/`check` 调用改为 4 个参数，第 4 个是网站仓目录（命令行 `--site` 传入，默认与其余入口相同）；缺目录时 `tests/Contracts` 以 `FileNotFoundException` 直接失败，不跳过。
+- `tools/validate-pure.py`、`tools/validate-t1.py`、`tools/validate-independent.py`：证据目录可以是 `ForgeTrigger/artifacts` 内的新目录或系统临时目录下的新目录，其他位置（可能覆盖仓库跟踪文件）与已存在的目录一律拒绝；默认仍是各自的时间戳目录。
+- `tools/t1-contracts.mjs`：编译选项补必填的挂载目标 `attachments: [{kind:'level', reference:'test.resource'}]`（计划 ABI 要求 `attachments[]` 必填非空）；`invalidGraphs` 的 compile 段支持 `errorKind: "prose"`，用于消息不带码段的拒绝。
+- `tests/fixtures/t1/cases.json`：按当前编译器实际行为更新失效期望——`execution-fanout` 与 `optional-required-recipient` 改为 prose 断言，`dynamic-node-output` 与 `empty-entrypoint` 改用实现真正抛出的码/文本，`pure-evaluator-needs-r4` 改名 `pure-evaluator` 并移入 `validGraphs`（纯计算步骤现在由数据边可达即可进入计划，不再被 `pure-shape` 拒绝）。
+
+`validate-t1.py` 仍未通过，原因在本包之外：`auditAuthoringContracts` 要求 C# canonical 清单与网站 `logic-primitives.ts` 的定义逐字段相等，而 `forge.action.combat.damage` 在 C# 仍是 `1.0.0`、网站已是 `2.0.0`（两者除版本号外逐字段相同，已用一次离线比较确认）。该契约在 `ForgeRuntime/Framework/CombatContracts.cs`，由伤害任务负责，本批未改。因此 `validate-t1.py` 的 TypeScript 段无法完成，C# `check` 段与 `wire-cases.json` 的 29 条计划断言本次没有执行。
+
+## 声明表注册 23 行纯节点，能力/端口逐字段取自网站目录（2026-09-15）
+
+`Pure/PureModule.cs` 成为唯一声明表：一行同时给出 catalog 能力 id、kind、label、description、graph、evaluate binding、handler 与 `HandlerShape`，`ModuleDefinition.Create()` 由这张表生成 providers/capabilities/bindings/Evaluators/Shapes/BindingSupport，不再手写单个 compare 行（`BindingId` 仍是 `forge.module.trigger.binding.<名字>`，handler 仍是 `trigger.<kind>.<名字>`，compare 的两个 id 与旧注册逐字相同）。23 行全部 `execution: pure`，graph 的 domains、inputs、outputs、parameters（含 `set`/`values`/`minimum`/`maximum`）与 `variadic` 全部按目录行书写，没有任何一行自行发明端口。`add`、`multiply`、`minimum`、`maximum`、`all`、`any` 是目录声明的可变端口行：端口按 `input_count`（2…32）在计划里展开，注册时没有固定布局，所以它们的 shape 为空、由框架按计划解析。
+
+求值器只调用既有 `Pure/*` 助手，算法一行未改：`constant`→`ScalarNodes.Constant`，`add`/`multiply`/`minimum`/`maximum`→`VariadicNodes.Reduce`，`subtract`/`power`→`ScalarNodes.Binary`，`clamp`/`absolute`/`round`/`lerp`/`select_value`→`ScalarNodes.Clamp`/`Absolute`/`Round`/`Lerp`/`SelectValue`，`divide`→`ScalarNodes.Divide`，`vector_compose`/`vector_add`/`vector_scale`→`VectorNodes.ComposeMetres`/`AddMetres`/`ScaleMetres`，`random_range`→`SeededNodes.Uniform`，`chance`→`SeededNodes.Chance`，`compare`/`range`/`not`→`PureConditions.Compare`/`InRange`/`Not`，`all`/`any`→`VariadicNodes.All`/`Any`。枚举入参与枚举参数按 Q3 边界以成员名到达 handler，再由声明表里的成员顺序映射回枚举值。
+
+`forge.condition.predicate.exists` **没有注册**。它要求「已证明失效的世界/生命返回 false、观察未知则报错」，而 `query` 步骤拿到的 `RuntimeQuerySession` 会把失败的读取记为 refusal，步骤随后以该错误码拒绝：求值器边界内没有一条路径能读到「已证明失效」而不被拒绝。`Targeting/ObservedEntityNodes.Exists` 的语义正确，但它需要 kernel，不在求值器边界内。伪造一个 binding 会谎称该行可用，因此本表不含该行。
+
+实际运行的命令与结果：
+
+| 命令 | 结果 |
+| --- | --- |
+| `dotnet build ForgeTrigger/ForgeTrigger.csproj -c Release --artifacts-path $env:TEMP\trigpure\build` | 成功，0 警告 0 错误 |
+| `dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release --artifacts-path $env:TEMP\trigpure\build`（原生工程需要宿主程序集） | 成功，0 警告 0 错误 |
+| `dotnet build ForgeTrigger/Native/ForgeTrigger.Native.csproj -c Release --artifacts-path $env:TEMP\trigpure\build -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -p:ForgeRuntimeAssembly=$env:TEMP\trigpure\build\bin\ForgeRuntime\release\ForgeRuntime.dll` | 成功，0 警告 0 错误 |
+| `dotnet build ForgeTrigger/tests/Contracts/Contracts.csproj -c Release …` / `…/tests/Pure/Pure.csproj` / `…/tests/R3Consumers/R3Consumers.csproj` | 三次都 0 错误 |
+| `node ForgeTrigger/tools/pure-vectors.mjs <ForgeTrigger> <网站仓> $env:TEMP\trigpure\pure` | `{"status":"passed","assertions":1355,"vectorCases":293,"canonicalIds":23}`，exit 0 |
+| `dotnet $env:TEMP\trigpure\build\bin\Pure\release\ForgeTrigger.PureTests.dll <pure-reference.json> <result.json>` | `{"status":"passed","primitiveCount":23,"vectorCases":293,"assertions":1697,"failureCount":0}`，exit 0 |
+| `node ForgeTrigger/tools/collection-vectors.mjs <网站仓> $env:TEMP\trigpure\pure` | exit 1：`collection-vectors.mjs:92` 仍断言目录行 `execution === 'pure'`，而 `forge.condition.predicate.count` 已是 `query`。该断言与 `tools/validate-t1.py` 的参数、t1 seed 的结果行字段已在下一节修好，本条只作当时的记录 |
+| `dotnet $env:TEMP\trigpure\build\bin\Contracts\release\ForgeTrigger.ContractTests.dll export <ForgeTrigger> $env:TEMP\trigpure\contracts <网站仓>` | 23 行逐行 `PASS`：能力+绑定+evaluator+shape+support 齐备、kind/label/description 与目录行相等、graph 逐字段相等（domains 按集合比较）；`production Trigger advertises exactly its declaration table`、`the registered manifest carries exactly the declared rows`、`duplicate provider rejected [provider-conflict]` 全部通过。之后在 `Harness` 注册 t1 seed 时被 SDK 以 `ValidateResultFields`（`test.trigger.record`）拒绝——既有夹具问题，见下 |
+| `node ForgeTrigger/tools/spatial-vectors.mjs <网站仓> $env:TEMP\trigpure\probe` | `{"status":"passed","assertions":360,"cases":117,"unimplemented":2}`，exit 0 |
+| `node ForgeTrigger/tools/recipient-filter-vectors.mjs <网站仓> $env:TEMP\trigpure\probe` | `{"status":"passed","assertions":628,"cases":164}`，exit 0 |
+| `dotnet $env:TEMP\trigpure\build\bin\R3Consumers\release\ForgeTrigger.R3ConsumerTests.dll …` | `{"status":"passed","assertions":1858,"failures":[]}`，exit 0 |
+| `node --import ./Tools/register-typescript.ts %TEMP%\trigpure\compare-catalog.mjs <网站仓> %TEMP%\trigpure\trigger-registry.json`（在网站仓 cwd） | 授权行 62，可授权行 **10 → 32**（按 evaluate 绑定计 1 → 23），形状不符 0 处；仍缺 39 行 |
+| `python ForgeTrigger/tools/validate-pure.py` | 未运行：脚本守卫要求输出位于 `ForgeTrigger/artifacts`（本任务禁写 `artifacts/**`）。按其步骤手工执行了向量生成与 `PureTests`，结果同上 |
+
+本轮跑到但**没能跑完**的入口，原因都在本包之外（这三条已在下一节处理，保留作当时的失败记录）：
+
+- `Release/export-runtime-manifest` 编译失败：`ForgeEnemy/Native/EnemyModule.Damage.cs`（并发任务 13:59 新建的未跟踪文件）使用 `UnityEngine.Vector3` 与 `Dam_EnemyDamageBase.BulletDamage`，而该工具以 `EnemyModule*.cs` glob 编译这个文件且不引用 Unity/interop 程序集，4 个错误、0 警告。`Release/**` 与 `ForgeEnemy/**` 都不在本任务范围，未改。因此本轮的清单证据是 `ModuleDefinition.Create()` 的 registry JSON（`%TEMP%\trigpure\trigger-registry.json`，23 能力 23 绑定），与导出工具注册的是同一个模块。
+- t1 seed 的 `test.trigger.record` 结果端口仍被 `ValidateResultFields` 拒绝，`tests/fixtures/t1/seed.json` 属结果行字段形状（rtabi 合同）的同步工作。
+- `collection-vectors.mjs:92` 的 `execution === 'pure'` 期望需要与本次 `spatial-vectors.mjs`/`recipient-filter-vectors.mjs` 同样的 one-line 修改；`tools/validate-t1.py` 调用 `Contracts` 可执行文件时仍是 3 个参数，而契约测试现在要求第 4 个参数（网站目录），否则以用法错误退出。
+
+覆盖对比的剩余缺口（39 行，按 kind）：selector 20、control 10、condition 4（`count`、`entity_type`、`exists`、`has_tag`）、action 2、trigger 2、modifier 1（`transform_point`）。
+
+
+## 独立成包：插件入口与宿主摘除（2026-09-15）
+
+本包不再被宿主链接编译，改由自己的 BepInEx 插件注册，与 ForgeMap/ForgeWeapon/ForgeEnemy 同构。
+
+- 新增 `Native/ForgeTrigger.Native.csproj`（`net6.0`、`EnableDefaultCompileItems=false`、`RequireHostInputs` 校验 `ForgeRuntimeAssembly` 与 `GTFOBepInExPath`）与 `Native/Plugin.cs`：`BepInPlugin("NAinfini.ForgeTrigger")`、`[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]`，Load 依次处理 `Runtime.Mode == Off`、`Plugin.IsSuspended`、`Plugin.Runtime == null`，然后 `RegisterModule(ModuleDefinition.Create(), cfg 的 Logging.Level)`；单次 Load 闩锁，注册失败清空句柄并重抛；`Unload()` 返回 false。注册走公开入口，同 provider 的第二次注册由内核以 `provider-conflict` 拒绝（`RuntimeRegistry.WithModule`），插件不另写预检。
+- `ForgeTrigger/ForgeTrigger.csproj` 的 `Compile Remove` 增加 `Native/**/*.cs`：默认 glob 会把插件入口编进托管包，产生第二份 `Plugin` 类型。
+- 宿主摘除：`ForgeRuntime/ForgeRuntime.csproj` 删掉 `Compile Include="..\ForgeTrigger\**\*.cs"`；`GameRuntimeBridge.Initialize` 删掉 `RegisterBuiltinModule(ForgeTrigger.ModuleDefinition.Create())`，只留 CombatContracts 与 ControlContracts 两个内置 provider（`RegisterBuiltinModule` 因此仍有调用者）。`RuntimeKernel`/`Framework` 一行未改（属 rtabi）。
+- `Release/release.json` 在本批之前就已把本包登记为独立包；`pwsh Release/check-identity.ps1` 中本包 10 项全部通过（providerId、模块 Version、两个 csproj 的 `<Version>`、插件 GUID/版本、manifest 名称/版本/依赖串）。
+
+实际运行的命令与结果：
+
+| 命令 | 结果 |
+| --- | --- |
+| `dotnet build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj -c Release -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH --artifacts-path $env:TEMP\trigpkg` | 成功，0 警告 0 错误 |
+| `dotnet build ForgeRuntime/ForgeRuntime.csproj -c Release …` | 成功，1 警告（`Logging/RuntimeLogWriter.cs:183` CS8602，他人文件） |
+| `dotnet build ForgeTrigger/Native/ForgeTrigger.Native.csproj -c Release -p:ForgeFrameworkAssembly=… -p:ForgeRuntimeAssembly=…` | 成功，0 警告 0 错误 |
+| `dotnet run --project ForgeRuntime/tests/PluginStartup … --no-build` | 46 断言通过，0 场景失败，exit 0 |
+| `dotnet run --project ForgeRuntime/tests/HostIntegration … -- --host <trigpkg 编译的 ForgeRuntime.dll>` | 66 断言通过，0 组失败，exit 0（新增 2 条：宿主程序集不含 `ForgeTrigger*` 类型、也不含指向该命名空间的成员调用） |
+| `dotnet run --project ForgeRuntime/tests/HostConfiguration …` | 68 断言通过，0 场景失败，exit 0 |
+| `pwsh Release/check-identity.ps1` | 51 项：50 通过、1 失败；唯一失败是他人文件 `ForgeWeapon/ModuleDefinition.cs:12` 的 `Version` 为 `0.2.0`（release.json 为 `0.1.0`），与本包无关 |
+| `python ForgeTrigger/tools/validate-trigger.py`（无 `--mutations`，产物 `artifacts/trigger-20260915-103646`） | exit 1：`pure` 阶段 TS 向量生成通过、`collection-authoring-fixtures` 失败；`t1` 阶段 build 成功（exit 0）、export 失败；`spatial-fixtures` 失败。三处都不是本包改动：①`collection-vectors.mjs`/`spatial-vectors.mjs` 断言目录行 `execution === 'pure'`，网站目录该行已改为 `query`；②`t1` 的 export 在测试 seed 的 `test.trigger.record` 结果端口上被 SDK 以 `ValidateResultFields` 拒绝（结果行字段形状属 rtabi 的合同变更，`tests/fixtures/t1/seed.json` 未同步）。export 之前 7 条生产断言全部通过，包含 `duplicate provider rejected [provider-conflict]` |
+
+未运行：`ForgeTrigger/tests/Pure`、`R3Consumers`、`Acceptance`（它们需要网站侧生成的向量文件，本轮生成步骤已在上面失败）；`GameBindings --fixtures` 与 `--bridge`（前者被网站夹具的 `schemaVersion: 3` 与 rtabi 的 `attachments` 要求拦住，后者被测试替身 `test.bridge.action.record` 的结果行形状拦住——两处都在夹具/测试替身侧，不是本包改动）；`GameBindings --native`；任何原生/游戏/多人/安装/发布检查。
 
 ## t1 的 TypeScript 段跟上网站编译器 v3 拒绝码（2026-09-14）
 
@@ -126,6 +239,18 @@ python ForgeTrigger/tools/validate-trigger.py --mutations
 ```powershell
 python ForgeTrigger/tools/validate-trigger.py --mutations
 ```
+
+单项入口（`<输出目录>` 用 `ForgeTrigger/artifacts/<本次名称>` 或系统临时目录下的新目录，不需要预先存在；`validate-t1.py` 与 `tests/Contracts` 都必须得到网站仓目录）：
+
+```powershell
+python ForgeTrigger/tools/validate-pure.py --out <输出目录>
+python ForgeTrigger/tools/validate-t1.py --site <网站仓> --out <输出目录>
+node ForgeTrigger/tools/spatial-vectors.mjs <网站仓> <输出目录>
+node ForgeTrigger/tools/recipient-filter-vectors.mjs <网站仓> <输出目录>
+node ForgeTrigger/tools/collection-vectors.mjs <网站仓> <输出目录>
+```
+
+`validate-pure.py`、`validate-t1.py` 与 `validate-independent.py` 只接受 `ForgeTrigger/artifacts` 内或系统临时目录下的新目录，默认仍是各自的时间戳目录；向量脚本把 `collections-reference.json` 之类的结果写在传入的输出目录里，不要指向仓库内已有文件的目录。
 
 R3 专项：
 

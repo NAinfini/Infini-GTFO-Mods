@@ -14,7 +14,7 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;MapPluginSession.cs;MapNativeHooks.cs;PlayerIdentityModule.cs" />
+    <Compile Include="Plugin.cs;MapPluginSession.cs;MapNativeHooks.cs;PlayerIdentityModule.cs;PlayerLifeFacts.cs;PlayerObservation.cs;PlayerSelector.cs;PlayerHealthReceiver.cs;PlayerHealthAction.cs;MapObjectHooks.cs;MapObjectSources.cs;GeneratorSource.cs;MapObjectHit.cs;DoorObservation.cs;TerminalObservation.cs;ZoneIndex.cs;LevelIdentity.cs;ExpeditionHooks.cs;MapActionOutcome.cs;DoorActions.cs;DoorActionCommands.cs;TerminalActions.cs;TerminalObjectActions.cs;ObjectiveActions.cs;ObjectiveActionHandler.cs;AlarmWaveActions.cs;PlayerActions.cs;AgentModifierAdapter.cs;AgentModifierValues.cs;PlayerStateFacts.cs;PlayerEventFacts.cs;PlayerStateHooks.cs;PlayerEventHooks.cs;PlayerValueReads.cs;PlayerNativeSources.cs;PlayerCommandActions.cs;PlayerSessions.cs;EnvironmentActions.cs;EnvironmentQuery.cs;HudActions.cs;TeammateOverhead.cs;TeammateOverheadHooks.cs;DoorTerminalDerivations.cs;DoorTerminalPublisher.cs;DoorTerminalFacts.cs;DoorTerminalActions.cs;DoorTerminalHooks.cs;LevelObjectHooks.cs;LevelObjectObservation.cs;LevelEventHooks.cs;LevelEventObservation.cs;LevelEventActions.cs;LevelObjectiveValueReader.cs;TriggerZoneData.cs;TriggerZoneCollision.cs;TriggerZoneHooks.cs;TriggerZoneRoomResolver.cs" />
     <!-- The Map provider definition comes from the game-independent ForgeMap assembly; no second provider. -->
     <ProjectReference Include="../ForgeMap.csproj" Private="false" />
     <Reference Include="ForgeRuntime" HintPath="$(ForgeRuntimeAssembly)" Private="false" />
@@ -22,12 +22,21 @@
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" Private="false" />
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />
+    <!-- The interop assemblies' own BCL: an interop signature that exposes a framework collection (an
+         `Il2CppSystem` list or set) needs these two to resolve the type it names. -->
+    <Reference Include="Il2CppSystem" HintPath="$(GTFOBepInExPath)/interop/Il2CppSystem.dll" Private="false" />
+    <Reference Include="Il2CppSystem.Core" HintPath="$(GTFOBepInExPath)/interop/Il2CppSystem.Core.dll" Private="false" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" Private="false" />
     <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
+    <!-- The trigger-zone blocking half builds a BoxCollider per zone, which is the physics module's type. -->
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.UI" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.UI.dll" Private="false" />
+    <Reference Include="Unity.TextMeshPro" HintPath="$(GTFOBepInExPath)/interop/Unity.TextMeshPro.dll" Private="false" />
     <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
+    <!-- The one asset loader entry: an authored room reference names the prefab object its `Assets/` path loads. -->
+    <Reference Include="Shards-ASM" HintPath="$(GTFOBepInExPath)/interop/Shards-ASM.dll" Private="false" />
     <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" Private="false" />
     <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)/interop/Utils-ASM.dll" Private="false" />
-    <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)/interop/GameData-ASM.dll" Private="false" />
     <Reference Include="GlobalFramework-ASM" HintPath="$(GTFOBepInExPath)/interop/GlobalFramework-ASM.dll" Private="false" />
   </ItemGroup>
 </Project>

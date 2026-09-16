@@ -33,7 +33,8 @@ const manifest = read(path.join(output, 'sdk-manifest.json'));
 check(manifest.runtime.gameBuild === 'synthetic-no-game', 'manifest is explicitly synthetic');
 const registry = new ForgeRegistry(manifest.registry);
 const options = id => ({planId: 't1-' + id, resource: {id: 'test.resource', revision: 't1'},
-    limits: {maxEventsPerTick: 16, maxCommandsPerTick: 16, maxQueuedEvents: 32, maxCausalDepth: 8}});
+    limits: {maxEventsPerTick: 16, maxCommandsPerTick: 16, maxQueuedEvents: 32, maxCausalDepth: 8},
+    attachments: [{kind: 'level', reference: 'test.resource'}]});
 const wires = [];
 for (const row of suite.validGraphs) {
     const compiled = compileForgeRuntimePlan(row.graph, manifest, options(row.id));
@@ -47,7 +48,10 @@ for (const row of suite.validGraphs) {
 for (const row of suite.invalidGraphs) {
     if (row.stage === 'compile') {
         check(validateForgeGraph(row.graph, registry).kind === 'validated-authoring-ir', 'valid authoring structure before lowering rejection: ' + row.id);
-        rejectsCode(() => compileForgeRuntimePlan(row.graph, manifest, options(row.id)), row.error, row.id);
+        // The compiler carries codes only where the wire table defines one; `errorKind: prose`
+        // records a rejection whose message has no code segment, so it asserts the message.
+        if (row.errorKind === 'prose') rejects(() => compileForgeRuntimePlan(row.graph, manifest, options(row.id)), row.error, row.id);
+        else rejectsCode(() => compileForgeRuntimePlan(row.graph, manifest, options(row.id)), row.error, row.id);
     } else rejects(() => validateForgeGraph(row.graph, registry), row.error, row.id);
 }
 function mutate(input, changes) {

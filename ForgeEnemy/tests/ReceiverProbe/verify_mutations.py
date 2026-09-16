@@ -11,13 +11,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sdk', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--website', required=True, type=Path,
+                        help='the website repository the contract comparison reads its catalog from')
     args = parser.parse_args()
     sdk = args.sdk.resolve(strict=True)
     output = args.output.resolve()
+    website = args.website.resolve(strict=True)
     output.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parents[3]
     source = (root / 'ForgeEnemy/Native/EnemyModule.cs').read_text(encoding='utf-8-sig')
+    damage = (root / 'ForgeEnemy/Native/EnemyModule.Damage.cs').read_text(encoding='utf-8-sig')
     lifecycle = (root / 'ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs').read_text(encoding='utf-8-sig')
+    # Entry owns a behaviour watermark, so the module's behaviour partial and the observer it reads are
+    # part of the probe too, exactly as the suite's csproj compiles them.
+    behaviour = (root / 'ForgeEnemy/Native/EnemyModule.BehaviorFacts.cs').read_text(encoding='utf-8-sig')
+    observer = (root / 'ForgeEnemy/Native/Observation/EnemyBehaviorFactsObserver.cs').read_text(encoding='utf-8-sig')
     program = (Path(__file__).parent / 'Program.cs').read_text(encoding='utf-8-sig')
     doubles = (root / 'ForgeRuntime/tests/GameBindings/GameDoubles.cs').read_text(encoding='utf-8-sig')
     shared = [(p.name, p.read_text(encoding='utf-8-sig')) for p in sorted((root / 'ForgeEnemy/tests/Shared').glob('*.cs'))]
@@ -54,6 +62,44 @@ def main() -> int:
         ('health-value-before', 'value = healthAfter,', 'value = (double)before.HealthBefore,', 'health.damage-window-change'),
         ('health-rise-inferred', 'if (actualDamage == 0) return;',
          'if (actualDamage == 0 && healthAfter <= before.HealthBefore) return;', 'health.damage-window-rise-not-inferred'),
+        # The `enemy-type` mount: a reference spelling the id loosely, a type read that outlives the life it was
+        # read for, and a kind registered even though the session has no way to read an enemy's block.
+        ('enemy-type-loose-reference',
+         '=> uint.TryParse(reference, NumberStyles.None, CultureInfo.InvariantCulture, out id)\n'
+         '            && reference == id.ToString(CultureInfo.InvariantCulture);',
+         '=> uint.TryParse(reference, out id);', 'mount.enemy-type-leading-zero'),
+        ('enemy-type-stale-life',
+         '        // The block getter is native: a callback may retire the life or replace the instance while it is read.\n'
+         '        return Resolve(subject) == entry;',
+         '        return true;', 'mount.enemy-type-life-retired-while-reading'),
+        ('enemy-type-always-registered',
+         '            AttachmentMatchers = enemyType == null ? null : new Dictionary<string, AttachmentMatcherRegistration>\n'
+         '                { [EnemyTypeAttachment] = AttachmentMatcherRegistration.BySubject(MatchesEnemyType) }',
+         '            AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>\n'
+         '                { [EnemyTypeAttachment] = AttachmentMatcherRegistration.BySubject(MatchesEnemyType) }',
+         'mount.enemy-type-unregistered-kind'),
+        # The damage action: a client that submits, an unreadable effect reported as a commit, and a limb id that
+        # is used as the array index instead of being resolved to one.
+        ('damage-nonhost-applies',
+         '        if (!CanExecute) return CommandResult.Rejected("authority-or-phase");\n'
+         '        var policy = context.Parameters.GetProperty("mitigation_policy").GetString();',
+         '        if (false) return CommandResult.Rejected("authority-or-phase");\n'
+         '        var policy = context.Parameters.GetProperty("mitigation_policy").GetString();',
+         'action.not-host-authority'),
+        ('damage-unknown-row-as-committed',
+         '                    "rejected" => CommitStates.None,\n'
+         '                    _ => CommitStates.Unknown',
+         '                    "rejected" => CommitStates.None,\n'
+         '                    _ => CommitStates.Confirmed', 'action.unseen-commit-is-unknown'),
+        ('damage-unseen-as-commit',
+         'if (after == before) { rows.Add(Row("unknown", "damage-unseen", before, after)); unknown++; continue; }',
+         'if (after == before) { rows.Add(Row("committed", "committed", before, after)); committed++; continue; }',
+         'action.unseen-commit-is-unknown'),
+        ('damage-limb-id-as-index',
+         '            if (!EnemyNativeWrite.TryNameLimb(damage, limb, out int limbIndex))\n'
+         '            { rows.Add(Row("rejected", "invalid-limb", before)); rejected++; continue; }',
+         '            int limbIndex = limb;',
+         'action.limb-id-resolves-to-index'),
     ]
     cases = [('baseline', source, None)]
     for name, old, new, expected in mutations:
@@ -72,10 +118,14 @@ def main() -> int:
         case = output / name
         case.mkdir(exist_ok=False)
         for filename, text in [('Probe.csproj', project), ('Program.cs', program), ('EnemyModule.cs', receiver),
-                               ('EnemyModule.LifecycleFacts.cs', lifecycle), ('GameDoubles.cs', doubles), *shared]:
+                               ('EnemyModule.Damage.cs', damage),
+                               ('EnemyModule.LifecycleFacts.cs', lifecycle),
+                               ('EnemyModule.BehaviorFacts.cs', behaviour),
+                               ('EnemyBehaviorFactsObserver.cs', observer), ('GameDoubles.cs', doubles), *shared]:
             (case / filename).write_text(text, encoding='utf-8')
         report_path = case / 'report.json'
-        command = ['dotnet', 'run', '--project', str(case / 'Probe.csproj'), '-c', 'Release', '--', str(report_path)]
+        command = ['dotnet', 'run', '--project', str(case / 'Probe.csproj'), '-c', 'Release', '--',
+                   str(report_path), str(website)]
         completed = subprocess.run(command, capture_output=True, text=True, encoding='utf-8',
                                    errors='replace', timeout=180, check=False)
         (case / 'run.log').write_text(completed.stdout + completed.stderr, encoding='utf-8')

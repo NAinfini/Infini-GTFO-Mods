@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The three contract files under test compile ModuleDefinition.cs beside them, and the GameDoubles in this
+         project deliberately declare the game types the module names, so CS0436 fires on every shadowed mention.
+         Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this package is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead, for the window in which the in-tree sources do
+         not compile. Only the contract files are compiled into this assembly: the native half reaches
+         `WeaponNativeSession` and the game, which is what the NativeLayout project covers. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+    <!-- The deployable-fact hook set is read as source by `NativeMemberTests`, so its path is stamped into this
+         assembly at build time rather than guessed from the test's working directory. -->
+    <DeployableFactsSource>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..', '..', 'Native', 'WeaponDeployableFacts.cs'))</DeployableFactsSource>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The game-independent half: the three contract files and the module they register through. Nothing here
+         touches a game type, so the rows, their bindings, their owner-session table and their shapes are all
+         exercised for real. -->
+    <Compile Include="../../WeaponHolderChannelContract.cs" />
+    <Compile Include="../../WeaponHolderActionsContract.cs" />
+    <Compile Include="../../WeaponDeployableFactsContract.cs" />
+    <Compile Include="../../WeaponMeleeHitContract.cs" />
+    <Compile Include="../../WeaponPlacementContract.cs" />
+    <Compile Include="../../AttackInstanceContract.cs" />
+    <!-- `ModuleDefinition.Create` composes the action families' rows too, so their contracts compile with it. -->
+    <Compile Include="../../WeaponSupplyContract.cs" />
+    <Compile Include="../../WeaponOverrideContract.cs" />
+    <Compile Include="../../InventoryActionContract.cs" />
+    <Compile Include="../../ModuleDefinition.cs" />
+    <Compile Include="HolderWorld.cs;HolderRowsTests.cs;DeployableRowsTests.cs;HolderChannelTests.cs;MeleeHitRowsTests.cs;MeleeDedupeTests.cs;GameDoubles.cs" />
+    <!-- The melee dedupe rule is game-independent by design, so the ledger the two native sources share is
+         compiled and driven here rather than only under the native build. -->
+    <Compile Include="../../Native/WeaponMeleeRemoteLedger.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" />
+    <!-- `0Harmony` is what the hook set's patch attributes are written against and `Mono.Cecil` is what reads the
+         interop metadata those targets are checked against; neither is applied here. -->
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+    <!-- `Gear` and `Player` live in Modules-ASM, and the doubles in GameDoubles.cs are what the compile binds; the
+         assembly is referenced so a member this build does not have fails the build and the hook sources can be
+         checked against the real metadata. -->
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="DeployableFactsSource" Value="$(DeployableFactsSource)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

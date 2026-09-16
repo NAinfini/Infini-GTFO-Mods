@@ -1,0 +1,26 @@
+{
+  "$file": "GameData_LevelLayoutDataBlock_bin.json",
+  "$target": "Rundown004_B1_L1_Power_Cells (persistentID 3510149958, ZoneAliasStart 51)",
+  "$verifies": "ni-generator 6.3.8：PuzzleType=3 的 CustomText 写本地化 id 时的显示效果（对照字面量版本）",
+  "$warning": "MTFO 是整文件替换：把本文件的 Blocks 条目合并进你自己导出的同文件。目标区域必须真的有门。",
+  "$readBack": "probes/commands/ni-generator.json 的 gen-door-locked-read（准星指门后执行，会读回 UntranslatedText 与 Id）",
+  "Blocks": [
+    {
+      "name": "Rundown004_B1_L1_Power_Cells",
+      "persistentID": 3510149958,
+      "internalEnabled": true,
+      "ZoneAliasStart": 51,
+      "Zones": [
+        {
+          "LocalIndex": 3,
+          "ProgressionPuzzleToEnter": {
+            "PuzzleType": 3,
+            "CustomText": 972,
+            "PlacementCount": 0,
+            "ZonePlacementData": []
+          }
+        }
+      ]
+    }
+  ]
+}

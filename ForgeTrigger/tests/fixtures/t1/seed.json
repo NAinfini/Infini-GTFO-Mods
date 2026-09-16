@@ -106,7 +106,31 @@
           {
             "id": "result",
             "type": "result",
-            "schema": "test.trigger.result.record"
+            "schema": "test.trigger.result.record",
+            "fields": [
+              {
+                "id": "target",
+                "type": "entity"
+              },
+              {
+                "id": "status",
+                "type": "enum",
+                "schema": "execution_outcome"
+              },
+              {
+                "id": "committed",
+                "type": "enum",
+                "schema": "commit_state"
+              },
+              {
+                "id": "code",
+                "type": "string"
+              },
+              {
+                "id": "value",
+                "type": "number"
+              }
+            ]
           }
         ],
         "parameters": [],

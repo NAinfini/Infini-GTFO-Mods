@@ -1,6 +1,6 @@
 namespace ForgeRuntime.Framework;
 
-/// <summary>One discovered `.plan.json` file (I-PACK D-009), already read or already rejected by the host's filesystem
+/// <summary>One discovered `.plan.json` file, already read or already rejected by the host's filesystem
 /// scan. The kernel treats the content as untrusted input regardless of origin; it never touches a filesystem itself, so
 /// this is the only way work reaches <see cref="RuntimeKernel.LoadPlans"/>.</summary>
 public readonly struct PlanCandidate

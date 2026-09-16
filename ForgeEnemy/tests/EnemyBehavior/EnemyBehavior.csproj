@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production sources are compiled against, and the
+         interop assembly is referenced for its other members, so CS0436 fires on every mention of a shadowed type.
+         Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this suite is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The production rule sources and their one shared table. The decisions name no game type — the native
+         bridge is the only thing that would — so this suite compiles them against the suite's own bridge and
+         needs no interop assembly: `EnemyBehaviorNative.cs` (the bridge) and every other partial of the module
+         belong to the native assembly, which the package build compiles. -->
+    <Compile Include="../../Native/EnemyBehaviorLedger.cs;../../Native/EnemyBehaviorActions.cs" />
+    <Compile Include="../../EnemyBehaviorContract.cs" />
+    <Compile Include="FakePorts.cs;Scene.cs;LedgerCases.cs;ActionCases.cs;Program.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+  </ItemGroup>
+</Project>

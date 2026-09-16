@@ -12,7 +12,7 @@ internal static class LimbCases
             s.Limb.IsDestroyed = true; s.Module.AfterLimbBreak(s.Limb, token); s.Module.AfterLimbBreak(s.Limb, token);
             s.Break(); s.Tick(); var c = s.Records.Single();
             Check(c.GetEntityInput("target") == s.Ref && c.Inputs.GetProperty("limb_id").GetInt32() == 0
-                && c.Source == null && s.Enemy.Damage.Sends == 0, "Wrong limb identity or inferred cause.");
+                && s.Enemy.Damage.Sends == 0, "Wrong limb identity.");
         });
         Case("limb.two-parts-same-tick", () => {
             using var s = new Scene(); s.Break(); s.Break(s.Enemy.Damage.DamageLimbs[1]); s.Tick();

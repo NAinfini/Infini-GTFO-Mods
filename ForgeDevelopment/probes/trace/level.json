@@ -1,0 +1,174 @@
+{
+  "profile": "level",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "GameStateManager",
+      "methods": ["*"],
+      "exclude": ["Update", "FixedUpdate", "get_*", "set_*", "add_*", "remove_*"],
+      "record": "args+result",
+      "instance": ["m_currentState", "m_stateName"],
+      "firstStack": true,
+      "maxPerSecond": 25,
+      "onOverflow": "count"
+    },
+    {
+      "type": "RundownManager",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "Awake"],
+      "record": "args+result",
+      "instance": ["m_activeExpedition", "m_currentExpedition", "m_rundownData"],
+      "firstStack": true,
+      "maxPerSecond": 25,
+      "onOverflow": "count"
+    },
+    {
+      "type": "WardenObjectiveManager",
+      "methods": ["*"],
+      "exclude": ["Update", "UpdateFromInLevel", "get_*", "set_*", "add_*", "remove_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "WorldEventManager",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "instance": ["m_state", "m_replicator"],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameData.WardenObjectiveEventData",
+      "methods": ["ToString"],
+      "record": "args+result",
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "SNetwork_*"],
+      "record": "args+result",
+      "instance": ["m_stateReplicator.State", "m_status", "m_sync"],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ChainedPuzzles.CP_*",
+      "methods": ["*"],
+      "exclude": ["Update", "LateUpdate", "get_*", "set_*", "MoveNext", "SNetwork_*", "System_*", "__c*"],
+      "record": "args+result",
+      "instance": ["m_stateReplicator.State"],
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CheckpointManager",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "SNetwork_*", "Awake"],
+      "record": "args+result",
+      "instance": ["m_stateReplicator.State", "m_currentCheckpoint"],
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.Dimension",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "ToString", "RegisterAgent", "UnregisterAgent"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_DimensionPortal",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "SNetwork_*", "_Setup*", "iWardenObjectiveItem_*"],
+      "record": "args+result",
+      "instance": ["m_stateReplicator.State"],
+      "firstStack": true,
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ElevatorRide",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Factory",
+      "methods": ["FactoryDone", "OnStart", "NextBatch", "GetNewJob", "ForceBatch", "InjectJob", "ReportArea", "ReportGeomorph", "SetZoneIndexAlias", "WriteJobLogToDisk", "SaveFactoryReport", "Setup", "SetupFactoryReport", "UpdateCost", "RestLastBuildCounters", "BatchHasJobs"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Floor",
+      "methods": ["BuildFloor", "CleanupFloor", "PlaceRoot", "AddZoneToLayer", "Setup"],
+      "record": "args+result",
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Layer",
+      "methods": ["CreateZone", "AddZoneToLayer", "GetUniqueTempAlias"],
+      "record": "args+result",
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelExitGeo",
+      "methods": ["ActivateWinCondition", "DeactivateWinCondition", "OnBuildDone", "AddRequiredScanItems", "RemoveRequiredScanItems"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 10,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_Zone",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "maxPerSecond": 25,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_WorldEventObject",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*"],
+      "record": "args+result",
+      "maxPerSecond": 15,
+      "onOverflow": "count"
+    },
+    {
+      "type": "LevelGeneration.LG_LevelInteractionManager",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "Update"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    }
+  ]
+}

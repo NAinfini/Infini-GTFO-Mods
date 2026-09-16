@@ -112,6 +112,24 @@ try
         Check(root.GetProperty("overflow").GetProperty("droppedIssues").GetInt64() == 2, "dropped unique issues are counted");
     }
 
+    // A flood of distinct trace contexts cannot grow the aggregate table past its cap, an aggregate
+    // that already exists keeps counting, and every context refused after the cap is counted.
+    var aggregateCap = new DiagnosticsReport("aggregate-cap");
+    for (var index = 0; index < 1030; index++)
+        aggregateCap.Event("generation_job", "update", "job-" + index, new() { ["jobType"] = "Job", ["geomorph"] = "geo-" + index }, 1);
+    aggregateCap.Event("generation_job", "update", "job-0-again", new() { ["jobType"] = "Job", ["geomorph"] = "geo-0" }, 2);
+    using (var json = Read(aggregateCap.Export(Path.Combine(directory, "aggregate-cap.json"), "complete")))
+    {
+        var root = json.RootElement;
+        var aggregates = root.GetProperty("eventAggregates");
+        Check(aggregates.GetArrayLength() == 1024, "detailed trace aggregates are bounded");
+        var first = aggregates.EnumerateArray().Single(entry => entry.GetProperty("context").GetString() == "Job||geo-0");
+        Check(first.GetProperty("count").GetInt64() == 2 && first.GetProperty("totalElapsedMs").GetDouble() == 3,
+            "an existing aggregate keeps counting after the cap");
+        Check(root.GetProperty("overflow").GetProperty("droppedAggregateEvents").GetInt64() == 6,
+            "trace contexts beyond the aggregate cap are counted as dropped observations");
+    }
+
     var concurrent = new DiagnosticsReport("concurrent");
     Parallel.For(0, 1000, _ => concurrent.Issue("repeat", "same-source", "message", "stack"));
     using (var json = Read(concurrent.Export(Path.Combine(directory, "concurrent.json"), "complete")))

@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "task": "C-attack-weapon",
+  "verification": "metadata-and-decompiled-interop-only",
+  "gameExecuted": false,
+  "profileWritten": false,
+  "repositoriesModifiedForEvidence": false,
+  "gameBuild": "20403457",
+  "assembly": {
+    "interop": "Modules-ASM.dll",
+    "readWith": "ilspycmd 11.0.0.9375, read-only type and member listing",
+    "readFrom": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop\\Modules-ASM.dll",
+    "note": "The generated interop assemblies are Il2CppInterop runtime-invoke thunks; they carry the member set, the virtual slot and the field offset, but no game logic. A native field is exposed as a property of the field's own name, which is what `ForgeWeapon/tests/AttackInstance/NativeMemberTests.cs` reads through Mono.Cecil."
+  },
+  "sharedEvidence": {
+    "files": [
+      "ForgeWeapon/evidence/w4-player-fire.json",
+      "ForgeWeapon/evidence/w4-combat-hooks.json",
+      "%TEMP%\\fwdesign\\fwd-combat\\evidence.md"
+    ],
+    "reusedFor": [
+      "The four Fire bodies are the complete per-shot hook set and no Fire body reaches another (w4-player-fire).",
+      "A player's every ranged hit reaches BulletWeapon.BulletHit inside the Fire body, so the scope can answer the miss question when that body returns (w4-player-fire `hit-routine`).",
+      "The synced pair runs for a non-local player's weapon on this machine, which is why a client's attack is observed on the host (w4-player-fire `syncChain`)."
+    ]
+  },
+  "answer": {
+    "id": "c-attack-weapon/hooks",
+    "question": "Which native members carry the attack-instance facts of this build, and is the accepted/missed rule observable at all?",
+    "conclusion": [
+      "A ranged attack's whole lifecycle is one Fire body. The request is the body's own entry (`Fire(System.Boolean)`, one optional bool), the close is its return, and every hit the attack causes is resolved inside it: `BulletWeapon.BulletHit` is reached from the four Fire bodies and from the sentry's own firing component, and the shotgun's two hit sites sit inside its pellet loop.",
+      "The native acceptance signal is `PlayerSync.RegisterFiredBullets(int)`: its complete literal caller set in this build is `Gear.BulletWeapon::Fire` and `Gear.Shotgun::Fire`. A pull the weapon refused never calls it, which is what makes 'the shot counter of the equipment life moved inside the body' the acceptance test rather than a Forge guess.",
+      "Melee has no Fire. `Gear.MeleeWeaponFirstPerson.DoTriggerAttack(System.Boolean)` is the attack entry and `OnAttackHitDone()` is the end of the swing; the state enum `Gear.eMeleeWeaponState` declares the twelve attack states, so the melee half is anchored on declared types.",
+      "The game's own empty-clip path is an explicit member: `Gear.BWA_Burst.OnFireShotEmptyClip()` and `Gear.BWA_Auto.OnFireShotEmptyClip()`. The dry-fire fact is published from that decision and never from comparing a clip readback against zero.",
+      "A burst sequence has two declared ends on the two burst-capable archetypes: `BWA_Burst` and `BWA_Auto` each declare `OnStartFiring()` and `OnStopFiring()`. `BWA_SemiBurst` derives from `BWA_Semi` and declares neither an end nor an empty-clip path, so it carries no sequence hook.",
+      "The burst length the `burst_*` facts carry is `Gear.BulletWeapon.m_burstMax`, a native int on the weapon itself, not a Forge tally.",
+      "A weapon's attack scope is named `gtfo.weapon.attack:<equipment life>:<n>`, one sequence per equipment life, the same identity scheme ruling 78 gave the shot scope.",
+      "`forge.trigger.combat.attack_cancelled` has no native signal. Nothing in the four Fire bodies, in `MeleeWeaponFirstPerson` or in `PlayerInventoryBase` reports an interrupted trigger pull, and the design's `reason` was to be a native reason code; there is none to read."
+    ],
+    "rows": [
+      {
+        "capability": "forge.trigger.combat.attack_requested",
+        "status": "implemented",
+        "native": "Gear.BulletWeapon.Fire / Gear.Shotgun.Fire / Gear.BulletWeaponSynced.Fire / Gear.ShotgunSynced.Fire prefix; Gear.MeleeWeaponFirstPerson.DoTriggerAttack prefix",
+        "ports": "source, equipment, phase='requested'",
+        "derivation": "none — the request is the native body's own entry"
+      },
+      {
+        "capability": "forge.trigger.combat.attack_accepted",
+        "status": "implemented",
+        "native": "PlayerSync.RegisterFiredBullets(int), called only by the two unsynced Fire bodies",
+        "ports": "source, equipment",
+        "derivation": "the equipment life's own shot counter is read before the body and again after it; a moved counter is the native registration"
+      },
+      {
+        "capability": "forge.trigger.combat.attack_completed",
+        "status": "implemented",
+        "native": "the same bodies' postfix; Gear.MeleeWeaponFirstPerson.OnAttackHitDone postfix",
+        "ports": "source, equipment",
+        "derivation": "none — the native body returned"
+      },
+      {
+        "capability": "forge.trigger.combat.attack_missed",
+        "status": "implemented",
+        "native": "the same close, against the hit candidates the hit observer published inside the scope",
+        "ports": "source, equipment",
+        "derivation": "the scope's opening hit-candidate count compared with the count at its close; derived, and the derivation is the rule"
+      },
+      {
+        "capability": "forge.trigger.combat.burst_started",
+        "status": "implemented",
+        "native": "Gear.BWA_Burst.OnStartFiring / Gear.BWA_Auto.OnStartFiring",
+        "ports": "source, equipment, count=Gear.BulletWeapon.m_burstMax",
+        "derivation": "none — the weapon's own sequence start"
+      },
+      {
+        "capability": "forge.trigger.combat.burst_ended",
+        "status": "implemented",
+        "native": "Gear.BWA_Burst.OnStopFiring / Gear.BWA_Auto.OnStopFiring",
+        "ports": "source, equipment, count=Gear.BulletWeapon.m_burstMax",
+        "derivation": "none — the weapon's own sequence end"
+      },
+      {
+        "capability": "forge.trigger.combat.dry_fire",
+        "status": "implemented",
+        "native": "Gear.BWA_Auto.OnFireShotEmptyClip / Gear.BWA_Burst.OnFireShotEmptyClip",
+        "ports": "actor, equipment",
+        "derivation": "none — the game's own empty-clip decision"
+      },
+      {
+        "capability": "forge.trigger.combat.attack_cancelled",
+        "status": "not-implemented",
+        "native": null,
+        "ports": "source, equipment, reason — declared, never published",
+        "derivation": "none available; see the conclusion above and AttackInstanceContract.CancelledGap"
+      }
+    ]
+  },
+  "types": [
+    { "name": "Weapon", "declaration": "public class Weapon : ItemEquippable", "members": ["Fire(System.Boolean)"] },
+    { "name": "Gear.BulletWeapon", "declaration": "public class BulletWeapon : Weapon", "members": ["Fire(System.Boolean)", "BulletHit(Weapon.WeaponHitData, ...)", "m_burstMax", "m_burstCurrentCount", "IsCurrentlyBurstFiring", "GetCurrentClip()", "ClipIsFull()"] },
+    { "name": "Gear.BulletWeaponSynced", "declaration": "public class BulletWeaponSynced : BulletWeapon", "members": ["Fire(System.Boolean)"] },
+    { "name": "Gear.Shotgun", "declaration": "public class Shotgun : BulletWeapon", "members": ["Fire(System.Boolean)"] },
+    { "name": "Gear.ShotgunSynced", "declaration": "public class ShotgunSynced : BulletWeaponSynced", "members": ["Fire(System.Boolean)"] },
+    { "name": "Gear.RifleWeapon / Gear.RifleWeaponSynced", "declaration": "RifleWeapon : BulletWeapon, RifleWeaponSynced : BulletWeaponSynced", "members": ["no Fire of their own; they use their family's body"] },
+    { "name": "Gear.MeleeWeaponFirstPerson", "declaration": "public class MeleeWeaponFirstPerson : ItemEquippable", "members": ["DoTriggerAttack(System.Boolean)", "OnAttackHitDone()", "ChangeState(eMeleeWeaponState)", "CurrentStateName", "CheckForAttackTargets(...)", "DoAttackDamage(MeleeWeaponDamageData, System.Boolean)", "FireButton", "FireButtonPressed"] },
+    { "name": "Gear.eMeleeWeaponState", "declaration": "public enum eMeleeWeaponState", "members": ["None", "Idle", "Hitreact", "AttackMissLeft", "AttackMissRight", "AttackHitLeft", "AttackHitRight", "AttackChargeUpLeft", "AttackChargeReleaseLeft", "AttackChargeUpRight", "AttackChargeReleaseRight", "AttackChargeHitLeft", "AttackChargeHitRight", "Push", "CancelChargeToIdleLeft", "CancelChargeToIdleRight"] },
+    { "name": "Gear.BulletWeaponArchetype", "declaration": "public class BulletWeaponArchetype : Il2CppSystem.Object", "members": ["m_weapon", "Setup(BulletWeapon)", "OnStartFiring()", "OnStopFiring()", "OnFireShot()", "OnFireShotEmptyClip()", "BurstIsDone()", "Update()"] },
+    { "name": "Gear.BWA_Burst", "declaration": "public class BWA_Burst : BulletWeaponArchetype", "members": ["OnStartFiring()", "OnStopFiring()", "OnFireShot()", "OnFireShotEmptyClip()", "BurstIsDone()", "m_burstMax", "m_burstCurrentCount"] },
+    { "name": "Gear.BWA_Auto", "declaration": "public class BWA_Auto : BulletWeaponArchetype", "members": ["OnStartFiring()", "OnStopFiring()", "OnFireShot()", "OnFireShotEmptyClip()", "BurstIsDone()", "PreFireCheck()"] },
+    { "name": "Gear.BWA_Semi / Gear.BWA_SemiBurst", "declaration": "BWA_Semi : BulletWeaponArchetype, BWA_SemiBurst : BWA_Semi", "members": ["BWA_SemiBurst declares OnFireShot, ResetBurstCount, Update, TriggerCooldown and no sequence end or empty-clip path of its own"] }
+  ],
+  "hostVisibility": {
+    "authority": "Every fact here is published on the host only, through the same gate the shot and hit facts use: SNet.IsMaster, the host's ready lifecycle and the equipment life's owner resolving to a current gtfo.player reference.",
+    "syncedBodies": "The two synced Fire bodies run on this machine for another player's weapon, so the host observes a client's attack there; the unsynced bodies are the firing player's own.",
+    "melee": "The melee weapon runs only on the machine whose player swings it, so a client's swing is not observed on the host by this hook set.",
+    "unverified": [
+      "Nothing here was executed. The facts above are static: the member set, the call edges w4-player-fire.json proved, and the interop metadata.",
+      "That BWA_SemiBurst's inherited OnStartFiring/OnStopFiring are not reached, and that its empty clip leaves no native trace, is read from the metadata (it declares neither member). A runtime trace of a semi-burst weapon would settle it.",
+      "That the empty-clip members really run on every dry pull, rather than only on some archetypes' paths, is a runtime fact this metadata cannot show."
+    ]
+  },
+  "integration": {
+    "declarations": "The eight row documents live in ForgeWeapon/AttackInstanceContract.cs verbatim from catalog/capability-catalog.json; the integration batch moves them into ForgeRuntime/Framework/TriggerContracts.cs, because every forge.trigger.* row is declared once by forge.contract.trigger and a second declaration of one id is refused at registration.",
+    "bindings": "Seven observe bindings, one per implemented row, are spelled in the same file and registered by ForgeWeapon/ModuleDefinition.cs's capability and binding lists; the cancelled row carries no binding and its absence is recorded in AttackInstanceContract.Gaps.",
+    "nativeHalves": [
+      "ForgeWeapon/Native/AttackInstanceHooks.cs is a new Compile item in ForgeWeapon/Native/ForgeWeapon.Native.csproj and its sixteen hook classes are added to WeaponNativeHooks.Types.",
+      "The session builds the module in WeaponNativeSession.Start and exposes it as WeaponNativeSession.Attack.",
+      "EquipmentNativeAdapter implements IAttackNativeReads and counts hit candidates per equipment life in its own PublishEvent."
+    ],
+    "testProject": "ForgeWeapon/tests/AttackInstance",
+    "releaseManifest": "No row is added by hand: the eight declarations and the seven bindings enter Release/export-runtime-manifest's output only after the integration batch registers them, exactly like the a-wpn slice's six action rows.",
+    "nativeLayout": "No new native read or write is registered by the module: it reads the equipment life's own counters through the adapter, and the four weapon members it names (m_burstMax, m_burstCurrentCount, m_weapon, and the two melee callbacks) are checked against the interop metadata by this slice's own NativeMemberTests."
+  }
+}

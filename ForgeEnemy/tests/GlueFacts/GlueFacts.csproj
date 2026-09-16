@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production sources are compiled against, and the
+         interop assembly is referenced for its other members, so CS0436 fires on every mention of a shadowed type.
+         Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this suite is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead, for the window in which the in-tree sources do
+         not compile. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt; to an already built ForgeRuntime.Framework.dll." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- This slice's three production sources: the game-independent contract row, the glue entry points, and the
+         ledger and handler that fan one step out over the recipients. `EnemyModule` is deliberately not compiled
+         here — the suite dispatches the handler through a kernel-built command context, and the module's own
+         registration of it is the one-line integration patch this slice reports rather than something a focused
+         suite can install. Nothing else in the package is reached: the resolver this family asks for an enemy
+         reference is a delegate the provider passes in, so no second registry is compiled either. -->
+    <Compile Include="../../GlueContract.cs;../../Native/GlueFacts.cs;../../Native/GlueActions.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+  </ItemGroup>
+</Project>

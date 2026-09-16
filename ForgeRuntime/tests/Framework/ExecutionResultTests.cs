@@ -46,7 +46,8 @@ internal static class ExecutionResultTests
         Check(partialUnknown.Status == CommandStatuses.Partial && partialUnknown.CommitState == CommitStates.Unknown && partialUnknown.Facts.Count == 1
             && CommandResultRules.TryValidate(partialUnknown, out _), "partial is valid with unknown completion and a known fact");
 
-        // r11: partial only requires a known commit (confirmed or unknown); facts may be empty when no row produced one.
+        // A partial result only requires a known commit (confirmed or unknown); facts may be empty when no row
+        // produced one.
         var partialConfirmedNoFacts = CommandResult.Create(CommandStatuses.Partial, CommitStates.Confirmed, "test.partial", "", RuntimeJson.EmptyObject, Array.Empty<RuntimeFact>());
         var partialUnknownNoFacts = CommandResult.Create(CommandStatuses.Partial, CommitStates.Unknown, "test.partial", "", RuntimeJson.EmptyObject, Array.Empty<RuntimeFact>());
         Check(CommandResultRules.TryValidate(partialConfirmedNoFacts, out _), "partial with a confirmed commit may have no facts");
@@ -70,7 +71,10 @@ internal static class ExecutionResultTests
 
         CheckInvalid(CommandStatuses.Succeeded, CommitStates.None, Array.Empty<RuntimeFact>(), "succeeded+none is invalid");
         CheckInvalid(CommandStatuses.Succeeded, CommitStates.Unknown, Array.Empty<RuntimeFact>(), "succeeded+unknown is invalid");
-        CheckInvalid(CommandStatuses.Partial, CommitStates.None, new[] { fact }, "partial+none is invalid");
+        // A partial result may commit nothing at all: that is what a `presentation` handler reports, because
+        // presenting is work it really did and none of it writes world state.
+        Check(CommandResultRules.TryValidate(CommandResult.Create(CommandStatuses.Partial, CommitStates.None, "test.presented", "",
+            RuntimeJson.EmptyObject, new[] { fact }), out _), "partial+none is the presentation handler's own result");
         CheckInvalid(CommandStatuses.Rejected, CommitStates.Confirmed, Array.Empty<RuntimeFact>(), "rejected+confirmed is invalid");
         CheckInvalid(CommandStatuses.Rejected, CommitStates.None, new[] { fact }, "rejected facts are invalid");
         CheckInvalid(CommandStatuses.Cancelled, CommitStates.Unknown, Array.Empty<RuntimeFact>(), "cancelled+unknown is invalid");
@@ -112,7 +116,7 @@ internal static class ExecutionResultTests
             s.Plan("partial-plan", "example.alpha", steps: 2);
             a.Publish(s.Event("partial-event", "example.alpha"));
             var tick = s.Kernel.Advance(1, true);
-            // r11: a confirmed-commit partial does not stop the entrypoint, so both steps run.
+            // A confirmed-commit partial does not stop the entrypoint, so both steps run.
             Check(calls == 2 && tick.CommandsExecuted == 2 && tick.Commands.Count == 2, "confirmed-commit partial does not stop the entrypoint");
             Check(tick.Commands.All(c => c.Result.Status == CommandStatuses.Partial && c.Result.CommitState == CommitStates.Confirmed && c.Result.Facts.Count == 1),
                 "each step's partial carries its confirmed fact evidence");
@@ -209,8 +213,11 @@ internal static class ExecutionResultTests
 
         {
             var publicMethods = typeof(RuntimeKernel).GetMethods().Select(m => m.Name).ToArray();
+            // The parent index this checks beside is the observation's own reverse direction (`InspectChildren`,
+            // built from the `parent` reading an observer publishes), which is why the guard names the task-tree
+            // concepts rather than every name containing "Child".
             Check(!publicMethods.Any(n => n.Contains("Task", StringComparison.Ordinal) || n.Contains("Timeout", StringComparison.Ordinal)
-                || n.Contains("Child", StringComparison.Ordinal) || n.Contains("Deadline", StringComparison.Ordinal)
+                || n.Contains("TaskTree", StringComparison.Ordinal) || n.Contains("Deadline", StringComparison.Ordinal)
                 || n.Contains("Recover", StringComparison.Ordinal) || n.Contains("ResultGraph", StringComparison.Ordinal)),
                 "Task.Run, wall-clock timeout, parent-child task tree, deadline, recovery, and result graph remain unsupported in this slice");
         }

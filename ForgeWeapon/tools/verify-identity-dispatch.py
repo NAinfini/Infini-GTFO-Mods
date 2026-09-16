@@ -1,6 +1,6 @@
 """Verify the actual Weapon resolver in the public SDK queue/command lifecycle.
 All action bindings are explicit synthetic fixtures. No native call or installation.
-The runner retains exact input hashes and logs and rejects concurrent-source claims.
+The runner retains exact input hashes, the dotnet test log and TRX results, and rejects concurrent-source claims.
 """
 from __future__ import annotations
 import argparse
@@ -10,6 +10,19 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import xml.etree.ElementTree as ElementTree
+
+TRX_NAMESPACE = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
+
+
+def trx_results(path: Path) -> tuple[int, int, list[str]]:
+    """(total, passed, failed test names) from a dotnet test TRX report."""
+    root = ElementTree.parse(path).getroot()
+    definitions = {d.get("id"): d.get("name") for d in root.iter(TRX_NAMESPACE + "UnitTest")}
+    names = [definitions.get(r.get("testId"), "") for r in root.iter(TRX_NAMESPACE + "UnitTestResult")]
+    failed = [definitions.get(r.get("testId"), "") for r in root.iter(TRX_NAMESPACE + "UnitTestResult")
+              if r.get("outcome") != "Passed"]
+    return len(names), len(names) - len(failed), failed
 
 
 def main() -> int:
@@ -50,19 +63,18 @@ def main() -> int:
         print("RUN", name, flush=True)
         with (output / (name + ".log")).open("w", encoding="utf-8") as log:
             result = subprocess.run(command, cwd=repo, stdout=log, stderr=subprocess.STDOUT,
-                                    timeout=180, check=False)
+                                    timeout=900, check=False)
         receipt["stages"].append({"name": name, "argv": command, "exitCode": result.returncode})
         if result.returncode != 0: raise RuntimeError(f"{name} failed ({result.returncode}); see {name}.log")
     try:
-        build = output / "build"
-        run("build", ["dotnet", "build", str(weapon / "tests/IdentityDispatchReview/IdentityDispatchReview.csproj"),
-                      "-c", "Release", "--artifacts-path", str(build), "-p:NuGetAudit=false", "--ignore-failed-sources"])
-        run("tests", ["dotnet", str(build / "bin/IdentityDispatchReview/release/IdentityDispatchReview.dll"),
-                      "--report", str(output / "tests.json")])
-        report = json.loads((output / "tests.json").read_text(encoding="utf-8"))
-        if report["failures"] != 0 or not report["tests"] or any(t["status"] != "passed" for t in report["tests"]):
-            raise RuntimeError("Unexpected/failed dispatch result")
-        receipt.update(status="passed", testCount=len(report["tests"]), failures=0)
+        results = output / "results"
+        code = run("tests", ["dotnet", "test", str(weapon / "tests/IdentityDispatchReview/IdentityDispatchReview.csproj"),
+                             "-c", "Release", "--artifacts-path", str(output / "build"),
+                             "--results-directory", str(results), "-p:NuGetAudit=false", "--ignore-failed-sources"])
+        total, passed, failed = trx_results(results / "tests.trx")
+        if code != 0 or not total or failed:
+            raise RuntimeError("Unexpected/failed dispatch result: " + ", ".join(failed))
+        receipt.update(status="passed", testCount=total, failures=0)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.TimeoutExpired) as error:
         receipt.update(status="failed", error=str(error))
         print(str(error), file=sys.stderr)

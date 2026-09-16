@@ -1,6 +1,6 @@
-"""Run the independent compiled Weapon/SDK identity consumer tests.
+"""Run the independent compiled Weapon/SDK identity consumer tests through dotnet test.
 No native method execution, game launch, installation or network access.
-Every run retains logs and exact source snapshots under ForgeWeapon/.artifacts.
+Every run retains the dotnet log, TRX results and exact source snapshots under ForgeWeapon/.artifacts.
 """
 from __future__ import annotations
 import argparse
@@ -10,6 +10,19 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import xml.etree.ElementTree as ElementTree
+
+TRX_NAMESPACE = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
+
+
+def trx_results(path: Path) -> tuple[int, int, list[str]]:
+    """(total, passed, failed test names) from a dotnet test TRX report."""
+    root = ElementTree.parse(path).getroot()
+    definitions = {d.get("id"): d.get("name") for d in root.iter(TRX_NAMESPACE + "UnitTest")}
+    names = [definitions.get(r.get("testId"), "") for r in root.iter(TRX_NAMESPACE + "UnitTestResult")]
+    failed = [definitions.get(r.get("testId"), "") for r in root.iter(TRX_NAMESPACE + "UnitTestResult")
+              if r.get("outcome") != "Passed"]
+    return len(names), len(names) - len(failed), failed
 
 
 def main() -> int:
@@ -52,20 +65,18 @@ def main() -> int:
         print("RUN", name, flush=True)
         with (output / (name + ".log")).open("w", encoding="utf-8") as log:
             process = subprocess.run(command, cwd=repo, stdout=log, stderr=subprocess.STDOUT,
-                                     timeout=180, check=False)
+                                     timeout=900, check=False)
         receipt["stages"].append({"name": name, "argv": command, "exitCode": process.returncode})
         return process.returncode
+    results = output / "results"
     try:
-        code = run("build", ["dotnet", "build", str(weapon / "tests/IdentityAcceptance/IdentityAcceptance.csproj"),
-                   "-c", "Release", "--artifacts-path", str(build), "-p:NuGetAudit=false", "--ignore-failed-sources"])
-        if code != 0:
-            raise RuntimeError("Compilation failed; tests were not executed. See build.log")
-        code = run("tests", ["dotnet", str(build / "bin/IdentityAcceptance/release/IdentityAcceptance.dll"),
-                             "--report", str(output / "tests.json")])
-        report = json.loads((output / "tests.json").read_text(encoding="utf-8"))
-        receipt.update(testCount=len(report["tests"]), failures=report["failures"])
-        if code != 0 or report["failures"] != 0:
-            raise RuntimeError("Identity acceptance failed. See tests.log and tests.json")
+        code = run("tests", ["dotnet", "test", str(weapon / "tests/IdentityAcceptance/IdentityAcceptance.csproj"),
+                             "-c", "Release", "--artifacts-path", str(build),
+                             "--results-directory", str(results), "-p:NuGetAudit=false", "--ignore-failed-sources"])
+        total, passed, failed = trx_results(results / "tests.trx")
+        receipt.update(testCount=total, failures=len(failed))
+        if code != 0 or not total or failed:
+            raise RuntimeError("Identity acceptance failed: " + ", ".join(failed))
         receipt["status"] = "passed"
     except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
         receipt.update(status="failed", error=str(error))

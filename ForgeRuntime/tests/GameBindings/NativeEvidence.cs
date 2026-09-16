@@ -28,10 +28,10 @@ internal static class NativeEvidence
         Signature("Dam_SyncedDamageBase", "SendSetHealth", "System.Void", "System.Single");
         Signature("Dam_EnemyDamageBase", "ReceiveSetHealth", "System.Void", "pSetHealthData");
         Signature("Dam_EnemyDamageBase", "ProcessReceivedDamage", "System.Boolean", "System.Single", "Agents.Agent", "UnityEngine.Vector3", "UnityEngine.Vector3", "ES_HitreactType", "System.Boolean", "System.Int32", "System.Single", "DamageNoiseLevel", "System.UInt32");
-        Signature("GameStateManager", "DoChangeState", "System.Void", "eGameStateName");
-        Signature("GameStateManager", "OnLevelCleanup", "System.Void");
-        Signature("GameStateManager", "OnResetSession", "System.Void");
-        Signature("CheckpointManager", "OnStateChange", "System.Void", "pCheckpointState", "pCheckpointState", "System.Boolean");
+        // GameStateManager is no longer patched by the host: level lifecycle is a GTFO-API subscription, and the
+        // two detours left are the checkpoint save and reload this GTFO-API version has no event for.
+        Signature("CheckpointManager", "StoreCheckpoint", "System.Void", "UnityEngine.Vector3");
+        Signature("CheckpointManager", "ReloadCheckpoint", "System.Void");
         Signature("Enemies.EnemySync", "OnSpawn", "System.Void", "Enemies.pEnemySpawnData");
         Signature("Enemies.EnemySync", "OnDespawn", "System.Void");
         Require(Method("Agents.Agent", "get_GlobalID").ReturnType.FullName == "System.UInt16", "Stable network ID type");
@@ -41,12 +41,24 @@ internal static class NativeEvidence
 
         bool Patch(CustomAttribute a) => a.AttributeType.FullName == "HarmonyLib.HarmonyPatch";
         var patches = forgeTypes.Where(t => t.CustomAttributes.Any(Patch)).ToArray();
-        string[] expectedHost = { "FrameworkStateChanged", "FrameworkWorldCleanup", "FrameworkSessionReset", "FrameworkCheckpointRestore" };
+        string[] expectedHost = { "FrameworkCheckpointSave", "FrameworkCheckpointRestore" };
         // Diagnostics live in the optional Development plugin; every host detour is a framework world binding.
         Require(patches.All(t => t.Namespace == "ForgeRuntime.GameBindings")
             && patches.Select(t => t.Name).OrderBy(x => x).SequenceEqual(expectedHost.OrderBy(x => x)), "Host actual compiled patch set changed");
+        // The level lifecycle the patches used to carry is a GTFO-API subscription, so the host must reference the
+        // shipped API and must not keep a GameStateManager detour beside it.
+        var gtfoApi = forge.MainModule.AssemblyReferences.SingleOrDefault(r => r.Name == "GTFO-API");
+        Require(gtfoApi != null, "Host does not reference GTFO-API for the level lifecycle");
+        var lifecycle = forgeTypes.Single(t => t.FullName == "ForgeRuntime.GameBindings.LevelLifecycle");
+        var subscribed = lifecycle.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions)
+            .Select(i => i.Operand).OfType<MethodReference>().Select(m => m.DeclaringType.FullName + "." + m.Name).ToList();
+        foreach (var entry in new[] { "GTFO.API.LevelAPI.add_OnBuildStart", "GTFO.API.LevelAPI.add_OnEnterLevel",
+            "GTFO.API.LevelAPI.add_OnLevelCleanup", "GTFO.API.LevelAPI.remove_OnBuildStart",
+            "GTFO.API.LevelAPI.remove_OnEnterLevel", "GTFO.API.LevelAPI.remove_OnLevelCleanup" })
+            Require(subscribed.Contains(entry), "Level lifecycle does not subscribe or unsubscribe " + entry);
         var load = forgeTypes.Single(t => t.FullName == "ForgeRuntime.Plugin").Methods.Single(m => m.Name == "Load");
         Require(load.Body.Instructions.Any(i => i.Operand is MethodReference method && method.DeclaringType.FullName == "HarmonyLib.Harmony" && method.Name == "PatchAll"), "Plugin does not install its own host patch set");
+        Require(load.Body.Instructions.Any(i => i.Operand is MethodReference method && method.DeclaringType.FullName == "ForgeRuntime.GameBindings.LevelLifecycle" && method.Name == "Subscribe"), "Plugin does not subscribe the level lifecycle");
         foreach (var type in patches)
         {
             var attribute = type.CustomAttributes.Single(Patch);
@@ -65,7 +77,8 @@ internal static class NativeEvidence
                 }
         }
         var bridge = forgeTypes.Single(t => t.FullName == "ForgeRuntime.GameBindings.GameRuntimeBridge");
-        string expectedHash = (string)bridge.Fields.Single(f => f.Name == "GameAssemblySha256").Constant;
+        var hashField = bridge.Fields.Single(f => f.Name == "GameAssemblySha256");
+        string expectedHash = System.Text.Encoding.UTF8.GetString((byte[])hashField.InitialValue);
         string gameAssembly = Path.Combine(gameRoot, "GameAssembly.dll");
         using var native = File.OpenRead(gameAssembly);
         using var sha256 = SHA256.Create();

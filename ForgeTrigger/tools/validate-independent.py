@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MUTATIONS = [
@@ -33,12 +34,18 @@ def sources(site: Path) -> list[Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--site', type=Path, default=ROOT.parents[1]/'Infini-GTFO-Model-Site')
-    parser.add_argument('--output', type=Path)
+    parser.add_argument('--out', '--output', dest='output', type=Path,
+                        help='Evidence directory; inside ForgeTrigger/artifacts or the system temporary directory.')
     parser.add_argument('--mutations', action='store_true')
     args = parser.parse_args(); site = args.site.resolve()
-    output = (args.output or ROOT/'artifacts'/('independent-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))).resolve()
-    if not output.is_relative_to((ROOT/'artifacts').resolve()):
-        raise ValueError('Output must be a fresh directory inside ForgeTrigger/artifacts.')
+    artifacts = (ROOT/'artifacts').resolve(); temporary = Path(tempfile.gettempdir()).resolve()
+    output = (args.output or artifacts/('independent-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))).resolve()
+    # Not a shared directory: this run owns its evidence directory, so an existing path is a previous run's
+    # output (or a tracked file) and is never overwritten.
+    if not (output.is_relative_to(artifacts) or output.is_relative_to(temporary)):
+        raise ValueError('Output must stay inside ForgeTrigger/artifacts or the system temporary directory.')
+    if output.exists():
+        raise ValueError('Output must not already exist; every run writes its own directory: '+str(output))
     output.mkdir(parents=True, exist_ok=False)
     hashes = lambda: {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources(site)}
     read = lambda p: json.loads(p.read_text(encoding='utf-8'))

@@ -25,6 +25,14 @@
     {
       "path": "e2-spawn-space-20403457/spawn-space-evidence.json",
       "sha256": "926954D04322CEDD441D6E44B4BCD73D6AD33CC4E1310B4EB26F587D4755CB88"
+    },
+    {
+      "path": "enemy-behavior-hooks.json",
+      "sha256": "AC02FC58577BC710EC12C524B1331CB3F08CB06B1B35EE003FAEF8008EE342ED"
+    },
+    {
+      "path": "e10-damage-window.json",
+      "sha256": "FA849FDCF7913F61F6358229ADCAE1889A3D04DB0B7D56FDDD16E237AB49013B"
     }
   ],
   "methods": [
@@ -48,8 +56,12 @@
         "ForgeEnemy.Native.EnemyModule::CaptureDespawn",
         "ForgeEnemy.Native.EnemyModule::CompleteDespawn",
         "ForgeEnemy.Native.EnemyModule::MatchesLimb",
+        "ForgeEnemy.Native.EnemyModule::ObserveEnemyBehavior",
+        "ForgeEnemy.Native.EnemyModule::ObserveScoutDetection",
         "ForgeEnemy.Native.EnemyModule::Resolve",
+        "ForgeEnemy.Native.EnemyModule::ResolveInstance",
         "ForgeEnemy.Native.EnemyModule::TrackSpawn",
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce",
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
       ],
@@ -115,6 +127,7 @@
       "forgeCallers": [
         "ForgeEnemy.Native.EnemyModule::AfterDamage",
         "ForgeEnemy.Native.EnemyModule::BeforeDamage",
+        "ForgeEnemy.Native.EnemyModule::Damage",
         "ForgeEnemy.Native.EnemyModule::Heal",
         "ForgeEnemy.Native.EnemyModule::MatchesLimb",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
@@ -186,8 +199,10 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce",
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture",
-        "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
+        "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture",
+        "ForgeEnemy.Native.Observation.EnemyTypeReader::Read"
       ],
       "dataEvidence": []
     },
@@ -237,6 +252,7 @@
         "ForgeEnemy.Native.EnemyModule::AfterDamage",
         "ForgeEnemy.Native.EnemyModule::BeforeDamage",
         "ForgeEnemy.Native.EnemyModule::BeforeLimbBreak",
+        "ForgeEnemy.Native.EnemyModule::Damage",
         "ForgeEnemy.Native.EnemyModule::Heal",
         "ForgeEnemy.Native.EnemyModule::MatchesLimb",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
@@ -256,6 +272,8 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
+        "ForgeEnemy.Native.EnemyModule::ObserveEnemyBehavior",
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce",
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture"
       ],
       "dataEvidence": []
@@ -308,7 +326,9 @@
       "forgeHooks": [],
       "forgeCallers": [
         "ForgeEnemy.Native.EnemyModule::AfterDeath",
+        "ForgeEnemy.Native.EnemyModule::Damage",
         "ForgeEnemy.Native.EnemyModule::Heal",
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce",
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
       ],
@@ -341,7 +361,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::MovementBlocks"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -361,7 +383,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::MovementBlocks"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -381,7 +405,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -401,7 +427,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -421,7 +449,10 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BasePrefabs",
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -456,7 +487,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BalancingBlocks"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -476,7 +509,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BalancingBlocks"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -496,7 +531,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -536,7 +573,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -576,7 +615,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
       "dataEvidence": [
         {
           "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
@@ -596,7 +637,9 @@
       "evidenceLevel": "metadata",
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
-      "forgeCallers": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyTypeReader::Read"
+      ],
       "dataEvidence": []
     },
     {
@@ -690,6 +733,229 @@
       "dataEvidence": []
     },
     {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>.GetAllBlocks.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>",
+      "signature": "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase`1<!0> GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>::GetAllBlocks()",
+      "isStatic": true,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BasePrefabs",
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "enemies"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>.GetAllBlocks.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>",
+      "signature": "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase`1<!0> GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>::GetAllBlocks()",
+      "isStatic": true,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::MovementBlocks"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "movementBlocks"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>.GetAllBlocks.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>",
+      "signature": "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase`1<!0> GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>::GetAllBlocks()",
+      "isStatic": true,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BalancingBlocks"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "balancingBlocks"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>.get_internalEnabled.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>",
+      "signature": "System.Boolean GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>::get_internalEnabled()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BasePrefabs",
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "enemies[*].internalEnabled"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>.get_internalEnabled.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>",
+      "signature": "System.Boolean GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>::get_internalEnabled()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::MovementBlocks"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "movementBlocks[*].internalEnabled"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>.get_internalEnabled.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>",
+      "signature": "System.Boolean GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>::get_internalEnabled()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BalancingBlocks"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "balancingBlocks[*].internalEnabled"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>.get_persistentID.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>",
+      "signature": "System.UInt32 GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>::get_persistentID()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies",
+        "ForgeEnemy.Native.Observation.EnemyTypeReader::Read"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "enemies[*].id"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>.get_persistentID.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>",
+      "signature": "System.UInt32 GameData.GameDataBlockBase`1<GameData.EnemyMovementDataBlock>::get_persistentID()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::MovementBlocks"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "movementBlocks[*].id"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>.get_persistentID.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>",
+      "signature": "System.UInt32 GameData.GameDataBlockBase`1<GameData.EnemyBalancingDataBlock>::get_persistentID()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::BalancingBlocks"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "balancingBlocks[*].id"
+        }
+      ]
+    },
+    {
+      "id": "spawn-requirements.GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>.get_name.0",
+      "area": "spawn-requirements",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>",
+      "signature": "System.String GameData.GameDataBlockBase`1<GameData.EnemyDataBlock>::get_name()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemySpawnRequirementSource::Enemies"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e2-spawn-space-20403457/spawn-space-evidence.json",
+          "pointer": "enemies[*].name"
+        }
+      ]
+    },
+    {
       "id": "health.Dam_SyncedDamageBase.get_Health.0",
       "area": "health",
       "assembly": "Modules-ASM.dll",
@@ -704,6 +970,7 @@
       "forgeCallers": [
         "ForgeEnemy.Native.EnemyModule::AfterDamage",
         "ForgeEnemy.Native.EnemyModule::BeforeDamage",
+        "ForgeEnemy.Native.EnemyModule::Damage",
         "ForgeEnemy.Native.EnemyModule::Heal",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
       ],
@@ -722,6 +989,7 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
+        "ForgeEnemy.Native.EnemyModule::Damage",
         "ForgeEnemy.Native.EnemyModule::Heal",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
       ],
@@ -740,6 +1008,7 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
+        "ForgeEnemy.Native.EnemyModule::Damage",
         "ForgeEnemy.Native.EnemyModule::Heal",
         "ForgeEnemy.Native.EnemyModule::MatchesLimb",
         "ForgeEnemy.Native.Observation.EnemyEntityObserver::Capture"
@@ -855,7 +1124,8 @@
       "isStatic": false,
       "isVirtual": false,
       "isPublic": true,
-      "evidenceLevel": "metadata",
+      "evidenceLevel": "static-native",
+      "nativeRva": "0x137E570",
       "nativeCallPhase": "unknown",
       "forgeHooks": [
         "postfix",
@@ -1075,7 +1345,8 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
-        "ForgeEnemy.Native.EnemyModule::MatchesLimb"
+        "ForgeEnemy.Native.EnemyModule::MatchesLimb",
+        "ForgeEnemy.Native.EnemyNativeWrite::TryNameLimb"
       ],
       "dataEvidence": []
     },
@@ -1129,7 +1400,8 @@
       "forgeHooks": [],
       "forgeCallers": [
         "ForgeEnemy.Native.EnemyModule::BeforeLimbBreak",
-        "ForgeEnemy.Native.EnemyModule::MatchesLimb"
+        "ForgeEnemy.Native.EnemyModule::MatchesLimb",
+        "ForgeEnemy.Native.EnemyNativeWrite::TryNameLimb"
       ],
       "dataEvidence": []
     },
@@ -1150,6 +1422,28 @@
         "ForgeEnemy.Native.EnemyModule::MatchesLimb"
       ],
       "dataEvidence": []
+    },
+    {
+      "id": "damage-limbs-death.Dam_EnemyDamageBase.BulletDamage.0",
+      "area": "damage-limbs-death",
+      "assembly": "Modules-ASM.dll",
+      "type": "Dam_EnemyDamageBase",
+      "signature": "System.Void Dam_EnemyDamageBase::BulletDamage(System.Single,Agents.Agent,UnityEngine.Vector3,UnityEngine.Vector3,UnityEngine.Vector3,System.Boolean,System.Int32,System.Single,System.Single,System.UInt32)",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemyNativeWrite::ApplyDamage"
+      ],
+      "dataEvidence": [
+        {
+          "file": "e10-damage-window.json",
+          "pointer": "damageMethods[1].nativeRva"
+        }
+      ]
     },
     {
       "id": "ai-perception.Enemies.EnemyAI.SetTarget.0",
@@ -1269,6 +1563,7 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce",
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture"
       ],
       "dataEvidence": []
@@ -1308,6 +1603,250 @@
       "dataEvidence": []
     },
     {
+      "id": "ai-perception.Agents.AgentAI.get_IsTargetValid.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Agents.AgentAI",
+      "signature": "System.Boolean Agents.AgentAI::get_IsTargetValid()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::TryTarget"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "hookMembers[7].nativeRva"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Agents.AgentAI.get_Target.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Agents.AgentAI",
+      "signature": "Agents.AgentTarget Agents.AgentAI::get_Target()",
+      "isStatic": false,
+      "isVirtual": true,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::TryTarget"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "hookMembers[8].nativeRva"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Agents.AgentTarget.get_m_agent.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Agents.AgentTarget",
+      "signature": "Agents.Agent Agents.AgentTarget::get_m_agent()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemyModule::ObserveScoutDetection",
+        "ForgeEnemy.Native.EnemyModule::ObserveTargetChange"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[9].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Agents.AgentTarget.get_m_position.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Agents.AgentTarget",
+      "signature": "UnityEngine.Vector3 Agents.AgentTarget::get_m_position()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemyModule::ObserveScoutDetection"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[10].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyAI.get_m_behaviour.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyAI",
+      "signature": "Enemies.EnemyBehaviour Enemies.EnemyAI::get_m_behaviour()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[7].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyAI.get_m_detection.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyAI",
+      "signature": "Enemies.EnemyDetection Enemies.EnemyAI::get_m_detection()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[8].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyBehaviour.get_m_ai.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyBehaviour",
+      "signature": "Enemies.EnemyAI Enemies.EnemyBehaviour::get_m_ai()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[0].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyBehaviour.get_m_currentStateName.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyBehaviour",
+      "signature": "Enemies.EB_States Enemies.EnemyBehaviour::get_m_currentStateName()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[1].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyDetection.UpdateTargets.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyDetection",
+      "signature": "System.Void Enemies.EnemyDetection::UpdateTargets()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [
+        "postfix"
+      ],
+      "forgeCallers": [],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "hookMembers[0].nativeRva"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyDetection.get_m_ai.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyDetection",
+      "signature": "Enemies.EnemyAI Enemies.EnemyDetection::get_m_ai()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemyBehaviorPump::Postfix",
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[2].declaration"
+        }
+      ]
+    },
+    {
+      "id": "ai-perception.Enemies.EnemyDetection.get_m_biggestDetectionBuildup.0",
+      "area": "ai-perception",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyDetection",
+      "signature": "System.Single Enemies.EnemyDetection::get_m_biggestDetectionBuildup()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[3].declaration"
+        }
+      ]
+    },
+    {
       "id": "movement-space.Enemies.EnemyLocomotion.ChangeState.0",
       "area": "movement-space",
       "assembly": "Modules-ASM.dll",
@@ -1335,6 +1874,7 @@
       "nativeCallPhase": "unknown",
       "forgeHooks": [],
       "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ScoutScreamPhase",
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture"
       ],
       "dataEvidence": []
@@ -1447,6 +1987,50 @@
         "ForgeEnemy.Native.Observation.EnemyBehaviorObserver::Capture"
       ],
       "dataEvidence": []
+    },
+    {
+      "id": "movement-space.Enemies.EnemyAI.get_m_locomotion.0",
+      "area": "movement-space",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyAI",
+      "signature": "Enemies.EnemyLocomotion Enemies.EnemyAI::get_m_locomotion()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ReadOnce"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[6].declaration"
+        }
+      ]
+    },
+    {
+      "id": "movement-space.Enemies.EnemyLocomotion.get_ScoutScream.0",
+      "area": "movement-space",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.EnemyLocomotion",
+      "signature": "Enemies.ES_ScoutScream Enemies.EnemyLocomotion::get_ScoutScream()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ScoutScreamPhase"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[14].declaration"
+        }
+      ]
     },
     {
       "id": "abilities.Enemies.EnemyAbilities.HasAbility.0",
@@ -1768,6 +2352,72 @@
       "forgeHooks": [],
       "forgeCallers": [],
       "dataEvidence": []
+    },
+    {
+      "id": "birthing-scout.ES_ScoutDetection.OnTargetRegistered.0",
+      "area": "birthing-scout",
+      "assembly": "Modules-ASM.dll",
+      "type": "ES_ScoutDetection",
+      "signature": "System.Void ES_ScoutDetection::OnTargetRegistered(Agents.AgentTarget)",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [
+        "postfix"
+      ],
+      "forgeCallers": [],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "hookMembers[1].nativeRva"
+        }
+      ]
+    },
+    {
+      "id": "birthing-scout.ES_ScoutDetection.get_m_owner.0",
+      "area": "birthing-scout",
+      "assembly": "Modules-ASM.dll",
+      "type": "ES_ScoutDetection",
+      "signature": "Enemies.EnemyAgent ES_ScoutDetection::get_m_owner()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.EnemyScoutDetected::Postfix"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[16].declaration"
+        }
+      ]
+    },
+    {
+      "id": "birthing-scout.Enemies.ES_ScoutScream.get_m_state.0",
+      "area": "birthing-scout",
+      "assembly": "Modules-ASM.dll",
+      "type": "Enemies.ES_ScoutScream",
+      "signature": "Enemies.ES_ScoutScream/ScoutScreamState Enemies.ES_ScoutScream::get_m_state()",
+      "isStatic": false,
+      "isVirtual": false,
+      "isPublic": true,
+      "evidenceLevel": "metadata",
+      "nativeCallPhase": "unknown",
+      "forgeHooks": [],
+      "forgeCallers": [
+        "ForgeEnemy.Native.Observation.EnemyBehaviorFactsObserver::ScoutScreamPhase"
+      ],
+      "dataEvidence": [
+        {
+          "file": "enemy-behavior-hooks.json",
+          "pointer": "readFields[15].declaration"
+        }
+      ]
     },
     {
       "id": "attacks-projectiles.EAB_ProjectileShooter.Trigger.0",

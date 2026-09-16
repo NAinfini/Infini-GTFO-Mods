@@ -35,7 +35,11 @@ public sealed record DiagnosticNativeObject
 internal sealed record ProjectResourcePin(string Id, string Revision);
 internal abstract record ProjectLocator;
 internal sealed record ProjectZoneLocator(uint LayoutId, int Dimension, int Layer, int LocalIndex) : ProjectLocator;
-internal sealed record ProjectRoomLocator(string ZoneAuthorId, ProjectResourcePin Room, string SourcePrefab) : ProjectLocator;
+/// <summary>One authored room's locator: the zone it belongs to in both spellings — the author's zone id and that
+/// zone's native coordinates — plus the room definition and the native prefab it is generated from. The native
+/// coordinates are required because the resolver searches one zone: the authored id alone is not a zone the level
+/// can be asked about.</summary>
+internal sealed record ProjectRoomLocator(string ZoneAuthorId, ProjectRoomScope Zone, ProjectResourcePin Room, string SourcePrefab) : ProjectLocator;
 internal sealed record ProjectObjectDeclaration(string ExpeditionId, string AuthorId, ProjectLocator Locator)
 {
     internal string Kind => Locator is ProjectZoneLocator ? "zone" : "room";
@@ -44,6 +48,7 @@ internal sealed record ProjectObjectDeclaration(string ExpeditionId, string Auth
         ProjectZoneLocator zone => new { kind = "zone", layoutId = zone.LayoutId, dimension = zone.Dimension,
             layer = zone.Layer, localIndex = zone.LocalIndex },
         ProjectRoomLocator room => new { kind = "unique-geomorph-in-zone", zoneAuthorId = room.ZoneAuthorId,
+            dimension = room.Zone.Dimension, layer = room.Zone.Layer, localIndex = room.Zone.LocalZoneIndex,
             room = new { id = room.Room.Id, revision = room.Room.Revision }, sourcePrefab = room.SourcePrefab },
         _ => throw new InvalidOperationException("Unsupported project locator.")
     };
@@ -58,13 +63,46 @@ internal sealed record ProjectZoneCandidate(int InstanceId, uint LayoutId, int D
 }
 
 internal sealed record ProjectAreaCandidate(int InstanceId, int Uid);
-internal sealed record ProjectGeomorphObservation(int InstanceId, int ZoneInstanceId, string SourcePrefab,
-    bool CreationContextVerified, IReadOnlyList<ProjectAreaCandidate> Areas)
+// The areas one generated geomorph owns, observed where the inspection already walks the level. The
+// geomorph's source identity is deliberately not observed here: which authored reference a geomorph answers is
+// the one shared resolver's answer, and a copy of that rule kept by this scan would be a second answer to it.
+internal sealed record ProjectGeomorphAreas(int InstanceId, int ZoneInstanceId, IReadOnlyList<ProjectAreaCandidate> Areas);
+// One room the shared resolver named for an authored reference, as the candidate document the report contract
+// carries to the site.
+internal sealed record ProjectGeomorphCandidate(int InstanceId, int ZoneInstanceId, string SourcePrefab,
+    IReadOnlyList<ProjectAreaCandidate> Areas)
 {
     internal object Document(int maximumAreas) => new { kind = "geomorph", instanceId = InstanceId,
         zoneInstanceId = ZoneInstanceId, sourcePrefab = SourcePrefab,
         areas = Array.AsReadOnly(Areas.Take(maximumAreas).Select(area => new { instanceId = area.InstanceId, uid = area.Uid }).ToArray()) };
 }
+
+/// <summary>One zone's three coordinates: the scope one authored room search runs in, and the same three numbers a
+/// room's locator carries for the zone it belongs to.</summary>
+internal readonly record struct ProjectRoomScope(int Dimension, int Layer, int LocalZoneIndex);
+
+/// <summary>One generated room the level answered with: the geomorph the level built and the zone it stands
+/// in. Native instance ids, so this scan can join them to the areas it observed itself.</summary>
+internal readonly record struct ProjectRoomHit(int GeomorphInstanceId, int ZoneInstanceId);
+
+/// <summary>
+/// What one room question answered: the rooms the level holds for the reference inside the zone the locator names,
+/// or the one reason the question could not be answered. A refusal is never a candidate to pick from, and it keeps
+/// the resolver's own reason instead of being flattened into "unverified": no room, several rooms and a zone the
+/// level does not have are three different things an author fixes differently.
+/// </summary>
+internal readonly record struct ProjectRoomAnswer(IReadOnlyList<ProjectRoomHit>? Rooms, ProjectReferenceReason? Refusal)
+{
+    internal static ProjectRoomAnswer Answered(IReadOnlyList<ProjectRoomHit> rooms) => new(rooms, null);
+    internal static ProjectRoomAnswer Refused(ProjectReferenceReason reason) => new(null, reason);
+}
+
+/// <summary>
+/// The one question this diagnostics scan asks about an authored room: which generated room does this authored
+/// prefab path name inside this zone. No rooms is a refusal — no such room, several of them, or a zone the level
+/// cannot answer for — and a refusal is never a candidate to pick from.
+/// </summary>
+internal delegate ProjectRoomAnswer ProjectRoomResolver(long worldEpoch, string sourcePrefab, ProjectRoomScope zone);
 
 internal sealed record ProjectReferenceOverflow(long DroppedNativeObjects, long DroppedCandidates, long DroppedAreas)
 {
@@ -190,6 +228,7 @@ internal static class ProjectObjectReferences
         var result = new List<ProjectObjectDeclaration>(value.GetArrayLength());
         var identities = new HashSet<(string Expedition, string Kind, string Author)>();
         var zoneTargets = new HashSet<(string Expedition, ProjectZoneLocator Zone)>();
+        var declaredZones = new Dictionary<(string Expedition, string Author), ProjectZoneLocator>();
         var roomTargets = new HashSet<(string Expedition, string Zone, string Prefab)>();
         var counts = new Dictionary<string, (int Zones, int Rooms)>(StringComparer.Ordinal);
         foreach (var entry in value.EnumerateArray())
@@ -209,11 +248,12 @@ internal static class ProjectObjectReferences
                     (int)ReadInteger(locator.GetProperty("layer"), 0, 2),
                     (int)ReadInteger(locator.GetProperty("localIndex"), 0, int.MaxValue));
                 if (!zoneTargets.Add((expedition, zone))) throw new InvalidDataException("Native zone tuple has more than one author in the expedition.");
+                declaredZones[(expedition, author)] = zone;
                 parsed = zone;
             }
             else if (kind == "room")
             {
-                RequireObject(locator, "kind", "zoneAuthorId", "room", "sourcePrefab");
+                RequireObject(locator, "kind", "zoneAuthorId", "dimension", "layer", "localIndex", "room", "sourcePrefab");
                 if (ReadText(locator.GetProperty("kind"), 32, 32) != "unique-geomorph-in-zone")
                     throw new InvalidDataException("Unsupported room locator.");
                 var pin = locator.GetProperty("room");
@@ -222,6 +262,9 @@ internal static class ProjectObjectReferences
                 if (id.Any(character => char.IsWhiteSpace(character) || character is '/' or '\\'))
                     throw new InvalidDataException("Invalid room resource ID.");
                 var room = new ProjectRoomLocator(ReadAuthorId(locator.GetProperty("zoneAuthorId")),
+                    new ProjectRoomScope((int)ReadInteger(locator.GetProperty("dimension"), 0, int.MaxValue),
+                        (int)ReadInteger(locator.GetProperty("layer"), 0, 2),
+                        (int)ReadInteger(locator.GetProperty("localIndex"), 0, int.MaxValue)),
                     new ProjectResourcePin(id, ReadSha256(pin.GetProperty("revision"))), ReadSourcePrefab(locator.GetProperty("sourcePrefab")));
                 if (!roomTargets.Add((expedition, room.ZoneAuthorId, room.SourcePrefab)))
                     throw new InvalidDataException("A unique geomorph locator has more than one author in the expedition.");
@@ -237,8 +280,14 @@ internal static class ProjectObjectReferences
             result.Add(new ProjectObjectDeclaration(expedition, author, parsed));
         }
         foreach (var declaration in result)
-            if (declaration.Locator is ProjectRoomLocator room && !identities.Contains((declaration.ExpeditionId, "zone", room.ZoneAuthorId)))
-                throw new InvalidDataException("Room zoneAuthorId must name a declared zone in the same expedition.");
+            if (declaration.Locator is ProjectRoomLocator room)
+            {
+                if (!declaredZones.TryGetValue((declaration.ExpeditionId, room.ZoneAuthorId), out var zone))
+                    throw new InvalidDataException("Room zoneAuthorId must name a declared zone in the same expedition.");
+                // 房间引用带的原生定位必须就是那条区域引用自己的定位：两处说的是同一件事，写两份就必须相等。
+                if (zone.Dimension != room.Zone.Dimension || zone.Layer != room.Zone.Layer || zone.LocalIndex != room.Zone.LocalZoneIndex)
+                    throw new InvalidDataException("A room locator must carry the native coordinates of its declared zone.");
+            }
         return result.AsReadOnly();
     }
 
@@ -252,7 +301,8 @@ internal sealed class ProjectObjectReferenceScan
     private readonly Dictionary<(string Expedition, string Author), ProjectZoneLocator> _declaredZones;
     private readonly long _worldEpoch;
     private readonly Dictionary<int, ProjectZoneCandidate> _zones = new();
-    private readonly Dictionary<int, ProjectGeomorphObservation> _geomorphs = new();
+    private readonly Dictionary<int, ProjectGeomorphAreas> _geomorphs = new();
+    private readonly ProjectRoomResolver? _rooms;
     private readonly Dictionary<int, (string Kind, int Owner)> _nativeObjects = new();
     private readonly HashSet<ProjectLayoutKey> _activeLayouts = new();
     private readonly HashSet<int> _supportedDimensions = new();
@@ -263,8 +313,11 @@ internal sealed class ProjectObjectReferenceScan
     private int _areaCount;
     private long _droppedNativeObjects, _droppedAreas;
 
+    /// <param name="rooms">The one room resolver installed in this build, or null when this build installed
+    /// none. A scan without one refuses every authored room instead of matching a prefab name against a
+    /// second copy of the identity rule that lives with the generated level.</param>
     internal ProjectObjectReferenceScan(IReadOnlyList<ProjectObjectDeclaration> declarations, long worldEpoch,
-        long? simulationTick, ProjectSourceVerification sourceVerification)
+        long? simulationTick, ProjectSourceVerification sourceVerification, ProjectRoomResolver? rooms = null)
     {
         ProjectObjectReferences.ValidateEpoch(worldEpoch, simulationTick);
         if (!Enum.IsDefined(typeof(ProjectSourceVerification), sourceVerification))
@@ -276,6 +329,7 @@ internal sealed class ProjectObjectReferenceScan
         _worldEpoch = worldEpoch;
         _simulationTick = simulationTick;
         _sourceVerification = sourceVerification;
+        _rooms = rooms;
         _status = worldEpoch == 0 ? ProjectScanStatus.Rejected : ProjectScanStatus.NotRequested;
     }
 
@@ -336,19 +390,16 @@ internal sealed class ProjectObjectReferenceScan
         }
     }
 
-    internal void ObserveGeomorph(ProjectGeomorphObservation observation)
+    /// <summary>One generated geomorph's own areas, as the inspection walked them inside its zone. The witness
+    /// itself is not observed as a candidate here: which authored reference names it is the one room resolver's
+    /// answer, and this scan only supplies the areas a report names the answer by.</summary>
+    internal void ObserveAreas(ProjectGeomorphAreas observation)
     {
         lock (_gate)
         {
             if (_status != ProjectScanStatus.Pending) return;
             if (observation.InstanceId == 0 || observation.ZoneInstanceId == 0 || observation.Areas == null)
             { _observationFault = true; return; }
-            var sourcePrefab = string.Empty;
-            if (observation.CreationContextVerified)
-            {
-                try { sourcePrefab = ProjectObjectReferences.ValidateSourcePrefab(observation.SourcePrefab); }
-                catch (InvalidDataException) { _observationFault = true; return; }
-            }
             // Inspect Count before enumeration, so one malformed giant collection is bounded.
             if (observation.Areas.Count > ProjectObjectReferences.MaximumAreas)
             {
@@ -367,8 +418,7 @@ internal sealed class ProjectObjectReferenceScan
             var areas = uniqueAreas.Values.OrderBy(area => area.InstanceId).ToArray();
             if (_geomorphs.TryGetValue(observation.InstanceId, out var existing))
             {
-                if (existing.ZoneInstanceId != observation.ZoneInstanceId || existing.SourcePrefab != sourcePrefab ||
-                    existing.CreationContextVerified != observation.CreationContextVerified || !existing.Areas.SequenceEqual(areas))
+                if (existing.ZoneInstanceId != observation.ZoneInstanceId || !existing.Areas.SequenceEqual(areas))
                     _observationFault = true;
                 return;
             }
@@ -387,8 +437,8 @@ internal sealed class ProjectObjectReferenceScan
                     else Add(ref _droppedAreas, 1);
                 }
             }
-            _geomorphs.Add(observation.InstanceId, new ProjectGeomorphObservation(observation.InstanceId,
-                observation.ZoneInstanceId, sourcePrefab, observation.CreationContextVerified, accepted.AsReadOnly()));
+            _geomorphs.Add(observation.InstanceId, new ProjectGeomorphAreas(observation.InstanceId,
+                observation.ZoneInstanceId, accepted.AsReadOnly()));
         }
     }
 
@@ -440,11 +490,6 @@ internal sealed class ProjectObjectReferenceScan
             // Index once. Matching does not rescan all native objects for every declaration.
             var zones = _zones.Values.OrderBy(zone => zone.InstanceId).GroupBy(zone => zone.Locator)
                 .ToDictionary(group => group.Key, group => group.ToArray());
-            var geomorphs = _geomorphs.Values.Where(geomorph => geomorph.CreationContextVerified)
-                .OrderBy(geomorph => geomorph.InstanceId).GroupBy(geomorph => (geomorph.ZoneInstanceId, geomorph.SourcePrefab))
-                .ToDictionary(group => group.Key, group => group.ToArray());
-            var unknownCreationZones = _geomorphs.Values.Where(geomorph => !geomorph.CreationContextVerified)
-                .Select(geomorph => geomorph.ZoneInstanceId).ToHashSet();
             var restriction = Restriction();
             // Layout IDs alone do not identify an expedition when authors reuse them.
             // Require the complete declared layout-key set, never a matching subset.
@@ -470,20 +515,43 @@ internal sealed class ProjectObjectReferenceScan
                 var zoneLocator = _declaredZones[(declaration.ExpeditionId, locator.ZoneAuthorId)];
                 var parent = ResolveZone(zoneLocator);
                 var parentCandidates = zones.GetValueOrDefault(zoneLocator) ?? Array.Empty<ProjectZoneCandidate>();
-                var candidates = parentCandidates.Length == 1
-                    ? geomorphs.GetValueOrDefault((parentCandidates[0].InstanceId, locator.SourcePrefab)) ?? Array.Empty<ProjectGeomorphObservation>()
-                    : Array.Empty<ProjectGeomorphObservation>();
-                var examples = candidates.Take(ProjectObjectReferences.MaximumCandidatesPerGroup).Select(candidate => (object)candidate).ToArray();
-                if (restriction.HasValue) return new(ProjectReferenceStatus.Unverified, restriction.Value, candidates.Length, examples);
+                if (restriction.HasValue) return new(ProjectReferenceStatus.Unverified, restriction.Value, 0, Array.Empty<object>());
                 if (parent.Status == ProjectReferenceStatus.Inactive)
-                    return new(ProjectReferenceStatus.Inactive, ProjectReferenceReason.LayoutInactive, candidates.Length, examples);
+                    return new(ProjectReferenceStatus.Inactive, ProjectReferenceReason.LayoutInactive, 0, Array.Empty<object>());
                 if (parent.Status != ProjectReferenceStatus.Matched)
                     return new(ProjectReferenceStatus.Unverified,
                         parent.Reason == ProjectReferenceReason.UnsupportedDimension ? parent.Reason : ProjectReferenceReason.ZoneUnresolved,
-                        candidates.Length, examples);
-                // An unverified source in the same zone might be another candidate; it cannot establish uniqueness.
-                if (unknownCreationZones.Contains(parentCandidates[0].InstanceId))
-                    return new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.CreationContextUnverified, candidates.Length, examples);
+                        0, Array.Empty<object>());
+                // One resolver answers which generated room this authored reference names, asked in the zone the
+                // locator itself carries — the same coordinates its declared zone reference carries, which the
+                // parser already required them to equal. The resolver's own refusal reason is kept: a zone the
+                // level does not have, a zone with no such room and a build with no resolver are different things.
+                var zone = parentCandidates[0];
+                ProjectRoomAnswer answer;
+                try
+                {
+                    answer = _rooms?.Invoke(_worldEpoch, locator.SourcePrefab, locator.Zone)
+                        ?? ProjectRoomAnswer.Refused(ProjectReferenceReason.CreationContextUnverified);
+                }
+                catch (Exception) { answer = ProjectRoomAnswer.Refused(ProjectReferenceReason.CreationContextUnverified); }
+                // A refusal that observed no room is that refusal. A refusal that observed several — the same
+                // prefab placed twice in the zone — carries them, and the cardinality rule below turns them into
+                // the ambiguous group an author reads the candidates from.
+                if (answer.Rooms is not { } found)
+                    return new(ProjectReferenceStatus.Unverified, answer.Refusal!.Value, 0, Array.Empty<object>());
+                var names = found.OrderBy(hit => hit.GeomorphInstanceId).ToArray();
+                var candidates = new ProjectGeomorphCandidate[names.Length];
+                var ownZone = true;
+                for (var i = 0; i != names.Length; i++)
+                {
+                    if (names[i].ZoneInstanceId != zone.InstanceId) ownZone = false;
+                    candidates[i] = new ProjectGeomorphCandidate(names[i].GeomorphInstanceId, names[i].ZoneInstanceId,
+                        locator.SourcePrefab, _geomorphs.TryGetValue(names[i].GeomorphInstanceId, out var observed)
+                            ? observed.Areas : Array.Empty<ProjectAreaCandidate>());
+                }
+                var examples = candidates.Take(ProjectObjectReferences.MaximumCandidatesPerGroup).Select(candidate => (object)candidate).ToArray();
+                // A room the reference claims for one zone but the level built in another is not that zone's room.
+                if (!ownZone) return new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.ZoneUnresolved, candidates.Length, examples);
                 if (candidates.Length == 1 && candidates[0].Areas.Count == 0)
                     return new(ProjectReferenceStatus.Unverified, ProjectReferenceReason.AreaMappingIncomplete, 1, examples);
                 return ByCount(candidates.Length, examples);
@@ -514,7 +582,7 @@ internal sealed class ProjectObjectReferenceScan
                 foreach (var example in examples)
                 {
                     if (example is ProjectZoneCandidate zoneCandidate) documents.Add(zoneCandidate.Document);
-                    else if (example is ProjectGeomorphObservation geomorph)
+                    else if (example is ProjectGeomorphCandidate geomorph)
                     {
                         var areaCount = Math.Min(remainingAreas, geomorph.Areas.Count);
                         remainingAreas -= areaCount;

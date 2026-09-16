@@ -14,7 +14,7 @@ void Check(bool condition, string name)
 ProjectObjectDeclaration[] Declarations() => new ProjectObjectDeclaration[]
 {
     new("expedition", "zone-a", new ProjectZoneLocator(10, 0, 0, 1)),
-    new("expedition", "room-a", new ProjectRoomLocator("zone-a", new("room", new string('a', 64)), "Assets/Rooms/room.prefab"))
+    new("expedition", "room-a", new ProjectRoomLocator("zone-a", new ProjectRoomScope(0, 0, 1), new("room", new string('a', 64)), "Assets/Rooms/room.prefab"))
 };
 ProjectInspectionSession Session(long epoch = 7, ProjectSourceVerification source = ProjectSourceVerification.Matched, long? tick = 12)
 {
@@ -28,7 +28,7 @@ ProjectInspectionSession Session(long epoch = 7, ProjectSourceVerification sourc
     var floor = new LG_Floor();
     var layer = new LG_Layer { m_dimension = floor.MainDimension };
     floor.MainDimension!.Layers.Add(layer);
-    var zone = new LG_Zone { Layer = layer, LocalIndex = 1 };
+    var zone = new LG_Zone { Layer = layer, LocalIndex = 1, m_settings = new LG_ZoneSettings { m_zoneData = new GameData.ExpeditionZoneData() } };
     layer.m_zones.Add(zone);
     floor.allZones!.Add(zone);
     var geo = new LG_Geomorph { m_zone = zone };
@@ -78,6 +78,31 @@ try
     Check(nullArea.IsPartial, "null area reduces coverage");
     var noGeomorph = Session(); world = Floor(); world.Zone.m_areas![0]!.m_geomorph = null; Drain(noGeomorph);
     Check(noGeomorph.IsPartial, "missing area geomorph reduces coverage");
+    var noZoneData = Session(); world = Floor(); world.Zone.m_settings = null; Drain(noZoneData);
+    Check(noZoneData.IsPartial, "a zone without its own data block is unverified, not an invented policy");
+    var respawn = Session(); world = Floor();
+    world.Zone.m_settings!.m_zoneData = new GameData.ExpeditionZoneData
+    {
+        EnemyRespawning = true, EnemyRespawnRequireOtherZone = true, EnemyRespawnRoomDistance = 2,
+        EnemyRespawnTimeInterval = 900f, EnemyRespawnCountMultiplier = 2.5f,
+        EnemyRespawnExcludeList = new() { 11u, 22u, 33u }, HealthMulti = 1.5f
+    };
+    Drain(respawn);
+    using (var json = Export(respawn, "zone-respawn"))
+    {
+        var events = json.RootElement.GetProperty("events").EnumerateArray().ToList();
+        Check(events.Any(e => e.GetProperty("stage").GetString() == "zone_respawn_policy"), "respawn policy is its own observation");
+        var policy = events.Single(e => e.GetProperty("stage").GetString() == "zone_respawn_policy");
+        var fields = policy.GetProperty("fields");
+        Check(fields.GetProperty("enabled").GetString() == "True" && fields.GetProperty("courseNodeDistance").GetString() == "2"
+            && fields.GetProperty("intervalSeconds").GetString() == "900" && fields.GetProperty("countPercent").GetString() == "250"
+            && fields.GetProperty("excludeCount").GetString() == "3" && fields.GetProperty("healthMulti").GetString() == "1.5",
+            "read values are the zone's own authored data");
+        var verdict = json.RootElement.GetProperty("checks").EnumerateArray()
+            .Single(row => row.GetProperty("kind").GetString() == "zone_enemy_respawn_policy");
+        Check(verdict.GetProperty("status").GetString() == "enabled" && verdict.GetProperty("detail").GetString()!.Contains("count=250%"),
+            "the enabled policy is the check's own status, not a pass/fail claim");
+    }
     var failedRead = Session(); world = Floor(); world.Zone.ThrowOnPosition = true; Drain(failedRead);
     Check(failedRead.IsPartial, "caught native read exception reduces scan completeness");
     using (var json = Export(failedRead, "read-error"))
@@ -168,6 +193,7 @@ try
     tupleScan.Complete(2);
     Check(tupleScan.Snapshot().Groups.All(g => g.Status == ProjectReferenceStatus.Matched && g.ObservedCandidateCount == 1), "same local index in different dimension/layer stays distinct");
     Check(tupleScan.Snapshot().Groups.Count == 3, "all three native tuple declarations remain present");
+    NodeBackReferenceTests.Run(output, Check);
 }
 finally
 {

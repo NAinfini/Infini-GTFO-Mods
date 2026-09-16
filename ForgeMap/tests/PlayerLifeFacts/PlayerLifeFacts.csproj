@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production observation half is compiled
+         against, so CS0436 fires on every mention of a shadowed type. Which definition wins is decided by the
+         `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this package is compiled against: the in-tree Framework build output, or an already built
+         `ForgeRuntime.Framework.dll` for the window in which the in-tree sources do not compile. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/core/0Harmony.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The two production sources under test, compiled into this assembly: the life half and the contract rows
+         it binds and publishes through. The Map provider definition travels with the contract because the
+         capability ids and binding ids are read from it, so a renamed row fails here instead of drifting. No
+         GTFO assembly is loaded: the game types are the doubles in GameDoubles.cs. -->
+    <Compile Include="../../Native/PlayerLifeFacts.cs;../../PlayerLifeContract.cs" />
+    <Compile Include="AssemblyAttributes.cs;GameDoubles.cs;PlayerLifeFixture.cs;PlayerLifeTests.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <!-- The production half carries the Harmony patch classes that install it, so the patch attributes must
+         resolve here. The assembly is referenced for its attributes only; nothing is patched in this suite. -->
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <!-- The framework types a payload is built from are used by every file here, and the interop member kind a
+         name resolves to is part of this suite's subject, so the namespace is a using and not an alias per file. -->
+    <Using Include="ForgeRuntime.Framework" />
+  </ItemGroup>
+</Project>

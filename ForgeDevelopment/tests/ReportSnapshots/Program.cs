@@ -80,6 +80,7 @@ try
     QueueBoundaryTests.Run(root, Check);
     WorkerBoundaryTests.Run(root, Check);
     PreservedSnapshotTests.Run(Check);
+    TraceBackReferenceTests.Run(root, Check);
 }
 finally { Directory.Delete(root, recursive: true); }
 Console.WriteLine($"Forge Development report snapshots: {checks - failures}/{checks} passed");

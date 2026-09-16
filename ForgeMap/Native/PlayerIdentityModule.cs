@@ -10,7 +10,7 @@ namespace ForgeMap.Native;
 /// <summary>MAP5a player entity identity. One life is one PlayerAgent instance observed for one SNet_Player
 /// in one Runtime world. Downed, revive, heal and warp never allocate or end a life here; respawn, landing
 /// and checkpoint semantics belong to the rest of MAP5 and are not modelled. Only the host allocates lives.</summary>
-internal sealed class PlayerIdentityModule : IDisposable
+internal sealed class PlayerIdentityModule : IPlayerLifeWorld, IDisposable
 {
     internal const string EntityKind = "gtfo.player";
     private const string Prefix = EntityKind + ":";
@@ -34,20 +34,35 @@ internal sealed class PlayerIdentityModule : IDisposable
     private bool _disposed;
     internal bool IsRegistered => !_disposed && _registration.IsRegistered;
 
-    internal PlayerIdentityModule(RuntimeKernel kernel, RuntimeLogLevel logLevel, Func<bool> canObserve, Action<string> log, Action<string> warn)
+    /// <summary>The registered module whose lives the player selector answers with. The runtime rejects two
+    /// providers of one identity namespace, so at most one Map module is ever registered, and the property is
+    /// cleared again when that registration goes away.</summary>
+    internal static PlayerIdentityModule? Current { get; private set; }
+
+    /// <summary>Whether this process may read a recorded life at all right now: the registration is live, the
+    /// runtime is ready and this peer is the authority. It is the same gate every readback in this class already
+    /// applies, exposed because the life half asks before it reads rather than deriving a second gate.</summary>
+    public bool Authoritative => CanObserve;
+
+    /// <summary>Attaches this domain's half to the one Map registration. The registration itself is owned by
+    /// the session, because the runtime accepts exactly one provider of an identity namespace and both of this
+    /// package's namespaces have to be declared by that one provider. The registration is already in place when
+    /// this constructor runs, so a rejected registration leaves no module and this half is simply not attached.</summary>
+    internal PlayerIdentityModule(RuntimeModuleHandle registration, RuntimeKernel kernel, Func<bool> canObserve, Action<string> log, Action<string> warn)
     {
+        _registration = registration ?? throw new ArgumentNullException(nameof(registration));
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
         _canObserve = canObserve ?? throw new ArgumentNullException(nameof(canObserve));
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _warn = warn ?? throw new ArgumentNullException(nameof(warn));
-        // The one Map provider identity. The resolver and the instance lookup are its only runtime surface: no
-        // capability, binding or observer, because a snapshot would need the alive/downed/dead mapping that MAP5
-        // has not verified. The instance lookup lets other domains name a player without ever seeing the account key.
-        _registration = kernel.RegisterModule(ModuleDefinition.Create() with
-        {
-            EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [EntityKind] = IsCurrent },
-            EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>> { [EntityKind] = ResolveInstance }
-        }, logLevel);
+        // The resolver, the instance lookup, the read-only observer and the `forge.selector.target.players`
+        // query binding are this half's whole runtime surface. The observer reads one named life through the
+        // kernel's budgeted query; the binding answers with the lives this module records, so a selector never
+        // enumerates native state on its own. The instance lookup lets other domains name a player without
+        // ever seeing the account key.
+        // Assigned only after the registration that owns it succeeded: a rejected registration leaves no
+        // module for a selector step to answer from, and every later refusal is the kernel's own.
+        Current = this;
         try
         {
             // Checkpoint reload, level cleanup and authority loss reach Map as a host world change; no local copy.
@@ -58,7 +73,7 @@ internal sealed class PlayerIdentityModule : IDisposable
                     ClearWorld();
             });
         }
-        catch { _registration.Dispose(); throw; }
+        catch { if (ReferenceEquals(Current, this)) Current = null; throw; }
     }
 
     internal int Count { get { CheckThread(); return _players.Count; } }
@@ -84,12 +99,15 @@ internal sealed class PlayerIdentityModule : IDisposable
     {
         CheckThread();
         if (_disposed) return;
-        _registration.Dispose(); _lifecycle.Dispose(); ClearWorld(); _disposed = true;
+        _lifecycle.Dispose(); ClearWorld(); _disposed = true;
+        if (ReferenceEquals(Current, this)) Current = null;
     }
 
     /// <summary>Reads the in-level agent list after a native spawn or despawn body and reconciles lives.
-    /// A changed agent or player pointer for a player key is a new life under the same per-world number.</summary>
-    internal void Reconcile()
+    /// A changed agent or player pointer for a player key is a new life under the same per-world number.
+    /// Public because it is the interface member <see cref="IPlayerLifeWorld"/> declares, which is how the
+    /// player-life facts half reaches the identity this module owns.</summary>
+    public void Reconcile()
     {
         CheckThread();
         if (!CanObserve) return;
@@ -160,6 +178,167 @@ internal sealed class PlayerIdentityModule : IDisposable
     }
 
     internal bool IsCurrent(EntityReference reference) => Resolve(reference) != null;
+
+    /// <summary>The entity the replication data of a spawn names, or null while the identity tracks no life for
+    /// that player. The player is matched by its native pointer, exactly as the instance lookup does, and the
+    /// reference that answers is the one <see cref="Resolve"/> already verified.</summary>
+    public EntityReference? ReferenceOf(SNet_Player? player)
+    {
+        CheckThread();
+        if (player == null || !CanObserve) return null;
+        var pointer = player.Pointer;
+        foreach (var entry in _players.Values)
+            if (entry.PlayerPointer == pointer) return Resolve(entry.Reference)?.Reference;
+        return null;
+    }
+
+    /// <summary>The entity of a native agent a callback carried, or null when this module tracks no life for it.
+    /// It is the same pointer comparison the instance lookup performs, over the agents the module recorded rather
+    /// than over the player objects.</summary>
+    public EntityReference? ReferenceOf(object? instance)
+    {
+        CheckThread();
+        if (instance is not PlayerAgent agent || agent == null || !CanObserve) return null;
+        var pointer = agent.Pointer;
+        foreach (var entry in _players.Values)
+            if (entry.AgentPointer == pointer) return Resolve(entry.Reference)?.Reference;
+        return null;
+    }
+
+    /// <summary>One read of a recorded life right now: alive from the agent's own flag, downed from the
+    /// locomotion machine's current state, and whether that state already ran its revive. A state machine that
+    /// is not there to read answers "not revived" rather than guessing. Null means the identity no longer holds
+    /// the reference, which is not the same as a life that is simply not downed.</summary>
+    public RuntimePlayerLife? LifeOf(EntityReference reference)
+    {
+        CheckThread();
+        if (!CanObserve) return null;
+        if (Resolve(reference) is not { } entry || entry.Agent is not { } agent) return null;
+        var locomotion = agent.Locomotion;
+        bool readLocomotion = locomotion != null && locomotion.Pointer != IntPtr.Zero;
+        var downed = readLocomotion && locomotion!.m_currentStateEnum == PlayerLocomotion.PLOC_State.Downed;
+        var state = readLocomotion && downed ? locomotion!.TryCast<PLOC_Downed>() : null;
+        return new RuntimePlayerLife(agent.Alive, downed, state is { m_isRevived: true });
+    }
+
+    /// <summary>The actor the game recorded on a downed life's revive interaction. The interop surface of this
+    /// build does not expose that actor: the interact base keeps its per-interactor records in a nested info type
+    /// whose `Agent` member the interaction itself does not carry, so there is no read here to make. The answer is
+    /// null, and the `revived` fact's rescuer is the one the revive interaction's own callback named, exactly as a
+    /// `revive_started` row's is — the caller keeps that actor and this read adds none.</summary>
+    public EntityReference? ReviverOf(EntityReference reference)
+    {
+        CheckThread();
+        return null;
+    }
+
+    /// <summary>The position of a recorded life in metres, or null when it cannot be read. Only finite
+    /// coordinates answer: a position the game could not produce is not a position.</summary>
+    public double[]? PositionOf(EntityReference reference)
+    {
+        CheckThread();
+        if (!CanObserve) return null;
+        if (Resolve(reference) is not { } entry || entry.Agent is not { } agent) return null;
+        var position = agent.Position;
+        return float.IsFinite(position.x) && float.IsFinite(position.y) && float.IsFinite(position.z)
+            ? new double[] { position.x, position.y, position.z } : null;
+    }
+
+    /// <summary>The position a teleport argument names, in metres, or null when it is not a finite position.
+    /// The argument is the game's own location struct, so the read is the same finite-coordinate rule the
+    /// recorded life's own position goes through.</summary>
+    public double[]? Position(object? locationData)
+    {
+        CheckThread();
+        if (!CanObserve) return null;
+        if (locationData is not pPlayerLocationData location) return null;
+        var position = location.goodPosition;
+        return float.IsFinite(position.x) && float.IsFinite(position.y) && float.IsFinite(position.z)
+            ? new double[] { position.x, position.y, position.z } : null;
+    }
+
+    /// <summary>The position of a recorded life in metres, or null when it cannot be read. It is the same read
+    /// <see cref="PositionOf"/> performs, under the name the life-world contract declares.</summary>
+    public double[]? Position(EntityReference reference) => PositionOf(reference);
+
+    /// <summary>The refusal a life transition gets when it is routed through the identity. The identity half owns
+    /// which native agent is which recorded life and how to read it; publishing a transition is the player-life
+    /// trigger half's, which does it once per transition. The members below implement the contract's transition
+    /// half so this module carries exactly the surface it is read through, and every one of them refuses: a
+    /// caller that reached them went around the one publisher, and answering `false` would report that as the
+    /// transition having been judged.</summary>
+    internal const string TransitionOwnerCode = "life-transition-owner";
+
+    public bool Downed(object? downedState) => Forbidden();
+
+    public bool Revived(object? downedState) => Forbidden();
+
+    public bool ReviveStarted(object? rescuer, object? target) => Forbidden();
+
+    public bool ReviveCancelled(string reason, object? rescuer, object? target) => Forbidden();
+
+    public bool Died(bool alive, object? agent) => Forbidden();
+
+    public bool Teleported(object? agent, object? destination) => Forbidden();
+
+    public bool Respawned(object? spawnData) => Forbidden();
+
+    private static bool Forbidden()
+        => throw new RuntimeContractException(TransitionOwnerCode,
+            "Player-life transitions are published by the player-life trigger half, not by the identity.");
+
+    /// <summary>The identity half keeps no publication log: it publishes nothing. The contract asks for one
+    /// because the half that does publish keeps it.</summary>
+    public IReadOnlyList<string> Journal => Array.Empty<string>();
+
+    /// <summary>Drops this world's recorded lives. The kernel's world epoch is what invalidates the references
+    /// already handed out; this releases the table they were read from.</summary>
+    public void BeginWorld() => ClearWorld();
+
+    /// <summary>Whether a native change to a recorded life is legal right now: the same readiness, authority,
+    /// ownership and fault gate every readback goes through. The action layer asks this instead of deriving a
+    /// second gate from the kernel and the network flag, so a commit can never be attempted in a state the
+    /// module would refuse to read in.</summary>
+    internal bool CanCommit => CanObserve;
+
+    /// <summary>The current agent behind a recorded life, for the half that reads or commits native state on it;
+    /// null when the reference is not this module's current life. The instance is handed out only after the same
+    /// verification a snapshot read performs, and the caller re-reads and re-compares the pointers it captured
+    /// before it commits anything, so a life replaced mid-command is refused rather than written through.</summary>
+    internal PlayerAgent? CurrentAgent(EntityReference reference)
+    {
+        CheckThread();
+        return Resolve(reference)?.Agent;
+    }
+
+    /// <summary>Read-only snapshot for a current player life: position, health, alive/downed/dead and the
+    /// host, local, bot and slot facts. A reference whose identity the module no longer holds is refused, and
+    /// a life replaced while its native state was being read yields no snapshot at all.</summary>
+    internal RuntimeEntitySnapshot? Observe(EntityReference reference)
+    {
+        CheckThread();
+        if (!CanObserve) return null;
+        var entry = Resolve(reference);
+        if (entry == null) return null;
+        var agent = entry.Agent;
+        return agent == null || agent.Pointer != entry.AgentPointer
+            ? null : PlayerObservation.Read(agent, entry.Player, entry.Reference);
+    }
+
+    /// <summary>The recorded lives that still resolve right now, in first-recorded order. The caller is the Map
+    /// player candidate source, which the kernel reads under its query budget: this enumeration reads the
+    /// module's own registry and resolves each entry as it lists it, and that one read is what a selector's
+    /// `query` step spends. The order it answers in is the registry's, so the candidate source decides the
+    /// order the kind publishes.</summary>
+    internal IReadOnlyList<EntityReference> CurrentPlayers()
+    {
+        CheckThread();
+        if (!CanObserve) return Array.Empty<EntityReference>();
+        var current = new List<EntityReference>(_players.Count);
+        foreach (var entry in _players.Values)
+            if (Resolve(entry.Reference) is { } live) current.Add(live.Reference);
+        return current;
+    }
 
     /// <summary>SDK instance lookup: an <see cref="SNet_Player"/> maps to its recorded current life, anything else to null.
     /// It never allocates, so a player seen before the spawn readback has no reference yet rather than a guessed one.</summary>

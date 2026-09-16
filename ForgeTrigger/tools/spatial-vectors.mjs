@@ -13,10 +13,14 @@ const ref=id=>({id:'test.spatial:'+id,worldEpoch:1,lifeEpoch:1});
 const positions={origin:[0,0,0],a:[1,0,0],b:[-1,0,0],c:[3,0,0],d:[5,0,0],v:[0,3,0],diagonal:[3,4,0]};
 const world={worldEpoch:1,relations:[],actors:{source:ref('origin')},entities:Object.entries(positions).map(([id,position])=>({
     ref:ref(id),kind:'enemy',faction:null,lifeState:'alive',tags:[],receives:[],position}))};
+// Every row selects from the explicit candidate set its own inputs carry, shape_overlap included: the row names
+// the whole world sample as that set, so both sides compare the same population even though only the C# handler
+// narrows it before the volume test.
+const sample=world.entities.map(row=>row.ref);
 const names=['shape_overlap','nearest','farthest','chain'];
 const versions=Object.fromEntries(names.map(name=>{
     const definition=logicPrimitiveDefinitions.find(row=>row.id==='forge.selector.target.'+name);
-    assert.equal(definition?.graph.execution,'pure');
+    assert.equal(definition?.graph.execution,'query');
     return [definition.id,definition.version];
 }));
 const emit={empty:'emit-empty'};
@@ -31,13 +35,9 @@ function evaluate(name,parameters,inputs,golden){
     return {name,parameters,inputs,expected:result.outputs.targets};
 }
 const add=(...row)=>rows.push(evaluate(...row));
-// shape_overlap queries the whole world sample; it has no candidate input.
-const volume=(shape,center,radius,height)=>[{shape,...emit},{center,radius,angle:0,height,extents:[radius,height/2,radius]}];
-for(const shape of ['sphere','cylinder']) for(const center of [[0,0,0],[3,0,0]]) for(const radius of [1,3,5]) for(const height of [2,8])
+const volume=(shape,center,radius,height)=>[{shape,...emit},{candidates:sample,center,radius,angle:0,height,extents:[radius,height/2,radius]}];
+for(const shape of ['sphere','cylinder','capsule','box']) for(const center of [[0,0,0],[3,0,0]]) for(const radius of [1,3,5]) for(const height of [2,8])
     add('shape_overlap',...volume(shape,center,radius,height));
-// The C# observed volume implements point sphere/cylinder only; these website results are recorded as a gap, not consumed.
-for(const shape of ['capsule','box'])
-    unimplemented.push({...evaluate('shape_overlap',...volume(shape,[0,0,0],3,8)),reason:'ObservedVolumeShape has no '+shape});
 const all=Object.keys(positions).filter(id=>id!=='origin').map(ref);
 for(const candidates of [[],[ref('a')],all,[...all].reverse(),[...all,...all]]){
     for(const anchor of [ref('origin'),ref('a')]){

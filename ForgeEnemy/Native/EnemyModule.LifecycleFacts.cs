@@ -57,6 +57,9 @@ internal sealed partial class EnemyModule
             || enemy.GlobalID != entry.Enemy.GlobalID || enemy.Alive) return;
         if (!CanObserveFacts || Resolve(before.Target) != entry || enemy.Pointer != before.EnemyPointer
             || enemy.Alive) return;
+        // The life is over here, so the values that lived with it go with it: the kernel cannot tell a dead enemy
+        // from a live one, which is why the provider that observed the death says so.
+        ReleaseEnemyScope(before.Target);
         // OnDead carries no verifiable killer, so the nullable source stays unknown instead of guessed.
         PublishLifecycleFact(DeathStartedBinding, before.Target,
             RuntimeJson.From(new { enemy = before.Target, source = (EntityReference?)null }));
@@ -114,8 +117,18 @@ internal sealed partial class EnemyModule
         return indexed != null && indexed.Pointer == observation.LimbPointer;
     }
 
-    private void PublishLifecycleFact(string binding, EntityReference target, JsonElement outputs)
+    /// <summary>Drops one retired life's `enemy`-scoped variables. The scope kind is the kernel's own, not a
+    /// second spelling, and only the reference a plan wrote under is released: a subject the store never saw
+    /// costs one lookup and writes nothing. The kernel requires the subject's epoch to be the live world's, so a
+    /// life whose world has already ended is skipped rather than refused — the world change cleared the whole
+    /// scope already.</summary>
+    private void ReleaseEnemyScope(EntityReference target)
     {
+        if (target.WorldEpoch != _kernel.WorldEpoch) return;
+        _kernel.ReleaseVariableScope(VariableScopeKinds.Enemy, target);
+    }
+
+    private void PublishLifecycleFact(string binding, EntityReference target, JsonElement outputs)    {
         if (!CanObserveFacts || Resolve(target) == null) return;
         var result = _registration.Publish(new RuntimeEvent(
             "gtfo.enemy.lifecycle:" + _kernel.WorldEpoch + ":" + checked(++_eventSequence), binding,

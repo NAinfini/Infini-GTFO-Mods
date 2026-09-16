@@ -1,0 +1,241 @@
+{
+  "schema": "forge.native.evidence/1",
+  "slice": "W-override-core",
+  "family": "weapon-instance-override",
+  "build": "20403457",
+  "verification": "metadata-and-static-native-disassembly-only",
+  "gameExecuted": false,
+  "gameRevision": "34873",
+  "dump": {
+    "name": "gtfo-inspection/dumper/dump.cs",
+    "length": 27985238,
+    "sha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC"
+  },
+  "nativeImage": {
+    "file": "GameAssembly.dll",
+    "length": 57070592,
+    "sha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55"
+  },
+  "assemblies": [
+    "interop/Modules-ASM.dll (GameData and Gear types; IL2CPP interop wrappers), read with ilspycmd 11.0.0.9375",
+    "%TEMP%\\wpnovr\\report.md and evidence-draft.json (the wpnovr task's decoded read/write sets for this same build; every offset below was re-checked against dump.cs by this slice)",
+    "%TEMP%\\wpnovr\\asm-*.txt and lds-*.txt (the decoded instruction windows the wpnovr claims rest on)"
+  ],
+  "evidenceLimits": [
+    "Every method body in Modules-ASM is an interop wrapper ending in IL2CPP.il2cpp_runtime_invoke; no C# source for a native body is reachable from these assemblies. The bodies quoted below come from the wpnovr disassembly of GameAssembly.dll, not from the interop assembly.",
+    "Nothing here is game-verified: no game process was started and no r2modman profile was written. The clone a request performs is built with the game's own allocator and constructor, which no static read can confirm at runtime; that check is recorded under unverified.",
+    "RVAs are valid for GameAssembly.dll sha256 C6A5C3CD...D7BF55 only."
+  ],
+  "rows": [
+    {
+      "capability": "forge.action.weapon.fire_rate",
+      "binding": "forge.module.gtfo.weapon.binding.weapon_fire_rate",
+      "handler": "gtfo.weapon.fire_rate",
+      "status": "implemented",
+      "ports": {
+        "equipment": "entity input — the instance whose block is cloned",
+        "source": "entity input — read as the writer identity of the merge order, never copied anywhere",
+        "rate": "number input — a frequency in shots per second; the native field is its reciprocal",
+        "duration": "integer tick input — a positive value becomes an absolute expiry at the accepting tick",
+        "result": "forge.result.weapon.fire_rate; fields target/status/committed/code then rate"
+      },
+      "nativeWritePoints": [
+        {
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "float ShotDelay (field <ShotDelay>k__BackingField)",
+          "offset": "0x8C",
+          "meaning": "The interval between shots. Read on every shot from the instance field, never cached.",
+          "readSite": "Gear.BulletWeaponArchetype.Update 0x145C950 at 0x145D2C6 (mov rax,[rbx+10h] / addss xmm0,[rax+8Ch] / movss [rbx+38h],xmm0) advances m_nextShotTimer; Gear.BulletWeaponArchetype.ShotDelay 0x145C840 returns it",
+          "derivation": "decoded instruction, grade 已反汇编确认 (wpnovr Q1)"
+        },
+        {
+          "type": "Gear.BulletWeaponSynced",
+          "member": "void UpdateRegular()",
+          "rva": "0x145E5B0",
+          "meaning": "A client that received replicated fire events throttles them with its own block's ShotDelay (0x145E689 comiss xmm6,[rax+8Ch]), so a block swap has to be applied on every client that shows the weapon, not only on the shooter.",
+          "derivation": "decoded instruction (wpnovr Q7)"
+        }
+      ],
+      "authority": "host decides; the write is the holder client's own instance"
+    },
+    {
+      "capability": "forge.action.weapon.spread",
+      "binding": "forge.module.gtfo.weapon.binding.weapon_spread",
+      "handler": "gtfo.weapon.spread",
+      "status": "implemented",
+      "ports": {
+        "equipment": "entity input — the instance whose block is cloned",
+        "cone": "number deg input — the shot-spread cone; a 32-bit load in the shipped code, so the value is rounded to an integer",
+        "seed": "integer input — refused with input-unsupported: the native spread is computed, not sampled from a seed",
+        "movement_scale": "number input — the hip-fire spread value",
+        "aim_scale": "number input — the aimed spread value",
+        "pattern": "structural parameter — random and fixed are accepted because they describe the same native cone; spiral is refused with weapon-mode-unsupported",
+        "result": "forge.result.weapon.spread; fields target/status/committed/code then cone"
+      },
+      "whatTheRowCannotExpress": "The movement and aim scales are the values themselves, not multipliers of an unknown base: the native block carries the two spread numbers and nothing the request could scale them from, so a caller that means \"twice as wide\" writes the doubled value.",
+      "nativeWritePoints": [
+        {
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "int ShotgunConeSize (field <ShotgunConeSize>k__BackingField)",
+          "offset": "0xD4",
+          "meaning": "The cone the shotgun path reads per pellet.",
+          "readSite": "shotgun fire loop 0x13C3020 at 0x13C3176 (mov edi,[rax+0D4h])",
+          "derivation": "decoded instruction (wpnovr Q1). The field is declared int in dump.cs — an earlier note in the wpnovr report described a float here and was wrong about the type, not the offset.",
+          "destination": "shotgun family only; refused with override-field-unknown on a weapon whose fire path never reads a cone"
+        },
+        {
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "int ShotgunBulletSpread (field <ShotgunBulletSpread>k__BackingField)",
+          "offset": "0xD8",
+          "meaning": "The per-pellet spread of the same loop. Declared int in dump.cs and read as a 32-bit load, so the interop property is an int.",
+          "readSite": "0x13C3246 (movd xmm0,[rax+0D8h])",
+          "derivation": "decoded instruction (wpnovr Q1). The wpnovr report wrote this field as a float; dump.cs and the decoded load both say int."
+        },
+        {
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "float HipFireSpread (0xA4) / float AimSpread (0xA8)",
+          "meaning": "The two spread values a bullet weapon reads per shot, selected by aim state.",
+          "readSite": "Gear.BulletWeapon.Fire 0x145FB30 at 0x145FBFE (HipFireSpread) and 0x145FC13 (AimSpread); the block is fetched again for each",
+          "derivation": "decoded instruction (wpnovr Q1)"
+        }
+      ],
+      "authority": "host decides; the write is the holder client's own instance"
+    },
+    {
+      "capability": "forge.action.weapon.recoil",
+      "binding": "forge.module.gtfo.weapon.binding.weapon_recoil",
+      "handler": "gtfo.weapon.recoil",
+      "status": "implemented",
+      "ports": {
+        "equipment": "entity input — the instance whose archetype recoil reference is replaced",
+        "horizontal": "number input — the horizontal scale range's minimum",
+        "vertical": "number input — the vertical scale range's minimum",
+        "recovery": "number input — the spring stiffness the recoil system is given",
+        "camera_kick": "number input — the power range's minimum, the impulse the camera kick is derived from",
+        "result": "forge.result.weapon.recoil; fields target/status/committed/code then horizontal"
+      },
+      "nativeWritePoints": [
+        {
+          "type": "Gear.BulletWeaponArchetype",
+          "member": "unsafe RecoilDataBlock m_recoilData (field)",
+          "offset": "0x18",
+          "meaning": "The recoil block this instance actually uses. It is resolved once, in the weapon-archetype constructor, by looking up ArchetypeDataBlock.RecoilDataID (0x64) in the game's own RecoilDataBlock table (0x1C15930) — which is why a block swap has to refresh it and why a request that changes no recoil value does not touch it.",
+          "writeSite": "archetype constructors 0x145B490 / 0x145B9B0 at 0x145B513 / 0x145BA3A (the only writes in the shipped code)",
+          "derivation": "decoded instruction (wpnovr Q2)",
+          "destination": "any bullet archetype whose block resolved a recoil block; a null m_recoilData is refused with override-block-missing"
+        },
+        {
+          "type": "GameData.RecoilDataBlock",
+          "member": "MinMaxValue horizontalScale (field <horizontalScale>k__BackingField) / MinMaxValue verticalScale",
+          "offset": "0x60 / 0x68",
+          "meaning": "Reference fields, not embedded floats: the recoil system reads the object and then its Min at +0x10. The applier clones both objects rather than assigning the original's, because sharing one range would write through into the block the rest of the game still uses.",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EE32 / 0x193EE2B (mov rcx,[rsi+68h] / [rsi+60h] then the MinMaxValue's Min)",
+          "derivation": "decoded instruction + dump.cs field layout (wpnovr Q3 read the ranges as scalars; dump.cs shows the reference layout and the consumer offsets match MinMaxValue.Min at +0x10)"
+        },
+        {
+          "type": "GameData.RecoilDataBlock",
+          "member": "float spring (0x48) / float dampening (0x4C)",
+          "meaning": "The spring/damper the recoil system applies; `recovery` writes the spring.",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EE0C ([rsi+48h] -> [rdi+98h])",
+          "derivation": "decoded instruction (wpnovr Q3)"
+        },
+        {
+          "type": "GameData.RecoilDataBlock",
+          "member": "MinMaxValue power (field <power>k__BackingField)",
+          "offset": "0x40",
+          "meaning": "The impulse range the kick is derived from; `camera_kick` writes its minimum.",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EFC1 (mov rcx,[rsi+40h])",
+          "derivation": "decoded instruction (wpnovr Q3), re-read against dump.cs"
+        }
+      ],
+      "authority": "host decides; the write is the holder client's own instance"
+    },
+    {
+      "capability": "forge.action.weapon.cooldown_reset",
+      "binding": "forge.module.gtfo.weapon.binding.weapon_cooldown_reset",
+      "handler": "gtfo.weapon.cooldown_reset",
+      "status": "implemented",
+      "ports": {
+        "cooldown": "handle(cooldown, entity_life) input — required; the reset is refused with input-unsupported when it is absent",
+        "reason": "string input — accepted and not stored: the native timer carries no reason and this package keeps no second state store for one",
+        "result": "forge.result.weapon.cooldown_reset; fields target/status/committed/code"
+      },
+      "nativeWritePoints": [
+        {
+          "type": "Gear.BulletWeaponArchetype",
+          "member": "protected float m_nextShotTimer (field)",
+          "offset": "0x38",
+          "meaning": "The shot gate. Zeroing it lets the next shot happen on the next frame; nothing in the decoded code reads it as a duration or derives anything else from its value.",
+          "readSite": "Gear.BulletWeaponArchetype.Update 0x145C950 writes it at 0x145D2DB (m_nextShotTimer = now + ShotDelay)",
+          "derivation": "decoded instruction (wpnovr Q1)"
+        }
+      ],
+      "notWritten": {
+        "member": "protected float m_nextBurstTimer (0x3C)",
+        "reason": "No decoded read site consumes it in this build (the wpnovr reverse scan over the per-shot path found none), so zeroing it would be a write with no observable effect. It is left alone rather than written for symmetry."
+      },
+      "authority": "host; the timer is the weapon's own, so the reset is a cooldown the game itself observes"
+    },
+    {
+      "capability": "forge.action.weapon.fire_mode",
+      "binding": "not registered",
+      "handler": "not registered",
+      "status": "not-implemented",
+      "gap": "missing native archetype rebuild entry point: FireMode selects which archetype class SetupArchetype constructs, and an instance already holds the class it was built as, so only a rebuild (which replaces the instance's timer state) could change it",
+      "nativeFacts": [
+        {
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "eWeaponFireMode FireMode",
+          "offset": "0x60",
+          "meaning": "Semi=0, Burst=1, Auto=2, SemiBurst=3 (SentryGun*=10..13). The shipped code switches on it while building the archetype, not while firing.",
+          "readSite": "Gear.BulletWeapon.SetupArchetype 0x1462050 at 0x146214B (mov eax,[rax+60h] / sub eax,1 / je) selecting BWA_Auto / BWA_Burst / BWA_Semi / BWA_SemiBurst",
+          "derivation": "decoded instruction + dump.cs enum (wpnovr Q6)"
+        },
+        {
+          "type": "Gear.BulletWeaponArchetype.Update",
+          "rva": "0x145C950",
+          "meaning": "The frame path also reads FireMode (0x145CB94 cmp dword ptr [rax+60h],1) for the burst-continuation branch, so a changed block field does reach this branch — but the archetype's own class, its m_burstMax and its burst counters are what decide how a shot sequence actually runs. A block write alone therefore produces a weapon whose data says one mode and whose class advances another.",
+          "derivation": "decoded instruction (wpnovr Q1/Q2)"
+        },
+        {
+          "type": "Gear.BWA_Burst.Setup / Gear.BWA_SemiBurst.Setup",
+          "rva": "0x145B970 / 0x145BD20",
+          "meaning": "The burst length is copied out of the block only here, from BurstShotCount (0xCC) into m_burstMax (0x60); nothing on the per-shot path re-reads it for these classes.",
+          "derivation": "decoded instruction (wpnovr Q2)",
+          "consequence": "The burst_count field this vocabulary carries is writeable on a burst archetype (both copies are refreshed by the applier) and refused with override-field-unknown on an archetype that has no such field at all."
+        },
+        {
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "the row's release_policy parameter (on_press / on_release)",
+          "meaning": "No decoded member of the weapon or archetype carries a press-versus-release trigger policy; what the block holds is m_triggerNeedsPress's input to the archetype, and no catalog-named mechanism sets it. The row's second required structural parameter therefore has no native destination either.",
+          "derivation": "absence in the decoded read/write sets and in dump.cs's ArchetypeDataBlock property list"
+        }
+      ]
+    }
+  ],
+  "netcodeBoundary": {
+    "rule": "The instance a request lands on is the holder client's own weapon: rate of fire, spread and the burst path are simulated where the weapon is wielded, and a client that never applies the same block still throttles replicated fire events with its own ShotDelay (Gear.BulletWeaponSynced.UpdateRegular 0x145E5B0 at 0x145E689).",
+    "consequence": "The host decides and the holder's client writes; a machine with no holder client (bot or offline) writes locally. The command channel that carries a request to a client that is not the host is a framework capability this slice does not build, and the applier is written as the body on whichever machine receives it.",
+    "derivation": "decoded instruction (wpnovr Q7)"
+  },
+  "whatTheWriteSetDoesNotDo": [
+    "It never writes the shared GameData blocks. The clone is taken with the game's own constructor, which neither registers the block in a static table nor marks it dirty (GameData.ArchetypeDataBlock..ctor 0x1420060 decoded in full, 54 instructions, no static access), so a clone changes nothing for any other instance.",
+    "It never touches the gear pool or the loadout: narrowing which gear a slot offers happens before an instance exists, and this slice reads no pool array and writes none.",
+    "It does not re-create the archetype instance. Constructing a replacement is possible, but it discards the burst counters and the charge timer the instance is holding (BWA_Burst.m_burstCurrentCount 0x64, BWA_SemiBurst.m_semiBurstCurrentCount 0x64), which is why the applier keeps the instance and replaces the block it points at.",
+    "It writes only the minimum of each MinMaxValue range and copies the maximum as it found it: the shipped recoil path reads Min only (see the read sites above), so writing a maximum would be writing a value nothing consumes."
+  ],
+  "unverified": [
+    "The clone is built at runtime through il2cpp_object_new plus an invoke of the class's own parameterless constructor. The constructor's body and the allocation path are decoded, but no static read proves the interop call reaches it in a live process.",
+    "The identity of the vtable member at +0x520 that BulletWeapon.Update and Weapon.ApplyRecoil fetch a RecoilDataBlock through is unresolved in wpnovr; both paths end in the same block type and the read/write sets here do not depend on which member it is.",
+    "Whether checkpoint restore or gear regeneration rebuilds an archetype outside the OnGearSpawnComplete chain was not settled statically (the reverse scan resolves literal calls only). The replay hook is on OnGearSpawnComplete, the one chain that was decoded.",
+    "Whether an unapplied block swap produces a visible divergence between clients, and whether the crosshair consumes the block per frame, need a running game."
+  ],
+  "inGameVerification": [
+    "Log a wielded bullet weapon's ArchetypeDataBlock.ShotDelay and m_archeType.m_archetypeData pointer, fire a magazine, and confirm the observed interval matches before any swap.",
+    "Apply a fire_rate override and read back m_archetypeData (must be the clone) and m_recoilData (must be non-null); fire again and confirm the interval changed.",
+    "Apply a recoil override and confirm the camera kick and crosshair pop change with it.",
+    "Wield/unwield, reload and force a gear respawn: the swap must survive the first three and be replayed by the fourth.",
+    "Apply the same override on both clients and confirm no visible divergence in the replicated fire rate.",
+    "Apply burst_count on a burst weapon and read back m_burstMax and BulletWeapon.m_burstMax; apply a smaller default clip while the magazine is full and read back BulletWeapon.m_clip."
+  ]
+}

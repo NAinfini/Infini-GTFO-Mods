@@ -15,11 +15,14 @@ if (args.Length != 3 || args[0] is not ("check" or "generate"))
 string root = Path.GetFullPath(args[1]);
 string evidenceDirectory = Path.Combine(root, "evidence", "e2-spawn-space-20403457");
 byte[] evidence = File.ReadAllBytes(Path.Combine(evidenceDirectory, "spawn-space-evidence.json"));
-var catalog = EnemySpawnRequirementCatalog.FromEvidence(evidence);
+// The evidence file is a fixture: it is translated into the same typed rows the runtime source reads.
+EnemySpawnRequirementCatalog Catalog(byte[] evidenceUtf8, out EnemySpawnRequirementProvenance provenance) =>
+    EnemySpawnRequirementCatalog.Build(EvidenceInputs.Read(evidenceUtf8, out provenance));
+var catalog = Catalog(evidence, out var provenance);
 if (args[0] == "generate")
 {
-    File.WriteAllText(Path.GetFullPath(args[2]), catalog.ToJson(), new UTF8Encoding(false));
-    Console.WriteLine("Wrote " + catalog.Requirements.Count + " requirements from evidence " + catalog.EvidenceSha256);
+    File.WriteAllText(Path.GetFullPath(args[2]), catalog.ToJson(provenance), new UTF8Encoding(false));
+    Console.WriteLine("Wrote " + catalog.Requirements.Count + " requirements from evidence " + provenance.EvidenceSha256);
     return 0;
 }
 
@@ -35,19 +38,23 @@ void Rejects(string id, Action body)
     catch (InvalidDataException error) { checks.Add(new(id, true, error.Message)); }
     catch (Exception error) { checks.Add(new(id, false, "wrong failure " + error.GetType().Name + ": " + error.Message)); }
 }
-string contract = catalog.ToJson();
+string contract = catalog.ToJson(provenance);
 string contractPath = Path.Combine(evidenceDirectory, "spawn-requirements.json");
 string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 EnemySpawnRequirement R(uint id) => catalog.Get(id);
 HashSet<uint> Ids(EnemyMovementKind kind) => catalog.Requirements.Where(r => r.Movement == kind).Select(r => r.EnemyDataBlockId).ToHashSet();
 
 // Data interpretation. Every asserted value traces to a DataBlock, base prefab or project setting in the evidence.
-Case("evidence.catalog", () => (catalog.Requirements.Count == 39 && catalog.GameBuild == "20403457" && catalog.EvidenceSha256 == Sha(evidence)
+Case("evidence.catalog", () => (catalog.Requirements.Count == 39 && provenance.GameBuild == "20403457" && provenance.EvidenceSha256 == Sha(evidence)
     && catalog.AgentTypes.Select(a => a.AgentTypeId).SequenceEqual(new[] { 0, -1372625422, -334000983 })
     && catalog.Areas.Select(a => a.Name).SequenceEqual(new[] { "Walkable", "Not Walkable", "Jump" }),
-    $"requirements={catalog.Requirements.Count}; evidence={catalog.EvidenceSha256}"));
+    $"requirements={catalog.Requirements.Count}; evidence={provenance.EvidenceSha256}"));
 Case("contract.checked-in-matches-evidence", () => (File.ReadAllText(contractPath) == contract, contractPath));
-Case("contract.round-trip", () => (EnemySpawnRequirementCatalog.Parse(contract).ToJson() == contract, "Parse(ToJson()) is byte-identical."));
+Case("contract.round-trip", () =>
+{
+    var parsed = EnemySpawnRequirementCatalog.Parse(contract, out var roundTrip);
+    return (parsed.ToJson(roundTrip) == contract, "Parse(ToJson()) is byte-identical.");
+});
 Case("movement.partition", () => (Ids(EnemyMovementKind.Unresolved).SetEquals(new uint[] { 22, 44, 61 })
     && Ids(EnemyMovementKind.Flying).SetEquals(new uint[] { 42, 43, 45, 58 }) && Ids(EnemyMovementKind.Ground).Count == 32,
     $"ground={Ids(EnemyMovementKind.Ground).Count}; flying={string.Join(',', Ids(EnemyMovementKind.Flying))}; unresolved={string.Join(',', Ids(EnemyMovementKind.Unresolved))}"));
@@ -97,18 +104,18 @@ JsonObject Row(JsonObject document, string array, uint id) =>
     document[array]!.AsArray().Select(n => n!.AsObject()).Single(r => (uint)r["id"]! == id);
 JsonObject Base(JsonObject document, string name) =>
     document["basePrefabs"]!.AsArray().Select(n => n!.AsObject()).Single(r => ((string)r["path"]!).EndsWith("/" + name + ".prefab", StringComparison.Ordinal));
-Rejects("evidence.reject-game-executed", () => EnemySpawnRequirementCatalog.FromEvidence(MutateEvidence(e => e["gameExecuted"] = true)));
-Rejects("evidence.reject-missing-base-prefab", () => EnemySpawnRequirementCatalog.FromEvidence(MutateEvidence(e => Row(e, "enemies", 13)["basePrefabs"]!.AsArray().Add("Assets/AssetPrefabs/Characters/Enemies/Bases/Unknown.prefab"))));
-Rejects("evidence.reject-missing-movement-block", () => EnemySpawnRequirementCatalog.FromEvidence(MutateEvidence(e => Row(e, "enemies", 13)["movementDataId"] = 999)));
-Rejects("evidence.reject-disabled-enemy", () => EnemySpawnRequirementCatalog.FromEvidence(MutateEvidence(e => Row(e, "enemies", 13)["internalEnabled"] = false)));
+Rejects("evidence.reject-game-executed", () => Catalog(MutateEvidence(e => e["gameExecuted"] = true), out _));
+Rejects("evidence.reject-missing-base-prefab", () => Catalog(MutateEvidence(e => Row(e, "enemies", 13)["basePrefabs"]!.AsArray().Add("Assets/AssetPrefabs/Characters/Enemies/Bases/Unknown.prefab")), out _));
+Rejects("evidence.reject-missing-movement-block", () => Catalog(MutateEvidence(e => Row(e, "enemies", 13)["movementDataId"] = 999), out _));
+Rejects("evidence.reject-disabled-enemy", () => Catalog(MutateEvidence(e => Row(e, "enemies", 13)["internalEnabled"] = false), out _));
 Case("evidence.unmapped-locomotion-state", () =>
 {
-    var mutated = EnemySpawnRequirementCatalog.FromEvidence(MutateEvidence(e => Row(e, "movementBlocks", 13)["locomotionPathMove"] = 5));
+    var mutated = Catalog(MutateEvidence(e => Row(e, "movementBlocks", 13)["locomotionPathMove"] = 5), out _);
     return (mutated.Get(13).UnresolvedReason == "locomotion-state-unmapped", "ES_StateEnum 5 is not a known path-move state.");
 });
 Case("evidence.ground-base-with-air-graph-conflicts", () =>
 {
-    var mutated = EnemySpawnRequirementCatalog.FromEvidence(MutateEvidence(e => Base(e, "StrikerBase")["airGraphAgent"] = true));
+    var mutated = Catalog(MutateEvidence(e => Base(e, "StrikerBase")["airGraphAgent"] = true), out _);
     return (mutated.Get(13).UnresolvedReason == "locomotion-navigation-conflict", "Both navigation components means unresolved, not a guess.");
 });
 
@@ -119,7 +126,7 @@ string MutateContract(Action<JsonObject> change)
 }
 JsonObject Requirement(JsonObject document, uint id) =>
     document["requirements"]!.AsArray().Select(n => n!.AsObject()).Single(r => (uint)r["enemyDataBlockId"]! == id);
-void RejectContract(string id, Action<JsonObject> change) => Rejects(id, () => EnemySpawnRequirementCatalog.Parse(MutateContract(change)));
+void RejectContract(string id, Action<JsonObject> change) => Rejects(id, () => EnemySpawnRequirementCatalog.Parse(MutateContract(change), out _));
 RejectContract("contract.reject-unknown-field", c => Requirement(c, 13)["nativeAgent"] = "EnemyAgent");
 RejectContract("contract.reject-version", c => c["version"] = 2);
 RejectContract("contract.reject-ground-without-navigation", c => Requirement(c, 13)["groundNavigation"] = null);
@@ -151,15 +158,19 @@ using (var fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "tes
 // Dependencies follow actual references; Enemy bindings are read from the real provider registry.
 var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
 kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
 using var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
 using var manifest = JsonDocument.Parse(kernel.ExportManifest());
 var enemyBindingRows = manifest.RootElement.GetProperty("registry").GetProperty("bindings").EnumerateArray()
     .Where(b => b.GetProperty("providerId").GetString() == ModuleDefinition.ProviderId).ToArray();
 var registered = enemyBindingRows.Select(b => b.GetProperty("id").GetString()!).ToHashSet(StringComparer.Ordinal);
 // Content dependencies read only a plan's binding pins, so the pins come straight from the registered Enemy rows.
-string enemyPlan = JsonSerializer.Serialize(new { domain = "enemy", bindings = enemyBindingRows
-    .Where(b => b.GetProperty("id").GetString() is EnemyModule.LimbBrokenBinding or EnemyModule.HealBinding)
+string PinPlan(IEnumerable<JsonElement> rows) => JsonSerializer.Serialize(new { domain = "enemy", bindings = rows
     .Select(b => new { bindingId = b.GetProperty("id").GetString(), providerId = b.GetProperty("providerId").GetString() }).ToArray() });
+// Two plans over the same registry: one pinning every registered Enemy binding, one a subset. Both expectations
+// are the registered rows themselves, so neither has to be edited when the Enemy registry gains a binding.
+string allEnemyPlan = PinPlan(enemyBindingRows);
+string enemyPlan = PinPlan(enemyBindingRows.Where(b => b.GetProperty("id").GetString() is EnemyModule.HealBinding or EnemyModule.LimbBrokenBinding));
 Case("dependencies.appearance-only", () =>
 {
     var set = EnemyContentDependencies.Compute(new[] { "model:striker@9f1c", "material:glow@2", "model:striker@9f1c" }, Array.Empty<string>());
@@ -168,9 +179,19 @@ Case("dependencies.appearance-only", () =>
 });
 Case("dependencies.enemy-plan-bindings", () =>
 {
+    // A plan pinning enemy bindings requires the pack and contributes exactly the pins the registry declares.
+    // Both sides are sorted, so the equality holds however the registry happens to order its rows.
+    var set = EnemyContentDependencies.Compute(new[] { "model:striker@9f1c" }, new[] { allEnemyPlan });
+    return (set.RequiresEnemyPack && set.EnemyBindings.OrderBy(id => id, StringComparer.Ordinal)
+            .SequenceEqual(registered.OrderBy(id => id, StringComparer.Ordinal))
+        && set.OtherProviders.Count == 0, JsonSerializer.Serialize(set) + "; registered=" + string.Join(',', registered));
+});
+Case("dependencies.enemy-bindings-follow-the-pins", () =>
+{
+    // A narrower plan reports only its own pins, never the whole registry, and every pin must be registered.
     var set = EnemyContentDependencies.Compute(new[] { "model:striker@9f1c" }, new[] { enemyPlan });
     return (set.RequiresEnemyPack && set.EnemyBindings.SequenceEqual(new[] { EnemyModule.HealBinding, EnemyModule.LimbBrokenBinding })
-        && set.EnemyBindings.All(registered.Contains) && registered.Count == 5, JsonSerializer.Serialize(set) + "; registered=" + string.Join(',', registered));
+        && set.EnemyBindings.All(registered.Contains), JsonSerializer.Serialize(set) + "; registered=" + string.Join(',', registered));
 });
 Case("dependencies.domain-label-is-not-dependency", () =>
 {
@@ -185,7 +206,7 @@ int failed = checks.Count(c => !c.Passed);
 var report = new
 {
     schemaVersion = 1, verification = "offline-data-contract-with-map-stand-in", gameExecuted = false, utc = DateTimeOffset.UtcNow,
-    evidenceSha256 = catalog.EvidenceSha256, contractSha256 = Sha(Encoding.UTF8.GetBytes(contract)),
+    evidenceSha256 = provenance.EvidenceSha256, contractSha256 = Sha(Encoding.UTF8.GetBytes(contract)),
     frameworkAssemblySha256 = Sha(File.ReadAllBytes(typeof(RuntimeKernel).Assembly.Location)),
     passed = checks.Count - failed, failed, checks,
 };

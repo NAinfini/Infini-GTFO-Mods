@@ -24,6 +24,9 @@ public sealed class AuthoringMonitor : MonoBehaviour
 {
     public AuthoringMonitor(IntPtr pointer) : base(pointer) { }
     public void Update() => RuntimeDiagnostics.Safe(RuntimeDiagnostics.Tick);
+    // The recorder's own notice is the only thing this component draws: a session that reached its budget says so
+    // in the corner of the screen, not only in a log the player will never open.
+    public void OnGUI() => RuntimeDiagnostics.Safe(RecNotice.OnGui);
     public void OnApplicationQuit() => RuntimeDiagnostics.Stop();
     public void OnDestroy() => RuntimeDiagnostics.Stop();
 }
@@ -148,7 +151,7 @@ internal static class RuntimeDiagnostics
         _nextExport = Time.realtimeSinceStartup + 30;
         var epoch = WorldEpoch;
         var tick = SimulationTick;
-        var scan = ProjectChecks.Load(_report, epoch, tick);
+        var scan = ProjectChecks.Load(_report, epoch, tick, ProjectRoomSource.Resolve);
         _inspectionSession = new ProjectInspectionSession(_report, scan, epoch);
         Export("generating");
     }
@@ -296,6 +299,9 @@ internal static class RuntimeDiagnostics
         }
         if (Input.GetKeyDown(Settings.ExportKey.Value)) Export(_outcome);
         if (Input.GetKeyDown(KeyCode.F11)) CombatSampling.Toggle();
+        // The recorder rides this Update: it is the only per-frame callback this package owns, and its hotkeys,
+        // kernel poll and level boundaries all belong to the same frame the player is in.
+        RecRuntime.Tick();
         if (Time.realtimeSinceStartup >= _nextExport) { Export(_outcome); _nextExport = Time.realtimeSinceStartup + 30; }
     }
     internal static void Cleanup(string phase, Exception? error = null)
@@ -307,6 +313,7 @@ internal static class RuntimeDiagnostics
             CancelInspection("level_cleanup");
             ProjectChecks.CancelSourceSnapshot("Level cleanup started.");
             PerformanceDiagnostics.CancelWorldInspection();
+            RecRuntime.LevelEnded(phase);
         }
         if (error != null) _report?.Issue(error.GetType().FullName!, "Builder.OnLevelCleanup", error.Message, error.ToString());
         if (phase != "after") return;
@@ -379,13 +386,32 @@ internal static class RuntimeDiagnostics
             Plugin.PluginLog.LogError("Forge report queue rejected a snapshot: " + _path);
         }
     }
+    /// <summary>The shutdown stages with each one recorded into the session as it starts, which is what makes the real
+    /// list readable after the process is gone. The recorder closes the session on its own stage, so the stages up to
+    /// and including `recorder` are the ones the session can hold; the writer it releases is proved by the segment's
+    /// own end.</summary>
+    private static (string Stage, Action Action)[] RecordedStages((string Stage, Action Action)[] steps)
+    {
+        var recorded = new (string, Action)[steps.Length];
+        for (var i = 0; i != steps.Length; i++)
+        {
+            var step = steps[i];
+            recorded[i] = (step.Stage, () =>
+            {
+                RecSession.Write("session", "shutdown_stage", json => json.WriteString("stage", step.Stage));
+                step.Action();
+            });
+        }
+        return recorded;
+    }
+
     internal static void Stop()
     {
         if (_stopped) return;
         _stopped = true;
         _generationActive = false;
         // A failed native unsubscribe must not prevent exports or writer disposal.
-        ShutdownSequence.Run(new (string, Action)[]
+        ShutdownSequence.Run(RecordedStages(new (string, Action)[]
         {
             ("bepinex_listener", () => { if (_listening) BepInEx.Logging.Logger.Listeners.Remove(Listener); _listening = false; }),
             ("unity_listener", () =>
@@ -401,8 +427,9 @@ internal static class RuntimeDiagnostics
             ("source_snapshot", () => ProjectChecks.CancelSourceSnapshot("Process shutdown.")),
             ("job_state", () => { JobCalls.Clear(); CullingObservations.Clear(); }),
             ("final_export", () => Export("process_exit")),
+            ("recorder", RecRuntime.Stop),
             ("report_writer", () => _writer?.Dispose())
-        }, (stage, error) =>
+        }), (stage, error) =>
         {
             _report?.Issue("shutdown_error", stage, error.Message, error.ToString());
             Plugin.PluginLog.LogError("Forge shutdown " + stage + " failed: " + error);

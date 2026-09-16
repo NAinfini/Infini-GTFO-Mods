@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production module and the hook set are compiled
+         against, and the interop assembly is referenced beside them, so CS0436 fires on every mention of a
+         shadowed type. Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this package is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead, for the window in which the in-tree sources do
+         not compile. The module, the hook set and the adapter are compiled into this assembly, so no built
+         ForgeWeapon.dll is needed at all. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+    <!-- The hook set is read as source by `NativeMemberTests`, so the path is stamped into this assembly at build
+         time instead of guessed from the test's own working directory: the build output can live under any
+         artifacts path the caller chooses, including one outside the repository. -->
+    <AttackHooksSource>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)..', '..', 'Native', 'AttackInstanceHooks.cs'))</AttackHooksSource>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The sources under test: the attack module and the catalog contract. The module reads its native facts
+         through `IAttackNativeReads`, which `AttackWorld` implements as a fixture with its own counters, so no
+         game object graph is needed and no game type is executed.
+         The hook set is deliberately NOT compiled here: its bodies reach `WeaponNativeSession`, whose
+         registration is the package's own and not this fixture's, and duplicating that session would prove
+         nothing. `NativeMemberTests` reads the hook source instead and checks every patch declaration in it
+         against this build's interop metadata, which is the property that actually matters — that each patched
+         member exists. -->
+    <Compile Include="../../Native/AttackInstanceModule.cs" />
+    <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../ModuleDefinition.cs" />
+    <!-- The other two contracts the provider seed registers: the module names them, so their rows are compiled
+         here rather than assumed. -->
+    <Compile Include="../../WeaponDeployableFactsContract.cs;../../WeaponMeleeHitContract.cs" />
+    <Compile Include="AttackWorld.cs;AttackInstanceTests.cs;ContractTests.cs;NativeMemberTests.cs;GameDoubles.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" />
+    <!-- `0Harmony` is what the hook set's patch attributes are written against; the attributes are read here by
+         reflection and no patch is ever applied. `Mono.Cecil` is what reads the interop metadata the patch targets
+         are checked against. -->
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />
+    <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
+    <!-- `Gear.BulletWeapon` and its families live in Modules-ASM; the doubles in GameDoubles.cs are what the
+         compile binds, and the assembly is referenced so that a member this build does not have fails the build
+         and `NativeMemberTests` can check every patch target against the real metadata. -->
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="AttackHooksSource" Value="$(AttackHooksSource)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

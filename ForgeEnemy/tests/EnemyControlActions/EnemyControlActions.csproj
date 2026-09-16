@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production sources are compiled against, and the
+         interop assembly is referenced for its other members, so CS0436 fires on every mention of a shadowed type.
+         Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this suite is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead, for the window in which the in-tree sources do
+         not compile. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt; to an already built ForgeRuntime.Framework.dll." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The two production files this slice owns, compiled as they ship, plus the provider state they read.
+         `EnemyModuleShim.cs` declares the members the control actions touch on the same partial class — the
+         entity table, the reference lookup, the kernel and the authority gate — because the package's own
+         `EnemyModule` core is edited by a dozen sibling slices at once and cannot be compiled here without also
+         compiling their half-finished partials. Everything the actions themselves do is the production source,
+         unchanged. The native hook classes, the plugin lifetime and the sibling families are not part of this
+         suite's statement: it dispatches the handlers, it does not install Harmony patches. -->
+    <Compile Include="../../Native/EnemyControlActions.cs;../../Native/EnemyControlContract.cs" />
+    <Compile Include="GameDoubles.cs;EnemyModuleShim.cs;Probe.cs;EnemyControlWorld.cs;EnemyControlFacts.cs;Program.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+  </ItemGroup>
+</Project>

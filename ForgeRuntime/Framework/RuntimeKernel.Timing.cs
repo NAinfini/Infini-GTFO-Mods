@@ -14,6 +14,12 @@ public sealed partial class RuntimeKernel
     public const int MaximumScheduledPulsesPerTick = 64;
     public const int MaximumScheduleEntityReferences = 16;
     private readonly Dictionary<(string Provider, string Id), ScheduledJob> schedules = new();
+    /// <summary>The schedules this advance ended, collected while the table is scanned and removed after it: the
+    /// scan may not mutate the collection it walks.</summary>
+    private readonly List<(ScheduledJob Job, string Code)> endedSchedules = new();
+    /// <summary>Whether a schedule ended since the queue was last compacted. Ending one is the only thing that can
+    /// leave a waiting pulse behind, so it is also the only thing that asks for the compaction.</summary>
+    private bool schedulesDirty;
     private int scheduledThisTick;
     private sealed class ScheduledJob
     {
@@ -23,17 +29,59 @@ public sealed partial class RuntimeKernel
         internal readonly PulseSchedule Spec;
         internal readonly IReadOnlyList<Work> Work;
         internal readonly string Identity;
-        internal readonly long FirstTick;
+        /// <summary>The tick this schedule's pulse series is anchored at. A `restart` moves the anchor while the
+        /// pulse index keeps counting, so the next pulse lands one interval later without the schedule ever
+        /// replaying an occurrence the ledger already recorded.</summary>
+        internal long FirstTick;
         internal readonly long? EndTick;
-        internal readonly int TotalPulses;
+        /// <summary>The pulse limit, or <c>null</c> for a series that only cancellation, its scope's end or its
+        /// world's end stops: an `interval` control whose `count` input the plan omitted (ruling 160.2). Every
+        /// provider-facing schedule is bounded — <see cref="Schedule"/> refuses one that is not — so this is null
+        /// only on a control continuation.</summary>
+        internal readonly int? TotalPulses;
         internal int Index;
+        /// <summary>Set while a re-armed schedule still has the pulse it had already placed sitting in the queue:
+        /// the compaction drops that entry, which is the only way a live schedule's stale pulse is removed.</summary>
+        internal bool ReArmed;
+        /// <summary>The lifecycle generation this job's capture was last validated at, and the entities that
+        /// validation resolved. A capture cannot change, and the registry and the plan table cannot change without
+        /// the generation moving, so while the number stands still the only thing left to ask is whether the
+        /// entities the template names are still alive — which is what <see cref="Liveness"/> is for.</summary>
+        internal long ValidatedGeneration = -1;
+        internal EntityCheck[] Liveness = Array.Empty<EntityCheck>();
+        /// <summary>Set only on a plan's own control continuation: the pulse re-enters the plan's entry instead of
+        /// publishing an event. <see cref="HandleSlot"/> is the pool slot that continuation's timer occupies, so a
+        /// schedule ending for any reason — expiry, cancel, world end — frees it in one place.</summary>
+        internal Continuation? Resume { get; init; }
+        internal int HandleSlot { get; init; } = -1;
         internal ScheduledJob(RuntimeScheduleHandle handle, long generation, RuntimeEvent template, PulseSchedule spec,
-            IReadOnlyList<Work> work, string identity, long firstTick, long? endTick, int total)
+            IReadOnlyList<Work> work, string identity, long firstTick, long? endTick, int? total)
         { Handle = handle; Generation = generation; Template = template; Spec = spec; Work = work; Identity = identity; FirstTick = firstTick; EndTick = endTick; TotalPulses = total; }
         internal long NextTick => FirstTick + Index * Spec.IntervalTicks;
     }
     private static string Fingerprint(object value)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(RuntimeJson.StableText(RuntimeJson.From(value)))));
+    /// <summary>The entities one captured template names, with the resolver that answers for each kind. The capture
+    /// is a snapshot and its ports are fixed by the capability it was validated against, so this list is the whole
+    /// time-dependent part of the capture and the only thing a later frame re-asks.</summary>
+    private EntityCheck[] LivenessOf(RuntimeEvent template, JsonElement capability)
+    {
+        var live = new List<EntityCheck>();
+        foreach (var port in RuntimeJson.Rows(capability.GetProperty("graph"), "outputs"))
+        {
+            if (RuntimeJson.Text(port, "type") != "entity") continue;
+            if (!template.Outputs.TryGetProperty(RuntimeJson.Text(port, "id"), out var data) || data.ValueKind == JsonValueKind.Null) continue;
+            if (!RuntimeGraphContracts.Many(port)) Collect(RuntimeJson.EntityRow(data));
+            else foreach (var item in data.EnumerateArray()) Collect(RuntimeJson.EntityRow(item));
+        }
+        return live.Count == 0 ? Array.Empty<EntityCheck>() : live.ToArray();
+        // The reference was validated and its resolver proved present by the check that accepted the capture, so
+        // this reads the resolver the entity will be re-asked of and resolves nothing now.
+        void Collect(EntityReference entity)
+        {
+            if (registry.Resolvers.TryGetValue(RuntimeJson.KindOf(entity.Id), out var registered)) live.Add(new EntityCheck(entity, registered.Resolve));
+        }
+    }
     private RuntimeEvent CaptureScheduledEvent(RuntimeModuleHandle handle, RuntimeEvent value)
     {
         RuntimeJson.Require(handle.IsRegistered, "module-unregistered", handle.ProviderId);
@@ -65,7 +113,8 @@ public sealed partial class RuntimeKernel
         try
         {
             var snapshot = CaptureScheduledEvent(owner, template);
-            RuntimeJson.Require(spec != null && Enum.IsDefined(typeof(FirstPulse), spec.FirstPulse) && Enum.IsDefined(typeof(MissedPulsePolicy), spec.MissedPulsePolicy), "schedule-policy", "Explicit first/missed pulse policies are required.");
+            RuntimeJson.Require(spec != null && spec.FirstPulse is FirstPulse.Immediate or FirstPulse.AfterInterval
+                && spec.MissedPulsePolicy is MissedPulsePolicy.CatchUp or MissedPulsePolicy.SkipMissed, "schedule-policy", "Explicit first/missed pulse policies are required.");
             RuntimeJson.Integer(spec!.IntervalTicks, 1);
             RuntimeJson.Require(spec.MaxPulses != null || spec.LifetimeTicks != null, "unbounded-schedule", "A finite pulse count or lifetime is required.");
             if (spec.MaxPulses != null) RuntimeJson.Integer(spec.MaxPulses.Value, 1, MaximumSchedulePulses);
@@ -79,7 +128,10 @@ public sealed partial class RuntimeKernel
             if (spec.MaxPulses == null && end != null) RuntimeJson.Require(end.Value <= first || (end.Value - first - 1) / spec.IntervalTicks + 1 <= MaximumSchedulePulses, "schedule-pulse-budget", "Lifetime contains too many pulses.");
             if (total > 0) RuntimeJson.Require(spec.IntervalTicks <= (RuntimeJson.MaxSafeInteger - first) / Math.Max(1, total - 1) || total == 1, "schedule-overflow", template.EventId);
             RuntimeJson.Require(subscriptions.TryGetValue(snapshot.BindingId, out var subscribed), "no-consumer", template.EventId);
-            var work = subscribed!.ToArray();
+            // A domain schedule reaches the same plans a direct publish would: the mount filter is applied here too,
+            // so a plan attached to another map object never runs off someone else's timer.
+            var work = ClaimedWork(subscribed!, snapshot);
+            RuntimeJson.Require(work.Length > 0, "attachment-mismatch", template.EventId);
             RuntimeJson.Require(snapshot.CausalDepth >= 0 && snapshot.CausalDepth <= Limits.MaxCausalDepth && work.All(w => snapshot.CausalDepth <= w.Plan.Plan.Limits.MaxCausalDepth), "causal-depth", template.EventId);
             if (spec.MissedPulsePolicy == MissedPulsePolicy.CatchUp)
             {
@@ -90,7 +142,7 @@ public sealed partial class RuntimeKernel
                 }
             }
             var key = owner.ProviderId + "\0schedule\0" + snapshot.EventId;
-            var fingerprint = Fingerprint(new { snapshot, spec });
+            var fingerprint = LedgerFingerprint(RuntimeJson.StableText(RuntimeJson.From(new { snapshot, spec })));
             if (history.TryGetValue(key, out var previous))
             {
                 if (previous == fingerprint) return new ScheduleResult("duplicate", "duplicate-schedule", null);
@@ -107,8 +159,14 @@ public sealed partial class RuntimeKernel
             }
             RuntimeJson.Require(work.Sum(w => w.Entry.DispatchableStepCount) <= Limits.MaxCommandsPerTick, "event-command-budget", snapshot.EventId);
             var handle = new RuntimeScheduleHandle(this, owner.ProviderId, snapshot.EventId, WorldEpoch);
-            var identity = Fingerprint(new { provider = owner.ProviderId, generation = owner.Generation, world = WorldEpoch, source = snapshot.Source, scope = snapshot.ScopeId, schedule = snapshot.EventId });
-            var job = new ScheduledJob(handle, owner.Generation, snapshot, spec, work, identity, first, end, (int)total);
+            var identity = Fingerprint(new { provider = owner.ProviderId, generation = owner.Generation, world = WorldEpoch, scope = snapshot.ScopeId, schedule = snapshot.EventId });
+            var job = new ScheduledJob(handle, owner.Generation, snapshot, spec, work, identity, first, end, (int)total)
+            {
+                // The capture was validated on the way in, so the job starts out already checked at this generation
+                // and carries the entities that check resolved.
+                ValidatedGeneration = lifecycleGeneration,
+                Liveness = LivenessOf(snapshot, registry.Capabilities[RuntimeJson.Text(registry.Bindings[snapshot.BindingId], "capabilityId")])
+            };
             history.Add(key, fingerprint);
             if (total == 0) { handle.Status = "completed"; handle.Code = "no-pulses-before-end"; }
             else { schedules.Add((owner.ProviderId, handle.ScheduleId), job); QueuePulse(job); }
@@ -137,10 +195,24 @@ public sealed partial class RuntimeKernel
     {
         job.Handle.Status = status; job.Handle.Code = code; job.Handle.NextTick = null;
         schedules.Remove((job.Handle.ProviderId, job.Handle.ScheduleId));
+        // A plan continuation's timer dies with its schedule, so the handle it wrote into a step frame can never
+        // be read as live again — the generation is what makes that visible to a `cancel` that still names it.
+        ReleaseHandle(job.HandleSlot);
+        // The queue still holds this job's waiting pulses; they are dropped by the next compaction, which is the
+        // only thing this flag schedules.
+        schedulesDirty = true;
     }
+    /// <summary>
+    /// Drops the queue entries that belong to a schedule that has ended. Compaction is the only way a dead pulse
+    /// stops occupying queue capacity — a cancelled timer releases its slot immediately, which is what the callers
+    /// that end a schedule and then publish rely on — so it runs exactly when a schedule ended and never on a frame
+    /// that ended none.
+    /// </summary>
     private void PruneSchedules()
     {
-        var entries = queue.UnorderedItems.Where(x => x.Element.Schedule == null || x.Element.Schedule.Handle.Status == "active").ToArray();
+        if (!schedulesDirty) return;
+        schedulesDirty = false;
+        var entries = queue.UnorderedItems.Where(x => x.Element.Schedule == null || Live(x.Element.Schedule)).ToArray();
         if (entries.Length == queue.Count) return;
         queue.Clear(); foreach (var entry in entries) queue.Enqueue(entry.Element, entry.Priority);
     }
@@ -151,17 +223,85 @@ public sealed partial class RuntimeKernel
         if (!schedules.TryGetValue((handle.ProviderId, handle.ScheduleId), out var job) || !ReferenceEquals(job.Handle, handle)) return false;
         EndSchedule(job, "cancelled", "explicit-cancel"); PruneSchedules(); return true;
     }
+
+    /// <summary>Whether one queued entry still belongs to a live schedule. The one entry a re-armed schedule had
+    /// already placed is stale although its handle is live, so the compaction clears the flag as it drops it.</summary>
+    private static bool Live(ScheduledJob job)
+    {
+        if (job.Handle.Status != "active") return false;
+        if (!job.ReArmed) return true;
+        job.ReArmed = false;
+        return false;
+    }
+
+    /// <summary>Re-arms one live schedule from now: its next pulse lands one interval later, the handle keeps naming
+    /// the same schedule for its whole life, and the pulse index is not reset, so no occurrence identity is ever
+    /// replayed. A schedule whose pulse already fired has ended and released its slot, so a `restart` that still
+    /// names it is refused there rather than here.</summary>
+    private bool RestartSchedule(ScheduledJob job)
+    {
+        if (job.Handle.Status != "active") return false;
+        var next = CurrentTick + job.Spec.IntervalTicks;
+        RuntimeJson.Integer(next);
+        job.FirstTick = next - job.Index * job.Spec.IntervalTicks;
+        RuntimeJson.Integer(job.FirstTick);
+        job.ReArmed = true; schedulesDirty = true; PruneSchedules();
+        QueuePulse(job);
+        return true;
+    }
     private ScheduleReceipt ScheduleReport(ScheduledJob job, string status, string code)
         => new(job.Handle.ProviderId, job.Handle.ScheduleId, job.Handle.WorldEpoch, CurrentTick, status, code, job.Handle.DispatchedPulses, job.Handle.SkippedPulses);
+    /// <summary>
+    /// Why a live schedule cannot dispatch any more, or null while it can. The answer has two halves, and only one
+    /// of them can change from frame to frame: the source, the scope and the plans behind the capture are the
+    /// lifecycle generation's business — a module or plan cannot come or go without it moving — while an entity's
+    /// life ends under the kernel without any registration changing at all. So a frame at a standing generation
+    /// asks the capture's resolvers, and the full check runs only where the number moved.
+    /// </summary>
     private string? ScheduleEndCode(ScheduledJob job)
     {
+        if (job.ValidatedGeneration != lifecycleGeneration)
+        {
+            var code = RevalidateSchedule(job);
+            if (code != null) return code;
+        }
+        return EntityLivenessCode(job.Liveness);
+    }
+    /// <summary>The full check of one capture against the tables it was resolved from.</summary>
+    private string? RevalidateSchedule(ScheduledJob job)
+    {
         if (!IsRegistered(job.Handle.ProviderId, job.Generation) || job.Handle.WorldEpoch != WorldEpoch) return "source-lifecycle";
-        if (cancelled.Contains((job.Handle.ProviderId, job.Template.ScopeId))) return "scope-cancelled";
-        if (!job.Work.All(w => plans.TryGetValue(w.Plan.Plan.Id, out var live) && ReferenceEquals(live, w.Plan))) return "plan-unloaded";
-        try { ValidateEvent(job.Template, registry.Capabilities[RuntimeJson.Text(registry.Bindings[job.Template.BindingId], "capabilityId")]); }
+        if (cancelled.Count > 0 && cancelled.Contains((job.Handle.ProviderId, job.Template.ScopeId))) return "scope-cancelled";
+        for (var i = 0; i < job.Work.Count; i++)
+            if (!plans.TryGetValue(job.Work[i].Plan.Plan.Id, out var live) || !ReferenceEquals(live, job.Work[i].Plan)) return "plan-unloaded";
+        try
+        {
+            var capability = registry.Capabilities[RuntimeJson.Text(registry.Bindings[job.Template.BindingId], "capabilityId")];
+            ValidateEvent(job.Template, capability);
+            job.Liveness = LivenessOf(job.Template, capability);
+        }
         catch (RuntimeContractException ex) { return ex.Code; }
+        job.ValidatedGeneration = lifecycleGeneration;
         return null;
     }
+    /// <summary>Whether an entity one value names has lost its life: the whole of what a repeated look at a
+    /// validated value still asks.</summary>
+    private string? EntityLivenessCode(EntityCheck[] checks, out string subject)
+    {
+        for (var i = 0; i < checks.Length; i++)
+        {
+            var check = checks[i];
+            subject = check.Entity.Id;
+            if (check.Entity.WorldEpoch != WorldEpoch) return "stale-world";
+            bool valid;
+            try { valid = check.Resolve(check.Entity); }
+            catch (Exception) { return "entity-resolver-failed"; }
+            if (!valid) return "stale-entity";
+        }
+        subject = "";
+        return null;
+    }
+    private string? EntityLivenessCode(EntityCheck[] checks) => EntityLivenessCode(checks, out _);
     private bool PreparePulse(Pending pending, List<ScheduleReceipt> reports)
     {
         var job = pending.Schedule!;
@@ -184,12 +324,14 @@ public sealed partial class RuntimeKernel
         {
             if (job.EndTick != null && CurrentTick >= job.EndTick)
             {
-                queue.Dequeue(); job.Handle.SkippedPulses += job.TotalPulses - job.Index;
+                // A lifetime bound only ever comes with a finite pulse count, so this schedule is bounded here.
+                queue.Dequeue(); job.Handle.SkippedPulses += (job.TotalPulses ?? 0) - job.Index;
                 EndSchedule(job, "expired", "lifetime-ended"); reports.Add(ScheduleReport(job, "expired", "lifetime-ended"));
                 LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "lifetime-ended", pending.Provider);
                 return false;
             }
-            var skipped = (int)Math.Min(job.TotalPulses - job.Index - 1L, (CurrentTick - job.NextTick) / job.Spec.IntervalTicks);
+            var missed = (CurrentTick - job.NextTick) / job.Spec.IntervalTicks;
+            var skipped = (int)(job.TotalPulses is { } limit ? Math.Min(limit - job.Index - 1L, missed) : missed);
             if (skipped > 0)
             {
                 queue.Dequeue(); job.Index += skipped; job.Handle.SkippedPulses += skipped;
@@ -213,9 +355,9 @@ public sealed partial class RuntimeKernel
             else LogEventRejected(pending.Event.BindingId, pending.Event.EventId, refusal, pending.Provider);
             return false;
         }
-        history.Add(key, Fingerprint(pending.Event));
+        history.Add(key, LedgerFingerprint(RuntimeJson.StableText(RuntimeJson.From(pending.Event))));
         job.Index++; job.Handle.DispatchedPulses++; scheduledThisTick++;
-        if (job.Index < job.TotalPulses) QueuePulse(job);
+        if (job.TotalPulses is not { } pulses || job.Index < pulses) QueuePulse(job);
         else job.Handle.NextTick = null;
         LogTriggerFired(pending.Provider, pending.Event.BindingId, pending.Event.EventId, pending.Event.CauseId,
             pending.Event.RootEventId ?? job.Template.EventId);
@@ -224,10 +366,17 @@ public sealed partial class RuntimeKernel
     private void CleanScheduledLifetimes(List<ScheduleReceipt> reports)
     {
         if (schedules.Count == 0) return;
-        foreach (var job in schedules.Values.ToArray())
+        endedSchedules.Clear();
+        foreach (var job in schedules.Values)
         {
             var code = ScheduleEndCode(job);
-            if (code != null) { EndSchedule(job, "cancelled", code); reports.Add(ScheduleReport(job, "cancelled", code)); }
+            if (code != null) endedSchedules.Add((job, code));
+        }
+        for (var i = 0; i < endedSchedules.Count; i++)
+        {
+            var (job, code) = endedSchedules[i];
+            EndSchedule(job, "cancelled", code);
+            reports.Add(ScheduleReport(job, "cancelled", code));
         }
         PruneSchedules();
     }

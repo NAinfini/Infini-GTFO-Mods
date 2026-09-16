@@ -18,8 +18,10 @@ internal static class ReceiptTests
         check(receipt.Count == 4, "receipt retains both cleanup and reporting failures");
         check(receipt.Select(item => item.Stage).SequenceEqual(new[]
             { "native", "native/error_report", "writer", "writer/error_report" }), "receipt preserves failure order and source stage");
-        check(ReferenceEquals(receipt[0].Error, nativeError) && ReferenceEquals(receipt[2].Error, writerError), "original cleanup exceptions are retained without replacement");
-        check(ReferenceEquals(receipt[1].Error, reportError) && ReferenceEquals(receipt[3].Error, reportError), "reporter exception evidence is retained without recursive reporting");
+        // Indexed receipt assertions must survive a sequence that stops early: a short receipt is a
+        // reported failure, not an escaping IndexOutOfRangeException that hides the remaining checks.
+        check(ReferenceEquals(receipt.ElementAtOrDefault(0).Error, nativeError) && ReferenceEquals(receipt.ElementAtOrDefault(2).Error, writerError), "original cleanup exceptions are retained without replacement");
+        check(ReferenceEquals(receipt.ElementAtOrDefault(1).Error, reportError) && ReferenceEquals(receipt.ElementAtOrDefault(3).Error, reportError), "reporter exception evidence is retained without recursive reporting");
         var immutable = false;
         try { ((ICollection<(string Stage, Exception Error)>)receipt).Add(("injected", reportError)); }
         catch (NotSupportedException) { immutable = true; }

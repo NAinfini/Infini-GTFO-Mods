@@ -6,10 +6,16 @@
     <AssemblyName>ForgeDevelopment.Native</AssemblyName><RootNamespace>ForgeDevelopment.Native</RootNamespace>
     <Version>1.0.0</Version><IsPackable>false</IsPackable>
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+    <!-- The Map module builds in the same artifacts path, so the one room resolver it owns is found there
+         without a second argument; an explicit path still wins. -->
+    <ForgeMapNativeAssembly Condition="'$(ForgeMapNativeAssembly)' == ''">$(ArtifactsPath)/bin/ForgeMap.Native/$(Configuration.ToLowerInvariant())/ForgeMap.Native.dll</ForgeMapNativeAssembly>
   </PropertyGroup>
   <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(ForgeRuntimeAssembly)') or !Exists('$(ForgeFrameworkAssembly)')"
       Text="Pass explicit ForgeRuntimeAssembly and ForgeFrameworkAssembly paths from a successful host build." />
+    <!-- The room resolver is ForgeMap.Native's: the diagnostics read the same answer as the trigger zones. -->
+    <Error Condition="!Exists('$(ForgeMapNativeAssembly)')"
+      Text="Pass ForgeMapNativeAssembly from a successful ForgeMap.Native build in the same artifacts path." />
     <Error Condition="!Exists('$(GTFOBepInExPath)/core/BepInEx.Core.dll')"
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
@@ -18,6 +24,8 @@
     <Compile Include="*.cs" />
     <Reference Include="ForgeRuntime" HintPath="$(ForgeRuntimeAssembly)" Private="false" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" Private="false" />
+    <!-- The one room resolver: naming an authored room in the generated level belongs to the Map module. -->
+    <Reference Include="ForgeMap.Native" HintPath="$(ForgeMapNativeAssembly)" Private="false" />
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" Private="false" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" Private="false" />
     <Reference Include="BepInEx.Unity.Common" HintPath="$(GTFOBepInExPath)/core/BepInEx.Unity.Common.dll" Private="false" />
@@ -40,8 +48,10 @@
     <Reference Include="UnityEngine.AudioModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AudioModule.dll" Private="false" />
     <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
     <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.IMGUIModule.dll" Private="false" />
     <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.InputLegacyModule.dll" Private="false" />
     <Reference Include="UnityEngine.ParticleSystemModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ParticleSystemModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.ScreenCaptureModule.dll" Private="false" />
     <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
     <Reference Include="UnityEngine.Physics2DModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.Physics2DModule.dll" Private="false" />
     <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.TextRenderingModule.dll" Private="false" />

@@ -20,6 +20,8 @@ internal sealed class AuditScene
     {
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+        LocalPlan.OwnMounts(Kernel);
         Module = new EnemyModule(Kernel, RuntimeLogLevel.Off, () => Allowed, Messages.Add);
         Actor = CreateEnemy(); Reference = Module.TrackSpawn(Actor);
         if (!subscribe) return;
@@ -60,17 +62,18 @@ internal sealed class AuditScene
         if (cap.HasValue) inputs["cap"] = cap.Value;
         var context = (CommandContext)Activator.CreateInstance(typeof(CommandContext), BindingFlags.Instance | BindingFlags.NonPublic, null,
             new object[] { origin, 0L, "audit.command", "audit.plan", "audit.resource", "1", "audit.node",
-                RuntimeJson.From(new { overheal_policy = policy }), RuntimeJson.From(inputs) }, null)!;
+                RuntimeJson.From(new { overheal_policy = policy }), RuntimeJson.From(inputs), true }, null)!;
         return (CommandResult)typeof(EnemyModule).GetMethod("Heal", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(Module, new object[] { context })!;
     }
     /// <summary>Resolves the tracked EnemyAgent behind a reference, the same way EnemyModule.Resolve does
-    /// internally, so the managed boundary reads/writes the correct actor for each target in a multi-target call.</summary>
+    /// internally, so the managed boundary reads/writes the correct actor for each target in a multi-target call.
+    /// The entry is a private nested type with internal members, so both bindings are needed to read it.</summary>
     private EnemyAgent? ResolveEnemy(EntityReference target)
     {
-        var entry = typeof(EnemyModule).GetMethod("Resolve", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(Module, new object[] { target });
-        return entry == null ? null : (EnemyAgent)entry.GetType().GetProperty("Enemy")!.GetValue(entry)!;
+        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        var entry = typeof(EnemyModule).GetMethod("Resolve", Flags)!.Invoke(Module, new object[] { target });
+        return entry == null ? null : (EnemyAgent)entry.GetType().GetProperty("Enemy", Flags)!.GetValue(entry)!;
     }
     private ForgeEnemy.Receivers.EnemyHealthSnapshot? ReadForBoundary(EntityReference target)
     {

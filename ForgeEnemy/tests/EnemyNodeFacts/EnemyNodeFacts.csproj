@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production sources are compiled against, and the
+         interop assembly is referenced for its other members, so CS0436 fires on every mention of a shadowed type.
+         Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this suite is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead, for the window in which the in-tree sources do
+         not compile. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt; to an already built ForgeRuntime.Framework.dll." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The node-list family this slice owns, compiled as it ships: the three contracts that declare the rows,
+         and the four native files that answer them. `EnemyModuleShim.cs` declares the members those files read
+         on the provider's own partial class — the entity table, the reference lookup, the kernel, the authority
+         gate and the node family's wiring — because the package's own `EnemyModule` core is edited by a dozen
+         sibling slices at once and cannot be compiled here without also compiling their half-finished partials.
+         Everything the family itself does is the production source, unchanged: the plugin lifetime, the Harmony
+         hook classes and the wave sibling are not part of this suite's statement. -->
+    <Compile Include="../../EnemyNodeEffectContract.cs;../../EnemyNodeTriggerContract.cs;../../EnemyNodeValueContract.cs" LinkBase="Contract" />
+    <Compile Include="../../ModuleDefinition.cs" Link="Contract/ModuleDefinition.cs" />
+    <Compile Include="../../Native/EnemyNodeEffectActions.cs;../../Native/EnemyNodeValueReads.cs;../../Native/EnemyNodeFacts.cs;../../Native/EnemyNodeRegistration.cs" LinkBase="Native" />
+    <!-- The zone responder the `where` row's kernel read goes to is the production partial, not a copy of it: the
+         refusal a life this provider cannot place makes is the one this suite asserts, so it cannot drift. -->
+    <Compile Include="../../Native/EnemyModule.Zones.cs" Link="Native/EnemyModule.Zones.cs" />
+    <!-- The two read-only native readers the value rows answer two of their ports from: the tag flag with its
+         remaining seconds, and the official enemy type block. They are the production files, not copies, so a
+         row cannot drift from the reading it claims. -->
+    <Compile Include="../../Native/Observation/EnemyEntityObserver.cs;../../Native/Observation/EnemyTypeReader.cs" LinkBase="Native/Observation" />
+    <Compile Include="GameDoubles.cs;EnemyModuleShim.cs;Scene.cs;ValueCases.cs;ActionCases.cs;FactCases.cs;Program.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+  </ItemGroup>
+</Project>

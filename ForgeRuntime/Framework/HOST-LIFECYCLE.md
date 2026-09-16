@@ -38,7 +38,7 @@ WorldChanged 在取消旧世界的排队工作、schedule 与 lease 之后发出
 
 ## 证据与限制
 
-HostIntegration 测试编译后的 SDK 与实际宿主元数据。GameBindings 的 `--bridge <游戏目录> <runtime-fixtures>` 用游戏替身驱动生产桥接源码，并读取核对实际的 GameAssembly hash；它**不调用原生游戏方法**。
+HostIntegration 测试编译后的 SDK 与实际宿主元数据。GameBindings 的 `--bridge <游戏目录> <runtime-fixtures>` 用游戏替身驱动生产桥接源码，并读取核对实际的 GameAssembly hash（不符或读不出时宿主挂起为 `startup-failed`，依赖包读 `Plugin.IsSuspended` 后不注册）；它**不调用原生游戏方法**。
 
 回归覆盖：启动失败不重复 IO、LoadPlan 之前冻结、观察器故障隔离、错误线程访问、保留内核在停止后的行为、动作执行期间的拆卸、检查点与迁移拒绝、客户端在下一 tick 前被提升、重复的 InLevel 通知。
 

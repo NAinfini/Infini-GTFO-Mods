@@ -1,6 +1,6 @@
 {
   "name": "ForgeWeapon",
-  "version_number": "0.1.0",
+  "version_number": "0.2.0",
   "website_url": "https://github.com/NAinfini/Infini-GTFO-Mods",
   "description": "Forge Weapon: equipment instances, wield events and weapon observation for the Forge framework. Registers provider forge.module.gtfo.weapon with the Forge Runtime; hard dependencies on ForgeRuntime and ForgeMap.",
   "dependencies": [

@@ -75,9 +75,9 @@ internal sealed class EquipmentIdentityIndex
     internal void Validate(EquipmentObservation value)
     {
         ArgumentNullException.ThrowIfNull(value); Reference(value.Entity);
-        Check(value.Entity.Id.StartsWith(EquipmentIdentitySession.EntityNamespace + ":", StringComparison.Ordinal)
-            && value.Entity.Id.Length > EquipmentIdentitySession.EntityNamespace.Length + 1,
-            "equipment.entity-namespace");
+        // The index holds backpack equipment lives only: a world deployment has the same namespace but its own
+        // shape, and the placement table owns it. A wrong namespace and a malformed life id are the same refusal.
+        Check(EquipmentIdentityId.ShapeOf(value.Entity.Id) == EquipmentEntityShape.Life, "equipment.entity-namespace");
         Check(value.Entity.WorldEpoch == WorldEpoch, "equipment.stale-world");
         Check(Text(value.ResourceId) && Text(value.ResourceRevision), "equipment.resource-reference");
         Check(Enum.IsDefined(typeof(EquipmentLocation), value.Location), "equipment.location");

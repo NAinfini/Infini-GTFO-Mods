@@ -16,9 +16,13 @@ def main() -> int:
     parser.add_argument("forge", type=Path, help="ForgeEnemy.Native.dll whose IL usage the spec freezes")
     parser.add_argument("spec", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--damage-window", type=Path, default=None,
+                        help="damage window evidence file passed to the auditor as its optional sixth argument")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     original = json.loads(args.spec.read_text(encoding="utf-8"))
+    window_source = args.damage_window or args.spec.parent / "e10-damage-window.json"
+    window_original = json.loads(window_source.read_text(encoding="utf-8"))
     # Mutated specs live in the output directory; give them the same relative data evidence files.
     for data in original["dataEvidenceFiles"]:
         target = args.output / data["path"]
@@ -26,12 +30,14 @@ def main() -> int:
         shutil.copyfile(args.spec.parent / data["path"], target)
     results: list[dict] = []
 
-    def run(name: str, candidate: dict, expected_id: str | None) -> bool:
+    def run(name: str, candidate: dict, expected_id: str | None, window: dict | None = None) -> bool:
         spec_path = args.output / f"{name}.spec.json"
         report_path = args.output / f"{name}.report.json"
+        window_path = args.output / f"{name}.damage-window.json"
         spec_path.write_text(json.dumps(candidate, indent=2), encoding="utf-8")
+        window_path.write_text(json.dumps(window if window is not None else window_original, indent=2), encoding="utf-8")
         command = ["dotnet", str(args.auditor.resolve()), str(args.bepinex.resolve()), str(args.game.resolve()),
-                   str(args.forge.resolve()), str(spec_path.resolve()), str(report_path.resolve())]
+                   str(args.forge.resolve()), str(spec_path.resolve()), str(report_path.resolve()), str(window_path.resolve())]
         completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         (args.output / f"{name}.log").write_text(completed.stdout + completed.stderr, encoding="utf-8")
         report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -106,6 +112,44 @@ def main() -> int:
     mutations.append(("data-file-hash", item, "data-file." + item["dataEvidenceFiles"][0]["path"]))
     for name, candidate, expected_id in mutations:
         run(name, candidate, expected_id)
+    # The damage window file is a second frozen input; each mutation below must be rejected by the check that
+    # owns the claim, so a passing audit cannot hide a wrong build, a moved body or a fabricated call edge.
+    window_mutations = []
+    item = copy.deepcopy(window_original); item["gameAssemblySha256"] = "0" * 64
+    window_mutations.append(("window-wrong-native-hash", item, "damage-window.build"))
+    item = copy.deepcopy(window_original); item["buildId"] = "0"
+    window_mutations.append(("window-wrong-build", item, "damage-window.build"))
+    item = copy.deepcopy(window_original); item["schemaVersion"] = 2
+    window_mutations.append(("window-retired-schema", item, "damage-window.schema"))
+    item = copy.deepcopy(window_original)
+    target = next(m for m in item["damageMethods"] if m["id"].endswith("ProcessReceivedDamage"))
+    target["nativeRva"] = "0x137E571"
+    window_mutations.append(("window-moved-rva", item, "damage-window.rva." + target["id"]))
+    item = copy.deepcopy(window_original)
+    target = next(m for m in item["damageMethods"] if m["id"].endswith("ProcessReceivedDamage"))
+    target["parameters"][1]["name"] = "attacker"
+    window_mutations.append(("window-fabricated-parameter", item, "damage-window.parameters." + target["id"]))
+    item = copy.deepcopy(window_original)
+    item["packetTypes"][0]["fields"][2]["declaration"] = "byte limbID"
+    window_mutations.append(("window-packet-layout", item, "damage-window.packet." + item["packetTypes"][0]["type"]))
+    item = copy.deepcopy(window_original)
+    edge = item["callEdges"][0]
+    edge["targetRva"] = "0x1380D50"
+    edge["to"] = "Dam_SyncedDamageBase.SendSetHealth"
+    item["callSiteWindows"] = [w for w in item["callSiteWindows"] if w["site"] != edge["site"]]
+    window_mutations.append(("window-fabricated-edge", item, "damage-window.edge." + edge["site"]))
+    item = copy.deepcopy(window_original)
+    # Dropping a frozen instruction window leaves the call edge that cites it unverifiable, so the edge
+    # check is the one that must reject it; the site is read from the file instead of hard-coded.
+    edge_sites = {edge["site"] for edge in item["callEdges"]}
+    removed = next(w["site"] for w in item["callSiteWindows"] if w["site"] in edge_sites)
+    item["callSiteWindows"] = [w for w in item["callSiteWindows"] if w["site"] != removed]
+    window_mutations.append(("window-missing-window", item, "damage-window.edge." + removed))
+    item = copy.deepcopy(window_original)
+    item["conclusions"].pop("q3-sentry-source")
+    window_mutations.append(("window-missing-conclusion", item, "damage-window.conclusions"))
+    for name, candidate, expected_id in window_mutations:
+        run(name, original, expected_id, window=candidate)
     summary = {"schemaVersion": 2, "gameExecuted": False, "passed": sum(r["passed"] for r in results),
                "failed": sum(not r["passed"] for r in results), "checks": results}
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

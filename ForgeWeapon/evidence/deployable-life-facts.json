@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameExecuted": false,
+  "gameBuild": "20403457",
+  "gameRevision": "34873",
+  "interop": {
+    "used": [
+      { "name": "Modules-ASM.dll", "length": 16777728, "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63",
+        "readWith": "existing local decompilation of the shipped interop assembly (%TEMP%\\covtrigb\\ilspy\\Modules), read-only; same assembly hash as w4-deployable-hooks.json" }
+    ],
+    "whyInteropIsNotBodies": "Every game member in an interop assembly is a wrapper that calls IL2CPP.il2cpp_runtime_invoke and returns the unboxed result. The interop therefore fixes a member's exact name, declaring type, parameter list, return type, virtual/override status and field presence, and it proves nothing about what the native body does. Where a body-level fact is needed it is taken from the decoded call graph already frozen in evidence/w4-deployable-hooks.json (dumper dump.cs of the same build, sha256 BF657C0E…DE1CC), never from interop.",
+    "il2cppWrapperSituation": "Every member below is an il2cpp wrapper. Harmony reaches the native method through the metadata token the interop's own static constructor resolves with IL2CPP.GetIl2CppMethodByToken, so a private native body is a patch target exactly like a public one; a field is read through IL2CPP.il2cpp_field_get_offset, so a private field is readable. A wrapper never exposes the body, so no statement here claims what a body does beyond the call graph frozen in w4-deployable-hooks.json."
+  },
+  "hooks": [
+    {
+      "id": "sentry-tool-place",
+      "hook": "Gear.SentryGunFirstPerson::PlaceOnGround",
+      "interopSignature": "private void PlaceOnGround()",
+      "patchShape": "HarmonyPostfix, no parameters",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-tool-place: rva 0x14115E0, rvaSharing 1, body 730 B, direct callers none, calls CheckCanPlace(bool), PlayerBackpack::IsDeployed(InventorySlot), PlayerBackpack::SetDeployed(InventorySlot,bool).",
+        "Interop declaration is parameterless, so the postfix needs no injected argument beyond __instance."
+      ],
+      "fact": "forge.trigger.equipment.deploy_requested when the tool's own placement state says the ground was valid after the body ran; forge.trigger.equipment.deploy_failed when it says the placement was refused."
+    },
+    {
+      "id": "sentry-tool-can-place",
+      "hook": "Gear.SentryGunFirstPerson::CheckCanPlace",
+      "interopSignature": "private bool CheckCanPlace()",
+      "patchShape": "HarmonyPostfix with __result",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-tool-can-place: rva 0x1410310, rvaSharing 1, body 3007 B, callers PlaceOnGround and SentryGunFirstPerson.Update.",
+        "The decoded body of the tool's placement path calls it before writing the deployed marker, so its result is the game's own placement decision."
+      ],
+      "fact": "the rejection half of the same pair: the game refuses the spot here, not in PlaceOnGround."
+    },
+    {
+      "id": "sentry-first-person-state",
+      "hook": "Gear.SentryGunFirstPerson::m_lastCanPlace / m_hasRayHit / m_placePos",
+      "interopSignature": "public bool m_lastCanPlace; public bool m_hasRayHit; public Vector3 m_placePos",
+      "patchShape": "field readback on __instance",
+      "grounds": [
+        "The interop declares all three fields on SentryGunFirstPerson (bound in its static constructor with IL2CPP.GetIl2CppField).",
+        "m_lastCanPlace is written by the tool's own per-frame path: evidence/w4-deployable-hooks.json records CheckCanPlace as recomputed every tool frame from Update."
+      ],
+      "fact": "the decision is read back from the tool after its body ran, never taken from a parameter; m_hasRayHit separates 'nothing under the crosshair' from 'the spot is occupied' in the failure reason."
+    },
+    {
+      "id": "mine-tool-place",
+      "hook": "Gear.MineDeployerFirstPerson::PlaceMine",
+      "interopSignature": "private void PlaceMine()",
+      "patchShape": "HarmonyPostfix, no parameters",
+      "grounds": [
+        "The interop declares PlaceMine on MineDeployerFirstPerson with the same field pair the sentry tool has (m_lastCanPlace, m_hasRayHit) and its own private CheckCanPlace.",
+        "The mine family's world object is created through ItemReplicationManager.SpawnGear, which is the same path that positions the sentry instance (w4-deployable-hooks.json, positionAtSpawn)."
+      ],
+      "fact": "the mine path of the same deploy pair. The mine tool declares no m_placePos, so the mine request carries its position only when the world instance reports one."
+    },
+    {
+      "id": "mine-tool-can-place",
+      "hook": "Gear.MineDeployerFirstPerson::CheckCanPlace",
+      "interopSignature": "private bool CheckCanPlace()",
+      "patchShape": "HarmonyPostfix with __result",
+      "grounds": ["Declared on MineDeployerFirstPerson alongside PlaceMine and the m_lastCanPlace field; the sentry tool's identical pair is decoded in w4-deployable-hooks.json."],
+      "fact": "the mine path's refusal half."
+    },
+    {
+      "id": "bot-sentry-place",
+      "hook": "Player.PlayerBotActionDeploySentryGun::PlaceSentryGunOnGround",
+      "interopSignature": "private void PlaceSentryGunOnGround()",
+      "patchShape": "HarmonyPostfix, no parameters",
+      "grounds": [
+        "Declared private on PlayerBotActionDeploySentryGun in the interop.",
+        "w4-deployable-hooks.json positionAtSpawn: this body reaches PlayerBackpack::SetDeployed at 0x19B2FFB on the tool-placement path, exactly like SentryGunFirstPerson::PlaceOnGround at 0x1411875."
+      ],
+      "fact": "a bot deploy is a player deploy for this fact: the same pair is published for the bot's own owner when that owner resolves."
+    },
+    {
+      "id": "sentry-armed",
+      "hook": "Gear.SentryGunInstance::SyncedTurnOn",
+      "interopSignature": "public override void SyncedTurnOn(PlayerAgent agent, AIG_CourseNode courseNode)",
+      "patchShape": "HarmonyPostfix with __instance and agent",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-turn-on: rva 0x141B9D0, rvaSharing 1, slot 40, virtual override, 102 B body, no literal caller.",
+        "Slot 40 of ISyncedItem, so it is the game's own 'this synced item is on' entry and it carries the acting agent."
+      ],
+      "fact": "forge.trigger.equipment.armed. The acting agent is the game's own parameter, and it is optional because the mechanism can run a turn-on with no acting player."
+    },
+    {
+      "id": "sentry-disarmed",
+      "hook": "Gear.SentryGunInstance::SyncedTurnOff",
+      "interopSignature": "public override void SyncedTurnOff(PlayerAgent agent)",
+      "patchShape": "HarmonyPostfix with __instance and agent",
+      "grounds": ["w4-deployable-hooks.json method sentry-turn-off: rva 0x141B980, rvaSharing 1, slot 41, virtual override, 79 B body, no literal caller."],
+      "fact": "forge.trigger.equipment.disarmed, the other half of the same pair."
+    },
+    {
+      "id": "sentry-recall-start",
+      "hook": "Gear.SentryGunInstance::SyncedPickup",
+      "interopSignature": "public override void SyncedPickup(PlayerAgent agent)",
+      "patchShape": "HarmonyPrefix with __instance and agent",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-instance-pickup: rva 0x141B2B0, rvaSharing 1, slot 45, virtual override, 1406 B body, calls PlayerAgent::get_Owner, its own get_Replicator and PlayerBackpack::SetDeployed.",
+        "ForgeWeapon/Native/WeaponNativeHooks.cs already patches the same body with a Postfix for the completed recall."
+      ],
+      "fact": "forge.trigger.equipment.recall_started is the prefix of this body and the existing postfix stays the completed half, so one native body carries both edges and neither is derived."
+    },
+    {
+      "id": "mine-recall-start",
+      "hook": "Gear.MineDeployerInstance::SyncedPickup",
+      "interopSignature": "public override void SyncedPickup(PlayerAgent agent)",
+      "patchShape": "HarmonyPrefix with __instance and agent",
+      "grounds": ["w4-deployable-hooks.json method mine-pickup: rva 0x1500600, rvaSharing 1, slot 45, virtual override, 489 B body, calls PlayerAgent::get_Owner."],
+      "fact": "the mine half of recall_started. The mine path never writes the backpack deployed marker, so this body is the mine's only recall signal."
+    },
+    {
+      "id": "sentry-life-end",
+      "hook": "Gear.SentryGunInstance::OnDespawn / OnDestroy",
+      "interopSignature": "public override void OnDespawn(); public new void OnDestroy()",
+      "patchShape": "reused existing postfixes",
+      "grounds": ["w4-deployable-hooks.json methods sentry-instance-despawn (rva 0x1417A20, slot 35) and sentry-instance-destroy (rva 0x1417A80, private, calls StopFiring and StopScanning); ForgeWeapon/Native/WeaponNativeHooks.cs already ends the placement on both."],
+      "fact": "forge.trigger.equipment.expired does not need a hook of its own: it is a second reading of the ending the existing hooks already report."
+    },
+    {
+      "id": "mine-life-end",
+      "hook": "Gear.MineDeployerInstance::OnDestroy",
+      "interopSignature": "public new void OnDestroy()",
+      "patchShape": "reused existing postfix",
+      "grounds": ["w4-deployable-hooks.json method mine-destroy: rva 0x14FF9C0, rvaSharing 1, 83 B body, no decoded outgoing edge; the mine declares no OnDespawn."],
+      "fact": "the mine's only ending path for expired."
+    },
+    {
+      "id": "sentry-target-state",
+      "hook": "Gear.SentryGunInstance_Detection::UpdateDetection",
+      "interopSignature": "public virtual void UpdateDetection()",
+      "patchShape": "HarmonyPostfix with __instance",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-detection-update: rva 0x1413CC0, rvaSharing 1, slot 6 of iSentrygunInstance_Detection, 1024 B body, no literal caller; calls CheckForTarget, CheckForPlayerTarget and CheckForTargetLegacy.",
+        "The same type declares Target (public virtual final GameObject, private setter), HasTarget (public virtual final bool, private setter) and m_core (iSentrygunInstanceCore), all bound in its static constructor.",
+        "The interface exposes only StartDetection (slot 5) and UpdateDetection (slot 6), so this update is the one per-scan entry."
+      ],
+      "fact": "forge.trigger.equipment.target_locked and target_unlocked are both a change of the component's own Target between two updates: the game records a lock, not a reason, so the unlock reason is derived and its derivation is written below."
+    }
+  ],
+  "derivations": [
+    {
+      "id": "deploy-pair",
+      "fact": "deploy_requested / deploy_failed",
+      "formula": "one published fact per placement call, chosen by the tool's own state after the body ran: m_lastCanPlace true => deploy_requested (position from m_placePos when the tool has one and it is finite), m_lastCanPlace false => deploy_failed (reason = no_ground when m_hasRayHit is false, otherwise blocked; outcome = rejected).",
+      "why": "PlaceOnGround has no return value, so the tool's own decision field is the only rejection signal the metadata exposes, and it is the same value the body itself read before writing the deployed marker."
+    },
+    {
+      "id": "expired-reason",
+      "fact": "expired",
+      "formula": "the ending reason the existing deployable tracking already classified: reason = expired when the object ended without a recall (despawned or destroyed), reason = recalled when the ending is the recall path.",
+      "why": "expired is the world taking the object away; the game reports the same teardown through OnDespawn, OnDestroy and the recall pickup, and the existing adapter already computes which of the three arrived first. Publishing it here keeps one fact per ending instead of a second event on the same body."
+    },
+    {
+      "id": "unlock-reason",
+      "fact": "target_unlocked.reason",
+      "formula": "reason = target_gone when the previously locked target no longer resolves to an entity (the component reported no target, or the object it named is gone). No fact is published when the component still reports a target the runtime cannot name, so the case that would need the other label (a real object that left the detection volume) is not published at all rather than labelled with a reason nobody read.",
+      "why": "the component keeps a single Target reference and no reason field, so the only distinction the metadata carries is whether the reference still resolves. `lost_lock` is the label a later body would use once one can tell a lost volume from a lost object."
+    }
+  ],
+  "authority": {
+    "question": "Does the deployable exist on both ends, and which end publishes?",
+    "answer": "Both ends hold the instance and only the host publishes.",
+    "grounds": [
+      "w4-deployable-hooks.json authority: SentryGunInstance is an IDynamicReplicatorSupplier<pGearSpawnData> with an SNet_Packet<pSentryGunSync_New> targeting stream, and WantToFire / RefreshDangerZone have UpdateMaster as their only decoded caller.",
+      "ForgeWeapon/Native/EquipmentNativeAdapter.Authoritative already requires SNet.IsMaster, a Ready runtime and IsHost == true, and every fact this package publishes goes through it."
+    ],
+    "consequences": [
+      "armed, disarmed and target_locked/unlocked run on both ends of a replicated instance, and the master gate is what keeps a client-side replica from publishing a second copy of the same fact.",
+      "A deploy request is a local action of the owning machine, so on a client the request runs on the client; the master gate means the request is published by the host only when the host is the machine running the placement (the host's own deploy, or a bot's deploy on the host)."
+    ]
+  },
+  "unverified": [
+    { "id": "check-can-place-internals", "statement": "Which concrete condition CheckCanPlace rejects for (no ground, occupied, too steep, restricted area).", "reason": "The interop exposes only the bool; the decoded body is 3007 B of data-dependent control flow that was not evaluated.", "whatWouldSettleIt": "A decompilation of the native body, or a runtime probe that logs the tool's own indicator state next to each refusal." },
+    { "id": "synced-turn-on-cadence", "statement": "How often SyncedTurnOn / SyncedTurnOff run for one sentry, and whether a recall emits a turn-off before the pickup.", "reason": "Both bodies are 79-102 B forwarders with no literal caller (interface dispatch), so the metadata orders nothing.", "whatWouldSettleIt": "A runtime counter on both bodies across a deploy, a recall and a level change." },
+    { "id": "target-selection-cadence", "statement": "How often UpdateDetection runs and which of the three selectors an archetype uses.", "reason": "Already recorded in w4-deployable-hooks.json; unchanged by this slice.", "whatWouldSettleIt": "A runtime counter on UpdateDetection while a sentry scans." },
+    { "id": "mine-armed-state", "statement": "Whether a deployed mine has an armed/disarmed transition anywhere in the image.", "reason": "Gear.MineDeployerInstance declares neither SyncedTurnOn nor SyncedTurnOff; the interop has no arming entry for it.", "whatWouldSettleIt": "A decompilation of MineDeployerInstance's own Setup / Update path, or a runtime trace of the fuse slice's timer." },
+    { "id": "recall-failure-path", "statement": "Whether a recall can fail, and what native state records the failure.", "reason": "SyncedPickup is a void body on both families. The metadata has no return value, no try/refusal member and no separate failure entry point for it.", "whatWouldSettleIt": "A decompilation of the native SyncedPickup bodies showing a refusal branch, or a runtime probe of the pickup interaction." },
+    { "id": "host-visible-player-deploy-request", "statement": "Whether a client's own deploy request is observable on the host.", "reason": "PlaceOnGround runs on the machine that owns the tool; the replicated world instance arrives on the host through ItemReplicationManager.SpawnGear, which is where deploy_completed is published. The request edge itself is not replicated by anything in the metadata.", "whatWouldSettleIt": "A runtime trace on a host with one client deploying a sentry." }
+  ],
+  "limits": [
+    "No claim about runtime behaviour: nothing here was executed; the member list was read from a local decompilation of the shipped interop assembly.",
+    "A member that exists in the interop is a member this build has; it does not prove the body runs on a given machine or how often.",
+    "The position carried by a request comes from the tool's own m_placePos, which only the sentry tool declares; a mine request therefore carries no position unless the world instance reports one."
+  ]
+}

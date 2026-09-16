@@ -20,12 +20,13 @@
   <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
     <Compile Remove="Framework\**\*.cs" />
+    <!-- tools/ holds standalone generator projects (each with its own csproj); they are not part of the plugin. -->
+    <Compile Remove="tools\**\*.cs" />
     <ProjectReference Include="Framework\ForgeRuntime.Framework.csproj" />
-    <!-- D-017 R4-a: the frame needs the trigger module's pure `compare` evaluator, so the host's own manifest must
-         declare provider forge.module.trigger; the module is a plain SDK consumer with no game or plugin state. -->
-    <Compile Include="..\ForgeTrigger\**\*.cs" Exclude="..\ForgeTrigger\bin\**\*.cs;..\ForgeTrigger\obj\**\*.cs;..\ForgeTrigger\tests\**\*.cs;..\ForgeTrigger\artifacts\**\*.cs" Link="ForgeTrigger\%(RecursiveDir)%(Filename)%(Extension)" />
     <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GTFOBepInExPath)\interop\UnityEngine.ImageConversionModule.dll" Private="false" />
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)\core\0Harmony.dll" Private="false" />
+    <!-- The host subscribes to GTFO-API's level lifecycle instead of patching GameStateManager itself. -->
+    <Reference Include="GTFO-API" HintPath="$(GTFOBepInExPath)\plugins\GTFO-API.dll" Private="false" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)\core\BepInEx.Core.dll" Private="false" />
     <Reference Include="BepInEx.Unity.Common" HintPath="$(GTFOBepInExPath)\core\BepInEx.Unity.Common.dll" Private="false" />
     <Reference Include="BepInEx.Unity.IL2CPP" HintPath="$(GTFOBepInExPath)\core\BepInEx.Unity.IL2CPP.dll" Private="false" />

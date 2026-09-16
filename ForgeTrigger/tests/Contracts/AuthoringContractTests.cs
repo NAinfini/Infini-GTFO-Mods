@@ -8,7 +8,12 @@ internal static class AuthoringContractTests
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var report = document.RootElement;
         check(report.GetProperty("kind").GetString() == "actual-authoring-registration-audit", "authoring audit provenance");
-        var canonical = RuntimeJson.Parse(CombatContracts.Module().RegistryJson).GetProperty("capabilities");
+        // The shared contract rows live in the runtime's own contract providers rather than in one of them: the
+        // combat actions come from the combat contract and every trigger shape from the trigger contract, so an
+        // audited shared definition is compared against the row whichever provider declares it.
+        var canonical = new[] { CombatContracts.Module(), TriggerContracts.Module() }
+            .SelectMany(module => RuntimeJson.Parse(module.RegistryJson).GetProperty("capabilities").EnumerateArray())
+            .ToArray();
         var accepted = 0; var rejected = 0; var shared = 0;
         var unsupported = new List<object>();
         foreach (var row in report.GetProperty("cases").EnumerateArray())
@@ -19,7 +24,7 @@ internal static class AuthoringContractTests
             check(definition.GetProperty("version").GetString() == row.GetProperty("version").GetString(), "exact audited version " + id);
             if (row.GetProperty("shared").GetBoolean())
             {
-                var expected = canonical.EnumerateArray().Single(c => c.GetProperty("id").GetString() == id);
+                var expected = canonical.Single(c => c.GetProperty("id").GetString() == id);
                 check(Same(definition, expected), "shared definition equals actual SDK " + id);
                 shared++;
             }

@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "task": "nl-gap ammunition rows (a-p-ammo): forge.action.weapon.{ammo_add,ammo_consume}",
+  "verification": "interop-metadata + static-native-method-body-decoding-only",
+  "gameExecuted": false,
+  "profileWritten": false,
+  "repositoriesModifiedForEvidence": false,
+  "assembly": {
+    "file": "GameAssembly.dll",
+    "path": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
+    "length": 57070592,
+    "note": "the same image the w1/w4/w6/a-inv1 evidence files were produced against; no game process was started"
+  },
+  "dump": {
+    "file": "dump.cs",
+    "path": "ForgeWeapon\\.artifacts\\w1-identity-20260912T143531174833Z\\native-map\\dump.cs",
+    "length": 27985238,
+    "note": "supplies RVA -> method entry, the per-type field offsets, and the GenericInstMethod table the generic instantiations below are pinned from"
+  },
+  "decodedBodies": {
+    "tool": "%TEMP%\\combat-mark-native\\probe (Iced 1.21.0, net9.0), copied to %TEMP%\\fan\\nl-gap\\probe with two read-only additions: a `--rawrva` decoder for generic instantiations (which the dump lists by RVA but never as method entries) and a `--callers` literal-call scanner",
+    "invocations": [
+      "dotnet run --artifacts-path %TEMP%\\fan\\nl-gap\\art-probe -- --dump <dump.cs> --assembly <GameAssembly.dll> --rva 0x1754630",
+      "… --rva 0x17589D0 --rva 0x1749830 --rva 0x12F7D70 --rva 0x174ADD0 --rva 0x174ABA0",
+      "… --rawrva 0x1C26630 --rawlen 512",
+      "… --callers 0x1754630,0x1749830"
+    ],
+    "rawOutput": [
+      "%TEMP%\\fan\\nl-gap\\body-giveammo.txt",
+      "%TEMP%\\fan\\nl-gap\\body-receiveammo.txt",
+      "%TEMP%\\fan\\nl-gap\\body-ammo3.txt",
+      "%TEMP%\\fan\\nl-gap\\body-ask.txt",
+      "%TEMP%\\fan\\nl-gap\\callers-ammo.txt"
+    ],
+    "nothingLoaded": "no game process, no IL2CPP runtime, no managed assembly of the game was loaded"
+  },
+  "types": {
+    "Player.PlayerBackpackManager": {
+      "declared": "public class PlayerBackpackManager : GlobalManager",
+      "fields": {
+        "m_giveAmmoPacket": "SNet_AuthorativeAction<pAmmoGive> (+0x20) — the game's own host-authoritative ammunition gift",
+        "m_ammoStoragePacket": "SNet_Packet<pAmmoStorageData> (+0x30) — the storage sync a client sends its host"
+      },
+      "members": {
+        "GiveAmmoToPlayer(SNet_Player toPlayer, float amountStandardRel, float amountSpecialRel, float amountClassRel)": "RVA 0x1754630, dumpLine 658908",
+        "AmmoGiveValidation(pAmmoGive data)": "RVA 0x174DA90, dumpLine 658911 — the action's incoming validation delegate",
+        "ReceiveAmmoGive(pAmmoGive data)": "RVA 0x17589D0, dumpLine 658914 — the action's incoming action delegate",
+        "GetBulletsInPack(AmmoType type, SNet_Player player)": "RVA 0x1753DB0, dumpLine 658890 — a read through GetLocalOrSyncBackpack",
+        "GetAmmoMaxCap(AmmoType type, SNet_Player player)": "RVA 0x1753B70, dumpLine 658893 — a read through GetLocalOrSyncBackpack",
+        "TryGetBackpack(SNet_Player player, out PlayerBackpack backpack)": "RVA 0x175BFC0, dumpLine 658776"
+      }
+    },
+    "Player.PlayerAmmoStorage": {
+      "declared": "public class PlayerAmmoStorage",
+      "fields": {
+        "m_playerBackpack": "PlayerBackpack (+0x18)",
+        "m_ammoStorage": "InventorySlotAmmo[] (+0x20)",
+        "NeedsSync": "bool (+0x59)"
+      },
+      "members": {
+        "GetBulletsInPack(AmmoType type)": "RVA 0x17483D0, dumpLine 658090",
+        "GetBulletMaxCap(AmmoType type)": "RVA 0x1747DD0, dumpLine 658093",
+        "PickupAmmo(AmmoType ammoType, float ammoAmount)": "RVA 0x1749830, dumpLine 658069",
+        "UpdateAmmoInPack(AmmoType ammoType, float delta)": "RVA 0x174ABA0, dumpLine 658081",
+        "UpdateBulletsInPack(AmmoType ammoType, int bulletCount)": "RVA 0x174ADD0, dumpLine 658084"
+      }
+    },
+    "Player.InventorySlotAmmo": {
+      "fields": {
+        "AmmoMaxCap": "float (+0x14)",
+        "AmmoInPack": "float (+0x18)",
+        "BulletsMaxCap": "int (+0x1C)",
+        "CostOfBullet": "float (+0x24)"
+      },
+      "members": { "AddAmmo(float ammoAmount)": "RVA 0x12F7D70, dumpLine 658163" }
+    },
+    "Player.pAmmoGive": {
+      "fields": {
+        "targetPlayer": "SNetStructs.pPlayer (+0x0)",
+        "ammoStandardRel": "float (+0x10)",
+        "ammoSpecialRel": "float (+0x14)",
+        "ammoClassRel": "float (+0x18)"
+      },
+      "note": "the amounts are relative — the receive body multiplies each one by the pool's own capacity before it reaches PickupAmmo"
+    },
+    "Player.AmmoType": {
+      "declared": "public enum AmmoType : byte",
+      "members": ["Standard = 0", "Special = 1", "Class = 2", "ResourcePackRel = 3", "None = 4", "CurrentConsumable = 5"],
+      "note": "the same six members in the same order as the catalog's `ammo_type` parameter, which is why the parameter travels as the native value with no second mapping table"
+    }
+  },
+  "hostEntryPoints": {
+    "rule": "a host write must be a body the host owns whose effect replicates, or the host's copy and every client's copy diverge; a bare field write is never one",
+    "add": {
+      "entry": "PlayerBackpackManager.GiveAmmoToPlayer(SNet_Player, float standardRel, float specialRel, float classRel)",
+      "rva": "0x1754630",
+      "decoded": [
+        "0x175468C call SNetStructs.pPlayer::SetPlayer  ; the pAmmoGive the body builds carries the target player",
+        "0x1754698/0x17546A8/0x17546B6 movss [rsp+50h]/[rsp+54h]/[rsp+58h]  ; the three relative amounts land at pAmmoGive +0x10/+0x14/+0x18",
+        "0x175487D mov rcx,[rcx+20h]  ; PlayerBackpackManager.Current.m_giveAmmoPacket",
+        "0x17548E6 call 0x1C26630  ; SNet_AuthorativeAction<pAmmoGive>::Ask (GenericInstMethod table, dumpLine 423459)"
+      ],
+      "gates": "the body itself tests nothing: the manager's own null checks are its only early exits, so the caller is the authority gate (this adapter's host gate)",
+      "kind": "host-authoritative action: its receive half applies the change through PlayerAmmoStorage.PickupAmmo, so a client cannot be written directly"
+    },
+    "addCallSite": {
+      "entry": "ResourcePackFirstPerson.ApplyPack -> PlayerAgent.GiveAmmoRel -> PlayerBackpackManager.GiveAmmoToPlayer",
+      "rva": "PlayerAgent.GiveAmmoRel 0x13047D0 (dumpLine 651106), call site 0x130485A",
+      "callers": "the only literal caller of GiveAmmoToPlayer in the image is PlayerAgent::GiveAmmoRel (--callers 0x1754630)",
+      "note": "ResourcePackFirstPerson.ApplyPack (0x13BF2D0) is the resource pack's own apply body; it reaches the local backpack's storage write directly (see consume) and reaches the gift for a player it does not own the storage of"
+    },
+    "applyPath": {
+      "validation": "PlayerBackpackManager.AmmoGiveValidation(pAmmoGive) 0x174DA90 calls SNet_AuthorativeAction<pAmmoGive>::Do (0x1C28420, GenericInstMethod dumpLine 423545) at +0x81",
+      "receive": "PlayerBackpackManager.ReceiveAmmoGive(pAmmoGive) 0x17589D0 calls 0x1749830 PlayerAmmoStorage::PickupAmmo three times (0x1758C62, 0x1758C89, 0x1758CB0), each with movd xmm2,[rbp+178h]; cvtdq2ps; mulss xmm2,xmm1 — xmm1 is the packet's own relative amount and the int is the pool capacity, so the relative value becomes an absolute pool delta",
+      "storage": "PlayerAmmoStorage.PickupAmmo indexes m_ammoStorage[(int)ammoType] and calls InventorySlotAmmo::AddAmmo(ammoAmount)",
+      "readback": "PlayerAmmoStorage.GetBulletsInPack(AmmoType) is the pool's own answer; PlayerBackpackManager.GetBulletsInPack(type, player) is the same read keyed by player"
+    },
+    "consume": {
+      "entry": "PlayerAmmoStorage.UpdateBulletsInPack(AmmoType ammoType, int bulletCount)",
+      "rva": "0x174ADD0",
+      "decoded": [
+        "0x174AE15 cmp esi,[rbx+18h] / jae  ; an ammo type outside the storage's own table is refused by the body",
+        "0x174AE23 mov rbx,[rbx+rsi*8+20h]  ; m_ammoStorage[type]",
+        "0x174AE3D movss xmm7,[rbx+18h]  ; AmmoInPack",
+        "0x174AE56 mulss xmm6,[rbx+24h]  ; bulletCount * CostOfBullet",
+        "0x174AE71 addss xmm6,xmm7 / 0x174AE82 call Mathf::Clamp  ; clamp(pack + delta, 0, AmmoMaxCap)",
+        "0x174AE99 movss [rbx+18h],xmm6  ; the pool's new AmmoInPack",
+        "0x174AEC1 mov byte ptr [rdi+59h],1  ; PlayerAmmoStorage.NeedsSync = true",
+        "0x174AECE call PlayerAmmoStorage::UpdateSlotAmmoUI"
+      ],
+      "clamping": "both ends: Mathf::Clamp(value, 0, AmmoMaxCap) — which is why a deduction goes through this body and not through the gift",
+      "callSite": "ResourcePackFirstPerson.ApplyPack (0x13BF2D0) calls it at 0x13BF41B on PlayerBackpackManager::get_LocalBackpack()",
+      "whyNotTheGift": "InventorySlotAmmo.AddAmmo (0x12F7D70) is Min(AmmoInPack + amount, AmmoMaxCap) with no lower clamp (0x12F7DD0 addss xmm6,xmm7; 0x12F7DDE call Mathf::Min; 0x12F7DE7 movss [rbx+18h],xmm0), so a negative gift amount could drive a pool below zero; the gift carries no amount field for the ResourcePackRel, None and CurrentConsumable pools either"
+    }
+  },
+  "implementation": {
+    "ammo_add": {
+      "poolSelection": "the `ammo_type` structural parameter, whose six members and the native enum's six members share one order; only Standard, Special and Class have a pAmmoGive field, so the other three are refused with `ammo-pool-has-no-gift`",
+      "amount": "the row's `amount` is a round count; it is converted against the pool's own cap read immediately before the call (GetAmmoMaxCap) and the bullets that landed are the difference the same pool reports afterwards (GetBulletsInPack). The result's `amount` is that readback",
+      "overflowPolicy": "`clamp` is the native behaviour; `reject` is implemented as a pre-read refusal (`ammo-pool-overflow`) with nothing written; `discard` is refused by name (`ammo-overflow-discard-unsupported`) because the native body clamps and a discard that clamped would be a different action",
+      "refusedByPort": {
+        "cap": "ammo-cap-unsupported — every pool already has the game's own cap",
+        "provenance": "ammo-provenance-unsupported — pAmmoGive carries no source field"
+      }
+    },
+    "ammo_consume": {
+      "pool": "any of the six native pools, because UpdateBulletsInPack indexes the storage's own table",
+      "ownership": "the pool must be this machine's own player's or a bot's (`SNet_Player.IsLocal || IsBot`): a remote client's ammunition is its own state, synced to the host through PlayerAmmoStorage.NeedsSync / PlayerBackpackManager.SendLocalAmmoData (0x175B280) and ReceiveAmmoSync (0x1758EA0), so a write to the host's mirrored copy would be overwritten by its owner; it is refused with `ammo-pool-not-owned-here`",
+      "failurePolicy": "`reject` refuses when the pool holds less than the request (`ammo-pool-insufficient`); `partial` spends what the pool holds and reports the number",
+      "refusedByPort": { "transaction": "ammo-transaction-unsupported — the storage write is one clamped field write and has nowhere to put a transaction handle" }
+    },
+    "codes": [
+      "authority-or-phase", "ammo-recipient-unknown", "amount-out-of-range", "ammo-type-unknown", "ammo-policy-unknown",
+      "ammo-cap-unsupported", "ammo-provenance-unsupported", "ammo-overflow-discard-unsupported", "ammo-pool-has-no-gift",
+      "ammo-transaction-unsupported", "ammo-pool-unavailable", "ammo-pool-not-owned-here", "ammo-pool-overflow",
+      "ammo-pool-insufficient", "ammo-pool-empty", "ammo-readback-exception", "ammo-change-unobserved",
+      "native-commit-exception", "ammo-committed"
+    ]
+  },
+  "testCoverage": {
+    "project": "ForgeWeapon/tests/SupplyFacts",
+    "cases": 28,
+    "covers": [
+      "the gift the row submits (pool, relative amount, addressee) and the readback it reports",
+      "the native clamp at the pool's cap, the reject policy's pre-read refusal and the discard refusal",
+      "the refused cap, provenance, transaction, ammo-type, policy, amount and pool-selection paths",
+      "both host gates (the game's master flag and the kernel's authoritative phase) before any native call",
+      "a foreign recipient kind, an unnameable player, a throwing lookup and a missing backpack",
+      "the throwing gift and the unreadable pool, each with its own commit state",
+      "the own/bot and remote-client ownership rules of the consume row, the empty and insufficient pools, and the storage write's own clamped result",
+      "the two rows' catalog shapes, their handlers, their support lines and the not-declared-when-unanswered rule",
+      "the item resolver's id spelling, its pocket-slot narrowing and its refusal paths"
+    ],
+    "outputsAreSynthetic": "the doubles record what each entry point was asked and apply what the game's own bodies apply; nothing here is game-verified"
+  },
+  "unverified": [
+    "no game process ran: whether SNet_AuthorativeAction<pAmmoGive>::Ask executes on the host and replicates to the clients is inferred from its body and from the packet/validation/receive chain, not observed",
+    "whether a remote client's mirrored pool on the host is really overwritten by its owner's next sync was not observed in game; the consume row refuses that case rather than relying on it",
+    "the relative-to-absolute conversion assumes the pool capacity the receive body multiplies by is the same GetAmmoMaxCap answers (the decode reads an int at PlayerAgent+0x178); the row reports the readback instead of the request, so a wrong assumption shows up as a smaller landed amount, never as a claimed write",
+    "the ResourcePackRel, None and CurrentConsumable pools were not observed being spent in game; the consume row accepts them because UpdateBulletsInPack indexes the storage's own table, and the add row refuses them because pAmmoGive has no field for them"
+  ]
+}

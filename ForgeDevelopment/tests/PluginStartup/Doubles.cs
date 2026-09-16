@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Reflection.Emit;
 using ForgeRuntime;
 
 internal sealed class UnwritableDataException : Exception
@@ -9,6 +11,19 @@ internal static class Probe
     internal static readonly Dictionary<string, Exception> Faults = new();
     internal static readonly List<UnityEngine.Object> Components = new();
     internal static int Checks, Failures;
+    private static bool _legacyTweaksInstalled;
+
+    // The plugin's only soft dependency is detected by assembly name and by the absence of
+    // InfiniTweaks.Telemetry. This defines an assembly named InfiniTweaks without that type, i.e. the
+    // pre-2.5.0 package the plugin must refuse. Assembly identity is process-wide, so it is installed
+    // once, after the cases that must run without any InfiniTweaks assembly.
+    internal static void InstallLegacyTweaks()
+    {
+        if (_legacyTweaksInstalled) return;
+        _legacyTweaksInstalled = true;
+        var name = new AssemblyName("InfiniTweaks") { Version = new Version(2, 0, 0) };
+        AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run).DefineDynamicModule("InfiniTweaks").DefineType("InfiniTweaks.LegacyCollector").CreateType();
+    }
     internal static void Call(string stage)
     { Calls.Add(stage); if (Faults.TryGetValue(stage, out var error)) throw error; }
     internal static void That(bool value, string message)
@@ -51,27 +66,64 @@ namespace ForgeDevelopment.Native
     internal static class Settings
     {
         internal static readonly TestSetting<bool> PerformanceLogging = new(true);
+        internal static readonly TestSetting<bool> RecorderEnabled = new(true);
         internal static void Bind(BepInEx.Configuration.ConfigFile config) => Probe.Call("settings:bind");
         internal static void BindAuthoring(BepInEx.Configuration.ConfigFile config) => Probe.Call("settings:authoring");
+        internal static void BindRecorder(BepInEx.Configuration.ConfigFile config) => Probe.Call("settings:recorder");
     }
     internal static class RuntimeDiagnostics
     {
         internal static void Initialize() => Probe.Call("diagnostics:init");
         internal static void Stop() => Probe.Call("diagnostics:stop");
     }
-    public sealed class AuthoringMonitor : UnityEngine.Object { }
+    // The recorder's own stages are covered by tests/Recorder; here it is one startup stage whose calls the
+    // plugin's order and rollback matrix can observe.
+    internal static class RecRuntime
+    {
+        internal static void Start(string root) => Probe.Call("recorder:start");
+        internal static void Stop() => Probe.Call("recorder:stop");
+    }
+    public sealed class AuthoringMonitor : UnityEngine.MonoBehaviour { }
     public sealed class PerformanceMonitor : UnityEngine.Object { }
+    // The capture registry and the experiment components are the pieces the plugin's authoring branch attaches. Each is
+    // one call here, so the startup order and the rollback matrix see them exactly as the game build would.
+    internal static class CaptureRegistry
+    {
+        internal const int DefaultPeriodicSeconds = 30;
+        internal static void EnsureStarted(UnityEngine.MonoBehaviour host, int periodicSeconds) => Probe.Call("capture:start");
+        internal static void Stop() => Probe.Call("capture:stop");
+    }
+    public sealed class ExperimentRunner : UnityEngine.Object { }
+    public sealed class ExperimentPanel : UnityEngine.Object
+    {
+        internal static void Load() => Probe.Call("experiment:load");
+    }
     [HarmonyLib.HarmonyPatch] internal sealed class GenerationHook { }
 }
 namespace BepInEx
 {
+    // The recorder writes under the BepInEx root; the double answers a temporary path so the loader-path cases can
+    // run the same startup sequence the game does.
+    public static class Paths
+    {
+        public static string BepInExRootPath => System.IO.Path.GetTempPath();
+    }
+
     [AttributeUsage(AttributeTargets.Class)] public sealed class BepInPlugin : Attribute
-    { public BepInPlugin(string guid, string name, string version) { } }
+    {
+        public string GUID { get; }
+        public string Name { get; }
+        public string Version { get; }
+        public BepInPlugin(string guid, string name, string version) { GUID = guid; Name = name; Version = version; }
+    }
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)] public sealed class BepInDependency : Attribute
     {
         public enum DependencyFlags { HardDependency = 1, SoftDependency = 2 }
-        public BepInDependency(string guid, string version) { }
-        public BepInDependency(string guid, DependencyFlags flags) { }
+        public string GUID { get; }
+        public string? Version { get; }
+        public DependencyFlags Flags { get; }
+        public BepInDependency(string guid, string version) { GUID = guid; Version = version; }
+        public BepInDependency(string guid, DependencyFlags flags) { GUID = guid; Flags = flags; }
     }
 }
 namespace BepInEx.Configuration { public sealed class ConfigFile { } }
@@ -107,6 +159,10 @@ namespace UnityEngine
         public static void Destroy(Object value)
         { Probe.Call("component:destroy:" + value.GetType().Name); value.Destroyed = true; }
     }
+    public class Component : Object { }
+    public class Behaviour : Component { }
+    // The capture registry is handed a MonoBehaviour, which is what the authoring monitor is in the game build.
+    public class MonoBehaviour : Behaviour { }
 }
 namespace HarmonyLib
 {

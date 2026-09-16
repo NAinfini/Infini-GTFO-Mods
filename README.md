@@ -10,7 +10,7 @@
 <a id="en"></a>
 ## English
 
-> The plan, spec, interfaces, decisions and status for Forge live **only** in the
+> The development plan and interfaces for Forge live **only** in the
 > two-repo unified framework — nothing is duplicated here:
 > - Local (both repos checked out side by side, always up to date): [`../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md`](../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md)
 > - Remote (committed content only): <https://github.com/NAinfini/Infini-GTFO-Model-Site/blob/main/Docs/forge-contract/FORGE-FRAMEWORK.md>
@@ -31,7 +31,7 @@ actually be verified.
 
 ### Layout
 
-Six Forge base packages, each shipped as its own Thunderstore package (D-011), plus
+Six Forge base packages, each shipped as its own Thunderstore package, plus
 one standalone mod:
 
 | Directory | What it does |
@@ -45,16 +45,20 @@ one standalone mod:
 | [InfiniTweaks](InfiniTweaks/README.md) | Standalone QoL mod, not part of Forge |
 
 Every Forge mod keeps two docs: `README.md` (capability, boundaries, structure) and
-`VALIDATION.md` (dated run logs only). Plan and status per unit are in §6 of the
-framework linked above, decisions in §8.2 — no one-off handoff notes, history lives
-in Git.
+`VALIDATION.md` (dated run logs only). Unit requirements are in §6 of the framework linked above, acceptance in §7
+and third-party choices in §8. Keep only the latest plan text, without handoff
+notes, historical findings or old plan copies.
+
+The current product sequence, full vanilla-content requirements and per-step
+verification live in the framework §4. Package implementation notes
+do not define a separate roadmap.
 
 ### How Forge builds on the game
 
 - **Native mechanics, no scope cuts.** Weapons, enemies, objectives, checkpoints,
   self-revive and spawn-apart are implemented on Forge's own Trigger/Event system;
   third-party mods are behaviour references only. Host migration, checkpoint restore,
-  the full 605-atom vocabulary and custom enemy/weapon models are all required (D-021).
+  the full 605-atom vocabulary and custom enemy/weapon models are all required.
 - **Networking.** Transport is GTFO-API's NetworkAPI (bundled with BepInExPack_GTFO)
   and BepInEx. Forge only adds dedupe, epochs, batching, the handshake and sync rules
   on top.
@@ -63,18 +67,15 @@ in Git.
 - **Community fixes.** Not rewritten. Pure fix packages become dependencies; only
   fixes that overlap side effects or authoritative state Forge owns are implemented by
   Forge, and the dependency must not run the same side effect again.
-- **Rooms (D-019).** The website assembles rooms from parts the game already has and
-  exports them as data. ForgeMap builds each room in game and registers it as a
-  geomorph that ComplexResourceSet and `CustomGeomorph`/LGTuner use; the vanilla
-  generator still decides placement. LGTuner (`hirnukuono-LGTuner`) stays long-term
-  for zone room order and extra complex resources. Exact placement/assembly generation
-  and its G0–G6 checks are cancelled and deleted. Author-uploaded mod packs extracted
-  into the community are a supplementary source.
+- **Rooms.** Existing official rooms use the vanilla generation pipeline and
+  LGTuner. New-room construction and third-party resources follow the framework
+  §4; the ForgeMap notes document actual entry points and evidence.
 
 ### Build & validate
 
-Until the six base packages and the website are all built, only `dotnet build` is run
-routinely; test runs happen together in one final phase (D-020).
+Verify each product step, then run final integrated acceptance. Use the
+commands appropriate to the change and record the actual evidence; compilation alone
+does not demonstrate gameplay.
 
 Stuff that doesn't need the game:
 
@@ -102,7 +103,7 @@ implementation into Infini Tweaks.
 
 ### Before you touch something
 
-Read the two-repo framework first for plan/rules/interfaces/status, then read the
+Read the two-repo framework first for product requirements, rules and interfaces, then read the
 README, VALIDATION and actual source of the module you're changing. The plan tells
 you the requirements, not the current state of code that's still moving.
 
@@ -113,7 +114,7 @@ you the requirements, not the current state of code that's still moving.
 <a id="zh"></a>
 ## 中文
 
-> Forge 的计划、规范、接口、裁决与状态**只**写在两仓统一框架里，这里不重复一份：
+> Forge 的开发计划、规范与接口**只**写在两仓统一框架里，这里不重复一份：
 > - 本地（两仓并排检出，永远最新）：[`../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md`](../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md)
 > - 远端（只有已提交的内容）：<https://github.com/NAinfini/Infini-GTFO-Model-Site/blob/main/Docs/forge-contract/FORGE-FRAMEWORK.md>
 
@@ -129,7 +130,7 @@ Forge 让普通 GTFO 玩家不用学模组制作，就能在网站上拼出敌�
 
 ### 目录
 
-六个 Forge 基础包，各自作为独立的 Thunderstore 包发行（D-011），外加一个独立模组：
+六个 Forge 基础包，各自作为独立的 Thunderstore 包发行，外加一个独立模组：
 
 | 目录 | 干什么 |
 | --- | --- |
@@ -142,29 +143,29 @@ Forge 让普通 GTFO 玩家不用学模组制作，就能在网站上拼出敌�
 | [InfiniTweaks](InfiniTweaks/README.md) | 独立的 QoL 模组，不属于 Forge |
 
 每个 Forge 模组保留两份文档：`README.md`（能力、边界、结构）和 `VALIDATION.md`（只记
-带日期的运行记录）。各单元的计划和状态在上面框架的第 6 节，裁决在 §8.2——不留一次性
-交接记录，历史翻 Git。
+带日期的运行记录）。各单元任务在框架 §6，验收标准在 §7，第三方选型在 §8。
+计划只保留最新正文，不附交接经过、历史发现和旧版副本。
+
+当前三步顺序、完整原版内容要求与分步验证只在框架 §4维护。
+各包实现说明不再另列路线或任务队列。
 
 ### Forge 怎么搭在游戏上
 
 - **原生实现，范围不砍。** 武器、敌人、任务目标、检查点、自救和分开出生都在 Forge 自己的
   Trigger/Event 体系上实现，第三方模组只当行为参考。主机迁移、检查点恢复、完整的 605 条
-  原子词表、自定义敌人和武器模型都要做（D-021）。
+  原子词表、自定义敌人和武器模型都要做。
 - **网络。** 传输用 GTFO-API 的 NetworkAPI（BepInExPack_GTFO 自带）和 BepInEx，Forge
   只在上面加去重、epoch、合批、握手和同步规则。
 - **关卡搭建。** 通过游戏自己的 `LG_Factory` 回调观察各个搭建阶段。
 - **社区修复。** 不重写。纯修复包直接作为依赖；和 Forge 自己负责的副作用或权威状态重叠的
   条目才由 Forge 实现，依赖包不能对同一副作用再执行一次。
-- **房间（D-019）。** 网站用游戏已有的零件拼房间，导出成数据；ForgeMap 在游戏里把房间搭
-  出来，登记成 geomorph，供 ComplexResourceSet 和 `CustomGeomorph`/LGTuner 使用，房间摆
-  在哪仍由原版生成器决定。LGTuner（`hirnukuono-LGTuner`）长期保留，负责区域内的房间选择
-  顺序和额外环境资源加载。精确摆放/拼装生成及其 G0–G6 检查已取消并删除。作者上传、提取进社区的
-  模组包是补充来源。
+- **房间。** 官方现有房间继续使用原版生成流程与 LGTuner。新房间搭建和第三方资源
+  按框架 §4 推进；ForgeMap 说明只记录实际入口与核验证据。
 
 ### 构建和验证
 
-六个基础包和网站全部搭完之前，日常只跑 `dotnet build`；测试留到最后一个阶段统一跑
-（D-020）。
+按三步分别验证，再做最终整体验收。根据改动运行相应构建与测试，记录实际证据；
+编译通过不代表游戏行为正确。
 
 不需要游戏的部分：
 
@@ -190,7 +191,7 @@ Infini Tweaks 和 Forge 分开构建——Forge 的东西不会漏到 Infini Twe
 
 ### 动手之前先看什么
 
-先看两仓框架搞清楚计划、规则、接口和状态，再看要改的那个模块的 README、VALIDATION 和
+先看两仓框架搞清楚产品要求、规则和接口，再看要改的那个模块的 README、VALIDATION 和
 真实源码。计划写的是要求，不是还在变的代码的当前状态。
 
 <p align="right"><a href="#top">↑ 顶部</a> · <a href="#en">English →</a></p>

@@ -5,62 +5,131 @@ using ForgeRuntime.Framework;
 namespace ForgeWeapon;
 
 /// <summary>Weapon provider. Wield facts come only from Weapon's own equipment observation; the actor is a
-/// player reference owned by the player domain and is never created here. Both bindings are observe-only.</summary>
+/// player reference owned by the player domain and is never created here. Most bindings are observe-only, and
+/// most capabilities they name are declared by the runtime's own `TriggerContracts` provider, so this module
+/// carries no second copy of a shape that contract owns. The exceptions are owned here, row for row: the
+/// three deployed-device fact rows, the melee-hit row and the seven implemented
+/// attack-instance rows, whose canonical ids are this provider's own; and the actions it executes itself — the
+/// ammunition pair, the three instance-override rows and the inventory give/consume pair — each
+/// declared with the native body this machine supplies. The reload rows are this provider's bindings but not its
+/// capabilities — their owner is `forge.contract.trigger`, which declares every one of their shapes. The rows are
+/// registered together with the support lines their bindings require, because the runtime refuses an implemented
+/// binding it has no support line for.</summary>
 public static class ModuleDefinition
 {
     public const string ProviderId = "forge.module.gtfo.weapon";
-    public const string Version = "0.1.0";
+    public const string Version = "0.2.0";
+    /// <summary>The one mount target kind this provider answers for: an official offline gear block id, which
+    /// every instance of that block hangs on, as opposed to one address or one native object.</summary>
+    public const string GearBlockAttachmentKind = "gear-block";
     public const string EquippedCapability = "forge.trigger.input.equipped";
     public const string UnequippedCapability = "forge.trigger.input.unequipped";
+    public const string ShotCommittedCapability = "forge.trigger.combat.shot_committed";
+    public const string HitCandidateCapability = "forge.trigger.combat.hit_candidate";
+    public const string DespawnedCapability = "forge.trigger.entity.despawned";
+    public const string DeployCompletedCapability = "forge.trigger.equipment.deploy_completed";
+    public const string RecallCompletedCapability = "forge.trigger.equipment.recall_completed";
     public const string EquippedBinding = ProviderId + ".binding.equipped";
     public const string UnequippedBinding = ProviderId + ".binding.unequipped";
+    public const string ShotCommittedBinding = ProviderId + ".binding.shot_committed";
+    public const string HitCandidateBinding = ProviderId + ".binding.hit_candidate";
+    public const string DespawnedBinding = ProviderId + ".binding.despawned";
+    public const string DeployCompletedBinding = ProviderId + ".binding.deploy_completed";
+    public const string RecallCompletedBinding = ProviderId + ".binding.recall_completed";
     public const string WieldReadPermission = "gtfo.equipment.wield.read";
+    public const string CombatReadPermission = "gtfo.weapon.combat.read";
+    public const string DeployableReadPermission = "gtfo.equipment.deployable.read";
 
-    public static RuntimeModule Create() => new(RuntimeKernel.ApiVersion,
-        RuntimeJson.From(new
-        {
-            providers = new[] { new { id = ProviderId, kind = "native", version = Version, dependencies = Array.Empty<string>() } },
-            capabilities = new[]
-            {
-                Capability(EquippedCapability, "装备切入", "玩家切到了某件装备。"),
-                Capability(UnequippedCapability, "装备切出", "玩家把某件装备收起来了。")
-            },
-            bindings = new[]
-            {
-                Binding(EquippedBinding, EquippedCapability, "gtfo.equipment.equipped"),
-                Binding(UnequippedBinding, UnequippedCapability, "gtfo.equipment.unequipped")
-            }
-        }).GetRawText(),
-        new Dictionary<string, CommandHandler>(),
-        new[]
-        {
-            new BindingSupport(EquippedBinding, "implementation-only", new[] { WieldReadPermission }),
-            new BindingSupport(UnequippedBinding, "implementation-only", new[] { WieldReadPermission })
-        });
-
-    // Label, description and graph are the canonical catalog entry for the same ID, unchanged.
-    private static object Capability(string id, string label, string description) => new
+    /// <summary>The one Weapon provider declaration. Every handler here is the native half's body for one row
+    /// this provider owns; a registration only ever declares what it answers, and the runtime refuses an
+    /// implemented binding whose handler the registration does not supply, so each row, its capability row and
+    /// its shape travel together with that handler or not at all.
+    ///
+    /// <paramref name="overrides"/> is the instance-override family's own handler table
+    /// (<see cref="WeaponOverrideContract.Handlers"/>): its three rows are declared by that contract as one set,
+    /// so the table that carries their bodies is what is supplied or not. The inventory pair is the `a-p-item`
+    /// half — give and consume. `drop` declares nothing and has no body: the node list has no drop node, so no
+    /// binding row is added for it, no capability row is declared (ruling 110.5) and the implementation is gone
+    /// with them (ruling 133.3).</summary>
+    public static RuntimeModule Create(
+        CommandHandler? ammoAdd = null, CommandHandler? ammoConsume = null,
+        IReadOnlyDictionary<string, CommandHandler>? overrides = null,
+        CommandHandler? inventoryGive = null, CommandHandler? inventoryConsume = null)
     {
-        id, owner = ProviderId, kind = "trigger", label, version = "1.0.0",
-        parameters = new { description },
-        graph = new
+        // Every capability this provider binds is declared by one contract, never twice: the runtime's own
+        // `TriggerContracts` carries the equipment, input and combat rows including the placement pair, and a
+        // second declaration of one id is refused at registration.
+        var capabilities = new List<object>();
+        // The rows whose canonical ids this provider owns travel with their own contract: a device fact, the melee
+        // hit and an attack instance are all observed by the native half that declares them, and each contract
+        // hands back the rows, the bindings and the support lines in one shape.
+        foreach (var row in WeaponDeployableFactsContract.Capabilities()) capabilities.Add(row);
+        capabilities.AddRange(WeaponMeleeHitContract.Capabilities());
+        capabilities.AddRange(AttackInstanceContract.Capabilities());
+        // The three action families this provider executes itself: the ammunition pair, the instance-override
+        // trio and the inventory pair. Each is declared by its own contract, only for the bodies really supplied.
+        capabilities.AddRange(WeaponSupplyContract.Rows(ammoAdd, ammoConsume));
+        if (overrides != null) capabilities.AddRange(WeaponOverrideContract.Capabilities());
+        capabilities.AddRange(InventoryActionContract.Capabilities(inventoryGive, inventoryConsume));
+        var bindings = new List<object>
         {
-            domains = new[] { "weapon", "tool", "consumable", "player" },
-            execution = "host",
-            inputs = Array.Empty<object>(),
-            outputs = new[]
-            {
-                new { id = "next", type = "execution" },
-                new { id = "actor", type = "entity" },
-                new { id = "equipment", type = "entity" }
-            },
-            parameters = Array.Empty<object>()
+            Binding(EquippedBinding, EquippedCapability, "gtfo.equipment.equipped"),
+            Binding(UnequippedBinding, UnequippedCapability, "gtfo.equipment.unequipped"),
+            Binding(ShotCommittedBinding, ShotCommittedCapability, "gtfo.weapon.shot_committed"),
+            Binding(HitCandidateBinding, HitCandidateCapability, "gtfo.weapon.hit_candidate"),
+            Binding(DespawnedBinding, DespawnedCapability, "gtfo.equipment.despawned"),
+            Binding(DeployCompletedBinding, DeployCompletedCapability, "gtfo.equipment.deploy_completed"),
+            Binding(RecallCompletedBinding, RecallCompletedCapability, "gtfo.equipment.recall_completed")
+        };
+        bindings.AddRange(WeaponDeployableFactsContract.Bindings());
+        bindings.AddRange(WeaponMeleeHitContract.Bindings());
+        bindings.AddRange(AttackInstanceContract.Bindings());
+        bindings.AddRange(WeaponSupplyContract.Bindings(ammoAdd, ammoConsume));
+        if (overrides != null) bindings.AddRange(WeaponOverrideContract.Bindings());
+        bindings.AddRange(InventoryActionContract.Rows(inventoryGive, inventoryConsume));
+        var support = new List<BindingSupport>
+        {
+            new(EquippedBinding, "implementation-only", new[] { WieldReadPermission }),
+            new(UnequippedBinding, "implementation-only", new[] { WieldReadPermission }),
+            new(ShotCommittedBinding, "implementation-only", new[] { CombatReadPermission }),
+            new(HitCandidateBinding, "implementation-only", new[] { CombatReadPermission }),
+            new(DespawnedBinding, "implementation-only", new[] { DeployableReadPermission }),
+            new(DeployCompletedBinding, "implementation-only", new[] { DeployableReadPermission }),
+            new(RecallCompletedBinding, "implementation-only", new[] { DeployableReadPermission })
+        };
+        support.AddRange(WeaponDeployableFactsContract.Support());
+        support.AddRange(WeaponMeleeHitContract.Support());
+        support.AddRange(AttackInstanceContract.Support());
+        support.AddRange(WeaponSupplyContract.Support(ammoAdd, ammoConsume));
+        if (overrides != null) support.AddRange(WeaponOverrideContract.Support());
+        support.AddRange(InventoryActionContract.Support(inventoryGive, inventoryConsume));
+        var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal);
+        var shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal);
+        // One body and one shape per declared row. A handler the registration carries but no binding names is
+        // refused as unused, which is why every table above answers per supplied body and not per family.
+        foreach (var entry in WeaponSupplyContract.Handlers(ammoAdd, ammoConsume)) handlers[entry.Key] = entry.Value;
+        foreach (var entry in WeaponSupplyContract.Shapes(ammoAdd, ammoConsume)) shapes[entry.Key] = entry.Value;
+        foreach (var entry in InventoryActionContract.Handlers(inventoryGive, inventoryConsume)) handlers[entry.Key] = entry.Value;
+        foreach (var entry in InventoryActionContract.Shapes(inventoryGive, inventoryConsume)) shapes[entry.Key] = entry.Value;
+        if (overrides != null)
+        {
+            foreach (var entry in overrides) handlers[entry.Key] = entry.Value;
+            foreach (var entry in WeaponOverrideContract.Shapes()) shapes[entry.Key] = entry.Value;
         }
-    };
+        return new RuntimeModule(RuntimeKernel.ApiVersion,
+            RuntimeJson.From(new
+            {
+                providers = new[] { new { id = ProviderId, kind = "native", version = Version, dependencies = Array.Empty<string>() } },
+                capabilities = capabilities.ToArray(),
+                bindings = bindings.ToArray()
+            }).GetRawText(),
+            handlers, support.ToArray())
+        { Shapes = shapes };
+    }
 
-    private static object Binding(string id, string capabilityId, string handler) => new
+    private static object Binding(string id, string capabilityId, string handler, string role = "observe") => new
     {
-        id, capabilityId, providerId = ProviderId, handler, role = "observe", status = "implemented",
+        id, capabilityId, providerId = ProviderId, handler, role, status = "implemented",
         dependencies = Array.Empty<string>(), requires = Array.Empty<string>()
     };
 }

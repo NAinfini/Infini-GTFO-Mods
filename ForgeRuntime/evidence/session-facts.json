@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "slice": "s-session",
+  "package": "ForgeRuntime",
+  "family": "session",
+  "generatedFor": "forge.trigger.session.{left,ready_changed,paused,resumed,package_ready,package_failed}",
+  "gameBuild": "20403457",
+  "evidenceSources": [
+    "%TEMP%/covtrigb/ilspy/Modules/PauseManager.cs",
+    "%TEMP%/covtrigb/ilspy/Modules/GameStateManager.cs",
+    "%TEMP%/covtrigb/ilspy/Modules/pGameState.cs",
+    "%TEMP%/covtrigb/ilspy/Modules/IPauseUpdator.cs",
+    "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_Events.cs",
+    "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_Player.cs",
+    "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_PlayerEvent.cs",
+    "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_PlayerEventReason.cs",
+    "ForgeRuntime/GameBindings/GameRuntimeBridge.cs",
+    "ForgeRuntime/GameBindings/PlanDiscovery.cs",
+    "ForgeRuntime/Framework/RuntimeKernel.cs",
+    "ForgeRuntime/Framework/RuntimeRegistry.cs",
+    "ForgeRuntime/Framework/RuntimeJson.cs",
+    "catalog/capability-catalog.json (website, read-only)"
+  ],
+  "hooks": [
+    {
+      "type": "SNetwork.SNet_Events",
+      "member": "public static Il2CppSystem.Action<SNet_Player, SNet_PlayerEvent, SNet_PlayerEventReason> OnPlayerEvent { get; set; }",
+      "assembly": "SNet_ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_Events.cs:309",
+      "kind": "static IL2CPP delegate field exposed as a property",
+      "il2cppWrapper": "present (SNet_Events is an Il2CppInterop wrapper over the native class; the property reads and writes the native static field)",
+      "usage": "subscribed, never patched",
+      "subscription": "SNet_Events.OnPlayerEvent += (Action<SNet_Player, SNet_PlayerEvent, SNet_PlayerEventReason>)handler",
+      "hostVisibility": "every peer raises it; the fact is published on the host because only the host dispatches plans",
+      "usedBy": [
+        "forge.trigger.session.left"
+      ]
+    },
+    {
+      "type": "SNetwork.SNet_PlayerEvent",
+      "member": "enum : byte { PlayerLeftSessionHub, PlayerKickedFromSession, PlayerInSession, PlayerIsSynced, OnPlayerNeedsAllLocalDataSynced, PlayerAgentSpawned, PlayerAgentDeSpawned, PlayerChangedNickName, PlayerAgentDropIn, PlayerDropInRecallDone }",
+      "assembly": "SNet_ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_PlayerEvent.cs:1-15",
+      "kind": "native enum",
+      "usage": "read to decide which membership changes end a session"
+    },
+    {
+      "type": "SNetwork.SNet_PlayerEventReason",
+      "member": "enum : byte { None, Kick_GameFull, Kick_ByVote, Kick_GenerationChecksum, Kick_Unresponsive, Kick_CorruptSessionData, Kick_NativeLobbyKick, Kick_Bot }",
+      "assembly": "SNet_ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/SNet/SNetwork/SNet_PlayerEventReason.cs:1-15",
+      "kind": "native enum",
+      "usage": "mapped onto the catalog's `reason` string",
+      "derivation": "reason = None -> \"left\"; Kick_X -> \"kicked_\" + lower_snake(X); the mapping is exhaustive over the eight members, and an unknown value falls back to \"left\""
+    },
+    {
+      "type": "GameStateManager",
+      "member": "private unsafe void OnPlayerGameStateChange(SNet_Player player, pGameState data)",
+      "assembly": "Modules-ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/Modules/GameStateManager.cs:675",
+      "kind": "private instance method",
+      "il2cppWrapper": "present (native method info pointer resolved by token)",
+      "usage": "HarmonyPostfix detour",
+      "patch": "[HarmonyPatch(typeof(GameStateManager), \"OnPlayerGameStateChange\")]",
+      "hostVisibility": "the manager exists on every peer; the fact is published on the host"
+    },
+    {
+      "type": "GameStateManager",
+      "member": "public static unsafe bool IsPlayerReady(SNet_Player player)",
+      "assembly": "Modules-ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/Modules/GameStateManager.cs:544",
+      "kind": "public static native method",
+      "il2cppWrapper": "present",
+      "usage": "read inside the postfix for the boolean the catalog's `ready` port carries"
+    },
+    {
+      "type": "pGameState",
+      "member": "struct { SNetStructs.pPlayer player; eGameStateName gameState; }",
+      "assembly": "Modules-ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/Modules/pGameState.cs:10-24",
+      "kind": "native struct",
+      "note": "the struct carries no ready flag, so `ready` is read through GameStateManager.IsPlayerReady rather than off the callback payload"
+    },
+    {
+      "type": "PauseManager",
+      "member": "public unsafe void SetPaused()",
+      "assembly": "Modules-ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/Modules/PauseManager.cs:154",
+      "kind": "private native method (the C# accessor the wrapper exposes is public)",
+      "usage": "HarmonyPostfix detour",
+      "patch": "[HarmonyPatch(typeof(PauseManager), \"SetPaused\")]",
+      "hostVisibility": "each peer pauses itself; the fact is published on the host"
+    },
+    {
+      "type": "PauseManager",
+      "member": "public unsafe void SetUnpaused()",
+      "assembly": "Modules-ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/Modules/PauseManager.cs:165",
+      "kind": "private native method",
+      "usage": "HarmonyPostfix detour",
+      "patch": "[HarmonyPatch(typeof(PauseManager), \"SetUnpaused\")]"
+    },
+    {
+      "type": "PauseManager",
+      "member": "public static unsafe bool IsPaused { get; set; }; public static unsafe bool s_isPaused { get; set; }; public unsafe override void OnPaused(); public unsafe override void OnUnpaused(); public static void RegisterForPausedUpdate(IPauseUpdator); public static void UnregisterPausedUpdate(IPauseUpdator)",
+      "assembly": "Modules-ASM.dll",
+      "decompile": "%TEMP%/covtrigb/ilspy/Modules/PauseManager.cs:61,105,188,199,210,221",
+      "kind": "native state and callbacks",
+      "note": "GameStateManager : GlobalManager implements IPauseUpdator too (its own OnPaused/OnUnpaused at Modules/GameStateManager.cs), so pausing runs a chain of registrants; the detour is on the two state writes rather than on one registrant's callback"
+    },
+    {
+      "type": "ForgeRuntime.Framework.PlanLoadOutcome",
+      "member": "readonly record struct PlanLoadOutcome(string Path, bool Loaded, string? PlanId, string? Code, string? Detail)",
+      "assembly": "ForgeRuntime.Framework (repository)",
+      "decompile": "ForgeRuntime/Framework/PlanCandidate.cs:39",
+      "kind": "host-derived, not native",
+      "derivation": "the outcomes of RuntimeKernel.LoadPlans over PlanDiscovery.Scan's file list; `Loaded` -> package_ready, otherwise package_failed with `Code` as the reason",
+      "hostVisibility": "host only: the host is the process that discovers and loads plans"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "forge.trigger.session.left",
+      "evidence": [
+        "SNet_Events.OnPlayerEvent (SNet_ASM.dll) with SNet_PlayerEvent.PlayerLeftSessionHub or PlayerKickedFromSession",
+        "SNet_PlayerEventReason for the `reason` string",
+        "SNet_PlayerEvent.PlayerAgentDeSpawned / PlayerAgentDropIn / PlayerDropInRecallDone are deliberately not treated as leaving the session"
+      ],
+      "ports": {
+        "player": "gtfo.player entity, resolved through RuntimeKernel.ResolveEntityInstance(\"gtfo.player\", SNet_Player). The resolver belongs to ForgeMap (PlayerIdentityModule); no resolver or no current life means the fact is not published at all.",
+        "reason": "LeaveReasons mapping above"
+      },
+      "absentSemantics": "`player` is a required, non-nullable catalog port: the kernel refuses a payload that omits it (`missing-field`) or carries null (`null-input`), so an unresolvable player makes the whole fact absent rather than publishing a placeholder.",
+      "unverified": [
+        "whether the native side raises PlayerLeftSessionHub on every peer for a remote player's departure, or only on the leaver (game-in check)",
+        "whether a bot removal arrives as PlayerKickedFromSession with Kick_Bot (game-in check)"
+      ]
+    },
+    {
+      "id": "forge.trigger.session.ready_changed",
+      "evidence": [
+        "GameStateManager.OnPlayerGameStateChange postfix with GameStateManager.IsPlayerReady(SNet_Player)"
+      ],
+      "ports": {
+        "player": "same gtfo.player resolution as session.left",
+        "ready": "GameStateManager.IsPlayerReady(player)"
+      },
+      "absentSemantics": "same required-port rule as session.left",
+      "unverified": [
+        "whether a ready state change always routes through OnPlayerGameStateChange, or whether the lobby also updates readiness through SNet_SyncManager.OnPlayerReadyChange (private, Modules/SNet_SyncManager.cs:505) alone; if it does, this trigger is driven by the wrong callback and must be re-pointed"
+      ]
+    },
+    {
+      "id": "forge.trigger.session.paused",
+      "evidence": [
+        "PauseManager.SetPaused (Modules-ASM.dll) as the native state write"
+      ],
+      "ports": {},
+      "derivation": "rising edge of `paused`; the adapter's latch is the edge detector, the native manager's own flag is the state",
+      "kernelTiming": "the kernel is not advanced while the game is paused, so a fact published from SetPaused is dispatched on the first advance after the simulation resumes. Both facts are published from the callbacks that flip the state, so a pause is never published as a resume.",
+      "unverified": [
+        "whether SetPaused/SetUnpaused are the only two paths that change the paused state (game-in check); a third path would publish no fact"
+      ]
+    },
+    {
+      "id": "forge.trigger.session.resumed",
+      "evidence": [
+        "PauseManager.SetUnpaused (Modules-ASM.dll)"
+      ],
+      "ports": {},
+      "unverified": [
+        "same single-path question as session.paused"
+      ]
+    },
+    {
+      "id": "forge.trigger.session.package_ready",
+      "evidence": [
+        "PlanDiscovery.Scan + RuntimeKernel.LoadPlans outcomes (repository, host-derived)"
+      ],
+      "ports": {
+        "pack": "the plugin directory under BepInEx/plugins that owns the plan file (`plugins/<pack>/forge/plans/<file>.plan.json`); a path outside that shape answers with the path itself"
+      },
+      "derivation": "one fact per discovered plan file whose outcome is Loaded",
+      "unverified": [
+        "whether the catalog's `pack` is meant to be the plan file or the plugin directory; the plugin directory is the unit a player sees in r2modman and the unit the kernel's own plan-conflict record names"
+      ]
+    },
+    {
+      "id": "forge.trigger.session.package_failed",
+      "evidence": [
+        "PlanDiscovery.Scan + RuntimeKernel.LoadPlans outcomes (repository, host-derived)"
+      ],
+      "ports": {
+        "pack": "same derivation as package_ready",
+        "outcome": "always the `failed` member of execution_outcome (index 3)",
+        "reason": "the kernel's or the host scan's own refusal code (json-size, plan-path, invalid-json, plan-budget, plan-conflict, plan-version, ...), never a re-worded one"
+      ],
+      "derivation": "one fact per discovered plan file whose outcome is not Loaded; a file the host could not even read counts as a failure of its pack",
+      "unverified": [
+        "whether the catalog intends `outcome` to distinguish a load refusal from a shape/binding refusal; this slice reports both as `failed` with the kernel's code in `reason`"
+      ]
+    }
+  ],
+  "hostDerived": [
+    "package_ready and package_failed are not native events at all: they are derived from the host's own plan discovery and load, and the evidence records them as such rather than as native observations."
+  ],
+  "nativeReads": {
+    "SNet_Player.Pointer": "read by ForgeMap's player resolver, not by this slice; this slice only passes the SNet_Player instance to ResolveEntityInstance",
+    "SNet_PlayerEventReason": "read",
+    "GameStateManager.IsPlayerReady": "read",
+    "PauseManager.s_isPaused/IsPaused": "not read: the fact is published from the two writes, so a state read is never needed"
+  },
+  "nativeLayout": {
+    "expectedReads": [
+      "SNetwork.SNet_Events.OnPlayerEvent (subscription, not a read)",
+      "SNetwork.SNet_PlayerEventReason (enum member)",
+      "GameStateManager.IsPlayerReady(SNet_Player)",
+      "PauseManager.SetPaused",
+      "PauseManager.SetUnpaused"
+    ],
+    "writes": [],
+    "note": "the slice writes nothing native; it detours two private pause entry points and one private player state change callback, and reads only IsPlayerReady off the game."
+  }
+}

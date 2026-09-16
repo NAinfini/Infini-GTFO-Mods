@@ -1,7 +1,7 @@
 using ForgeRuntime.Framework;
 
-/// <summary>Test-only adapter over the I-PACK D-009 batch <see cref="RuntimeKernel.LoadPlans"/>, which is
-/// intentionally non-throwing so one file's rejection never affects another's. This keeps the pre-existing
+/// <summary>Test-only adapter over <see cref="RuntimeKernel.LoadPlans"/>, which is intentionally
+/// non-throwing so one file's rejection never affects another's. This keeps the pre-existing
 /// single-file, throw-on-reject assertions (Reject/RejectCode, <see cref="LocalPlan.Load"/>) working with a minimal
 /// signature change; it is not a production compatibility layer, and lives only in test code, the same way other
 /// fixture helpers are test-only. Mirrors the identical adapter in the Framework/GameBindings/GraphContracts/

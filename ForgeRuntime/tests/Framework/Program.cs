@@ -205,7 +205,9 @@ void RejectCode(Action action, string code, string name)
         enumSeed["capabilities"]![1]!["graph"]!["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"schema\":\"compare_operator\",\"nullable\":true}"));
         // A structural literal narrows the index basis to its own inline `values`, not the shared set.
         enumSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"policy\",\"type\":\"enum\",\"role\":\"structural\",\"required\":true,\"values\":[\"floor\",\"ceil\",\"nearest\"]}"));
-        var enumHandle = s.Kernel.RegisterModule(enumModule with { RegistryJson = enumSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) }, RuntimeLogLevel.Off);
+        var enumHandle = s.Kernel.RegisterModule(enumModule with { RegistryJson = enumSeed.ToJsonString(),
+            Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(enumId)] = Fixture.Shape(enumId, new[] { "target", "kind" }, new[] { "amount", "policy" }) },
+            EntityResolvers = s.Resolvers(enumId) }, RuntimeLogLevel.Off);
         JsonNode EnumPlan(string policyConstantJson)
         {
             var plan = JsonNode.Parse(Fixture.Plan(s.Kernel, "enum_value", enumId))!;
@@ -246,7 +248,9 @@ void RejectCode(Action action, string code, string name)
         var opSeed = JsonNode.Parse(opModule.RegistryJson)!;
         opSeed["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"schema\":\"compare_operator\"}"));
         opSeed["capabilities"]![1]!["graph"]!["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"op\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"set\":\"compare_operator\"}"));
-        var opHandle = s.Kernel.RegisterModule(opModule with { RegistryJson = opSeed.ToJsonString(), EntityResolvers = s.Resolvers(enumId) }, RuntimeLogLevel.Off);
+        var opHandle = s.Kernel.RegisterModule(opModule with { RegistryJson = opSeed.ToJsonString(),
+            Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(enumId)] = Fixture.Shape(enumId, parameters: new[] { "amount", "op" }) },
+            EntityResolvers = s.Resolvers(enumId) }, RuntimeLogLevel.Off);
         var opPlan = JsonNode.Parse(Fixture.Plan(s.Kernel, "promote_enum", enumId))!;
         opPlan["entrypoints"]![0]!["layout"]!["outputs"]![2]!["valueSet"] = 0;
         Step(opPlan)["layout"]!["constants"] = JsonNode.Parse("[5,null]"); Step(opPlan)["layout"]!["promoted"] = JsonNode.Parse("[1]");
@@ -255,6 +259,16 @@ void RejectCode(Action action, string code, string name)
         Step(opPlan)["inputs"]!.AsArray().Add(JsonNode.Parse("{\"slot\":2,\"fromEventSlot\":2}"));
         s.Kernel.LoadPlan(opPlan.ToJsonString());
         Check(s.Kernel.HasSubscribers(Fixture.Trigger(enumId)), "a legal enum promotion registers a subscription");
+        // The promoted parameter is not a constant: it reads the input port `Resolve` appended after the declared
+        // inputs, so the frame carries the very slot the event copy targets and no pool entry at all.
+        var opFrames = s.Kernel.Resolved("promote_enum")!.Frames!.Steps[0];
+        Check(opFrames.Inputs.Length == 3 && opFrames.Inputs[2].Kind == ValueKind.Enum && opFrames.Inputs[2].Source == PortSource.Event,
+            "a promoted parameter keeps its appended input port");
+        Check(opFrames.Parameters.Length == 2 && opFrames.Parameters[1].Source == PortSource.Event
+            && opFrames.Parameters[1].Kind == ValueKind.Enum && opFrames.Parameters[1].Slot == opFrames.Inputs[2].Slot,
+            "a promoted parameter reads its input slot instead of a constant");
+        Check(opFrames.Parameters[0].Source == PortSource.Constant && opFrames.Parameters[0].Slot == 0,
+            "an authored parameter beside a promoted one still reads the plan's constant pool");
         RuntimeEvent OpEvent(string eventId, object op) => new(eventId, Fixture.Trigger(enumId), s.World, 1, "shared-scope",
             RuntimeJson.From(new { target = new EntityReference(enumId + ":1", s.World, s.Life), op }));
         Check(opHandle.Publish(OpEvent("op-lt", 2)).Status == "queued", "a legal promoted enum index queues");
@@ -276,7 +290,7 @@ void RejectCode(Action action, string code, string name)
         "an out-of-bounds promoted value is rejected before invocation, never clamped");
 }
 {
-    // D-017 R4-a: a schemaVersion 3 plan is a graph, not a chain. This provider registers its own canonical
+    // A schemaVersion 4 plan is a graph, not a chain. This provider registers its own canonical
     // compare-shaped condition beside the recorded-event trigger and action, so these cases exercise the loader and
     // the kernel without depending on the ForgeTrigger package; the control step uses the SDK's real branch contract.
     const string id = "example.graph";
@@ -302,6 +316,7 @@ void RejectCode(Action action, string code, string name)
     }).ToArray();
     static object Layout(JsonElement contract, object[] constants) => new { inputs = Slots(contract.GetProperty("inputs")), outputs = Slots(contract.GetProperty("outputs")), constants, promoted = Array.Empty<int>() };
     var graphKernel = new RuntimeKernel(Fixture.Identity); graphKernel.BeginWorld(1);
+    graphKernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
     graphKernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
     var branchBinding = "forge.contract.control.binding.branch";
     // One module: the recorded-event trigger, the recorded action, and one pure condition (role evaluate, one
@@ -322,6 +337,7 @@ void RejectCode(Action action, string code, string name)
         role = "evaluate", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() }).GetRawText()));
     graphKernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
         Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = _ => RuntimeJson.From(new { value = true }) },
+        Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(id)] = Fixture.Shape(id), [id + ".handler.compare"] = Fixture.CompareShape() },
         BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off);
     var graph = RuntimeJson.Parse(graphKernel.ExportManifest()).GetProperty("registry");
     JsonElement Row(string list, string rowId) => graph.GetProperty(list).EnumerateArray().Single(r => r.GetProperty("id").GetString() == rowId);
@@ -358,11 +374,11 @@ void RejectCode(Action action, string code, string name)
         Check(canonical.SequenceEqual(new object[] { "Compare", "Branch", "Guard" }), "the fixture graph has the expected canonical order");
         // Successor entries are array positions of that canonical order, so the array below is written in it.
         return JsonNode.Parse(RuntimeJson.From(new {
-            schemaVersion = 3, kind = "forge-runtime-plan", planId = "graph", resource = new { id = "author.resource", revision = "revision-1" },
+            schemaVersion = 4, kind = "forge-runtime-plan", planId = "graph", resource = new { id = "author.resource", revision = "revision-1" },
             runtime = graphKernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Fixture.Permissions,
             dependencies = Array.Empty<string>(),
             limits = new { graphKernel.Limits.MaxEventsPerTick, graphKernel.Limits.MaxCommandsPerTick, graphKernel.Limits.MaxQueuedEvents, graphKernel.Limits.MaxCausalDepth },
-            bindings = pins,
+            bindings = pins, attachments = Fixture.Attachments,
             entrypoints = new[] { new { nodeId = "Entry", binding = Array.IndexOf(pinIds, Fixture.Trigger(id)), layout = Layout(triggerContract, Array.Empty<object>()),
                 start = 1, steps = canonical.Select(n => nodes[(string)n]).ToArray() } }
         }).GetRawText())!;
@@ -375,10 +391,12 @@ void RejectCode(Action action, string code, string name)
     (RuntimeKernel Kernel, RuntimeModuleHandle Module) GraphKernel(EvaluatorHandler? evaluator = null, CommandHandler? action = null)
     {
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
         kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         var module = kernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
             Handlers = action == null ? graphModule.Handlers : new Dictionary<string, CommandHandler> { [Fixture.Handler(id)] = action },
             Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = evaluator ?? (_ => RuntimeJson.From(new { value = true })) },
+            Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(id)] = Fixture.Shape(id), [id + ".handler.compare"] = Fixture.CompareShape() },
             BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) },
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> { [id] = r => r.Id == id + ":1" && r.WorldEpoch == 1 && r.LifeEpoch == 1 } }, RuntimeLogLevel.Off);
         return (kernel, module);
@@ -405,7 +423,7 @@ void RejectCode(Action action, string code, string name)
     otherSeed["bindings"]![1]!["capabilityId"] = "example.other.control.sequence";
     var otherKernel = new RuntimeKernel(Fixture.Identity); otherKernel.BeginWorld(1);
     otherKernel.RegisterModule(otherModule with { RegistryJson = otherSeed.ToJsonString(),
-        Handlers = new Dictionary<string, CommandHandler>(),
+        Handlers = new Dictionary<string, CommandHandler>(), Shapes = new Dictionary<string, HandlerShape>(),
         BindingSupport = new[] { new BindingSupport(Fixture.Trigger("example.other"), "implementation-only", Array.Empty<string>()),
             new BindingSupport("example.other.binding.sequence", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off);
     var otherRegistry = RuntimeJson.Parse(otherKernel.ExportManifest()).GetProperty("registry");
@@ -427,28 +445,29 @@ void RejectCode(Action action, string code, string name)
     var otherTrigger = otherKernel.ResolveGraphContract(Fixture.TriggerCapability("example.other"), "1.0.0", RuntimeJson.EmptyObject);
     var otherLayout = JsonNode.Parse(RuntimeJson.From(Layout(otherContract, Array.Empty<object>())).GetRawText())!;
     var otherPlanJson = JsonNode.Parse(RuntimeJson.From(new {
-        schemaVersion = 3, kind = "forge-runtime-plan", planId = "other", resource = new { id = "author.resource", revision = "revision-1" },
+        schemaVersion = 4, kind = "forge-runtime-plan", planId = "other", resource = new { id = "author.resource", revision = "revision-1" },
         runtime = otherKernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Array.Empty<string>(),
         dependencies = Array.Empty<string>(),
         limits = new { otherKernel.Limits.MaxEventsPerTick, otherKernel.Limits.MaxCommandsPerTick, otherKernel.Limits.MaxQueuedEvents, otherKernel.Limits.MaxCausalDepth },
-        bindings = sequencePins,
+        bindings = sequencePins, attachments = Fixture.Attachments,
         entrypoints = new[] { new { nodeId = "Entry", binding = OtherPinIndex(Fixture.Trigger("example.other")), layout = Layout(otherTrigger, Array.Empty<object>()), start = 0,
             steps = new object[] { new { nodeId = "Sequence", nodeKind = "control", binding = OtherPinIndex("example.other.binding.sequence"), layout = otherLayout, inputs = Array.Empty<object>(), successors = new int?[] { null, null } } } } }
     }).GetRawText())!.ToJsonString();
-    // R4-a only routes the one branch capability; another control-kind capability is rejected, and a node whose
-    // declared nodeKind does not match its capability fails earlier.
+    // The kernel routes the control ids its own vocabulary declares; a control capability outside it is refused by
+    // id, and a node whose declared nodeKind does not match its capability fails earlier.
     void BadOther(Action<JsonNode> mutate, string code, string name)
     {
         var candidate = JsonNode.Parse(otherPlanJson)!;
         mutate(candidate);
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
         kernel.RegisterModule(otherModule with { RegistryJson = otherSeed.ToJsonString(),
-            Handlers = new Dictionary<string, CommandHandler>(),
+            Handlers = new Dictionary<string, CommandHandler>(), Shapes = new Dictionary<string, HandlerShape>(),
             BindingSupport = new[] { new BindingSupport(Fixture.Trigger("example.other"), "implementation-only", Array.Empty<string>()),
                 new BindingSupport("example.other.binding.sequence", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off);
         RejectCode(() => kernel.LoadPlan(candidate.ToJsonString()), code, name);
     }
-    BadOther(p => { }, "control-unsupported", "R4-a only routes forge.control.flow.branch");
+    BadOther(p => { }, "control-unsupported", "a control capability outside the kernel's vocabulary is refused by id");
     BadOther(p => p["entrypoints"]![0]!["steps"]![0]!["nodeKind"] = "action", "node-kind", "an action nodeKind cannot bind a control capability");
     // The evaluator table is exact in both directions: every implemented `evaluate` binding needs one, and nothing
     // else may be registered — a stale entry is a provider-side bug, not a spare handler the kernel can ignore.
@@ -462,8 +481,43 @@ void RejectCode(Action action, string code, string name)
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1); kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         RejectCode(() => kernel.RegisterModule(graphModule with { RegistryJson = graphSeed.ToJsonString(),
             Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = _ => RuntimeJson.From(new { value = true }), [id + ".handler.spare"] = _ => RuntimeJson.From(new { value = true }) },
+            Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(id)] = Fixture.Shape(id), [id + ".handler.compare"] = Fixture.CompareShape(), [id + ".handler.spare"] = Fixture.CompareShape() },
             BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off),
             "unused-evaluator", "an evaluator with no evaluate binding rejects");
+    }
+    // The shape table is exact in the same two directions as the handler and evaluator tables: a registered
+    // execute handler must bring its own shape, a shape no binding resolves against is a provider-side bug, and a
+    // shape may only name ports the capability it is resolved against really declares.
+    {
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        RejectCode(() => kernel.RegisterModule(Fixture.Module(id) with { Shapes = new Dictionary<string, HandlerShape>() }, RuntimeLogLevel.Off),
+            "missing-shape", "an execute handler without a declared shape rejects");
+    }
+    {
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        RejectCode(() => kernel.RegisterModule(Fixture.Module(id) with { Shapes = new Dictionary<string, HandlerShape> {
+            [Fixture.Handler(id)] = Fixture.Shape(id), [id + ".handler.spare"] = Fixture.Shape(id) } }, RuntimeLogLevel.Off),
+            "unused-shape", "a shape with no binding to resolve it rejects");
+    }
+    {
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        RejectCode(() => kernel.RegisterModule(Fixture.Module(id) with { Shapes = new Dictionary<string, HandlerShape> {
+            [Fixture.Handler(id)] = new HandlerShape().Inputs(id + ".undeclared") } }, RuntimeLogLevel.Off),
+            "shape-port", "a shape naming a port the capability does not declare rejects");
+    }
+    // Contract I-PLAN: `pure` authority means no world access, so a condition may not declare an entity input at
+    // all. The rejection happens at registration, not at plan load: a runnable pure step could otherwise be handed
+    // an entity it has no way to act on.
+    {
+        var seed = JsonNode.Parse(graphSeed.ToJsonString())!;
+        var pure = seed["capabilities"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id + ".condition.alias");
+        pure!["graph"]!["inputs"] = JsonNode.Parse("[{\"id\":\"target\",\"type\":\"entity\"}]");
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1); kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
+        RejectCode(() => kernel.RegisterModule(graphModule with { RegistryJson = seed.ToJsonString(),
+            Evaluators = new Dictionary<string, EvaluatorHandler> { [id + ".handler.compare"] = _ => RuntimeJson.From(new { value = true }) },
+            Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(id)] = Fixture.Shape(id), [id + ".handler.compare"] = new HandlerShape().Outputs("value") },
+            BindingSupport = new[] { Fixture.Support(id)[0], Fixture.Support(id)[1], new BindingSupport(id + ".binding.compare", "implementation-only", Array.Empty<string>()) } }, RuntimeLogLevel.Off),
+            "pure-world-port", "a pure capability cannot declare an entity port");
     }
     Bad(p => Step(p, 0)["nodeKind"] = "condition", "node-kind", "a step nodeKind outside action/control/pure rejects");
     Bad(p => Step(p, 0)["nodeKind"] = "control", "node-kind", "a step nodeKind must match the capability it binds");
@@ -475,12 +529,17 @@ void RejectCode(Action action, string code, string name)
     Bad(p => { Step(p, 1)["nodeKind"] = "pure"; Step(p, 1)["successors"] = new JsonArray(); }, "node-kind", "a control step cannot declare itself pure");
     Bad(p => { Step(p, 2)["nodeKind"] = "pure"; Step(p, 2)["successors"] = new JsonArray(); }, "node-kind", "a pure step cannot bind an action capability");
     Bad(p => Step(p, 1)["successors"]![0] = 0, "successor-index", "a successor never points backwards");
+    // A read names a slot of this entrypoint; an index outside the step array names no slot, which is the slot
+    // check's own case. That a read may name an action's declared output, and that a port it names has to be one
+    // this runtime can move, is PlanAbiTests' case: reading an execution output is `from-step-port` whatever step
+    // owns it.
+    Bad(p => Step(p, 0)["inputs"] = JsonNode.Parse("[{\"slot\":0,\"fromStepSlot\":{\"step\":9,\"port\":0}},{\"slot\":1,\"fromEventSlot\":0}]"),
+        "from-step-slot", "a fromStepSlot read outside the step array rejects");
     Bad(p => Step(p, 0)["inputs"] = JsonNode.Parse("[{\"slot\":0,\"fromStepSlot\":{\"step\":2,\"port\":0}},{\"slot\":1,\"fromEventSlot\":0}]"),
-        "from-step-kind", "fromStepSlot only reads pure steps");
-    Bad(p => Step(p, 2)["inputs"]![0] = JsonNode.Parse("{\"slot\":1,\"fromStepSlot\":{\"step\":1,\"port\":0}}"), "from-step-kind", "a step cannot read a control step's output");
+        "from-step-port", "an execution output is not a readable value");
+    Bad(p => Step(p, 2)["inputs"]![0] = JsonNode.Parse("{\"slot\":1,\"fromStepSlot\":{\"step\":1,\"port\":0}}"), "from-step-port", "a control's execution output is not a readable value");
     Bad(p => Step(p, 1)["inputs"]![0] = JsonNode.Parse("{\"slot\":1,\"fromStepSlot\":{\"step\":0,\"port\":1}}"), "from-step-port", "a read port must exist on the pure step");
-    Bad(p => Step(p, 2)["inputs"]![0] = JsonNode.Parse("{\"slot\":0,\"fromStepSlot\":{\"step\":0,\"port\":0}}"), "execution-slot", "a boolean output is not an execution input");
-    Bad(p => Step(p, 1)["inputs"]![0] = JsonNode.Parse("{\"slot\":1,\"fromEventSlot\":2}"), "port-mismatch", "a number event output is not a boolean condition");
+    Bad(p => Step(p, 2)["inputs"]![0] = JsonNode.Parse("{\"slot\":0,\"fromStepSlot\":{\"step\":0,\"port\":0}}"), "execution-slot", "a boolean output is not an execution input");    Bad(p => Step(p, 1)["inputs"]![0] = JsonNode.Parse("{\"slot\":1,\"fromEventSlot\":2}"), "port-mismatch", "a number event output is not a boolean condition");
     Bad(p => Step(p, 2)["inputs"]![0] = JsonNode.Parse("{\"slot\":1,\"fromEventSlot\":99}"), "event-port-missing", "an event slot outside the trigger frame rejects");
     Bad(p => { Step(p, 1)["successors"] = JsonNode.Parse("[null,null]"); }, "unreachable-step", "dropping the then-target leaves Guard unreachable");
     Bad(p => { Step(p, 0)["inputs"] = new JsonArray(); }, "missing-input", "a pure step must still drive every required input");
@@ -503,6 +562,46 @@ void RejectCode(Action action, string code, string name)
         Check(applied.Count == (condition ? 1 : 0) && tick.CommandsExecuted == (condition ? 1 : 0),
             condition ? "then routes into the action" : "otherwise ends the entrypoint");
     }
+    // The planned frames: trigger -> Compare (pure) -> Branch (control) -> Guard (action), one root frame, one
+    // pure memo region and one result-row region. Every assertion below is about a slot number the loader fixed,
+    // never about a name; the tick path itself still runs on JSON.
+    {
+        var kernel = GraphKernel().Kernel;
+        var graphPlan = JsonNode.Parse(Plan().ToJsonString())!; graphPlan["planId"] = "graph-frames";
+        kernel.LoadPlan(graphPlan.ToJsonString());
+        var resolved = kernel.Resolved("graph-frames")!;
+        var frames = resolved.Frames!;
+        var root = frames.Entries[0];
+        Check(frames.Steps.Length == 3 && frames.Entries.Length == 1 && resolved.Entries[0].Steps.Count == 3,
+            "the loaded plan carries one frame descriptor per step");
+        Check(root.Base == 0 && root.Start == 0 && root.StepCount == 3, "the plan's root frame starts at slot 0 and owns all three steps");
+        Check(root.EventPorts.Length == 3 && root.EventPorts[0].Slot == -1 && root.EventPorts[1].Kind == ValueKind.Entity
+            && root.EventPorts[1].Width == 1 && root.EventPorts[2].Kind == ValueKind.Number && root.EventPorts[2].Slot == 1,
+            "the trigger's execution output has no slot and its two value outputs own the frame's first slots");
+        var entity = frames.Steps[2].Inputs.Single(p => p.Kind == ValueKind.Entity);
+        Check(entity.Width == 1 && entity.Source == PortSource.Event && entity.SourceSlot == 1, "the action's entity input is a one-element event copy");
+        var compare = frames.Steps[0];
+        Check(compare.PureMemoBase == compare.InputBase + 2 && compare.OutputBase == -1 && compare.Span == 3,
+            "a pure step's outputs are its memo region, not a result row");
+        Check(compare.Outputs[0].Kind == ValueKind.Boolean && compare.Outputs[0].Width == 1 && compare.Outputs[0].Slot == compare.PureMemoBase,
+            "the pure step's boolean output frame is laid out in the memo region");
+        var branch = frames.Steps[1];
+        Check(branch.Inputs.Single(p => p.Kind == ValueKind.Boolean) is { Source: PortSource.Pure, SourceSlot: 0, SourceStep: 0 },
+            "the branch condition reads the pure memo through its step index and port order");
+        Check(branch.Successors.SequenceEqual(new[] { 2, -1 }), "a null successor is the frame's -1, not a nullable array");
+        Check(branch.OutputBase >= 0 && branch.Outputs.All(p => p.Width == 0), "a control step owns a result-row region its execution outputs never occupy");
+        var guard = frames.Steps[2];
+        Check(guard.Inputs.Single(p => p.Kind == ValueKind.Entity) is { Source: PortSource.Event, SourceSlot: 1 },
+            "the action's entity input copies the same event slot the control step read");
+        Check(guard.Inputs.All(p => p.Kind != ValueKind.Number), "the action's promoted amount arrives through its constant slot, not an input slot");
+        Check(guard.Parameters.Length == 1 && guard.Parameters[0].Source == PortSource.Constant
+            && guard.Parameters[0].Kind == ValueKind.Number && guard.Parameters[0].Slot == 0,
+            "a compiled parameter is addressed through the constant pool, not by name");
+        Check(frames.Constants.SlotCount == 1 && frames.Constants.Slots[0].Kind == ValueKind.Number
+            && frames.Constants.Slots[0].Number == 5, "one literal is encoded once into the plan's constant pool");
+        Check(frames.StepSlots <= frames.MaxValueSlotsPerStep && frames.ByteCount <= kernel.Limits.MaxDispatchFrameBytes,
+            "every step stays inside the per-step slot and per-plan byte budgets");
+    }
 }
 {
     // The production `evaluate` module end to end: ForgeTrigger's real compare condition is fed two numbers, an
@@ -522,6 +621,7 @@ void RejectCode(Action action, string code, string name)
     static (RuntimeKernel Kernel, RuntimeModuleHandle Handle) CompareKernel(List<string> applied)
     {
         var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
         kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off);
         var handle = kernel.RegisterModule(Fixture.Module(Provider, _ => { applied.Add("action"); return CommandResult.Succeeded(RuntimeJson.EmptyObject); })
@@ -549,13 +649,13 @@ void RejectCode(Action action, string code, string name)
         var actionContract = kernel.ResolveGraphContract(Fixture.ActionCapability(Provider), "1.0.0", RuntimeJson.From(new { amount = 5 }));
         int Port(JsonElement contract, string side, string port) => contract.GetProperty(side).EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == port).i;
         var plan = RuntimeJson.From(new {
-            schemaVersion = 3, kind = "forge-runtime-plan", planId = "compare-" + op + "-" + left + "-" + right, resource = new { id = "author.resource", revision = "revision-1" },
+            schemaVersion = 4, kind = "forge-runtime-plan", planId = "compare-" + op + "-" + left + "-" + right, resource = new { id = "author.resource", revision = "revision-1" },
             runtime = kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Fixture.Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },
-            bindings = pins,
+            bindings = pins, attachments = Fixture.Attachments,
             entrypoints = new[] { new { nodeId = "Entry", binding = Array.IndexOf(pinIds, Fixture.Trigger(Provider)),
                 layout = Layout(triggerContract, Array.Empty<object>()), start = 1, steps = new object[] {
-                    new { nodeId = "Compare", nodeKind = "pure", binding = Array.IndexOf(pinIds, CompareBinding), layout = Layout(compareContract, Array.Empty<object>()),
+                    new { nodeId = "Compare", nodeKind = "query", binding = Array.IndexOf(pinIds, CompareBinding), layout = Layout(compareContract, new object[] { null! }),
                         inputs = new object[] { new { slot = Port(compareContract, "inputs", "left"), value = left }, new { slot = Port(compareContract, "inputs", "right"), value = right },
                             new { slot = Port(compareContract, "inputs", "operator"), value = op }, new { slot = Port(compareContract, "inputs", "tolerance"), value = tolerance } },
                         successors = Array.Empty<int?>() },
@@ -586,7 +686,11 @@ void RejectCode(Action action, string code, string name)
     Bad(g => g["parameters"]![0]!.AsObject().Remove("role"), null, "parameters declare a role");
     Bad(g => g["inputs"]![1]!["type"] = "entity-list", null, "entity-list is retired");
     Bad(g => g["inputs"]![1]!["cardinality"] = "many", "recipient-cardinality", "recipient cardinality matches its port");
-    Bad(g => g["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"source\",\"type\":\"entity\",\"optional\":true}")), "context-role-port", "context role inputs are explicit");
+    // A context role may be left unwired only where the row's own contract says so (rule 146.4g makes
+    // `combat.damage.source` optional: environmental damage has no dealer). Nullable stays refused on every row —
+    // a wire that may hand the row nobody is ambiguous. The accepted optional case is the combat contract's own
+    // row, which the catalog comparison registers.
+    Bad(g => g["inputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"source\",\"type\":\"entity\",\"nullable\":true}")), "context-role-port", "a context role is never nullable");
     Bad(g => g["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"kind\",\"type\":\"enum\",\"role\":\"value\",\"required\":false,\"values\":[\"a\"]}")), "parameter-set", "promotable enums name a shared set");
     Bad(g => g["parameters"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"target\",\"type\":\"number\",\"role\":\"value\",\"required\":false}")), "parameter-collision", "value parameters cannot shadow an input");
     // Result-port reason codes (GraphPort.codes), mirrored from the website's port() field.
@@ -604,10 +708,11 @@ void RejectCode(Action action, string code, string name)
 }
 {
     var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+    kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
     var common = Fixture.Module("forge.contract.test");
     var commonJson = JsonNode.Parse(common.RegistryJson)!;
     commonJson["bindings"] = new JsonArray();
-    var commonHandle = kernel.RegisterModule(common with { RegistryJson = commonJson.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), BindingSupport = Array.Empty<BindingSupport>() }, RuntimeLogLevel.Off);
+    var commonHandle = kernel.RegisterModule(common with { RegistryJson = commonJson.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), Shapes = new Dictionary<string, HandlerShape>(), BindingSupport = Array.Empty<BindingSupport>() }, RuntimeLogLevel.Off);
 var calls = 0; var handles = new List<RuntimeModuleHandle>();
 foreach (var provider in new[] { "example.alpha", "example.beta" })
 {
@@ -649,7 +754,7 @@ Reject(() => Task.Run(() => s.Kernel.HasSubscribers(Fixture.Trigger("example.alp
 }
 {
 var s = new Scenario(); var a = s.Register("example.alpha"); s.Plan("alpha", "example.alpha");
-Check(a.Publish(s.Event("bad-source", "example.alpha") with { Source = new EntityReference("example.alpha:1", 1, RuntimeJson.MaxSafeInteger + 1) }).Code == "invalid-integer", "source epoch also rejects unsafe C# integer");
+Check(a.Publish(s.Event("bad-epoch", "example.alpha") with { Outputs = RuntimeJson.From(new { target = new EntityReference("example.alpha:1", 1, RuntimeJson.MaxSafeInteger + 1) }) }).Code == "invalid-integer", "a payload entity's epoch also rejects unsafe C# integer");
 a.Publish(s.Event("future", "example.alpha", 3));
 Check(s.Kernel.Advance(2, true).CommandsExecuted == 0 && s.Kernel.Advance(3, true).CommandsExecuted == 1, "future simulation event waits for its due tick");
     Reject(() => CommandResult.Succeeded(RuntimeJson.EmptyObject, Enumerable.Repeat(new RuntimeFact(Fixture.Trigger("example.alpha"), RuntimeJson.EmptyObject), 129).ToArray()), "unbounded committed facts reject");
@@ -661,14 +766,25 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     var directory = Path.GetFullPath(args[1]);
     var cases = RuntimeJson.Parse(File.ReadAllText(Path.Combine(directory, "cases.json")));
     var manifest = RuntimeJson.Parse(File.ReadAllText(Path.Combine(directory, cases.GetProperty("manifest").GetString()!)));
+    // No mount kind belongs to the kernel, so the fixture kernel stands its owner up: the levels are the ones the
+    // fixture plans themselves declare, so a plan mounted on a level this fixture set does not name is not claimed.
+    // This branch never dispatches — it loads real website plans and checks the frames they resolve to — so what is
+    // under test here is the loader and the layout, not the mount comparison.
+    var levels = new List<string>();
+    foreach (var row in cases.GetProperty("plans").EnumerateArray())
+        foreach (var attachment in RuntimeJson.Rows(RuntimeJson.Parse(
+            File.ReadAllText(Path.Combine(directory, row.GetProperty("plan").GetString()!))), "attachments"))
+            if (RuntimeJson.Text(attachment, "kind") == "level" && !levels.Contains(RuntimeJson.Text(attachment, "reference")))
+                levels.Add(RuntimeJson.Text(attachment, "reference"));
     RuntimeKernel Registered()
     {
         var kernel = new RuntimeKernel(JsonSerializer.Deserialize<RuntimeIdentity>(manifest.GetProperty("runtime"), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!);
+        kernel.RegisterModule(Fixture.MountOwner(levels), RuntimeLogLevel.Off);
         var registry = manifest.GetProperty("registry");
         JsonElement Capability(JsonElement binding) => registry.GetProperty("capabilities").EnumerateArray()
             .Single(c => c.GetProperty("id").GetString() == binding.GetProperty("capabilityId").GetString());
         var providers = registry.GetProperty("providers").EnumerateArray().OrderBy(p => registry.GetProperty("capabilities").EnumerateArray().Any(c => c.GetProperty("owner").GetString() == p.GetProperty("id").GetString()) ? 0 : 1);
-        // D-017 R4-a: an `evaluate` binding needs a real evaluator, and the kernel's exact-set rule rejects any name
+        // An `evaluate` binding needs a real evaluator, and the kernel's exact-set rule rejects any name
         // the module's own bindings do not use, so each module gets exactly its own rows. The double returns a zero
         // value for every output port, so the fixture's wiring — not its arithmetic — is what these cases check.
         var doubles = registry.GetProperty("bindings").EnumerateArray().Where(b => b.GetProperty("role").GetString() == "evaluate")
@@ -690,18 +806,49 @@ if (args.Length >= 2 && args[0] == "--fixtures")
             var handlers = bindings.Where(b => b.GetProperty("role").GetString() == "execute" && Capability(b).GetProperty("kind").GetString() == "action")
                 .ToDictionary(b => b.GetProperty("handler").GetString()!, b => (CommandHandler)(_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)));
             var evaluators = bindings.Where(b => b.GetProperty("role").GetString() == "evaluate").ToDictionary(b => b.GetProperty("handler").GetString()!, b => doubles[b.GetProperty("handler").GetString()!]);
+            // A real module declares the ports its handler reads; these doubles read every value port of the
+            // capability they implement, so the shape is derived from the same registry rows the plan was compiled
+            // against. Resolving it here is also what checks the shape addresses the real catalog's ports.
+            var shapes = handlers.Keys.Concat(evaluators.Keys).ToDictionary(handler => handler, handler =>
+            {
+                var binding = bindings.Single(b => b.GetProperty("handler").GetString() == handler);
+                var graph = Capability(binding).GetProperty("graph");
+                string[] ValuePorts(string side) => graph.GetProperty(side).EnumerateArray()
+                    .Where(p => p.GetProperty("type").GetString() != "execution")
+                    .Select(p => p.GetProperty("id").GetString()!).ToArray();
+                return new HandlerShape().Inputs(ValuePorts("inputs")).Outputs(ValuePorts("outputs"))
+                    .Parameters(graph.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToArray());
+            });
             var support = manifest.GetProperty("bindingSupport").EnumerateArray().Where(b => bindings.Any(row => row.GetProperty("id").GetString() == b.GetProperty("bindingId").GetString())).Select(b => new BindingSupport(b.GetProperty("bindingId").GetString()!, b.GetProperty("verification").GetString()!, b.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!).ToArray())).ToArray();
-            kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new { providers = new[] { provider }, capabilities, bindings }).GetRawText(), handlers, support) { Evaluators = evaluators }, RuntimeLogLevel.Off);
+            kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new { providers = new[] { provider }, capabilities, bindings }).GetRawText(), handlers, support) { Evaluators = evaluators, Shapes = shapes }, RuntimeLogLevel.Off);
         }
         return kernel;
     }
     foreach (var row in cases.GetProperty("plans").EnumerateArray())
     {
         var id = row.GetProperty("id").GetString()!;
+        var file = File.ReadAllText(Path.Combine(directory, row.GetProperty("plan").GetString()!));
+        // The case id names the fixture, not the plan: a loaded plan is addressed by the planId it declares.
+        var planId = RuntimeJson.Text(RuntimeJson.Parse(file), "planId");
         var kernel = Registered();
-        try { kernel.LoadPlan(File.ReadAllText(Path.Combine(directory, row.GetProperty("plan").GetString()!))); }
+        try { kernel.LoadPlan(file); }
         catch (RuntimeContractException error) { throw new Exception($"FAIL: fixture plan {id} rejected with {error.Code}: {error.Message}"); }
         Check(kernel.LoadedPlans == 1, "actual TypeScript compiled native fixture " + id + " consumed by C#");
+        // The compiled plan is laid out into frames with the same step count the file declares, and every step's
+        // own contract ports get exactly one slot table entry each — the loader's table and the website's agree.
+        var resolved = kernel.Resolved(planId)!;
+        var frames = resolved.Frames;
+        Check(frames.Steps.Length == resolved.Entries.Sum(entry => entry.Steps.Count) && frames.Entries.Length == resolved.Entries.Count,
+            "actual TypeScript compiled fixture " + id + " has one frame descriptor per step and entrypoint");
+        for (var entry = 0; entry < frames.Entries.Length; entry++)
+            for (var step = 0; step < frames.Entries[entry].StepCount; step++)
+            {
+                var descriptor = frames.Steps[frames.Entries[entry].Start + step];
+                var contract = resolved.Entries[entry].Steps[step].Contract;
+                Check(descriptor.Inputs.Length == RuntimeJson.Rows(contract, "inputs").Length
+                    && descriptor.Outputs.Length == RuntimeJson.Rows(contract, "outputs").Length,
+                    "actual TypeScript compiled fixture " + id + " keeps every port addressable in its step frame");
+            }
     }
     foreach (var row in cases.GetProperty("invalidPlans").EnumerateArray())
     {
@@ -712,7 +859,20 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     }
 }
 checks += TimingTests.Run();
+checks += PerfFixSemanticsTests.Run();
 checks += ExecutionResultTests.Run();
+checks += PlanAbiTests.Run();
+checks += PresentationDispatchTests.Run();
+checks += AttachmentRegistryTests.Run();
+checks += TriggerScopeTests.Run();
+checks += RuntimeContextTests.Run();
+checks += RuntimeCandidateSourceTests.Run();
+checks += ResourceRegistryTests.Run();
+checks += QueryPresenceTests.Run();
+checks += ZoneReadTests.Run();
+checks += QuerySnapshotTests.Run();
+checks += FrameShapeTests.Run();
+checks += PlanContractTests.Run();
 Console.WriteLine($"Framework checks: {checks} passed.");
 
 if (args.Contains("--benchmark"))
@@ -752,7 +912,13 @@ sealed class Scenario
     public readonly RuntimeKernel Kernel;
     public readonly List<string> Applied = new();
     public long World = 1, Life = 1;
-    public Scenario(RuntimeLimits? limits = null) { Kernel = new RuntimeKernel(Fixture.Identity, limits); Kernel.BeginWorld(1); }
+    /// <summary>The mount owner is registered first, because a plan's mount kind has to be owned before the plan
+    /// that declares it loads; the scenarios here register one or two behaviour providers on top of it.</summary>
+    public Scenario(RuntimeLimits? limits = null)
+    {
+        Kernel = new RuntimeKernel(Fixture.Identity, limits); Kernel.BeginWorld(1);
+        Kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
+    }
     public Dictionary<string, Func<EntityReference, bool>> Resolvers(string id) => new() { [id] = r => r.Id == id + ":1" && r.WorldEpoch == World && r.LifeEpoch == Life };
     public RuntimeModuleHandle Register(string id, CommandHandler? handler = null) => Kernel.RegisterModule(Fixture.Module(id, handler ?? (ctx => {
         Applied.Add(id + ":" + ctx.Parameters.GetProperty("amount").GetDouble()); return CommandResult.Succeeded(RuntimeJson.From(new { actual = ctx.Parameters.GetProperty("amount").GetDouble() }));
@@ -776,6 +942,32 @@ static class Fixture
     public static string TriggerCapability(string id) => id + ".trigger";
     public static string ActionCapability(string id) => id + ".apply";
     public static string Handler(string id) => id + ".handler.apply";
+    /// <summary>The fixture action handler's own ports. A test that widens the fixture capability declares the
+    /// extra names it made the handler read, so every shape in this file still describes its handler exactly.</summary>
+    public static HandlerShape Shape(string id, IReadOnlyList<string>? inputs = null, IReadOnlyList<string>? parameters = null)
+        => new HandlerShape().Inputs((inputs ?? new[] { "target" }).ToArray()).Outputs("result")
+            .Parameters((parameters ?? new[] { "amount" }).ToArray());
+    /// <summary>The fixture result schema's row: the four fixed columns in their fixed order, then the actual
+    /// amount and the number of affected targets, exactly as the contract's result-row rule spells them.</summary>
+    public static readonly object[] ResultFields = {
+        new { id = "target", type = "entity" },
+        new { id = "status", type = "enum", schema = "execution_outcome" },
+        new { id = "committed", type = "enum", schema = "commit_state" },
+        new { id = "code", type = "string" },
+        new { id = "amount", type = "number", unit = "hp" },
+        new { id = "target_count", type = "integer" }
+    };
+    /// <summary>Every fixture plan declares one mount target. A plan hangs on something, and a mount kind is only
+    /// loadable while the provider that owns it has registered its matcher; the fixture provider in these files
+    /// claims this kind.</summary>
+    /// <summary>The mount kind the fixture plans declare and the provider that owns it. No kind belongs to the
+    /// kernel any more, so a fixture that loads a plan has to stand its owner up.</summary>
+    public static readonly string MountProvider = "example.mounts";
+    public static readonly string MountReference = "fixture-level";
+    /// <summary>Every fixture plan declares one mount target, written in the reference the mount owner answers.</summary>
+    public static readonly object[] Attachments = { new { kind = "level", reference = MountReference } };
+    /// <summary>The graph fixture's pure compare handler: two numbers in, one boolean out.</summary>
+    public static HandlerShape CompareShape() => new HandlerShape().Inputs("left", "right").Outputs("value");
     public static BindingSupport[] Support(string id, IReadOnlyList<string>? permissions = null) => new[] {
         new BindingSupport(Trigger(id), "implementation-only", Array.Empty<string>()),
         new BindingSupport(id + ".binding.apply", "implementation-only", permissions ?? Permissions)
@@ -787,16 +979,38 @@ static class Fixture
             providers = new[] { new { id, kind = id.StartsWith("forge.") ? "native" : "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = new object[] {
                 new { id = TriggerCapability(id), owner = id, kind = "trigger", label = "Observed event", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = Array.Empty<object>(), outputs = new[] { Port("next", "execution"), Port("target", "entity") }, parameters = Array.Empty<object>() } },
-                new { id = ActionCapability(id), owner = id, kind = "action", label = "Effect", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = new[] { Port("in", "execution"), Port("target", "entity") }, outputs = new[] { Port("next", "execution"), new { id = "result", type = "result", schema = "example.result.apply" } }, parameters = new[] { new { id = "amount", type = "number", role = "value", required = true, minimum = 1, maximum = 100 } }, recipients = new { input = "target", target = "entity", cardinality = "one", requires = new[] { "health.current" }, result = "result" } } }
+                new { id = ActionCapability(id), owner = id, kind = "action", label = "Effect", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = new[] { Port("in", "execution"), Port("target", "entity") }, outputs = new[] { Port("next", "execution"), new { id = "result", type = "result", schema = "example.result.apply", fields = ResultFields } }, parameters = new[] { new { id = "amount", type = "number", role = "value", required = true, minimum = 1, maximum = 100 } }, recipients = new { input = "target", target = "entity", cardinality = "one", requires = new[] { "health.current" }, result = "result" } } }
             },
             bindings = new[] {
                 new { id = Trigger(id), capabilityId = TriggerCapability(id), providerId = id, handler = id + ".handler.trigger", role = "observe", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() },
                 new { id = id + ".binding.apply", capabilityId = ActionCapability(id), providerId = id, handler = Handler(id), role = "execute", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() }
             }
         });
-        return new RuntimeModule(RuntimeKernel.ApiVersion, json.GetRawText(), new Dictionary<string, CommandHandler> { [Handler(id)] = handler ?? (_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)) }, Support(id));
+        return new RuntimeModule(RuntimeKernel.ApiVersion, json.GetRawText(), new Dictionary<string, CommandHandler> { [Handler(id)] = handler ?? (_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)) }, Support(id))
+        {
+            Shapes = new Dictionary<string, HandlerShape> { [Handler(id)] = Shape(id) }
+        };
     }
-    public static string Plan(RuntimeKernel kernel, string planId, string provider, int stepCount = 1)
+    /// <summary>The provider that owns the fixture plans' own mount kind. It declares a scope matcher — no event
+    /// subject is needed — and answers only the references it was given.</summary>
+    public static RuntimeModule MountOwner() => MountOwner(new[] { MountReference });
+
+    /// <summary>The same owner scripted with another set of levels: a fixture that loads plans from a foreign
+    /// source names the levels those plans mount on, so the double answers exactly those and nothing else.</summary>
+    public static RuntimeModule MountOwner(IReadOnlyCollection<string> references) => new(RuntimeKernel.ApiVersion,
+        RuntimeJson.From(new
+        {
+            providers = new[] { new { id = MountProvider, kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
+            capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()
+        }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>())
+    {
+        AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>
+        {
+            ["level"] = AttachmentMatcherRegistration.ByScope((category, reference) =>
+                category == null && references.Contains(reference))
+        }
+    };
+    public static string Plan(RuntimeKernel kernel, string planId, string provider, int stepCount = 1, object[]? attachments = null)
     {
         var manifest = RuntimeJson.Parse(kernel.ExportManifest()); var registry = manifest.GetProperty("registry");
         var bindings = registry.GetProperty("bindings").EnumerateArray().Where(b => b.GetProperty("providerId").GetString() == provider).OrderBy(b => b.GetProperty("id").GetString(), StringComparer.Ordinal);
@@ -821,16 +1035,17 @@ static class Fixture
         int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
         var trigger = Graph(Trigger(provider)); var action = Graph(provider + ".binding.apply");
         var inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } };
-        // schemaVersion 3 (D-017 R4-a): a linear action chain still names its entry point and every successor
-        // explicitly, and a chain is already in nodeId ordinal order, so it is its own canonical step order.
+        // schemaVersion 4: a linear action chain still names its entry point and every successor explicitly, and a
+        // chain is already in nodeId ordinal order, so it is its own canonical step order.
         var steps = Enumerable.Range(0, stepCount).Select(i => new {
             nodeId = "Action" + i, nodeKind = "action", binding = ids.IndexOf(provider + ".binding.apply"), layout = Layout(action, new object[] { 5 }),
             inputs, successors = new int?[] { i + 1 < stepCount ? i + 1 : null }
         }).ToArray();
         return RuntimeJson.From(new {
-            schemaVersion = 3, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
+            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth }, bindings = pins,
+            attachments = attachments ?? Attachments,
             entrypoints = new[] { new { nodeId = "Entry", binding = ids.IndexOf(Trigger(provider)), layout = Layout(trigger, Array.Empty<object>()), start = 0, steps } }
         }).GetRawText();
     }

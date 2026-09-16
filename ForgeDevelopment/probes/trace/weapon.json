@@ -1,0 +1,385 @@
+{
+  "profile": "weapon",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "Gear.BulletWeapon",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "FixedUpdate",
+        "get_*",
+        "set_*",
+        "Trigger*Audio*",
+        "UpdateMagazineCartridgesVisible",
+        "UpdateRTPCForDelay",
+        "SetMagazineVisibile"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_clip",
+        "m_burstMax",
+        "m_archetypeData",
+        "m_recoilData",
+        "m_fireMode"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.Shotgun",
+      "methods": [
+        "Fire",
+        "OnGearSpawnComplete"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_clip",
+        "m_archetypeData"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Weapon",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ItemEquippable",
+      "methods": [
+        "Fire",
+        "BulletHit",
+        "CastWeaponRay",
+        "DropMagazine",
+        "EjectCasing",
+        "SetCurrentClip",
+        "SetCurrentClipRel",
+        "OnSyncFire",
+        "OnWield",
+        "OnUnWield",
+        "OnGearSpawnComplete",
+        "SetupArchetype",
+        "ApplyRecoil",
+        "Throw",
+        "TryTriggerReloadAnimationSequence",
+        "TryStartAnimationSequenceCoroutine",
+        "TriggerFireAnimationSequence",
+        "TriggerEquipAnimationSequence",
+        "ReceiveClassItemSync",
+        "SetOwner",
+        "BatteryConsumption"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.MeleeWeaponFirstPerson",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_currentState"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.MeleeWeaponThirdPerson",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "MoveNext"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SentryGunInstance",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "SNetwork_IReplicatorSupplier_*",
+        "_*",
+        "Need*",
+        "Give*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SentryGunFirstPerson",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "MineDeployerInstance",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "FixedUpdate",
+        "get_*",
+        "set_*",
+        "SNetwork_IReplicatorSupplier_*",
+        "_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "MineDeployerFirstPerson",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GlueGun",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "Updatepressure",
+        "UpdateRecharging"
+      ],
+      "record": "args+result",
+      "instance": [
+        "m_clip",
+        "m_pressure"
+      ],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.EnemyScanner",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "ThrowingWeapon",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.ResourcePackFirstPerson",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*",
+        "_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "HealerFreezer",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "CuttingTorch",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "HackingTool",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "BarrierInstance",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.NanoswarmTool",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "GameData.ArchetypeDataBlock",
+      "methods": [
+        "*"
+      ],
+      "exclude": [
+        "get_*",
+        "set_*"
+      ],
+      "record": "count",
+      "maxPerSecond": 20,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerInventorySynced",
+      "methods": [
+        "GetSync",
+        "OnSyncFire",
+        "OnSyncReload",
+        "OnSyncWield",
+        "Setup"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "PlayerInventoryLocal",
+      "methods": [
+        "CheckAndWield",
+        "DoWieldItem",
+        "TryTriggerReloadAnimationSequence",
+        "TryStartAnimationSequenceCoroutine"
+      ],
+      "exclude": [
+        "Update",
+        "get_*",
+        "set_*"
+      ],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    }
+  ]
+}

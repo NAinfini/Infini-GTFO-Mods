@@ -2,7 +2,7 @@ namespace BepInEx
 {
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class BepInPlugin : Attribute { public BepInPlugin(string id, string name, string version) { } }
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class BepInDependency : Attribute { public BepInDependency(string id, string version) { } }
 }
 namespace BepInEx.Configuration
@@ -41,6 +41,7 @@ namespace BepInEx.Unity.IL2CPP
         public Exception? InfoFailure;
         public void LogInfo(object message) { if (InfoFailure != null) throw InfoFailure; if (ThrowInfo) throw new IOException("fixture logger failure"); }
         public void LogWarning(object message) { }
+        public void LogError(object message) { }
     }
 }
 namespace HarmonyLib

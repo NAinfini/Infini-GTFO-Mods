@@ -1,11 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
-    <LangVersion>latest</LangVersion><Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings><IsPackable>false</IsPackable>
-    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../ForgeMap.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
   </ItemGroup>
 </Project>

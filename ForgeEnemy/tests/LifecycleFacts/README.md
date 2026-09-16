@@ -10,10 +10,15 @@ unknown/missing completion, readback changes, queue rejection, permissions and t
 Native Hook prefix/postfix adapters are invoked as managed test code, not injected.
 
 Plans are built locally from the kernel registry (fact -> QA record step); no website fixture is read.
-The two fact -> real Heal integrations (`integration.real-heal-*`) load a fact -> heal plan from the same registry:
-the fact's single subject wraps into heal's many-valued `targets` and is also `source`, `amount` is the literal 5 and
-`overheal_policy` is the clamp index. A limb break heals exactly +5 HP once; a death start is rejected `not-alive`
-without a native write. See ../../VALIDATION.md.
+The real-receiver heal coverage lives in [ReceiverProbe](../ReceiverProbe/Program.cs): it loads a fact -> heal plan
+from the same registry and dispatches it with the real kernel into the native receiver, so the amount, the clamp
+policy, the `not-alive` rejection and the unknown-commit outcome are stated there against a real write path. This
+suite states the fact side, so its two `integration.real-heal-*` cases were removed rather than kept as a second,
+weaker copy of that coverage. See ../../VALIDATION.md.
+
+This assembly is named in the SDK's `InternalsVisibleTo`
+(`ForgeRuntime/Framework/ForgeRuntime.Framework.csproj`) because the built-in variable module a scope-writing plan
+pins and the layout derivation the scope plan reads back are internal to the Framework assembly.
 
 Use the host build instructions in [Enemy README](../../README.md) to obtain $sdkDll.
 Run from the mod repository root with an isolated output/report directory:

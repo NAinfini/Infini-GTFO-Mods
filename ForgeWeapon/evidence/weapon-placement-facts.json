@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameExecuted": false,
+  "gameBuild": "20403457",
+  "gameRevision": "34873",
+  "scope": "The two placement rows this package publishes — forge.trigger.equipment.deploy_completed and forge.trigger.equipment.recall_completed — read from the deployed world object's own spawn and pickup bodies, plus the port that tells a sentry from a mine.",
+  "interop": {
+    "used": [
+      { "name": "Modules-ASM.dll", "length": 16777728, "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63",
+        "readWith": "the local decompilation of the shipped interop assembly (%TEMP%\\covtrigb\\ilspy\\Modules), read-only; the same assembly hash w4-deployable-hooks.json and deployable-life-facts.json were read from" }
+    ],
+    "whyInteropIsNotBodies": "Every game member in an interop assembly is a wrapper around IL2CPP.il2cpp_runtime_invoke. The interop therefore fixes a member's exact name, declaring type, parameter list, return type, slot and virtual/override status, and it proves nothing about what the native body does. Every statement below about what a body does is taken from the call graph already frozen in evidence/w4-deployable-hooks.json (dumper dump.cs of the same build), never from interop.",
+    "il2cppWrapperSituation": "Harmony reaches a native method through the metadata token the interop's own static constructor resolves, so a private native body is a patch target exactly like a public one, and a field is read through IL2CPP.il2cpp_field_get_offset, so a private field is readable. A wrapper never exposes a body, so nothing here claims what a body does beyond the frozen call graph."
+  },
+  "hooks": [
+    {
+      "id": "sentry-world-spawn",
+      "hook": "Gear.SentryGunInstance::OnSpawn",
+      "interopSignature": "public void OnSpawn(pGearSpawnData spawnData)",
+      "patchShape": "HarmonyPostfix with __instance",
+      "patchClass": "SentryPlaced",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-instance-spawn: rva 0x14184B0, rvaSharing 1, slot 150, body 1140 B, direct callers none, calls PlayerBackpack::SetDeployed at site 0x1418870.",
+        "Slot 150 with no literal caller is the replication path: the world object is created from the gear spawn data, not by the placement code, so the body runs on every end that holds the object."
+      ],
+      "fact": "forge.trigger.equipment.deploy_completed with equipment_kind = sentry_gun. It is also one of exactly three bodies in this build that write the owning backpack's deployed marker (w4-deployable-hooks.json backpack-set-deployed lists PlaceOnGround, this one and SyncedPickup)."
+    },
+    {
+      "id": "mine-world-spawn",
+      "hook": "Gear.MineDeployerInstance::OnSpawn",
+      "interopSignature": "public void OnSpawn(pItemSpawnData spawnData)",
+      "patchShape": "HarmonyPostfix with __instance",
+      "patchClass": "MinePlaced",
+      "grounds": [
+        "w4-deployable-hooks.json method mine-spawn: rva 0x14FFEF0, rvaSharing 1, slot 150, body 585 B, direct callers none, calls its own OnSpawnData.",
+        "Same slot and same IDynamicReplicatorSupplier<pItemSpawnData> shape as the sentry, so the mine's world object also exists through the replication path."
+      ],
+      "fact": "forge.trigger.equipment.deploy_completed with equipment_kind = mine. It is the only deploy signal the two families share: neither MineDeployerInstance.OnSpawn nor its SyncedPickup writes the backpack marker (the marker's three decoded call sites are all sentry bodies)."
+    },
+    {
+      "id": "sentry-recall",
+      "hook": "Gear.SentryGunInstance::SyncedPickup",
+      "interopSignature": "public override void SyncedPickup(PlayerAgent agent)",
+      "patchShape": "HarmonyPostfix with __instance",
+      "patchClass": "SentryRecalled",
+      "grounds": [
+        "w4-deployable-hooks.json method sentry-instance-pickup: rva 0x141B2B0, rvaSharing 1, slot 45, virtual override, body 1406 B, direct callers none, calls PlayerAgent::get_Owner, its own get_Replicator and PlayerBackpack::SetDeployed at site 0x141B687.",
+        "Slot 45 of ISyncedItem, reached through interface dispatch, and it carries the acting player as its own parameter."
+      ],
+      "fact": "forge.trigger.equipment.recall_completed with equipment_kind = sentry_gun. The acting player is the game's own parameter, not a value this package derives."
+    },
+    {
+      "id": "mine-recall",
+      "hook": "Gear.MineDeployerInstance::SyncedPickup",
+      "interopSignature": "public override void SyncedPickup(PlayerAgent agent)",
+      "patchShape": "HarmonyPostfix with __instance",
+      "patchClass": "MineRecalled",
+      "grounds": ["w4-deployable-hooks.json method mine-pickup: rva 0x1500600, rvaSharing 1, slot 45, virtual override, body 489 B, direct callers none, calls PlayerAgent::get_Owner and nothing else."],
+      "fact": "forge.trigger.equipment.recall_completed with equipment_kind = mine. The mine never writes the backpack deployed marker, so this body is the mine's only recall signal."
+    },
+    {
+      "id": "sentry-world-end",
+      "hook": "Gear.SentryGunInstance::OnDespawn / Gear.SentryGunInstance::OnDestroy",
+      "interopSignature": "public override void OnDespawn(); public new void OnDestroy()",
+      "patchShape": "HarmonyPostfix with __instance on both",
+      "patchClass": "SentryWorldDespawned / SentryWorldDestroyed",
+      "grounds": [
+        "w4-deployable-hooks.json methods sentry-instance-despawn (rva 0x1417A20, slot 35) and sentry-instance-destroy (rva 0x1417A80, private, calls StopFiring and StopScanning).",
+        "They are separate paths that both reach the same teardown, so the first one to arrive is the ending this package dates the placement to."
+      ],
+      "fact": "the ending half only: forge.trigger.entity.despawned with reason despawned or destroyed. No placement or recall row is published from these bodies, which is why a level teardown is not reported as a recall."
+    },
+    {
+      "id": "mine-world-end",
+      "hook": "Gear.MineDeployerInstance::OnDestroy",
+      "interopSignature": "public new void OnDestroy()",
+      "patchShape": "HarmonyPostfix with __instance",
+      "patchClass": "MineWorldDestroyed",
+      "grounds": ["w4-deployable-hooks.json method mine-destroy: rva 0x14FF9C0, rvaSharing 1, body 83 B, no decoded outgoing edge; the mine declares no OnDespawn."],
+      "fact": "the mine's only world-taken ending, published as forge.trigger.entity.despawned with reason destroyed."
+    }
+  ],
+  "kind": {
+    "question": "How does one placement fact say whether it is a sentry or a mine?",
+    "answer": "The hook class declares it. The spawning body is the family's own class — SentryGunInstance or MineDeployerInstance, two classes with no inheritance relation and one placement body each — so the class the patch targets is the answer, and this package stores it on the placement it mints.",
+    "grounds": [
+      "The interop declares `public class SentryGunInstance : ItemEquippable, IDynamicReplicatorSupplier<pGearSpawnData>, ...` and `public class MineDeployerInstance : ItemEquippable, IDynamicReplicatorSupplier<pItemSpawnData>, ...`; neither derives from the other.",
+      "No instance member of either class names the shell: the two deployed types share the Item/ItemEquippable surface, and the backpack slot that placed them holds the first-person tool class (SentryGunFirstPerson / MineDeployerFirstPerson), which is a third pair of classes."
+    ],
+    "members": ["sentry_gun", "mine", "glue_gun"],
+    "wireForm": "The port is the framework's closed enum set `equipment_kind`, so a fact carries the member's compiled index; the framework resolves it back to the member name at the handler boundary (RuntimeJson.EnumPortToHandlerValue).",
+    "markerPathKinds": "The backpack-marker path needs the kind before any spawn is seen, so it resolves the same five classes through the interop cast: the two first-person tools (the classes a placement slot actually holds while the tool is still in hand) and the two deployed instances (the classes a fixture and a replayed readback hold). A slot holding anything else is not a placement this package can name and mints none."
+  },
+  "authority": {
+    "question": "Which machine observes a placement, and does the host see a client's?",
+    "answer": "Every machine that holds the world object observes it there, and only the host publishes.",
+    "grounds": [
+      "w4-deployable-hooks.json authority: both ends hold a SentryGunInstance; it is an IDynamicReplicatorSupplier<pGearSpawnData> whose world object is created through the item replication path (OnSpawn, slot 150), and the host is authoritative for the simulation.",
+      "ForgeWeapon/Native/EquipmentNativeAdapter.Authoritative requires SNet.IsMaster, a Ready runtime and IsHost == true, so a client-side replica's observation publishes nothing.",
+      "The spawn body runs on every end because the replication machinery invokes it, not the placement code (no literal caller at slot 150)."
+    ],
+    "consequences": [
+      "A host sees a client's placement at the client's replicated world instance spawn, which is the deploy signal both families share.",
+      "The client's own backpack marker write (PlayerBackpack::SetDeployed at PlaceOnGround) is local state on the placer's machine; it is not one of the replicated members this evidence decodes. The world instance is therefore what this package joins the placement to on a machine that did not run the placement, and the join is by the owner the replicated instance itself reports."
+    ]
+  },
+  "unverified": [
+    { "id": "client-marker-replication", "statement": "Whether PlayerBackpack::SetDeployed runs on the host for a slot a client deployed.", "reason": "The metadata fixes the three call sites but not who invokes them, and the backpack item's replication is an item packet rather than a marker write. Nothing decoded here says the marker crosses machines.", "whatWouldSettleIt": "A runtime trace on a host with one client deploying a sentry, reading IsDeployed for that client's slot before and after." },
+    { "id": "spawn-order-versus-marker", "statement": "Whether a sentry's world spawn or its owner's marker write arrives first on the placer's own machine.", "reason": "Both orders are legal in the decoded call graph, and the two are the same event seen from two places.", "whatWouldSettleIt": "A runtime counter on both bodies across one placement; the observer is idempotent by construction, so only the diagnostic line differs." },
+    { "id": "recall-versus-despawn-order", "statement": "Whether the recall pickup runs before the world object's OnDespawn / OnDestroy on every machine.", "reason": "w4-deployable-hooks.json records SyncedPickup and the two ending bodies as separate paths with no decoded order between them.", "whatWouldSettleIt": "A runtime trace of one recall on the host and on the recalling client." },
+    { "id": "mine-recall-marker", "statement": "Whether the mine writes any backpack state at pickup that a reader could use instead of the world object.", "reason": "MineDeployerInstance declares neither SyncedTurnOn nor SyncedTurnOff, and its SyncedPickup body calls only PlayerAgent::get_Owner.", "whatWouldSettleIt": "A decompilation of the mine's own Setup / Update path, or a runtime probe of the pickup interaction." }
+  ],
+  "limits": [
+    "No claim about runtime behaviour: nothing here was executed; every member list was read from a local decompilation of the shipped interop assembly and of the build's own dump.",
+    "A member that exists in the interop is a member this build has; it does not prove the body runs on a given machine or how often.",
+    "The zone a placement stands in is not published on either row: a level's zone is a map-domain resource read through forge.selector.target.zone for any entity, and this row carries the placement's own position as the anchor that query is asked about."
+  ]
+}

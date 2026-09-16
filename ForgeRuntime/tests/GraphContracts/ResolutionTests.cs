@@ -8,9 +8,13 @@ internal static class ResolutionTests
     {
         foreach (var row in vectors.GetProperty("resolutions").EnumerateArray())
         {
+            var rowSeed = row.GetProperty("seed");
+            // The same coverage rule as a registration row: a definition this runtime does not register is counted,
+            // never failed — the resolution cases pin the shapes the two repositories share.
+            if (!Suite.Registrable(rowSeed)) { Suite.Uncover("resolve:" + row.GetProperty("name").GetString()); continue; }
             Suite.Test("resolve:" + row.GetProperty("name").GetString(), () =>
             {
-                var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(row.GetProperty("seed")), RuntimeLogLevel.Off);
+                var kernel = Suite.Kernel(); kernel.RegisterModule(Suite.Module(rowSeed), RuntimeLogLevel.Off);
                 var before = kernel.ExportManifest();
                 JsonElement Resolve() => kernel.ResolveGraphContract(row.GetProperty("id").GetString()!,
                     row.GetProperty("version").GetString()!, row.GetProperty("parameters"));
@@ -33,6 +37,7 @@ internal static class ResolutionTests
             r.GetProperty("seed").GetProperty("capabilities")[0].GetProperty("graph").TryGetProperty("variadic", out var v)
             && v.GetProperty("side").GetString() == "inputs" && v.GetProperty("port").GetProperty("type").GetString() == "number");
         var seed = sample.GetProperty("seed"); var id = sample.GetProperty("id").GetString()!;
+        if (!Suite.Registrable(seed)) { Suite.Uncover("resolutions:" + id); return; }
         var version = sample.GetProperty("version").GetString()!;
         var graph = seed.GetProperty("capabilities")[0].GetProperty("graph");
         var countName = graph.GetProperty("variadic").GetProperty("parameter").GetString()!;

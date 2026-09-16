@@ -10,7 +10,7 @@ using HostPlugin = ForgeRuntime.Plugin;
 namespace ForgeDevelopment.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
 [BepInDependency("NAinfini.InfiniTweaks", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
 {
@@ -36,25 +36,49 @@ public sealed class Plugin : BasePlugin
         Harmony? harmony = null;
         AuthoringMonitor? monitor = null;
         PerformanceMonitor? performanceMonitor = null;
+        ExperimentRunner? experimentRunner = null;
+        ExperimentPanel? experimentPanel = null;
         bool diagnosticsAttempted = false;
+        bool recorderAttempted = false;
+        bool captureAttempted = false;
         try
         {
             Settings.Bind(Config);
             Settings.BindAuthoring(Config);
+            Settings.BindRecorder(Config);
             var tweaks = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "InfiniTweaks");
             if (tweaks != null && tweaks.GetType("InfiniTweaks.Telemetry") == null)
                 throw new InvalidOperationException("When installed together, Infini Forge Development requires Infini Tweaks 2.5.0 or newer. Older versions already contain a diagnostics collector.");
             diagnosticsAttempted = true;
             RuntimeDiagnostics.Initialize();
+            // The recorder starts after the diagnostics that report its failures and before this assembly's hooks, so
+            // a trace patch that fails is reported by a pipeline that is already listening.
+            recorderAttempted = true;
+            RecRuntime.Start(BepInEx.Paths.BepInExRootPath);
             harmony = new Harmony(PluginGuid);
             harmony.PatchAll(typeof(Plugin).Assembly);
             monitor = AddComponent<AuthoringMonitor>();
+            // The capture and the experiments are this package's own components and are attached in the one branch
+            // that may collect anything. The capture monitor rides the authoring monitor's game object, and the
+            // experiment runner and panel have to exist before F5 can start or draw a command.
+            captureAttempted = true;
+            CaptureRegistry.EnsureStarted(monitor, CaptureRegistry.DefaultPeriodicSeconds);
+            experimentRunner = AddComponent<ExperimentRunner>();
+            experimentPanel = AddComponent<ExperimentPanel>();
+            ExperimentPanel.Load();
             if (Settings.PerformanceLogging.Value) performanceMonitor = AddComponent<PerformanceMonitor>();
             Log.LogInfo($"{PluginName} {PluginVersion} loaded for Runtime {HostPlugin.PluginVersion}. Diagnostics only observe; native hooks are not game-verified.");
         }
         catch (Exception original)
         {
             var failures = new List<Exception>();
+            // Teardown is the reverse of startup: the components that write into the session are released first, then
+            // the recorder, whose trace patches sit on game methods and whose session owns a writer thread, and only
+            // then the hooks that report the failure.
+            if (experimentPanel != null) Rollback("experiment_panel", () => UnityEngine.Object.Destroy(experimentPanel!), failures);
+            if (experimentRunner != null) Rollback("experiment_runner", () => UnityEngine.Object.Destroy(experimentRunner!), failures);
+            if (captureAttempted) Rollback("capture", CaptureRegistry.Stop, failures);
+            if (recorderAttempted) Rollback("recorder", RecRuntime.Stop, failures);
             if (harmony != null) Rollback("hooks", harmony.UnpatchSelf, failures);
             if (performanceMonitor != null) Rollback("performance_component", () => UnityEngine.Object.Destroy(performanceMonitor), failures);
             if (monitor != null) Rollback("authoring_component", () => UnityEngine.Object.Destroy(monitor), failures);
@@ -80,5 +104,9 @@ public sealed class Plugin : BasePlugin
     }
 
     // Native log callbacks and IL2CPP components are process-lifetime; no hot unload contract exists.
-    public override bool Unload() => false;
+    public override bool Unload()
+    {
+        RecRuntime.Stop();
+        return false;
+    }
 }

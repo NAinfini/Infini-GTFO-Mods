@@ -8,18 +8,35 @@ using NativePlugin = ForgeEnemy.Native.Plugin;
 
 if (args.Length != 1) { Console.Error.WriteLine("Usage: NativePlugin <report.json>"); return 2; }
 var checks = new List<object>(); int passed = 0, failed = 0;
+// Every class the one install table declares is patched once, so the expected count comes from that table
+// instead of a literal that has to be edited whenever a hook family is added. `EnemyNativeHooks.Types` is only
+// the native family; `Plugin.Load` installs every family the table names.
+int Hooks = EnemyHookInstall.Declared.Count();
 void Case(string name, Action test)
 {
     try { test(); passed++; checks.Add(new { name, passed = true }); }
     catch (Exception error) { failed++; checks.Add(new { name, passed = false, error = error.ToString() }); Console.Error.WriteLine(name + ": " + error.Message); }
-    finally { Harmony.Reset(); }
+    finally { Harmony.Reset(); ResetProcessStatics(); }
+}
+// Fixture isolation: the production plugin has process-lifetime state (one Load per process), so what one case
+// publishes outlives it. Each case starts from the state a fresh process would have.
+void ResetProcessStatics()
+{
+    const System.Reflection.BindingFlags Flags = System.Reflection.BindingFlags.Static
+        | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+    typeof(EnemySpawnRequirementSource).GetField("_attached", Flags)!.SetValue(null, false);
+    typeof(NativePlugin).GetProperty("Session", Flags)!.SetValue(null, null);
 }
 void Require(bool condition, string detail) { if (!condition) throw new Exception(detail); }
 void Throws(Action action) { try { action(); } catch { return; } throw new Exception("Expected rejection."); }
 RuntimeKernel Kernel()
 {
     var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
-    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off); return kernel;
+    // One world per kernel: a world epoch only ever advances, so the second BeginWorld this fixture used to
+    // repeat is a refusal rather than a reset.
+    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+    kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+    LocalPlan.OwnMounts(kernel); return kernel;
 }
 EnemyAgent Enemy()
 {
@@ -132,7 +149,7 @@ Case("plugin.log-failure-rollback", () =>
 {
     Host.Runtime = Kernel(); string before = Host.Runtime.ExportManifest();
     var plugin = new NativePlugin(); plugin.Log.ThrowInfo = true; Throws(plugin.Load);
-    Require(Harmony.Patches == 5 && Harmony.Unpatches == 1 && NativePlugin.Session == null
+    Require(Harmony.Patches == Hooks && Harmony.Unpatches == 1 && NativePlugin.Session == null
         && Host.Runtime.ExportManifest() == before, "Post-registration failure leaked the module.");
 });
 Case("session.readonly-error-data-keeps-primary", () =>
@@ -205,7 +222,6 @@ Case("plugin.cleanup-readonly-data-always-clears-session", () =>
         // Fixture isolation only, after assertions have recorded the production failure.
         Harmony.UnpatchFailure = null;
         NativePlugin.Session?.Module.Dispose(); NativePlugin.Session?.Dispose();
-        typeof(NativePlugin).GetProperty("Session", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.SetValue(null, null);
     }
 });
 Case("session.in-use-dispose-remains-retryable", () =>
@@ -276,12 +292,30 @@ Case("session.fault-diagnostic-is-bounded-and-once", () =>
 Case("plugin.success-single-load-no-hot-reload", () =>
 {
     Host.Runtime = Kernel(); var plugin = new NativePlugin(); plugin.Load();
-    Require(NativePlugin.Session?.Module.IsRegistered == true && Harmony.Patches == 5, "Native module was not installed.");
+    Require(NativePlugin.Session?.Module.IsRegistered == true && Harmony.Patches == Hooks, "Native module was not installed.");
     Throws(plugin.Load);
-    Require(Harmony.Patches == 5 && !plugin.Unload(), "Repeated Load or hot unload changed native lifetime.");
+    Require(Harmony.Patches == Hooks && !plugin.Unload(), "Repeated Load or hot unload changed native lifetime.");
     Host.Runtime.StartRuntime(() => { }); Host.Runtime.StopRuntime();
     NativePlugin.Session!.Dispose();
     Require(Harmony.Unpatches == 1 && !NativePlugin.Session.Module.IsRegistered, "Shutdown leaked registration.");
+});
+// The session owns the mount kind: only a session that hands the module an enemy-type read can load such a plan.
+Case("session.real-plan-mounted-on-enemy-type", () =>
+{
+    var kernel = Kernel(); var records = new List<CommandContext>();
+    using var session = EnemyPluginSession.Start(kernel, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => { });
+    kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
+    var actor = Enemy(); actor.EnemyData = new GameData.EnemyDataBlock { persistentID = 7 };
+    var reference = session.Module.TrackSpawn(actor);
+    kernel.StartRuntime(() => LocalPlan.Load(kernel, LocalPlan.Build(kernel, "test.plugin.enemy-type",
+        EnemyModule.DamageBinding, LocalPlan.RecordBinding, new[] { ("target", "target") }, Array.Empty<(string, object)>(),
+        RuntimeJson.EmptyObject, LocalPlan.EnemyTypeMount(7))));
+    var observed = session.Module.BeforeDamage(actor.Damage); actor.Damage.Health = 40;
+    session.Module.AfterDamage(actor.Damage, observed);
+    var tick = kernel.Advance(1, true);
+    Require(observed != null && tick.Commands.Count == 1 && records.Count == 1
+        && RuntimeJson.Entity(records[0].Inputs.GetProperty("target")) == reference,
+        $"The loaded plugin did not mount on the agent's own enemy type: commands={tick.Commands.Count}; records={records.Count}.");
 });
 var result = new { verification = "production-plugin-session-and-receiver-source-with-loader-game-doubles",
     gameExecuted = false, multiplayerExecuted = false, passed, failed, checks };

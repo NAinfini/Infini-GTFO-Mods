@@ -94,7 +94,11 @@ internal static class ProjectChecks
     private static Task? SourceWorker;
     internal static bool SourceSnapshotRunning { get { lock (SourceGate) return SourceWorker != null; } }
 
-    internal static ProjectObjectReferenceScan? Load(DiagnosticsReport report, long worldEpoch, long? simulationTick)
+    /// <param name="rooms">The room resolver this build installed, or null when it installed none. It is a
+    /// parameter rather than a constant so the game-independent scan names no native type; production passes the
+    /// one resolver, and a scan without one refuses every authored room.</param>
+    internal static ProjectObjectReferenceScan? Load(DiagnosticsReport report, long worldEpoch, long? simulationTick,
+        ProjectRoomResolver? rooms = null)
     {
         ArgumentNullException.ThrowIfNull(report);
         // An invalid epoch or tick is a caller contract violation, never an unscanned-but-valid world.
@@ -128,7 +132,7 @@ internal static class ProjectChecks
         // this line survives a rejection. One run owns exactly one scan; the source worker below
         // carries this same scan, so its result can never land on a different run's receipt.
         var scan = new ProjectObjectReferenceScan(manifest.References, worldEpoch, simulationTick,
-            ProjectSourceVerification.NotProvided);
+            ProjectSourceVerification.NotProvided, rooms);
         report.AttachObjectReferences(scan);
         report.SetMetadata("projectManifest", path);
         report.SetMetadata("projectManifestHash", Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());

@@ -8,20 +8,23 @@ namespace ForgeTrigger.Targeting;
 
 public enum ObservedVolumeShape { Sphere, Cylinder, Capsule, Box }
 
-/// <summary>Current point-position selection via the public R3 query. No discovery, LOS or collision certificate.</summary>
+/// <summary>Current point-position selection over the references a step already holds. No discovery, LOS or
+/// collision certificate.
+///
+/// Every read goes through the step's own <see cref="RuntimeQuerySession"/>: one budgeted call for the whole
+/// explicit candidate set, and a set the kernel could not observe completely is refused rather than ranked, so a
+/// selector can never answer with the best of the half it happened to see.</summary>
 public static class ObservedSpatialNodes
 {
-    public static IReadOnlyList<EntityReference> Overlap(RuntimeKernel runtime,
+    public static IReadOnlyList<EntityReference> Overlap(RuntimeQuerySession session,
         IReadOnlyList<EntityReference> candidates, IReadOnlyList<double> center,
-        ObservedVolumeShape shape, double radius, double height, bool candidatesComplete)
+        ObservedVolumeShape shape, double radius, double height)
     {
         var point = Point(center); Bounds(radius, 0.000001, 1000); Bounds(height, 0.000001, 2000);
         if (shape is not (ObservedVolumeShape.Sphere or ObservedVolumeShape.Cylinder
             or ObservedVolumeShape.Capsule or ObservedVolumeShape.Box))
             throw new RuntimeContractException("spatial-shape", "Only point sphere/cylinder/capsule/box selection is implemented.");
-        if (!candidatesComplete)
-            throw new RuntimeContractException("spatial-candidates-incomplete", "An incomplete candidate set cannot establish all-target coverage.");
-        var snapshots = Observe(runtime, candidates);
+        var snapshots = Observe(session, candidates);
         // Every shape is world-axis aligned and closed: a position exactly on the boundary is inside.
         return Array.AsReadOnly(snapshots.Where(row => shape switch
         {
@@ -34,34 +37,36 @@ public static class ObservedSpatialNodes
             _ => Delta(row.Position[0], point[0]) <= radius && Delta(row.Position[1], point[1]) <= height / 2d && Delta(row.Position[2], point[2]) <= radius
         }).OrderBy(row => ReferenceCollections.OrderKey(row.Ref), StringComparer.Ordinal).Select(row => row.Ref).ToArray());
     }
-    public static ReferenceSelection Nearest(RuntimeKernel runtime, IReadOnlyList<EntityReference> candidates,
-        IReadOnlyList<double> center, int count) => OrderedDistance(runtime, candidates, center, count, false);
-    public static ReferenceSelection Farthest(RuntimeKernel runtime, IReadOnlyList<EntityReference> candidates,
-        IReadOnlyList<double> center, int count) => OrderedDistance(runtime, candidates, center, count, true);
-    private static ReferenceSelection OrderedDistance(RuntimeKernel runtime,
+    public static ReferenceSelection Nearest(RuntimeQuerySession session, IReadOnlyList<EntityReference> candidates,
+        IReadOnlyList<double> center, int count) => OrderedDistance(session, candidates, center, count, false);
+    public static ReferenceSelection Farthest(RuntimeQuerySession session, IReadOnlyList<EntityReference> candidates,
+        IReadOnlyList<double> center, int count) => OrderedDistance(session, candidates, center, count, true);
+    private static ReferenceSelection OrderedDistance(RuntimeQuerySession session,
         IReadOnlyList<EntityReference> candidates, IReadOnlyList<double> center, int count, bool farthest)
     {
         if (count < 1 || count > 256)
             throw new RuntimeContractException("pure-selection-count", "Selection count must be in [1, 256].");
-        var point = Point(center); var snapshots = Observe(runtime, candidates);
+        var point = Point(center); var snapshots = Observe(session, candidates);
         var ranked = snapshots.Select(row => (Row: row, Distance: Distance(row.Position, point))).ToArray();
         var ordered = farthest ? ranked.OrderByDescending(row => row.Distance) : ranked.OrderBy(row => row.Distance);
         var selected = ordered.ThenBy(row => ReferenceCollections.OrderKey(row.Row.Ref), StringComparer.Ordinal)
             .Take(count).Select(row => row.Row.Ref).ToArray();
         return new ReferenceSelection(selected, candidates.Count, snapshots.Count, count);
     }
-    public static ReferenceSelection Chain(RuntimeKernel runtime, IReadOnlyList<EntityReference> candidates,
+    public static ReferenceSelection Chain(RuntimeQuerySession session, IReadOnlyList<EntityReference> candidates,
         EntityReference start, int maximumHops, double radius)
     {
         ArgumentNullException.ThrowIfNull(candidates); RuntimeEntityReferences.Validate(start);
         if (maximumHops < 1 || maximumHops > 64)
             throw new RuntimeContractException("spatial-hop-budget", "Chain maximum hops must be in [1, 64].");
         Bounds(radius, 0.000001, 1000);
-        if (candidates.Count > RuntimeKernel.MaximumEntityReferencesPerQuery)
-            throw new RuntimeContractException("entity-query-budget", "Explicit candidate query exceeds the Runtime limit.");
         var requested = candidates.ToList();
         if (!requested.Contains(start)) requested.Add(start);
-        var snapshots = Observe(runtime, requested);
+        // The start is one more reference the step must be allowed to read, and its count is what the query budget
+        // charges, so the explicit input is bounded with it rather than after it.
+        if (requested.Count > RuntimeKernel.MaximumEntityReferencesPerQuery)
+            throw new RuntimeContractException("entity-query-budget", "Explicit candidate query exceeds the Runtime limit.");
+        var snapshots = Observe(session, requested);
         var origin = snapshots.Single(row => row.Ref == start);
         var remaining = snapshots.Where(row => row.Ref != start).ToList();
         var available = remaining.Count; var selected = new List<EntityReference>();
@@ -75,12 +80,11 @@ public static class ObservedSpatialNodes
         }
         return new ReferenceSelection(selected.ToArray(), candidates.Count, available, maximumHops);
     }
-    private static IReadOnlyList<RuntimeEntitySnapshot> Observe(RuntimeKernel runtime, IReadOnlyList<EntityReference> candidates)
-    {
-        ArgumentNullException.ThrowIfNull(runtime);
-        // Do not batch around the Runtime per-query or per-tick budget.
-        return runtime.InspectEntities(candidates).RequireComplete();
-    }
+    /// <summary>Every snapshot of an explicit candidate set, in the order the kernel answered it. Do not batch
+    /// around the Runtime per-query or per-tick budget: one set is one call, and an incomplete answer — a spent
+    /// budget, a stale identity, an observer that refused — rejects the step with the kernel's own code.</summary>
+    private static IReadOnlyList<RuntimeEntitySnapshot> Observe(RuntimeQuerySession session, IReadOnlyList<EntityReference> candidates)
+        => ObservedSpaceNodes.Observe(session, candidates);
     private static double[] Point(IReadOnlyList<double> point)
     {
         if (point is null || point.Count != 3)

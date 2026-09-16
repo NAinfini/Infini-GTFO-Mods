@@ -34,7 +34,8 @@ internal sealed class EnemyPluginSession : IDisposable
         try
         {
             // Duplicate registration throws atomically before any new Harmony patches are attempted.
-            session.Module = new EnemyModule(kernel, level, () => !session._faulted && canExecute(), report, EnemyEntityObserver.Read);
+            session.Module = new EnemyModule(kernel, level, () => !session._faulted && canExecute(), report,
+                EnemyEntityObserver.Read, EnemyTypeReader.Read);
             hooksAttempted = true; installHooks();
             return session;
         }

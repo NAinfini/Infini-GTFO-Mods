@@ -296,6 +296,34 @@ internal static class WorldInspection
             ["navInfo"] = zone.m_navInfo == null ? "missing" : zone.m_navInfo.ToString() ?? "unavailable"
         };
         report.Event("world_inspection", "zone", subject, fields);
+        var zoneData = zone.m_settings?.m_zoneData;
+        if (zoneData == null)
+        {
+            session.MarkPartial();
+            report.Check("zone_enemy_respawn_policy", subject, "missing_data", "The live zone has no ExpeditionZoneData; respawn tuning could not be observed.");
+        }
+        else
+        {
+            var respawn = new Dictionary<string, string>
+            {
+                ["enabled"] = zoneData.EnemyRespawning.ToString(),
+                ["requireOtherZone"] = zoneData.EnemyRespawnRequireOtherZone.ToString(),
+                ["courseNodeDistance"] = zoneData.EnemyRespawnRoomDistance.ToString(),
+                ["intervalSeconds"] = RuntimeDiagnostics.Number(zoneData.EnemyRespawnTimeInterval),
+                ["countMultiplier"] = RuntimeDiagnostics.Number(zoneData.EnemyRespawnCountMultiplier),
+                // The authored value is a multiplier, not a bounded probability: clamping it would report an
+                // authored 2.5x as 100% and silently hide the difference from 1x.
+                ["countPercent"] = RuntimeDiagnostics.Number(zoneData.EnemyRespawnCountMultiplier * 100f),
+                ["excludeCount"] = (zoneData.EnemyRespawnExcludeList?.Count ?? 0).ToString(),
+                ["healthMulti"] = RuntimeDiagnostics.Number(zoneData.HealthMulti),
+                ["weaponAmmoMulti"] = RuntimeDiagnostics.Number(zoneData.WeaponAmmoMulti),
+                ["toolAmmoMulti"] = RuntimeDiagnostics.Number(zoneData.ToolAmmoMulti),
+                ["disinfectionMulti"] = RuntimeDiagnostics.Number(zoneData.DisinfectionMulti)
+            };
+            report.Event("world_inspection", "zone_respawn_policy", subject, respawn);
+            report.Check("zone_enemy_respawn_policy", subject, zoneData.EnemyRespawning ? "enabled" : "disabled",
+                $"count={respawn["countPercent"]}%; interval={respawn["intervalSeconds"]}s; CourseNodeDistance={respawn["courseNodeDistance"]}; requireOtherZone={respawn["requireOtherZone"]}.");
+        }
         var layer = zone.Layer;
         ProjectLayoutKey? layout = null;
         if (layer != null && (int)zone.DimensionIndex == 0 && layer.m_dimension != null && floor.MainDimension != null && layer.m_dimension.Pointer == floor.MainDimension.Pointer &&
@@ -390,9 +418,9 @@ internal static class WorldInspection
             { session.MarkPartial(); continue; }
             areas.Add(new ProjectAreaCandidate(area.GetInstanceID(), area.UID));
         }
-        // m_geoPrefab.name is display evidence only, not the original Assets/ identity.
-        session.Scan?.ObserveGeomorph(new ProjectGeomorphObservation(geomorph.GetInstanceID(),
-            owner.GetInstanceID(), "", false, areas));
+        // The areas are this scan's own observation; which authored reference names this geomorph is the one
+        // room resolver's answer, so no source identity is manufactured here from the prefab's display name.
+        session.Scan?.ObserveAreas(new ProjectGeomorphAreas(geomorph.GetInstanceID(), owner.GetInstanceID(), areas));
         report.Check("project_geomorph_source", subject, "unverified",
             "Creation-context source identity is unavailable; prefab names cannot establish an authored room match.",
             new DiagnosticNativeObject("geomorph", geomorph.GetInstanceID()));

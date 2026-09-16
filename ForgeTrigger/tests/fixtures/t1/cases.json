@@ -156,6 +156,92 @@
           "Event"
         ]
       }
+    },
+    {
+      "id": "pure-evaluator",
+      "graph": {
+        "schemaVersion": 1,
+        "domain": "logic",
+        "authority": "host",
+        "nodes": [
+          {
+            "id": "Event",
+            "capabilityId": "test.trigger.event",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.event",
+            "parameters": {}
+          },
+          {
+            "id": "Record",
+            "capabilityId": "test.trigger.record",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.record",
+            "parameters": {}
+          },
+          {
+            "id": "Add",
+            "capabilityId": "test.trigger.add",
+            "capabilityVersion": "1.0.0",
+            "bindingId": "test.trigger.binding.add",
+            "parameters": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "Event",
+              "port": "next"
+            },
+            "to": {
+              "node": "Record",
+              "port": "in"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "target"
+            },
+            "to": {
+              "node": "Record",
+              "port": "target"
+            }
+          },
+          {
+            "from": {
+              "node": "Add",
+              "port": "value"
+            },
+            "to": {
+              "node": "Record",
+              "port": "value"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Add",
+              "port": "a"
+            }
+          },
+          {
+            "from": {
+              "node": "Event",
+              "port": "amount"
+            },
+            "to": {
+              "node": "Add",
+              "port": "b"
+            }
+          }
+        ],
+        "entrypoints": [
+          "Event"
+        ]
+      }
     }
   ],
   "invalidGraphs": [
@@ -1190,104 +1276,6 @@
       "error": "Entrypoint is not a trigger"
     },
     {
-      "id": "action-output-dependency",
-      "graph": {
-        "schemaVersion": 1,
-        "domain": "logic",
-        "authority": "host",
-        "nodes": [
-          {
-            "id": "Event",
-            "capabilityId": "test.trigger.event",
-            "capabilityVersion": "1.0.0",
-            "bindingId": "test.trigger.binding.event",
-            "parameters": {}
-          },
-          {
-            "id": "Record",
-            "capabilityId": "test.trigger.record",
-            "capabilityVersion": "1.0.0",
-            "bindingId": "test.trigger.binding.record",
-            "parameters": {}
-          },
-          {
-            "id": "Second",
-            "capabilityId": "test.trigger.record",
-            "capabilityVersion": "1.0.0",
-            "bindingId": "test.trigger.binding.record",
-            "parameters": {}
-          }
-        ],
-        "edges": [
-          {
-            "from": {
-              "node": "Event",
-              "port": "next"
-            },
-            "to": {
-              "node": "Record",
-              "port": "in"
-            }
-          },
-          {
-            "from": {
-              "node": "Event",
-              "port": "target"
-            },
-            "to": {
-              "node": "Record",
-              "port": "target"
-            }
-          },
-          {
-            "from": {
-              "node": "Event",
-              "port": "amount"
-            },
-            "to": {
-              "node": "Record",
-              "port": "value"
-            }
-          },
-          {
-            "from": {
-              "node": "Record",
-              "port": "next"
-            },
-            "to": {
-              "node": "Second",
-              "port": "in"
-            }
-          },
-          {
-            "from": {
-              "node": "Event",
-              "port": "target"
-            },
-            "to": {
-              "node": "Second",
-              "port": "target"
-            }
-          },
-          {
-            "from": {
-              "node": "Record",
-              "port": "value"
-            },
-            "to": {
-              "node": "Second",
-              "port": "value"
-            }
-          }
-        ],
-        "entrypoints": [
-          "Event"
-        ]
-      },
-      "stage": "compile",
-      "error": "from-step-kind"
-    },
-    {
       "id": "execution-fanout",
       "graph": {
         "schemaVersion": 1,
@@ -1383,7 +1371,8 @@
         ]
       },
       "stage": "compile",
-      "error": "step-order"
+      "errorKind": "prose",
+      "error": "execution branch requires control lowering"
     },
     {
       "id": "control-needs-r4",
@@ -1472,94 +1461,6 @@
       },
       "stage": "compile",
       "error": "control-unsupported"
-    },
-    {
-      "id": "pure-evaluator-needs-r4",
-      "graph": {
-        "schemaVersion": 1,
-        "domain": "logic",
-        "authority": "host",
-        "nodes": [
-          {
-            "id": "Event",
-            "capabilityId": "test.trigger.event",
-            "capabilityVersion": "1.0.0",
-            "bindingId": "test.trigger.binding.event",
-            "parameters": {}
-          },
-          {
-            "id": "Record",
-            "capabilityId": "test.trigger.record",
-            "capabilityVersion": "1.0.0",
-            "bindingId": "test.trigger.binding.record",
-            "parameters": {}
-          },
-          {
-            "id": "Add",
-            "capabilityId": "test.trigger.add",
-            "capabilityVersion": "1.0.0",
-            "bindingId": "test.trigger.binding.add",
-            "parameters": {}
-          }
-        ],
-        "edges": [
-          {
-            "from": {
-              "node": "Event",
-              "port": "next"
-            },
-            "to": {
-              "node": "Record",
-              "port": "in"
-            }
-          },
-          {
-            "from": {
-              "node": "Event",
-              "port": "target"
-            },
-            "to": {
-              "node": "Record",
-              "port": "target"
-            }
-          },
-          {
-            "from": {
-              "node": "Add",
-              "port": "value"
-            },
-            "to": {
-              "node": "Record",
-              "port": "value"
-            }
-          },
-          {
-            "from": {
-              "node": "Event",
-              "port": "amount"
-            },
-            "to": {
-              "node": "Add",
-              "port": "a"
-            }
-          },
-          {
-            "from": {
-              "node": "Event",
-              "port": "amount"
-            },
-            "to": {
-              "node": "Add",
-              "port": "b"
-            }
-          }
-        ],
-        "entrypoints": [
-          "Event"
-        ]
-      },
-      "stage": "compile",
-      "error": "pure-shape"
     },
     {
       "id": "same-type-different-unit",
@@ -1742,7 +1643,8 @@
         ]
       },
       "stage": "compile",
-      "error": "optional-event-port"
+      "errorKind": "prose",
+      "error": "Optional event output cannot drive required runtime input"
     }
   ],
   "invalidPlans": [
@@ -1956,7 +1858,7 @@
         }
       ],
       "code": "unknown-field",
-      "error": "Unknown runtime field"
+      "error": "Runtime step input must name exactly one source"
     },
     {
       "id": "unknown-field",
@@ -2019,7 +1921,7 @@
         }
       ],
       "code": "empty-entrypoint",
-      "error": "steps per entrypoint"
+      "error": "empty-entrypoint"
     },
     {
       "id": "self-granted-permission",

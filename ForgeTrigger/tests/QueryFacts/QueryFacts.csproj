@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>ForgeTrigger.QueryFacts</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../ForgeTrigger.csproj" />
+    <ProjectReference Include="../../../ForgeRuntime/Framework/ForgeRuntime.Framework.csproj" />
+    <!-- The zone row's selection cases are the space family's own, so this suite compiles the one case file and
+         the one synthetic world it runs against instead of restating the four selection rows. The reference test
+         project keeps its copies; nothing here is a second implementation. -->
+    <Compile Include="../R3Consumers/ObservedSpaceTests.cs" Link="ObservedSpaceTests.cs" />
+    <Compile Include="../R3Consumers/ObservationWorld.cs" Link="ObservationWorld.cs" />
+  </ItemGroup>
+</Project>

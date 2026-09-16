@@ -3,8 +3,12 @@
     <TargetFramework>net6.0</TargetFramework><LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable><ImplicitUsings>disable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `WeaponOverrideApplier.Construct<T>` reaches a native GameData constructor through
+         `IL2CPP.il2cpp_runtime_invoke`, whose `void**` signature no safe declaration can spell, so that one method
+         is `unsafe`. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ForgeWeapon.Native</AssemblyName><RootNamespace>ForgeWeapon.Native</RootNamespace>
-    <Version>0.1.0</Version><IsPackable>false</IsPackable>
+    <Version>0.2.0</Version><IsPackable>false</IsPackable>
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
@@ -14,7 +18,22 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;WeaponNativeSession.cs;WeaponNativeHooks.cs;EquipmentNativeAdapter.cs" />
+    <Compile Include="Plugin.cs;WeaponNativeSession.cs;WeaponNativeHooks.cs;EquipmentNativeAdapter.cs;WeaponCombatObserver.cs;AttackInstanceHooks.cs;AttackInstanceModule.cs;GearPartTransformData.cs;GearPartTransformApplier.cs;LoadoutPolicyData.cs;LoadoutPolicyWiring.cs;GearLoadoutFilter.cs;GearLoadoutSession.cs;Il2CppGearPool.cs" />
+    <!-- The device facts and the holder tier: their observers, the fact router they publish through and the
+         channel the holder's own machine writes through. `WeaponMeleeHitFacts` carries the two melee hooks and
+         reads the remote half's ledger, which the receiver hooks claim through. -->
+    <Compile Include="WeaponHolderChannel.cs;WeaponHolderModule.cs;WeaponDeployableFacts.cs;FactRouter.cs;WeaponMeleeHitFacts.cs;WeaponMeleeRemoteFacts.cs;WeaponMeleeRemoteLedger.cs" />
+    <!-- The reload and inventory family: its two observers and the hooks that call them. Until this item the file
+         was compiled nowhere, which is why the rules its facts publish under were never installed. -->
+    <Compile Include="ReloadFacts.cs;InventoryFacts.cs;ReloadInventoryHooks.cs" />
+    <!-- nl-deploy: the placement family's hooks. The device facts nl-weapon wrote (WeaponHolderChannel,
+         WeaponHolderModule, WeaponDeployableFacts, FactRouter) are wired in the item above. -->
+    <Compile Include="WeaponPlacementHooks.cs" />
+    <!-- The actions this provider executes itself: the ammunition pair (`WeaponSupplyActions`, with the item-id
+         resolver beside it) and the instance-override family (`WeaponOverrideApplier` writing, `WeaponActionAdapter`
+         answering its three rows). Each is handed to the one registration as a body; a file that is in no compile
+         list has no body to hand over. -->
+    <Compile Include="InventoryActions.cs;WeaponSupplyActions.cs;WeaponSupplyItems.cs;WeaponOverrideApplier.cs;WeaponActionAdapter.cs" />
     <!-- Player owners come from ForgeMap through the SDK at runtime; there is deliberately no ForgeMap reference. -->
     <ProjectReference Include="../ForgeWeapon.csproj" Private="false" />
     <Reference Include="ForgeRuntime" HintPath="$(ForgeRuntimeAssembly)" Private="false" />
@@ -24,6 +43,8 @@
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" Private="false" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" Private="false" />
     <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" Private="false" />
+    <!-- The hit position is read from the by-value RaycastHit the weapon's own hit data carries. -->
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" Private="false" />
     <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" Private="false" />
     <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" Private="false" />
     <Reference Include="Utils-ASM" HintPath="$(GTFOBepInExPath)/interop/Utils-ASM.dll" Private="false" />

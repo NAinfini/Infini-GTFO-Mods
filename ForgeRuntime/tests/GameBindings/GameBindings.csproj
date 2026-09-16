@@ -5,15 +5,33 @@
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Framework/*.cs" Link="Framework/%(Filename)%(Extension)" />
+    <Compile Include="../../Framework/**/*.cs" Exclude="../../Framework/bin/**/*.cs;../../Framework/obj/**/*.cs" Link="Framework/%(Filename)%(Extension)" />
     <Compile Include="../../GameBindings/GameRuntimeBridge.cs" Link="GameRuntimeBridge.cs" />
+    <!-- The level lifecycle is a GTFO-API subscription; NativeHooks.cs itself is not compiled here because the
+         checkpoint detour needs the real Harmony runtime. -->
+    <Compile Include="../../GameBindings/LevelLifecycle.cs" Link="LevelLifecycle.cs" />
     <Compile Include="../../Logging/RuntimeLogWriter.cs" Link="RuntimeLogWriter.cs" />
-    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
-    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
+    <!-- The enemy provider is registered from its own declaration, never from the game-bound module: this harness
+         compiles no game-bound source, so the rows are the ones every contract at the package root declares plus the
+         control family's own declaration file, and `EnemyDeclaration` hands over a stand-in for every body. The
+         module and its partials are absent on purpose; compiling them would drag the whole game surface into a
+         harness whose doubles cover the host, not the game. -->
+    <Compile Include="../../../ForgeEnemy/*.cs" Link="ForgeEnemy/%(Filename)%(Extension)" />
+    <Compile Include="../../../ForgeEnemy/Native/EnemyControlContract.cs" Link="EnemyControlContract.cs" />
+    <!-- One declaration, two registrations: the release export and this harness register the same rows, so the file
+         lives with the export tool and is linked here rather than copied into a second table. -->
+    <Compile Include="../../../Release/export-runtime-manifest/EnemyDeclaration.cs" Link="EnemyDeclaration.cs" />
     <Compile Include="../../GameBindings/FrameworkFiles.cs" Link="FrameworkFiles.cs" />
     <Compile Include="../../GameBindings/PlanDiscovery.cs" Link="PlanDiscovery.cs" />
-    <!-- The bridge registers the ForgeTrigger module, and the website fixtures are compiled against it. -->
-    <Compile Include="../../../ForgeTrigger/**/*.cs" Exclude="../../../ForgeTrigger/bin/**/*.cs;../../../ForgeTrigger/obj/**/*.cs;../../../ForgeTrigger/tests/**/*.cs;../../../ForgeTrigger/artifacts/**/*.cs" Link="ForgeTrigger/%(Filename)%(Extension)" />
+    <!-- This harness compiles the SDK and the bridge sources directly (test doubles replace BepInEx and the game
+         types), so the trigger package is linked as source too: a project reference would bring the built SDK
+         assembly in beside the harness's own copy and split RuntimeModule into two identities. The host itself no
+         longer links or registers this package. -->
+    <Compile Include="../../../ForgeTrigger/**/*.cs" Exclude="../../../ForgeTrigger/bin/**/*.cs;../../../ForgeTrigger/obj/**/*.cs;../../../ForgeTrigger/tests/**/*.cs;../../../ForgeTrigger/artifacts/**/*.cs;../../../ForgeTrigger/Native/**/*.cs" Link="ForgeTrigger/%(Filename)%(Extension)" />
+    <!-- The world-change vocabulary the bridge and the network layer share: the transition that ended a world and
+         the one deferred until the kernel reaches its safe point. The rest of Network/** stays out of this harness
+         because it claims GTFO-API's event names and reads SNet, both of which NetworkDoubles.cs replaces. -->
+    <Compile Include="../../Network/NetworkWorld.cs" Link="Network/NetworkWorld.cs" />
     <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
     <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" />
     <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />

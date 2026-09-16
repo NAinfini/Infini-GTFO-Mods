@@ -24,6 +24,8 @@ const string Runtime = "forge.runtime";
 int checks = 0, failures = 0, sequence = 0;
 var console = new List<string>();
 var strict = new UTF8Encoding(false, true);
+// The kernel thread in this suite. Every BepInEx listener must be invoked on a thread that owns the calling frame.
+int mainThread = Environment.CurrentManagedThreadId;
 
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); Interlocked.Increment(ref checks); }
 void Case(string name, Action test)
@@ -65,7 +67,9 @@ string[] Codes(JsonElement[] lines) => lines.Select(line => Text(line, "code")!)
 
 Case("lazy start", () => {
     var directory = NewDirectory(); var (writer, _, events) = Writer(directory);
-    var kernel = Kernel(writer, RuntimeLogLevel.Info);
+    // Off keeps every kernel record point closed, including the `world.began` an Info-level gate would write: the writer
+    // may only be started by a record that actually reaches it.
+    var kernel = Kernel(writer, RuntimeLogLevel.Off);
     kernel.BeginWorld(1); kernel.ElevateLogging(); kernel.StartRuntime(() => { }); kernel.StopRuntime();
     writer.Dispose();
     Check(!writer.Started && writer.FilePath == null && !Directory.Exists(directory) && events.Count == 0,
@@ -86,6 +90,21 @@ Case("first line is log.level", () => {
         && !lines[0].GetProperty("elevated").GetBoolean(), "log.level does not carry the player level table");
     Check(Text(lines[0], "provider") == Runtime && Text(lines[0], "level") == "info" && lines[0].GetProperty("tick").GetInt64() == 7,
         "log.level owner, level or tick");
+});
+
+Case("log.level renders a disabled provider", () => {
+    var directory = NewDirectory(); var (writer, _, _) = Writer(directory);
+    // A package that registers at Off is in the published table, and the first record's own log.level line is where
+    // that table becomes console text: the name lookup has to spell every configured level, not only the written ones.
+    var kernel = Kernel(writer, RuntimeLogLevel.Error);
+    kernel.RegisterModule(Module("test.disabled"), RuntimeLogLevel.Off);
+    kernel.WriteLog(Record(RuntimeLogLevel.Error, "test.first", 7));
+    writer.Dispose(); var lines = Lines(writer);
+    Check(Codes(lines).SequenceEqual(new[] { RuntimeLogCodes.LogLevel, "test.first" }), "log.level is not the first line");
+    var levels = lines[0].GetProperty("levels").EnumerateArray()
+        .ToDictionary(row => Text(row, "provider")!, row => Text(row, "level")!);
+    Check(levels.Count == 2 && levels[Runtime] == "error" && levels["test.disabled"] == "off",
+        "log.level did not render the disabled provider: " + string.Join(",", levels.Select(x => x.Key + "=" + x.Value)));
 });
 
 Case("seq increments by one", () => {
@@ -113,17 +132,42 @@ Case("per-tick limit drops and reports counts", () => {
 
 Case("queue full drops and reports counts", () => {
     var directory = NewDirectory(); var (writer, log, _) = Writer(directory, RuntimeLogLimits.Default with { PlayerQueue = 4 });
-    using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim();
-    // Holding the consumer inside its first console mirror freezes the queue, so the drop count is deterministic.
-    log.LogEvent += (_, e) => { if (e.Data is string text && text.StartsWith("Forge log levels", StringComparison.Ordinal)) { entered.Set(); release.Wait(TimeSpan.FromSeconds(30)); } };
+    using var release = new ManualResetEventSlim(); bool mirroredOnCaller = false;
+    // The console mirror runs on the calling thread, and its listeners are synchronous, so holding one here freezes the
+    // queue exactly while the caller keeps writing. That also proves BepInEx never runs on the writer thread.
+    log.LogEvent += (_, e) =>
+    {
+        if (e.Data is not string text || !text.StartsWith("Forge log levels", StringComparison.Ordinal)) return;
+        mirroredOnCaller = Environment.CurrentManagedThreadId == mainThread;
+        release.Wait(TimeSpan.FromSeconds(30));
+    };
     var kernel = Kernel(writer, RuntimeLogLevel.Info);
     kernel.WriteLog(Record(RuntimeLogLevel.Info, "queue.1", 1));
-    Check(entered.Wait(TimeSpan.FromSeconds(10)), "consumer never started");
+    Check(mirroredOnCaller, "the log.level line was not mirrored on the calling thread");
     for (int i = 2; i <= 10; i++) kernel.WriteLog(Record(RuntimeLogLevel.Info, "queue." + i, i));
     release.Set(); writer.Dispose(); var lines = Lines(writer);
     Check(Codes(lines).SequenceEqual(new[] { "log.level", "queue.1", "queue.2", "queue.3", "queue.4", "log.dropped" }),
         "queue limit did not keep the oldest records: " + string.Join(",", Codes(lines)));
     Check(lines[5].GetProperty("count").GetInt64() == 6 && lines[5].GetProperty("tick").GetInt64() == 10, "queue drop count or tick");
+});
+
+Case("background file failures are reported as log.dropped by a later write", () => {
+    var directory = NewDirectory();
+    // A file at the directory's own path makes Directory.CreateDirectory and the session file fail on the writer thread.
+    File.WriteAllText(directory, "not a directory");
+    var (writer, _, _) = Writer(directory);
+    var kernel = Kernel(writer, RuntimeLogLevel.Info);
+    kernel.WriteLog(Record(RuntimeLogLevel.Info, "file.1", 1));
+    kernel.WriteLog(Record(RuntimeLogLevel.Info, "file.2", 2));
+    writer.Dispose();
+    Check(!writer.Started || writer.FilePath == null, "the writer opened a session file under a blocked path");
+    lock (console)
+    {
+        var reported = console.Where(line => line.Contains("Forge log dropped", StringComparison.Ordinal)
+            && line.Contains("Records were not written to", StringComparison.Ordinal)).ToArray();
+        Check(reported.Length == 1 && reported[0].Contains("dropped 2 records.", StringComparison.Ordinal),
+            "the kernel thread did not report the failed file exactly once with the lost record count: " + string.Join(" | ", reported));
+    }
 });
 
 Case("file size cap stops writing and ends with log.dropped", () => {
@@ -135,7 +179,7 @@ Case("file size cap stops writing and ends with log.dropped", () => {
     Check(new FileInfo(writer.FilePath!).Length <= 4096, "file exceeded injected cap");
     Check(Text(lines[^1], "code") == "log.dropped" && lines[^1].GetProperty("count").GetInt64() == 100 - written && written is > 0 and < 100,
         "capped file does not account for every unwritten record");
-    Check(events.Count(e => e.Level == LogLevel.Error && e.Data is string text && text.Contains("size limit", StringComparison.Ordinal)) == 1,
+    Check(events.Count(e => e.Level == LogLevel.Error && e.Data is string text && text.Contains("reached its size limit", StringComparison.Ordinal)) == 1,
         "size cap was not reported to the console exactly once");
 });
 
@@ -160,7 +204,9 @@ Case("retention keeps ten jsonl files and nothing else is touched", () => {
 });
 
 Case("console mirrors error and info only", () => {
-    var directory = NewDirectory(); var (writer, _, events) = Writer(directory);
+    var directory = NewDirectory(); var (writer, log, events) = Writer(directory);
+    var threads = new List<int>();
+    log.LogEvent += (_, _) => { lock (threads) threads.Add(Environment.CurrentManagedThreadId); };
     var kernel = Kernel(writer, RuntimeLogLevel.Info); kernel.ElevateLogging();
     kernel.WriteLog(Record(RuntimeLogLevel.Error, "mirror.error", 1));
     kernel.WriteLog(Record(RuntimeLogLevel.Info, "mirror.info", 1));
@@ -170,6 +216,8 @@ Case("console mirrors error and info only", () => {
     Check(Mirrored(LogLevel.Error, "mirror.error") && Mirrored(LogLevel.Info, "mirror.info") && Mirrored(LogLevel.Info, "(elevated)"), "error, info or log.level was not mirrored at its level");
     Check(!events.Any(e => e.Data is string text && text.Contains("mirror.trace", StringComparison.Ordinal)), "trace reached the console");
     Check(lines.Any(line => Text(line, "code") == "mirror.trace" && Text(line, "level") == "trace"), "trace record missing from file");
+    lock (threads) Check(threads.Count > 0 && threads.All(id => id == mainThread),
+        "a BepInEx listener ran off the calling thread: " + string.Join(",", threads.Distinct()));
 });
 
 Case("provider level gates and fixed rejection codes", () => {
@@ -190,7 +238,7 @@ Case("provider level gates and fixed rejection codes", () => {
             "domain record passed without a level entry");
         RejectCode("log-level", () => kernel.RegisterModule(Module("test.trace"), RuntimeLogLevel.Trace), "trace accepted as a registration level");
         RejectCode("log-provider-unregistered", () => kernel.LogGate("test.trace"), "rejected registration left a level entry");
-        // D-007: the level arrives with the registration, and one package registering several providers passes the same one to each.
+        // The level arrives with the registration, and one package registering several providers passes the same one to each.
         var domain = kernel.RegisterModule(Module("test.domain"), RuntimeLogLevel.Info);
         using var second = kernel.RegisterModule(Module("test.domain.second"), RuntimeLogLevel.Info);
         Check(kernel.LogGate("test.domain").Level == RuntimeLogLevel.Info && kernel.LogGate("test.domain.second").Level == RuntimeLogLevel.Info,
@@ -386,10 +434,12 @@ Case("kernel records world.began, plan.loaded and plan.rejected under Runtime", 
     var began = fixture.Records(RuntimeLogCodes.WorldBegan).Single();
     Check(began.Level == RuntimeLogLevel.Info && began.Provider == Runtime && began.Tick == -1 && began.WorldEpoch == 1, "world.began level, owner or tick");
     var loaded = fixture.Records(RuntimeLogCodes.PlanLoaded).Single();
-    Check(loaded.Level == RuntimeLogLevel.Info && loaded.Provider == Runtime && loaded.Path == "pack/plans/test.records.plan.json"
+    // The fixture names its plan file after the plan id, which already ends in ".plan": the record carries the
+    // candidate path verbatim, so the doubled suffix is the real discovered name.
+    Check(loaded.Level == RuntimeLogLevel.Info && loaded.Provider == Runtime && loaded.Path == "pack/plans/test.records.plan.plan.json"
         && loaded.Plan is { PlanId: "test.records.plan", ResourceId: "test.records.plan", ResourceRevision: "1" }
         && loaded.Permissions is { Count: 0 } && loaded.Result == null, "plan.loaded required fields");
-    var rejected = fixture.Kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/bad.plan.json", "{\"schemaVersion\":3}") })[0];
+    var rejected = fixture.Kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/bad.plan.json", "{\"schemaVersion\":4}") })[0];
     Check(!rejected.Loaded && rejected.Code == "missing-field", "a malformed plan was accepted: " + rejected.Code);
     var record = fixture.Records(RuntimeLogCodes.PlanRejected).Single();
     Check(record.Level == RuntimeLogLevel.Error && record.Provider == Runtime && record.Path == "pack/plans/bad.plan.json"
@@ -493,14 +543,15 @@ Case("kernel splits a refused event between event.rejected and budget.exceeded",
         && record.Result is { Status: "rejected", Reason: "stale-world" },
         "event.rejected required fields");
     Check(fixture.Records(RuntimeLogCodes.BudgetExceeded).Length == 0, "a non-budget refusal was also recorded as budget.exceeded");
-    // A full kernel queue is a budget reason, so the same refusal is recorded as budget.exceeded instead.
+    // A queue at its budget is a budget reason, so the same refusal is recorded as budget.exceeded instead. The plan
+    // may not declare a queue budget above the kernel ceiling, so both are one here and the plan's own budget refuses.
     var full = new RecordFixture(RuntimeLogLevel.Info, new RuntimeLimits { MaxQueuedEvents = 1 });
-    full.Start(maxQueuedEvents: 2);
+    full.Start(maxQueuedEvents: 1);
     Check(full.Trigger.Publish(full.Event("evt-first")).Status == "queued", "first publish refused");
     Check(full.Trigger.Publish(full.Event("evt-budget")).Status == "rejected", "a full queue accepted a second event");
     var budget = full.Records(RuntimeLogCodes.BudgetExceeded).Single();
     Check(budget.Level == RuntimeLogLevel.Error && budget.Provider == Runtime && budget.Binding == RecordFixture.TriggerBinding
-        && budget.EventId == "evt-budget" && budget.Result is { Status: "rejected", Reason: "queue-budget" },
+        && budget.EventId == "evt-budget" && budget.Result is { Status: "rejected", Reason: "plan-queue-budget" },
         "budget.exceeded required fields");
     Check(full.Records(RuntimeLogCodes.EventRejected).Length == 0, "a budget refusal was also recorded as event.rejected");
     Check(fixture.Records(RuntimeLogCodes.BudgetExceeded).Length == 0, "an unrelated kernel recorded the refusal");
@@ -533,7 +584,7 @@ Case("a disabled level keeps every kernel record point out of the sink", () => {
     fixture.Kernel.BeginWorld(1);
     using (var observer = fixture.Action.ObserveLifecycle(_ => throw new InvalidOperationException("off boom"), true)) { }
     Check(fixture.Sink.Records.Count == 0, "registration, world or observer wrote at Off");
-    fixture.Kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/bad.plan.json", "{\"schemaVersion\":3}") });
+    fixture.Kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/bad.plan.json", "{\"schemaVersion\":4}") });
     fixture.Kernel.LogSuspended("checkpoint-restore", "test restore");
     Check(fixture.Sink.Records.Count == 0, "a disabled runtime level still reached the sink: "
         + string.Join(",", fixture.Sink.Records.Select(r => r.Code)));

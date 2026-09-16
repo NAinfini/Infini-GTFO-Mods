@@ -20,8 +20,8 @@ internal static class NativeReaderCases
             ("above-max", s => s.Enemy.Damage.Health = 101, x => x?.Receives.Count == 0),
             ("zero-native", s => s.Enemy.Pointer = IntPtr.Zero, x => x == null),
             ("unsetup-enemy", s => s.Enemy.IsSetup = false, x => x == null),
-            ("nan-position", s => s.Enemy.Point.x = float.NaN, x => x == null),
-            ("unstable-position", s => s.Enemy.OnPosition = () => s.Enemy.Point.x++, x => x == null)
+            ("nan-position", s => s.Enemy.Position = (float.NaN, 2, 3), x => x == null),
+            ("unstable-position", s => { float moved = 0; s.Enemy.OnPositionRead = () => (++moved, 2, 3); }, x => x == null)
         };
         foreach (var item in cases) Case("native-reader." + item.Name, () =>
         {
@@ -37,8 +37,33 @@ internal static class NativeReaderCases
         Case("native-reader.frozen", () =>
         {
             using var s = new Scene(); var snapshot = EnemyEntityObserver.Read(s.Enemy, s.Ref)!;
-            s.Enemy.Point.x = 100;
+            s.Enemy.Position = (100, 2, 3);
             Require(snapshot.Position[0] == 1, "Snapshot remained attached to mutable native data.");
+        });
+        // The `enemy-type` mount's read: the official block id, or nothing at all.
+        Case("native-reader.enemy-type-id", () =>
+        {
+            using var s = new Scene();
+            Require(EnemyTypeReader.Read(s.Enemy) == 42, "The block's own persistent id was not read back.");
+        });
+        var noType = new (string Name, Action<Scene> Change)[]
+        {
+            ("missing-block", s => s.Enemy.EnemyData = null!),
+            ("zero-native", s => s.Enemy.Pointer = IntPtr.Zero),
+            ("unsetup-enemy", s => s.Enemy.IsSetup = false),
+            ("replaced-block", s =>
+            {
+                // The getter is asked twice; the second answer is a different block, so neither reading stands.
+                int reads = 0;
+                var first = new GameData.EnemyDataBlock { persistentID = 42 };
+                s.Enemy.OnEnemyDataRead = () => ++reads == 1 ? first : new GameData.EnemyDataBlock { persistentID = 99 };
+            }),
+            ("throwing-getter", s => s.Enemy.OnEnemyDataRead = () => throw new IOException("native getter"))
+        };
+        foreach (var item in noType) Case("native-reader.enemy-type." + item.Name, () =>
+        {
+            using var s = new Scene(); item.Change(s);
+            Require(EnemyTypeReader.Read(s.Enemy)! == null, "An unreadable enemy type was answered with a value.");
         });
     }
 }

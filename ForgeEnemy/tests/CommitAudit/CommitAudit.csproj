@@ -10,14 +10,23 @@
   </Target>
   <ItemGroup>
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
+    <!-- The package's whole native compile set, the same list `ForgeEnemy/Native/ForgeEnemy.Native.csproj` compiles:
+         the module this audit records is the entire provider, so a file that list leaves out is a member
+         `EnemyModule` names and this project does not compile. The game types those sources read are the same
+         doubles `NativePlugin` compiles, because the module under audit is the same module. -->
+    <Compile Include="../../Native/Plugin.cs;../../Native/EnemyPluginSession.cs;../../Native/EnemySpawnRequirementSource.cs;../../Native/EnemyHookInstall.cs;../../Native/Enemy*Hooks.cs;../../Native/EnemyModule*.cs;../../Native/EnemyActionFamilies.cs;../../Native/EnemyControlContract.cs;../../Native/EnemyControlActions.cs;../../Native/EnemyCombatActions.cs;../../Native/GlueActions.cs;../../Native/GlueFacts.cs;../../Native/EnemyBehaviorNative.cs;../../Native/EnemyBehaviorLedger.cs;../../Native/EnemyBehaviorActions.cs;../../Native/EnemyWaveModule.cs;../../Native/EnemyNodeEffectActions.cs;../../Native/EnemyNodeFacts.cs;../../Native/EnemyNodeRegistration.cs;../../Native/EnemyNodeValueReads.cs;../../Native/EnemySelector.cs;../../Native/EnemyAttackInstanceFacts.cs;../../Native/EnemyWaveFacts.cs;../../Native/Observation/*.cs" />
+    <Compile Include="../../Spawn/EnemySpawnRequirements.cs" Link="EnemySpawnRequirements.cs" />
+    <Compile Include="../../EnemyNode*Contract.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../../EnemyCombatContract.cs;../../GlueContract.cs;../../EnemyBehaviorContract.cs;../../EnemyWaveContract.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../../EnemySelectorContract.cs" Link="EnemySelectorContract.cs" />
+    <Compile Include="../../AttackInstanceContract.cs" Link="AttackInstanceContract.cs" />
+    <Compile Include="../../ModuleDefinition.cs" Link="ModuleDefinition.cs" />
+    <Compile Include="../NativePlugin/*Doubles.cs" Link="%(Filename)%(Extension)" />
     <Compile Include="../../Receivers/EnemyHealthCommit.cs" Link="EnemyHealthCommit.cs" />
     <Compile Include="../../Receivers/EnemyThreadBoundary.cs" Link="EnemyThreadBoundary.cs" />
-    <None Include="../../Receivers/EnemyHealthCommit.cs" Link="EnemyHealthCommit.source.txt" CopyToOutputDirectory="Always" />
-    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.cs" />
-    <Compile Include="../../../ForgeEnemy/Native/EnemyModule.LifecycleFacts.cs" Link="EnemyModule.LifecycleFacts.cs" />
-    <Compile Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.cs" />
     <Compile Include="../Shared/*.cs" />
-    <None Include="../../../ForgeEnemy/Native/EnemyModule.cs" Link="EnemyModule.source.txt" CopyToOutputDirectory="Always" />
-    <None Include="../../../ForgeRuntime/tests/GameBindings/GameDoubles.cs" Link="GameDoubles.source.txt" CopyToOutputDirectory="Always" />
+    <None Include="../../Receivers/EnemyHealthCommit.cs" Link="EnemyHealthCommit.source.txt" CopyToOutputDirectory="Always" />
+    <None Include="../../Native/EnemyModule.cs" Link="EnemyModule.source.txt" CopyToOutputDirectory="Always" />
+    <None Include="../NativePlugin/GameDoubles.cs" Link="GameDoubles.source.txt" CopyToOutputDirectory="Always" />
   </ItemGroup>
 </Project>

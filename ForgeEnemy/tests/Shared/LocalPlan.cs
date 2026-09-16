@@ -1,9 +1,10 @@
+using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using ForgeRuntime.Framework;
 
 /// <summary>
-/// Legal schemaVersion 3 plans built from the kernel's own registry export. Pins, capability and provider
+/// Legal schemaVersion 4 plans built from the kernel's own registry export. Pins, capability and provider
 /// versions, permissions, slot frames and positional constants all come from the registered contracts, so these
 /// tests follow the SDK instead of a website fixture that predates the current catalog shape.
 /// </summary>
@@ -20,7 +21,9 @@ internal static class LocalPlan
     {"id":"limb_id","type":"integer","optional":true,"nullable":true},
     {"id":"value","type":"number","unit":"hp","optional":true,"nullable":true},
     {"id":"delta","type":"number","unit":"hp","optional":true,"nullable":true}],
-    "outputs":[{"id":"next","type":"execution"},{"id":"result","type":"result","schema":"test.enemy.result.record"}],
+    "outputs":[{"id":"next","type":"execution"},{"id":"result","type":"result","schema":"test.enemy.result.record",
+    "fields":[{"id":"target","type":"entity"},{"id":"status","type":"enum","schema":"execution_outcome"},
+    {"id":"committed","type":"enum","schema":"commit_state"},{"id":"code","type":"string"}]}],
     "parameters":[],"recipients":{"input":"target","target":"entity","cardinality":"one","requires":[],"result":"result"}}}],
     "bindings":[{"id":"test.enemy.binding.record","capabilityId":"test.enemy.action.record",
     "providerId":"test.enemy","handler":"test.record","role":"execute","status":"implemented","dependencies":[],"requires":[]}]}
@@ -30,6 +33,47 @@ internal static class LocalPlan
     private static readonly MethodInfo LayoutFrame = typeof(RuntimeKernel).Assembly
         .GetType("ForgeRuntime.Framework.RuntimeGraphContracts", true)!
         .GetMethod("Layout", BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    /// <summary>The provider that owns the mount kind every plan here declares, and the one level identity it
+    /// answers. No mount kind belongs to the kernel any more, so a plan whose kind nothing owns is refused at
+    /// load: the builder stands the owner up in the kernel it is handed, because a fixture plan has to be
+    /// loadable in the kernel it was built for.</summary>
+    internal const string MountProvider = "test.enemy.mounts";
+    internal const string MountReference = "31:A:0";
+    internal static RuntimeModule LevelMount() => new(RuntimeKernel.ApiVersion, """
+    {"providers":[{"id":"test.enemy.mounts","kind":"extension","version":"1.0.0","dependencies":[]}],
+    "capabilities":[],"bindings":[]}
+    """, new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>())
+    {
+        AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>
+        {
+            // A level names no event subject, so the kind is judged from the mount target alone.
+            ["level"] = AttachmentMatcherRegistration.ByScope((category, reference) =>
+                category == null && reference == MountReference)
+        }
+    };
+    /// <summary>Registers the mount owner in a kernel that has not started yet. A suite calls this next to its
+    /// other registrations: the kernel freezes registration at startup, so the owner of a plan's mount kind has
+    /// to be in place before the plan loads, and a plan whose kind nothing owns is refused at load.</summary>
+    internal static void OwnMounts(RuntimeKernel kernel)
+    {
+        var providers = RuntimeJson.Parse(kernel.ExportManifest()).GetProperty("registry").GetProperty("providers");
+        if (providers.EnumerateArray().Any(p => p.GetProperty("id").GetString() == MountProvider)) return;
+        kernel.RegisterModule(LevelMount(), RuntimeLogLevel.Off);
+    }
+
+    /// <summary>Every plan mounts the whole level. The reference is the one identity <see cref="LevelMount"/>
+    /// answers, in the spelling the matcher parses; a plan mounted on nothing could never be dispatched.</summary>
+    private static readonly object[] Attachments = { new { kind = "level", reference = MountReference } };
+
+    /// <summary>An `enemy-type` mount: the official enemy block's persistentID as canonical decimal text, which
+    /// is the one spelling the website exports and the module's matcher parses (ruling 61).</summary>
+    internal static object[] EnemyTypeMount(uint enemyTypeId)
+        => new object[] { new { kind = "enemy-type", reference = enemyTypeId.ToString(CultureInfo.InvariantCulture) } };
+
+    /// <summary>The same one-row mount list with a reference the test spells itself, for cases that must prove a
+    /// spelling is refused rather than reinterpreted.</summary>
+    internal static object[] Mount(string kind, string reference) => new object[] { new { kind, reference } };
 
     internal sealed record Plan(string Json, string[] Permissions)
     {
@@ -55,7 +99,11 @@ internal static class LocalPlan
     /// <summary>A parameterless recording action; every invocation succeeds after handing its context to the test.</summary>
     internal static RuntimeModule Recorder(Action<CommandContext> record) => new(RuntimeKernel.ApiVersion, RecorderRegistry,
         new Dictionary<string, CommandHandler> { ["test.record"] = context => { record(context); return CommandResult.Succeeded(RuntimeJson.EmptyObject); } },
-        new[] { new BindingSupport(RecordBinding, "implementation-only", new[] { RecordPermission }) });
+        new[] { new BindingSupport(RecordBinding, "implementation-only", new[] { RecordPermission }) })
+    {
+        // The recorder reads no port: it hands the whole dispatch context to the test.
+        Shapes = new Dictionary<string, HandlerShape> { ["test.record"] = new HandlerShape() }
+    };
 
     /// <summary>One entrypoint: <paramref name="trigger"/> followed by one parameterless <paramref name="action"/> step fed only by event slots.</summary>
     internal static Plan Build(RuntimeKernel kernel, string planId, string trigger, string action, params (string EventOutput, string ActionInput)[] wires)
@@ -64,9 +112,14 @@ internal static class LocalPlan
     /// <summary>One entrypoint: <paramref name="trigger"/> followed by one <paramref name="action"/> step whose inputs are
     /// event-slot wires and <c>{slot, value}</c> literals, and whose constants are <paramref name="parameters"/> laid out
     /// positionally over the capability's parameter definitions (absent ones are null). Enum parameters must already be
-    /// member-set indexes, exactly as a compiled plan carries them.</summary>
+    /// member-set indexes, exactly as a compiled plan carries them. <paramref name="attachments"/> is the plan's own
+    /// mount list — the level by default, an `enemy-type` mount for the cases that ask whether a plan fires.
+    /// <paramref name="triggerParameters"/> is the same positional frame for the entrypoint's own trigger, whose
+    /// structural parameters an author fills by hand — a wave row's `resource` address is the only one today, and a
+    /// required parameter left null is refused with `missing-constant`.</summary>
     internal static Plan Build(RuntimeKernel kernel, string planId, string trigger, string action,
-        (string EventOutput, string ActionInput)[] wires, (string ActionInput, object Value)[] literals, JsonElement parameters)
+        (string EventOutput, string ActionInput)[] wires, (string ActionInput, object Value)[] literals, JsonElement parameters,
+        object[]? attachments = null, JsonElement? triggerParameters = null)
     {
         var manifest = RuntimeJson.Parse(kernel.ExportManifest());
         var registry = manifest.GetProperty("registry");
@@ -83,7 +136,7 @@ internal static class LocalPlan
             .Where(support => ids.Contains(support.GetProperty("bindingId").GetString()!))
             .SelectMany(support => support.GetProperty("requiredPermissions").EnumerateArray().Select(p => p.GetString()!))
             .Distinct(StringComparer.Ordinal).OrderBy(p => p, StringComparer.Ordinal).ToArray();
-        JsonElement Parameters(string id) => id == action ? parameters : RuntimeJson.EmptyObject;
+        JsonElement Parameters(string id) => id == action ? parameters : triggerParameters ?? RuntimeJson.EmptyObject;
         var contracts = pins.ToDictionary(p => p.bindingId, p => kernel.ResolveGraphContract(p.capabilityId, p.capabilityVersion, Parameters(p.bindingId)));
         JsonElement Frame(string id, string side) => (JsonElement)LayoutFrame.Invoke(null, new object[] { contracts[id], side })!;
         object?[] Constants(string id)
@@ -101,10 +154,11 @@ internal static class LocalPlan
             .OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
         var json = RuntimeJson.From(new
         {
-            schemaVersion = 3, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = kernel.Identity,
+            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },
             bindings = pins,
+            attachments = attachments ?? Attachments,
             // One action step is the whole graph; the last execution output is left unwired, so the entrypoint ends there.
             entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, trigger), layout = Layout(trigger), start = 0,
                 steps = new[] { new { nodeId = "Step", nodeKind = "action", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs, successors = new int?[] { null } } } } }
@@ -119,6 +173,12 @@ internal static class LocalPlan
             new[] { (subject, "targets"), (subject, "source") }, new[] { ("amount", (object)amount) },
             RuntimeJson.From(new { overheal_policy = 0 }));
 
-    /// <summary>Loads a plan; every rejection propagates.</summary>
-    internal static void Load(RuntimeKernel kernel, Plan plan) => kernel.LoadPlan(plan.Json);
+    /// <summary>Loads a plan through the host's own candidate entry point; every rejection propagates as the
+    /// contract failure the kernel classified it with, so a case can assert the code and nothing is swallowed.</summary>
+    internal static void Load(RuntimeKernel kernel, Plan plan)
+    {
+        string planId = RuntimeJson.Parse(plan.Json).GetProperty("planId").GetString()!;
+        var outcome = kernel.LoadPlans(new[] { PlanCandidate.Loaded("test/" + planId + ".plan.json", plan.Json) }).Single();
+        if (!outcome.Loaded) throw new RuntimeContractException(outcome.Code, outcome.Detail);
+    }
 }

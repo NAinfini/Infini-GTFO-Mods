@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The contract file under test compiles ModuleDefinition.cs beside it and the GameDoubles below deliberately
+         declare the game types the native half names, so CS0436 fires on every shadowed mention; the `Compile` list
+         decides which definition wins. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The framework assembly under test; an already built `ForgeRuntime.Framework.dll` may be passed instead. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The game-independent row declarations plus the two native halves this slice owns. The melee ledger is
+         compiled here as well because the dedupe rule it holds is what the weapon facts project exercises. -->
+    <Compile Include="../../WeaponSupplyContract.cs" />
+    <Compile Include="../../ModuleDefinition.cs" />
+    <!-- `ModuleDefinition.Create` composes the package's own row sets, so the contract files it names are compiled
+         here too; none of them is under test in this project. -->
+    <Compile Include="../../WeaponPlacementContract.cs" />
+    <Compile Include="../../WeaponDeployableFactsContract.cs" />
+    <Compile Include="../../WeaponMeleeHitContract.cs" />
+    <Compile Include="../../InventoryActionContract.cs" />
+    <Compile Include="../../WeaponOverrideContract.cs" />
+    <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../Native/WeaponSupplyActions.cs" />
+    <Compile Include="../../Native/WeaponSupplyItems.cs" />
+    <Compile Include="../../Native/WeaponMeleeRemoteLedger.cs" />
+    <Compile Include="GameDoubles.cs;AssemblyAttributes.cs;SupplyWorld.cs;AmmoSupplyTests.cs;ItemResolutionTests.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" />
+    <Reference Include="0Harmony" HintPath="$(GTFOBepInExPath)/core/0Harmony.dll" />
+    <!-- The game assemblies are referenced so a member this build does not have fails the build; the doubles below
+         are what the compile actually binds. -->
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+    <Reference Include="SNet_ASM" HintPath="$(GTFOBepInExPath)/interop/SNet_ASM.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

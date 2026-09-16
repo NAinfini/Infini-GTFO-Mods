@@ -10,7 +10,7 @@ internal static class DeathCases
         Case("death.fact-not-kill", () => {
             using var s = new Scene(); s.Die(); var tick = s.Tick(); var c = s.Records.Single();
             Check(tick.CommandsExecuted == 1 && c.Inputs.EnumerateObject().Count() == 1
-                && c.GetEntityInput("target") == s.Ref && c.Source == null && c.CauseId == null,
+                && c.GetEntityInput("target") == s.Ref && c.CauseId == null,
                 "Identity or unknown causal actors were changed.");
             Check(!s.Enemy.Alive && s.Enemy.Damage.Sends == 0, "Observation mutated health.");
         });

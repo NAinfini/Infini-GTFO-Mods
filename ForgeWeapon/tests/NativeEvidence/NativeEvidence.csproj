@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
-    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <IsPackable>false</IsPackable>
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <Target Name="ValidateEvidenceReferences" BeforeTargets="ResolveReferences">
@@ -12,5 +12,13 @@
   <ItemGroup>
     <Reference Include="Mono.Cecil" HintPath="$(GTFOBepInExPath)/core/Mono.Cecil.dll" />
     <Reference Include="Iced" HintPath="$(GTFOBepInExPath)/core/Iced.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
   </ItemGroup>
 </Project>

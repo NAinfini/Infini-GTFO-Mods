@@ -8,6 +8,7 @@ using static Checks;
 if (args.Length is < 1 or > 2) { Console.Error.WriteLine("Usage: EntityObservation <report.json> [sdk provenance]"); return 2; }
 NativeReaderCases.Run();
 ObserverRegistrationCases.Run();
+InstanceResolverCases.Run();
 Case("snapshot.exact-native-data", () =>
 {
     using var s = new Scene(); var q = s.Query();
@@ -55,9 +56,9 @@ var unavailable = new (string Name, Action<Scene> Change)[]
 {
     ("not-setup", s => s.Enemy.IsSetup = false),
     ("zero-native-pointer", s => s.Enemy.Pointer = IntPtr.Zero),
-    ("nan-position", s => s.Enemy.Point = (float.NaN, 2, 3)),
-    ("infinite-position", s => s.Enemy.Point = (1, float.PositiveInfinity, 3)),
-    ("moving-during-read", s => s.Enemy.OnPosition = () => s.Enemy.Point.x++)
+    ("nan-position", s => s.Enemy.Position = (float.NaN, 2, 3)),
+    ("infinite-position", s => s.Enemy.Position = (1, float.PositiveInfinity, 3)),
+    ("moving-during-read", s => { float moved = 0; s.Enemy.OnPositionRead = () => (++moved, 2, 3); })
 };
 foreach (var item in unavailable) Case("unavailable." + item.Name, () =>
 {
@@ -66,12 +67,12 @@ foreach (var item in unavailable) Case("unavailable." + item.Name, () =>
 });
 Case("snapshot.reader-exception", () =>
 {
-    using var s = new Scene(); s.Enemy.OnPosition = () => throw new IOException("native getter");
+    using var s = new Scene(); s.Enemy.OnPositionRead = () => throw new IOException("native getter");
     Require(s.Query().Items.Single().Code == "entity-observer-failed", "Native reader failure was hidden.");
 });
 Case("snapshot.frozen-values", () =>
 {
-    using var s = new Scene(); var x = s.Query().RequireComplete().Single(); s.Enemy.Point = (9, 8, 7);
+    using var s = new Scene(); var x = s.Query().RequireComplete().Single(); s.Enemy.Position = (9, 8, 7);
     Require(x.Position.SequenceEqual(new double[] { 1, 2, 3 }), "Snapshot retained mutable native position.");
     bool rejected = false;
     try { ((IList<double>)x.Position)[0] = 9; } catch (NotSupportedException) { rejected = true; }
@@ -79,7 +80,7 @@ Case("snapshot.frozen-values", () =>
 });
 Case("snapshot.negative-coordinates", () =>
 {
-    using var s = new Scene(); s.Enemy.Point = (-10, -20, -30);
+    using var s = new Scene(); s.Enemy.Position = (-10, -20, -30);
     Require(s.Query().RequireComplete().Single().Position.SequenceEqual(new double[] { -10, -20, -30 }), "Coordinates were normalized.");
 });
 Case("snapshot.wrong-native-id", () =>
@@ -106,12 +107,12 @@ Case("lifecycle.same-pointer-new-life", () =>
 });
 Case("lifecycle.clear-during-native-read", () =>
 {
-    using var s = new Scene(); s.Enemy.OnPosition = s.Module.ClearWorld;
+    using var s = new Scene(); s.Enemy.OnPositionRead = () => { s.Module.ClearWorld(); return (1, 2, 3); };
     Require(!s.Query().IsComplete, "Identity invalidation during native getter was missed.");
 });
 Case("lifecycle.gate-lost-during-read", () =>
 {
-    using var s = new Scene(); s.Enemy.OnPosition = () => s.Allowed = false;
+    using var s = new Scene(); s.Enemy.OnPositionRead = () => { s.Allowed = false; return (1, 2, 3); };
     Require(!s.Query().IsComplete, "Changed phase/authority gate was ignored.");
 });
 Case("lifecycle.replaced-life-during-read", () =>
@@ -193,6 +194,7 @@ var report = new
     gameExecuted = false, multiplayerExecuted = false, sdkProvenance = args.Length == 2 ? args[1] : "worktree",
     receiverSha256 = Hash(Path.Combine(AppContext.BaseDirectory, "EnemyModule.source.txt")),
     readerSha256 = Hash(Path.Combine(AppContext.BaseDirectory, "EnemyEntityObserver.source.txt")),
+    typeReaderSha256 = Hash(Path.Combine(AppContext.BaseDirectory, "EnemyTypeReader.source.txt")),
     sdkSha256 = Hash(typeof(RuntimeKernel).Assembly.Location), utc = DateTimeOffset.UtcNow,
     passed = Rows.Count(x => x.Passed), failed = Rows.Count(x => !x.Passed), checks = Rows
 };

@@ -24,25 +24,49 @@ internal sealed class WorkFixture
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         Kernel = new(JsonSerializer.Deserialize<RuntimeIdentity>(manifest.GetProperty("runtime"), options)!);
         Kernel.BeginWorld(1);
-        // The website manifest owns the pins and the permission declarations; the capabilities and the trigger
-        // evaluator come from the SDK, and the native enemy surface is registered from the manifest's own rows with
-        // managed doubles, so the fixture exercises the declared contracts rather than a copy of them.
+        Kernel.RegisterModule(LevelMount(), RuntimeLogLevel.Off);
+        // The website manifest owns the pins and the permission declarations; the shared contract capabilities and the
+        // trigger evaluator come from the SDK, and the native enemy module is registered from the manifest's own rows
+        // with managed doubles, so the fixture exercises the declared contracts rather than a copy of them.
         Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        // The trigger-contract rows are the kernel's own builtin module in production, so this fixture registers the
+        // same module: the manifest's enemy bindings pin capabilities such as `forge.trigger.combat.damage_applied`,
+        // and a registration that omits them is refused with `binding-capability`.
+        Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         Kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off);
         var declared = manifest.GetProperty("registry");
         var enemyProvider = declared.GetProperty("providers").EnumerateArray()
             .Single(p => p.GetProperty("id").GetString() == "forge.module.gtfo.enemy");
+        // The manifest is generated from that module's own export, so the rows it owns under this provider are the
+        // module's declared surface. A module registers its capabilities and its bindings together - a binding whose
+        // capability is not registered is refused as `missing-capability` - so every capability row the enemy
+        // provider owns is part of the registration, exactly as it is in the production module.
+        var enemyCapabilities = declared.GetProperty("capabilities").EnumerateArray()
+            .Where(c => c.GetProperty("owner").GetString() == enemyProvider.GetProperty("id").GetString()).ToArray();
         var enemyBindings = declared.GetProperty("bindings").EnumerateArray()
-            .Where(b => b.GetProperty("providerId").GetString() == "forge.module.gtfo.enemy").ToArray();
+            .Where(b => b.GetProperty("providerId").GetString() == enemyProvider.GetProperty("id").GetString()).ToArray();
         var enemySupport = manifest.GetProperty("bindingSupport").EnumerateArray()
             .Where(s => enemyBindings.Any(b => b.GetProperty("id").GetString() == s.GetProperty("bindingId").GetString()))
             .Select(s => JsonSerializer.Deserialize<BindingSupport>(s, options)!).ToArray();
         var enemyHandlers = enemyBindings.Where(b => b.GetProperty("role").GetString() == "execute")
             .ToDictionary(b => b.GetProperty("handler").GetString()!, _ => (CommandHandler)(ctx =>
             { Commits++; OnCommit?.Invoke(ctx); return CommandResult.Succeeded(RuntimeJson.EmptyObject); }));
+        // The doubles stand in for the native module, so their shapes name every value port the real handler reads:
+        // the shape is derived from the same declared rows the plan was compiled against, never restated here.
+        var enemyShapes = enemyHandlers.Keys.ToDictionary(handler => handler, handler =>
+        {
+            var binding = enemyBindings.Single(b => b.GetProperty("handler").GetString() == handler);
+            var graph = declared.GetProperty("capabilities").EnumerateArray()
+                .Single(c => c.GetProperty("id").GetString() == binding.GetProperty("capabilityId").GetString()).GetProperty("graph");
+            string[] ValuePorts(string side) => graph.GetProperty(side).EnumerateArray()
+                .Where(p => p.GetProperty("type").GetString() != "execution").Select(p => p.GetProperty("id").GetString()!).ToArray();
+            return new HandlerShape().Inputs(ValuePorts("inputs")).Outputs(ValuePorts("outputs"))
+                .Parameters(graph.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("id").GetString()!).ToArray());
+        });
         Owner = Kernel.RegisterModule(new(RuntimeKernel.ApiVersion,
-            RuntimeJson.From(new { providers = new[] { enemyProvider }, capabilities = Array.Empty<object>(), bindings = enemyBindings }).GetRawText(),
-            enemyHandlers, enemySupport, new Dictionary<string, Func<EntityReference, bool>> { ["gtfo.enemy"] = r => r == Target }), RuntimeLogLevel.Off);
+            RuntimeJson.From(new { providers = new[] { enemyProvider }, capabilities = enemyCapabilities, bindings = enemyBindings }).GetRawText(),
+            enemyHandlers, enemySupport, new Dictionary<string, Func<EntityReference, bool>> { ["gtfo.enemy"] = r => r == Target })
+        { Shapes = enemyShapes }, RuntimeLogLevel.Off);
         Plan = LocalPlan();
         RegisterState();
         if (ready) { Kernel.StartRuntime(() => Kernel.LoadPlan(Plan)); Kernel.Advance(0, true); }
@@ -87,14 +111,30 @@ internal sealed class WorkFixture
         var inputs = wires.OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
         return RuntimeJson.From(new
         {
-            schemaVersion = 3, kind = "forge-runtime-plan", planId = "test.lifecycle.plan", resource = new { id = "test.lifecycle.plan", revision = "1" },
+            schemaVersion = 4, kind = "forge-runtime-plan", planId = "test.lifecycle.plan", resource = new { id = "test.lifecycle.plan", revision = "1" },
             runtime = Kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth }, bindings = pins,
+            attachments = new[] { new { kind = "level", reference = "test.level" } },
             entrypoints = new[] { new { nodeId = "Fact", binding = Array.IndexOf(ids, DamageBinding), layout = Layout(DamageBinding), start = 0,
                 steps = new[] { new { nodeId = "Heal", nodeKind = "action", binding = Array.IndexOf(ids, HealBinding), layout = Layout(HealBinding),
                     inputs, successors = new int?[] { null } } } } }
         }).GetRawText();
     }
+    /// <summary>Every plan here mounts the whole level, and no mount kind belongs to the kernel any more: the
+    /// provider that owns the kind has to be registered before the plan loads. No domain package is loaded in
+    /// this fixture, so this double owns the kind and answers the one reference the fixture plan carries.</summary>
+    private static RuntimeModule LevelMount() => new(RuntimeKernel.ApiVersion,
+        RuntimeJson.From(new
+        {
+            providers = new[] { new { id = "test.lifecycle.level", kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
+            capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()
+        }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>())
+    {
+        AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>
+        {
+            ["level"] = AttachmentMatcherRegistration.ByScope((category, reference) => category == null && reference == "test.level")
+        }
+    };
     private static readonly string[] WirePortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
     private static readonly Type GraphContracts = typeof(RuntimeKernel).Assembly.GetType("ForgeRuntime.Framework.RuntimeGraphContracts")!;
     private static readonly MethodInfo LayoutOf = GraphContracts.GetMethod("Layout", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -128,7 +168,7 @@ internal sealed class WorkFixture
     }
     internal RuntimeEvent Event(string id, long tick = 10) => new(id, Trigger, Kernel.WorldEpoch, tick,
         "test.lifecycle.scope", RuntimeJson.From(new { source = (EntityReference?)null, target = Target, amount = 10,
-            damage_kind = (int?)null, limb = (int?)null }), Target);
+            damage_kind = (int?)null, limb = (int?)null }));
     internal RuntimeScheduleHandle Schedule(string id = "test.timer")
     {
         var result = Owner.Schedule(Event(id, Math.Max(0, Kernel.CurrentTick)),

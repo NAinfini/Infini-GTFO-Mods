@@ -1,0 +1,139 @@
+{
+  "profile": "enemy",
+  "enabledByDefault": true,
+  "entries": [
+    {
+      "type": "Enemies.EnemyAgent",
+      "methods": ["*"],
+      "exclude": ["Update", "LateUpdate", "get_*", "set_*", "_*"],
+      "record": "args+result",
+      "instance": ["m_tagMarker", "m_health", "m_alive", "m_enemyType", "m_dimensionIndex"],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyAI",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "instance": ["m_mode", "m_currentBehaviourState", "m_currentTarget"],
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyBehaviour",
+      "methods": ["ChangeState", "UpdateState", "FixedUpdateState", "SignalEvent", "SetIncomingExtraStateData", "OnSetupStateMachine", "Setup", "SetAI"],
+      "record": "args+result",
+      "instance": ["m_currentState"],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.ES_*",
+      "methods": ["Enter", "Exit", "ActivateState", "ActivateStateWithData", "CommonEnter", "CommonExit", "OnAttackWindUp", "OnAttackPerform", "DoStartAttack", "DoWakeup", "DoHeartbeat", "Heartbeat", "StartBeat", "EndBeat", "DoStartDetection", "DoEndDetection", "MasterStartDetection", "MasterEndDetection", "DamageShouldTriggerHitreact", "OnHitreactDone", "Stop"],
+      "exclude": ["Update", "FixedUpdate", "MoveNext", "System_*", "__c*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_EnemyDamageBase",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "instance": ["Owner", "Health", "HealthMax", "DamageMax"],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Dam_EnemyDamageLimb",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "instance": ["m_health", "m_broken", "m_limbID"],
+      "firstStack": true,
+      "maxPerSecond": 80,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyAllocator",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 40,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyGroup",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "SNetwork_IReplicatorSupplier_*"],
+      "record": "args+result",
+      "instance": ["m_groupData", "m_populationPointsSpentDuringWave"],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "SurvivalWave",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "SNetwork_IReplicatorSupplier_*", "Method_Internal_*"],
+      "record": "args+result",
+      "instance": ["m_isNewWave", "m_waveSpawnTimer", "m_populationPointsPerWaveMax"],
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemySpawnManager",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemyDetection",
+      "methods": ["UpdateTargets", "UpdateData", "UpdateDetectionTimer",  "UpdateInCombatDetection", "UpdateLineOfSightAndOcclusion", "UpdateLineOfSightAndOcclusion_NoFOV", "IsTargetValid", "IsOccluded", "GetDetectionWaveMod"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Enemies.EnemySync",
+      "methods": ["*"],
+      "exclude": ["get_*", "set_*", "SNetwork_IReplicatorSupplier_*", "TryCollectCaptureData"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Mastermind",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*", "GameStateUpdate*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 60,
+      "onOverflow": "count"
+    },
+    {
+      "type": "Gear.EnemyScanner",
+      "methods": ["*"],
+      "exclude": ["Update", "get_*", "set_*"],
+      "record": "args+result",
+      "firstStack": true,
+      "maxPerSecond": 30,
+      "onOverflow": "count"
+    }
+  ]
+}
+
+

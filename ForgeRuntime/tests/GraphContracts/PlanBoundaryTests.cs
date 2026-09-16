@@ -5,6 +5,10 @@ using ForgeRuntime.Framework;
 internal static class PlanBoundaryTests
 {
     const string Provider = "test.graphports", Trigger = "test.graphports.binding.start";
+    /// <summary>The mount reference every vector plan carries, answered by the owner the module below registers: a
+    /// plan's kind has to have a registered matcher before the plan loads, and a level target names no entity, so the
+    /// matcher is a scope one.</summary>
+    const string Mount = "graph-port-expansion";
 
     internal static void Run(JsonElement vectors)
     {
@@ -15,7 +19,15 @@ internal static class PlanBoundaryTests
                 ["record"] = _ => { calls++; return CommandResult.Succeeded(RuntimeJson.From(new { value_1 = 1, value_2 = 2 })); }
             }, seed.GetProperty("bindings").EnumerateArray().Select(b => new BindingSupport(
                 b.GetProperty("id").GetString()!, "implementation-only", Array.Empty<string>())).ToArray(),
-            new Dictionary<string, Func<EntityReference, bool>> { [Provider] = r => r.Id == Provider + ":1" && r.LifeEpoch == 1 });
+            new Dictionary<string, Func<EntityReference, bool>> { [Provider] = r => r.Id == Provider + ":1" && r.LifeEpoch == 1 })
+        {
+            // The port-group capability expands its outputs per plan, so the double names no port: its shape is empty.
+            Shapes = new Dictionary<string, HandlerShape> { ["record"] = new HandlerShape() },
+            AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>
+            {
+                ["level"] = AttachmentMatcherRegistration.ByScope((category, reference) => category == null && reference == Mount)
+            }
+        };
         void Refused(string seed, string plan, string name)
         {
             var kernel = Suite.Kernel();

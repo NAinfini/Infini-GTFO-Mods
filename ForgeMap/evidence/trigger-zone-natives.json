@@ -1,0 +1,72 @@
+{
+  "family": "trigger-zone",
+  "slice": "tz-mod",
+  "readOn": "2026-09-16",
+  "gameBuild": "20403457",
+  "profile": "r2modmanPlus-local/GTFO/profiles/Forge-MapEditor-QA/BepInEx",
+  "summary": "触发区的三个原生挂点：每 tick 的驱动、玩家/敌人位置与候选集的读取、以及 layer 13 的阻挡碰撞体。本文件只记录取证结论：哪些是本机可编译验证的成员、哪些来自 ni-triggerwall 的实测、哪些必须进游戏确认。",
+  "hooks": [
+    {
+      "id": "tick",
+      "type": "Player.PlayerInteraction",
+      "member": "FixedUpdate()",
+      "use": "HarmonyPostfix：本机自己的玩家每物理帧调用一次，作为 TriggerZoneSession.Tick() 的驱动（每内核 tick 去重一次，见 TriggerZoneHooks.Tick）。",
+      "il2cppWrapper": "编译通过：ForgeMap/tests/TriggerZoneFacts/TriggerZoneNative.csproj 对 QA profile 的 interop/Modules-ASM.dll 编译成功（dotnet build，Release，exit 0），证明该类型与成员在真程序集里存在且签名匹配。",
+      "precedent": "InfiniTweaks/InteractionFixes.cs:11 已用同一成员做 HarmonyPatch（同仓既有用法）。",
+      "hostClient": "每台机器自己的 PlayerInteraction 都在跑，所以 postfix 里必须先判 m_owner.IsLocallyOwned；非本机玩家直接 return，主机判定在 TriggerZoneModule.Tick 的 authority 守卫之后才发生。",
+      "risk": "与 GameRuntimeBridge.FixedTick 的先后顺序未定义（两者都是 FixedUpdate）。本 tick 用 kernel.CurrentTick 去重，因此最坏情况是判定晚一帧，不会重复判定。"
+    },
+    {
+      "id": "local-owner",
+      "type": "Player.PlayerAgent",
+      "member": "IsLocallyOwned",
+      "use": "区分本机玩家与同机上的其他 agent。",
+      "il2cppWrapper": "编译通过（同上镜像工程）；InfiniTweaks/InteractionFixes.cs:25 已按该成员判本机归属。"
+    },
+    {
+      "id": "player-candidates",
+      "type": "ForgeRuntime.Framework.RuntimeKernel",
+      "member": "EnumerateEntityCandidates(string kind)",
+      "use": "kind = gtfo.player（ForgeMap/Native/PlayerIdentityModule.cs 注册的 EntityKind），得到主机判定的候选玩家集合。",
+      "evidence": "ForgeRuntime/Framework/RuntimeKernel.Entities.cs:30-70；候选来源是 provider 注册的 EntityCandidates（MapPluginSession.cs:256-259）。预算：每 tick 最多 64 次查询 / 1024 个引用，超限返回 rejected（entity-query-budget / entity-query-tick-budget）。"
+    },
+    {
+      "id": "enemy-candidates",
+      "type": "ForgeRuntime.Framework.RuntimeKernel",
+      "member": "EnumerateEntityCandidates(string kind)",
+      "use": "kind = gtfo.enemy（ForgeEnemy 的 EnemySelector.EntityKind，模组侧只作为字符串使用，不引用该包程序集）。",
+      "evidence": "ForgeEnemy/Native/EnemyModule.cs:135 注册 [EnemySelector.EntityKind] = CurrentCandidates；ForgeEnemy/tests/EnemySelectorQuery/Program.cs:140 用字面量 \"gtfo.enemy\" 枚举。",
+      "派生式": "敌人未安装/未注册该 kind 时返回 rejected(entity-candidates-unavailable)，本模块按『未知』处理：该 kind 的成员保持既有集合，不发 exited、也不重复发 entered（见 TriggerZoneModule.Tick 的 unknown 集合）。"
+    },
+    {
+      "id": "positions",
+      "type": "ForgeRuntime.Framework.RuntimeKernel",
+      "member": "InspectEntities(IReadOnlyList<EntityReference>)",
+      "use": "一次有预算的调用读回整批目标的 RuntimeEntitySnapshot.Position（世界坐标，米）。",
+      "evidence": "ForgeRuntime/Framework/RuntimeKernel.Entities.cs:139-160；位置由各 kind 的 owner 通过 EntityObservers 提供（玩家：ForgeMap/Native/PlayerIdentityModule.cs 的 Observe；敌人：ForgeEnemy 的观察者）。任一实体读不到时返回 status=partial，本模块据此整 tick 拒绝判定（不发任何边沿）。"
+    },
+    {
+      "id": "blocking-collider",
+      "type": "UnityEngine.GameObject / UnityEngine.BoxCollider",
+      "member": "GameObject.layer, Transform.position/rotation, AddComponent<BoxCollider>(), BoxCollider.isTrigger/size/center",
+      "use": "每个 blocksPlayers 的 zone：一台机器一个 GameObject + BoxCollider(isTrigger=false)，layer 13。",
+      "il2cppWrapper": "编译通过（镜像工程引用 interop/UnityEngine.CoreModule.dll 与 interop/UnityEngine.PhysicsModule.dll）。同仓用法先例：InfiniTweaks/ResourceHandling.Slots.cs:66-71（new GameObject(...){layer=...} + AddComponent<BoxCollider>() + .size=）。",
+      "layer": "TagManager.layers[13] = \"InvisibleWall\"（ni-triggerwall.md §6，UnityPy 实测 globalgamemanagers）。物理矩阵实测：layer 13 与 10 PlayerMover 等相碰，与 16 Enemy / 19 EnemyDamagable / 11 Dynamic / 15 GlueGunProjectile / 22 ProjectileBlocker 不相碰。",
+      "hostClient": "每机各自生成（碰撞是本机物理），不做主机判定、不做复制。数据来自同一份包内文档，因此各机形状一致。",
+      "未证": "子弹是否被 layer 13 挡住未证（原始层掩码在 IL2CPP 代码里），文案与报告不作承诺；运行时新增碰撞体不重建 AI 图，敌人也不会绕行（同文档结论）。"
+    },
+    {
+      "id": "package-document",
+      "type": "BepInEx.Paths",
+      "member": "BepInExRootPath",
+      "use": "扫描 plugins/<一层目录>/forge/trigger-zones.json（与计划扫描 PlanDiscovery 同一层级规则）。",
+      "evidence": "ForgeRuntime/GameBindings/PlanDiscovery.cs:26-43；内容文件先例 ForgeWeapon/Native/GearPartTransformData.cs:81-102（plugins/<pkg>/forge/gear-parts/*.json）。"
+    }
+  ],
+  "notEvidence": [
+    "谁先跑（本 tick 与 GameRuntimeBridge.FixedTick）无保证，只能确定不会重复判定（kernel.CurrentTick 去重）。",
+    "裁定 112.4 的『trigger 行输入 zone + 参数 who』在模组内核不成立：RuntimePlan.cs:278 对 trigger 要求 inputs.Length == 0 && definitions.Length == 0；本切片改用包数据里的 zone.who 与事件 string 输出 zone。",
+    "事件的按 zone 作用域（计划只挂到某一个 zone）目前只有 scope 字符串 gtfo.trigger_zone:<id>，没有 attachment kind 的匹配机制。",
+    "bot 是否算玩家、敌人是否真的不碰撞 layer 13、子弹是否被挡：均需进游戏确认。"
+  ]
+}

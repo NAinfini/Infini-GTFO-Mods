@@ -16,6 +16,9 @@ internal sealed class TestWorld : IDisposable
         Kernel = new RuntimeKernel(new RuntimeIdentity("forge.weapon.test", "0.1.0",
             RuntimeKernel.ApiVersion, "synthetic-no-game"));
         Kernel.BeginWorld(7);
+        // The host registers the runtime's own contract providers before any domain package; the weapon module's
+        // bindings name Trigger capabilities, and a binding whose capability is missing is refused.
+        Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         Session = new EquipmentIdentitySession(Kernel, RuntimeLogLevel.Off, _ =>
         {
             NativeReads++; DuringProbe?.Invoke(); return NativeCurrent;
@@ -24,8 +27,8 @@ internal sealed class TestWorld : IDisposable
     }
     internal void Start()
     { Kernel.StartRuntime(() => { }); Kernel.Advance(0, true); }
-    internal EquipmentObservation Item(string id = "a", string slot = "GearStandard", long life = 1)
-        => new(new EntityReference("gtfo.equipment:" + id, Kernel.WorldEpoch, life),
+    internal EquipmentObservation Item(long number = 1, string slot = "GearStandard", long life = 1)
+        => new(new EntityReference(EquipmentIdentityId.Life(Kernel.WorldEpoch, number), Kernel.WorldEpoch, life),
             "fixture.rifle", "r1", Owner, slot, EquipmentLocation.Inventory, true, true);
     internal EquipmentUseTicket Track(EquipmentObservation? value = null)
     {

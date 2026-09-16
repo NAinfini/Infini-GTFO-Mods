@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "slice": "C-projectile-actions",
+  "family": "projectile-entity",
+  "topic": "actions",
+  "gameBuild": 20403457,
+  "assembly": "Modules-ASM.dll",
+  "assemblySource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop\\Modules-ASM.dll",
+  "decompiler": "%TEMP%\\codex-ilspy\\ilspycmd.exe 11.0.0.9375 (interop wrapper IL; native method bodies are not in this assembly)",
+  "producedWith": [
+    "ilspycmd -t ProjectileManager   -> %TEMP%\\fwdesign\\fwd-combat\\ilspy\\ProjectileManager.cs",
+    "ilspycmd -t ProjectileBase      -> %TEMP%\\fwdesign\\fwd-combat\\ilspy\\ProjectileBase.cs",
+    "ilspycmd -t Projectile          -> %TEMP%\\fwdesign\\fwd-combat\\ilspy\\Projectile.cs",
+    "ilspycmd -t ProjectileTargeting -> %TEMP%\\fan\\c-projectile-actions\\ilspy\\ProjectileTargeting.cs",
+    "ilspycmd -t ProjectileType      -> %TEMP%\\fan\\c-projectile-actions\\ilspy\\ProjectileType.cs",
+    "ilspycmd -t IProjectile         -> %TEMP%\\fwdesign\\fwd-combat\\ilspy\\IProjectile.cs"
+  ],
+  "typeInventory": {
+    "ProjectileBase": "public class ProjectileBase : MonoBehaviour (Modules-ASM)",
+    "ProjectileTargeting": "public class ProjectileTargeting : ProjectileBase (Modules-ASM)",
+    "Projectile": "public class Projectile : MonoBehaviour (Modules-ASM) - the glue gun's own ballistic carrier",
+    "ProjectileManager": "public class ProjectileManager : GlobalManager (Modules-ASM)",
+    "IProjectile": "interface with the single member OnFire(Agent)",
+    "modulesTypesSearch": "modules-types.txt: 'Beam' 0 hits, 'Penetrat' 0 hits, 'Shrapnel' 0 hits, 'Hitscan' 0 hits; 'Ricochet' only as ProjectileBase fields"
+  },
+  "members": [
+    {
+      "member": "ProjectileManager.WantToFireTargeting(ProjectileType type, Agent target, Vector3 spawnPos, Vector3 spawnDirFwd, int burstSize = 1, float burstShotDelay = 0f) -> void",
+      "kind": "public static",
+      "evidence": "ilspy ProjectileManager.cs line 959; CallerCount(4)",
+      "replicatedBy": "pFireTargeting is carried by ProjectileManager.m_fireTargeting, a SNet_BroadcastAction<pFireTargeting> (ilspy ProjectileManager.cs line 593)",
+      "usedFor": "forge.action.combat.projectile_fire"
+    },
+    {
+      "member": "ProjectileManager.pFireTargeting { Vector3 position; Vector3 forward; int burstSize; pAgent target; ProjectileType type; float burstShotDelay }",
+      "kind": "public nested struct",
+      "evidence": "ilspy ProjectileManager.cs lines 20-67; the six FieldOffset declarations are the wire payload",
+      "note": "There is no speed, damage, lifetime, owner or count-per-burst field beyond burstSize; a per-shot speed cannot be expressed here."
+    },
+    {
+      "member": "ProjectileManager.SpawnProjectileType(ProjectileType type, Vector3 pos, Quaternion rot) -> GameObject",
+      "kind": "public static (native private static in the metadata name)",
+      "evidence": "ilspy ProjectileManager.cs line 934; CallerCount(2)",
+      "usedFor": "the object reference forge.action.combat.projectile_fire registers for the projectile it created",
+      "note": "The interop wrapper is public and returns the spawned GameObject; the interop native name is NativeMethodInfoPtr_SpawnProjectileType_Private_Static_GameObject_ProjectileType_Vector3_Quaternion_0, so the underlying metadata method is private static and this wrapper is the only reachable form."
+    },
+    {
+      "member": "ProjectileManager.Current : ProjectileManager (public static)",
+      "kind": "public static field accessor",
+      "evidence": "ilspy ProjectileManager.cs line 475",
+      "usedFor": "the null check that decides whether this machine has a projectile manager at all"
+    },
+    {
+      "member": "ProjectileManager.m_projectilePrefabs : Il2CppReferenceArray<GameObject>",
+      "kind": "public instance field",
+      "evidence": "ilspy ProjectileManager.cs line 490",
+      "note": "Readable, but the prefab array is the manager's own asset table; nothing here writes it."
+    },
+    {
+      "member": "ProjectileBase.m_myFwd : Vector3 (get/set)",
+      "kind": "public instance field",
+      "evidence": "ilspy ProjectileBase.cs line 154",
+      "usedFor": "forge.action.combat.projectile_redirect (new heading of an in-flight projectile)"
+    },
+    {
+      "member": "ProjectileBase.m_targetAgent : Agent (get/set)",
+      "kind": "public instance field",
+      "evidence": "ilspy ProjectileBase.cs line 100",
+      "usedFor": "forge.action.combat.projectile_redirect (guide_target)",
+      "note": "The type is Agents.Agent, so only a provider that can hand out a native Agent can satisfy it; this slice satisfies it for gtfo.enemy through the enemy domain's own instance resolver."
+    },
+    {
+      "member": "ProjectileBase.m_ricochetAngleThreshold : float (get/set)",
+      "kind": "public instance field",
+      "evidence": "ilspy ProjectileBase.cs line 253",
+      "usedFor": "forge.action.combat.projectile_bounce",
+      "note": "The interop exposes only a getter and setter over the field, so the native unit of the threshold (radians or degrees) is not observable from this assembly. The row therefore documents its own unit as degrees and the value is written unchanged; see uncertainties[2]."
+    },
+    {
+      "member": "ProjectileBase.m_ricochetEffect : GameObject  /  ProjectileBase.m_ricochetPool : FX_Pool",
+      "kind": "public instance fields",
+      "evidence": "ilspy ProjectileBase.cs lines 238, 503",
+      "usedFor": "evidence that a ricochet path exists and is driven by the prefab, not by per-shot call parameters"
+    },
+    {
+      "member": "ProjectileBase.m_destroyDelaySeconds : float (get/set)",
+      "kind": "public instance field",
+      "evidence": "ilspy ProjectileBase.cs line 296"
+    },
+    {
+      "member": "ProjectileBase.DelayedDestroySelf(GameObject projectileGO) -> void",
+      "kind": "public instance method",
+      "evidence": "ilspy ProjectileBase.cs line 615; CallerCount(0)",
+      "usedFor": "forge.action.combat.projectile_destroy",
+      "note": "The GameObject parameter is the projectile's own game object; Component.get_gameObject is how this slice reads it back from the registered component."
+    },
+    {
+      "member": "ProjectileBase.Destroyed : bool (protected get, private set)",
+      "kind": "public getter over a protected backing field",
+      "evidence": "ilspy ProjectileBase.cs line 518; _Destroyed_k__BackingField",
+      "usedFor": "the liveness readback after a destroy call",
+      "note": "Only the game's own destruction path sets it, so it is a readback and never a write here."
+    },
+    {
+      "member": "ProjectileBase.OnFire(Agent target) / Update() / CheckCollision() / Collision(Ray, RaycastHit) / OnDestroy()",
+      "kind": "public virtual instance methods",
+      "evidence": "ilspy ProjectileBase.cs lines 567-634",
+      "note": "These are the observation points of the sibling slice C-projectile-facts; no hook is installed by this slice."
+    },
+    {
+      "member": "ProjectileTargeting.Speed / TargetStrength / m_currentStrength / m_aimPosition / m_alwaysFollowTarget / m_targetingDelay / m_initialTargetingDuration / m_initialTargetStrength / m_targetingTimer / m_endLifeTime",
+      "kind": "public instance fields",
+      "evidence": "ilspy ProjectileTargeting.cs lines 83-380",
+      "note": "All writable, but none of them is a per-shot speed or a per-second turn rate that forge.action.combat.projectile_fire or forge.action.combat.projectile_redirect declares; the native movement code reads them each frame."
+    },
+    {
+      "member": "ProjectileTargeting.TravelDirection : Vector3 (get only)",
+      "kind": "public instance property",
+      "evidence": "ilspy ProjectileTargeting.cs line 455; CallerCount(0) on the getter",
+      "note": "Read-only, so a redirect cannot be expressed by writing it."
+    },
+    {
+      "member": "Projectile.SetVelocity(Vector3 velocity) -> void",
+      "kind": "public virtual instance method",
+      "evidence": "ilspy Projectile.cs line 297",
+      "usedFor": "not used: Projectile is the glue gun's own ballistic carrier and is not the ProjectileTargeting instance the manager's targeting path spawns; see decisions[3]."
+    },
+    {
+      "member": "ProjectileType : byte enum, 16 members in declaration order: TargetingSmall, TargetingMedium, TargetingLarge, TargetingTiny, GlueFlying, GlueLanded, SemiTargetingQuick, InfectionBomb, TargetingSmallFast, NotTargetingSmallFast, SemiTargetingBoss, SemiTargetingBossArtillery, RagingBoss, NotTargetingBigFast, NotTargetingSmallPellet, TargetSpread",
+      "kind": "public enum",
+      "evidence": "ilspycmd -t ProjectileType output; matches evidence.md section 4",
+      "usedFor": "the projectile_type structural parameter of forge.action.combat.projectile_fire"
+    },
+    {
+      "member": "UnityEngine.Component.GetComponent<T>() / get_gameObject / get_transform",
+      "kind": "Unity engine members",
+      "evidence": "UnityEngine.CoreModule; the same two members are already used by other packages of this repository (ForgeWeapon native-layout expectedReads lists Component::get_gameObject and Component::get_transform)",
+      "usedFor": "reading the ProjectileTargeting component back from the GameObject SpawnProjectileType returns, and reading that component's own GameObject for DelayedDestroySelf"
+    }
+  ],
+  "decisions": [
+    "forge.action.combat.projectile_fire is implemented against the ruled shape (design fwd-combat section 4): the projectile:resource/model input is replaced by the structural parameter projectile_type (the native ProjectileType enum), and the destination is ProjectileManager.WantToFireTargeting.",
+    "The runtime speed input the ruled shape keeps has no native destination in pFireTargeting (six fields, none of them a speed), so a non-zero speed is refused by name instead of being ignored; the native per-shot speed lives on the prefab.",
+    "forge.action.combat.projectile_redirect writes ProjectileBase.m_myFwd (heading) and ProjectileBase.m_targetAgent (guide target) on the ProjectileTargeting instance this slice registered. Projectile.SetVelocity is deliberately not used: Projectile and ProjectileTargeting are two independent carriers and the manager's targeting path spawns the latter.",
+    "forge.action.combat.projectile_destroy calls ProjectileBase.DelayedDestroySelf with the component's own game object. impact_policy=detonate is refused because the explosion belongs to the projectile's own impact path (m_impactEffect, m_projectileExplosionForce, m_explosionTargetMask), which this call does not take.",
+    "forge.action.combat.projectile_bounce writes ProjectileBase.m_ricochetAngleThreshold. The native bounce has no count, restitution, speed loss or damage scale, so none of the removed inputs is accepted.",
+    "gtfo.projectile is registered by this slice because the four rows cannot be reached without it: the plan loader validates every entity input against a registered namespace resolver, and every projectile reference this slice hands out is its own SpawnProjectileType result. The entity instance resolver maps the native ProjectileTargeting back to that reference, so the kernel's own ResolveEntityInstance answers for this kind."
+  ],
+  "uncertainties": [
+    "The sibling slice `C-projectile-facts` was authored in the same worktree and also registers the `gtfo.projectile` entity kind (ForgeEnemy/Native/ProjectileModule.cs, ProjectileFacts.Wire), naming a life from ProjectileBase.Pointer. This slice registers the same kind from its own table and names a life from its own counter. The kernel's resolver and instance-resolver tables are keyed by kind, so one registration replaces the other silently and one slice's references stop resolving. Exactly one owner must be chosen before the integration batch wires either slice; see %TEMP%/fan/c-projectile-actions/integration.json, notes[0].",
+    "ProjectileManager.SpawnProjectileType is invoked directly rather than through the broadcast action. The broadcast path (WantToFireTargeting -> m_fireTargeting -> DoFireTargeting) is the replication the design names, but it returns void, so nothing could be registered for redirect/destroy/bounce and the host could not answer for what it fired. The fire therefore goes through the same spawn entry the broadcast receiver uses, on the host only, and the native method bodies that would prove the two paths converge are not present in the interop assembly.",
+    "Whether a non-host that received the broadcast also spawns its own copy is not observable from the interop assembly; if it does, a host-side redirect is a host-side write to a replica's own component. This is on the in-game confirmation list together with evidence.md section 6 item 3.",
+    "ProjectileBase.m_ricochetAngleThreshold's native unit. The interop exposes a field accessor only, so this slice writes the number unchanged and declares the port's unit as deg in the contract; an in-game probe should confirm whether the native value is radians.",
+    "ProjectileTargeting.Speed is writable and is what the native movement reads each frame; mapping the ruled shape's speed input onto it would change one shot's flight speed, but only if the native movement multiplies by it every frame rather than caching a derived value. Not implemented without that evidence."
+  ]
+}

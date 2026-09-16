@@ -86,7 +86,7 @@ public sealed partial class RuntimeKernel
         => logLevels = new RuntimeLogLevels(Identity.Id,
             logGates.OrderBy(x => x.Key, StringComparer.Ordinal).Select(x => new RuntimeLogProviderLevel(x.Key, x.Value.Level)).ToArray(), tier);
 
-    // ---- Kernel record points (§3.2 event code and reason code tables). ------------------------------------------
+    // ---- Kernel record points (the event code and reason code tables). ------------------------------------------
     // Every point below is one gate comparison while disabled: the level of a code is fixed by the table, so a site never
     // inspects a status to decide whether to look. The record is a readonly struct handed to the sink by `in`, and no site
     // concatenates a string — the writer composes the message off the simulation thread.

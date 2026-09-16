@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "task": "nl-gap remote source of e-w-melee: forge.trigger.combat.melee_hit observed on the host from the replicated melee damage",
+  "verification": "interop-metadata + static-native-method-body-decoding-only",
+  "gameExecuted": false,
+  "profileWritten": false,
+  "repositoriesModifiedForEvidence": false,
+  "assembly": {
+    "file": "GameAssembly.dll",
+    "path": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
+    "length": 57070592
+  },
+  "dump": {
+    "file": "dump.cs",
+    "path": "ForgeWeapon\\.artifacts\\w1-identity-20260912T143531174833Z\\native-map\\dump.cs",
+    "length": 27985238
+  },
+  "patchTarget": {
+    "declaringType": "Gear.Dam_EnemyDamageBase : Dam_SyncedDamageBase",
+    "member": "protected override void ReceiveMeleeDamage(pFullDamageData data)",
+    "rva": "0x138076D (the body's own entry; ForgeEnemy's evidence/e10-damage-window.json records the same member)",
+    "dumpLine": 544356,
+    "patchForm": "[HarmonyPatch(typeof(Dam_EnemyDamageBase), \"ReceiveMeleeDamage\")] — the member is `protected`, so the patch names it as a string; ForgeMap's player-side hook patches the same member name on Dam_PlayerDamageBase the same way",
+    "forgeEnemyOverlap": "ForgeEnemy patches Dam_EnemyDamageBase.ProcessReceivedDamage (the shared accept path its own damage facts read) and does NOT patch ReceiveMeleeDamage, so this row's hook is the only patch on this member — checked before the hook was written, as ruling 103 requires"
+  },
+  "packet": {
+    "type": "Gear.pFullDamageData",
+    "dumpLine": 545719,
+    "fields": {
+      "source": "Agents.pAgent (+0x8) — a packed replicator handle with `bool TryGet(out Agent)` (Agents.pAgent, dumpLine 680479)",
+      "damage": "UFloat16 (+0xA) — packed, and its decode scale belongs to the receiver's own body, so this half never decodes it",
+      "limbID": "byte (+0x15)",
+      "gearCategoryId": "uint (+0x18)",
+      "staggerMulti/precisionMulti/backstabberMulti/sleeperMulti": "UFloat16 — multipliers, not this row's ports"
+    },
+    "missing": "the packet carries no charge state, so the row's `charged` port stays absent on this source"
+  },
+  "ports": {
+    "source": "the packet's pAgent resolved through TryGet(out Agent) and TryCast<PlayerAgent>(), then the same player-reference lookup the other sources use (EquipmentNativeAdapter.OwnerOf)",
+    "target": "the receiver's own Owner (EnemyAgent) resolved through the kernel's enemy kind",
+    "limb": "the packet's limbID",
+    "damage": "the receiver's Health before and after the body ran: the damage that really landed. A hit the receiver's rules reduced to nothing, a rejected hit and a kill all read as the health difference the body produced, and a difference of zero or less publishes nothing",
+    "charged": "absent — the packet has no charge state"
+  },
+  "dedupe": {
+    "rule": "MeleeHitLedger.PublishesRemote(attackerIsLocal, attackerIsBot) is false for this machine's own player and for a bot, because those swings are published by the hit entry that performed them (MeleeWeaponFirstPerson.DoAttackDamage / MeleeWeaponThirdPerson.DoAttackDamage); the receive half publishes only a remote player's swing",
+    "whyTheyOverlap": "the machine that swings sends the damage to itself as well (Dam_EnemyDamageBase.MeleeDamage goes through SendPacket + SendLocally, per ForgeEnemy/VALIDATION.md), so on the host a local swing reaches both this receiver and the first-person hit entry",
+    "secondHalf": "MeleeHitLedger.TryClaim(source, target, limb, tick, world) is checked and claimed by both halves, so one landed hit is published once even if a packet is delivered twice; a claim is live for MeleeHitLedger.WindowTicks (8) ticks and never outlives its world epoch",
+    "test": "ForgeWeapon/tests/WeaponFacts/MeleeDedupeTests.cs (6 cases) drives the ledger and the ownership rule without a game"
+  },
+  "hooks": {
+    "prefix": "reads the receiver's Health before the body runs and the packet's source and limb; a receiver whose health cannot be read is not remembered, so the postfix has nothing to pair",
+    "postfix": "reads Health again, computes the landed damage, resolves the attacker and the enemy life and publishes through WeaponMeleeHitFacts.RemoteHit",
+    "reentrancy": "one pending slot keyed by the receiver's pointer; a postfix whose receiver does not match the pending prefix publishes nothing",
+    "guards": "both halves run inside WeaponNativeSession.Guard, so a hook that fires with no session, on the wrong thread or after a fault does nothing; every native read is inside its own try/catch and no exception can leave a patch"
+  },
+  "testCoverage": {
+    "project": "ForgeWeapon/tests/WeaponFacts",
+    "cases": ["one hit is claimed once inside the window", "a different limb, target or attacker is a different hit",
+      "a claim never outlives its world", "a hit without a nameable attacker or target is never claimed",
+      "the receive half publishes only a remote player's swing", "the ledger keeps a bounded number of claims"],
+    "note": "the hook bodies themselves are only compiled by the native build (the mirror project); the focused cases cover the rule the two sources share"
+  },
+  "unverified": [
+    "no game process ran: whether a client's melee swing really arrives at the host as ReceiveMeleeDamage, and whether it arrives once per hit, was not observed",
+    "whether the health readback brackets the whole applied damage for a hit that destroys a limb in the same body was not observed; the row publishes the difference either way and never a decoded packet value",
+    "whether SendLocally reaches ReceiveMeleeDamage on the swinging machine in every melee family (the first-person body, the third-person bot strike and the shove) was inferred from ForgeEnemy's decode of the damage entries, not observed"
+  ]
+}

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <AssemblyName>DevelopmentExperiments</AssemblyName>
+    <RootNamespace>ForgeDevelopment.Tests.Experiments</RootNamespace>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="ValidateGTFOBepInExPath" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(GTFOBepInExPath)' == '' or !Exists('$(GTFOBepInExPath)\interop\Modules-ASM.dll')"
+           Text="Set GTFO_BEPINEX_PATH or pass /p:GTFOBepInExPath=... with the profile BepInEx directory." />
+  </Target>
+  <ItemGroup>
+    <!-- The parser, the converter and the engine are compiled from the plugin sources, so the suite
+         exercises the shipped code and not a copy of it. The recorder and the driver are replaced by
+         doubles: this project never loads the game. -->
+    <Compile Include="../../Native/ExperimentModel.cs" Link="ExperimentModel.cs" />
+    <Compile Include="../../Native/ExperimentPath.cs" Link="ExperimentPath.cs" />
+    <Compile Include="../../Native/ExperimentParser.cs" Link="ExperimentParser.cs" />
+    <Compile Include="../../Native/ExperimentTargetSpec.cs" Link="ExperimentTargetSpec.cs" />
+    <Compile Include="../../Native/ExperimentConvert.cs" Link="ExperimentConvert.cs" />
+    <Compile Include="../../Native/ExperimentValue.cs" Link="ExperimentValue.cs" />
+    <Compile Include="../../Native/ExperimentEnvironment.cs" Link="ExperimentEnvironment.cs" />
+    <Compile Include="../../Native/ExperimentEngine.cs" Link="ExperimentEngine.cs" />
+    <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <Reference Include="GameData-ASM" HintPath="$(GTFOBepInExPath)/interop/GameData-ASM.dll" />
+    <Reference Include="Modules-ASM" HintPath="$(GTFOBepInExPath)/interop/Modules-ASM.dll" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.PhysicsModule.dll" />
+  </ItemGroup>
+</Project>

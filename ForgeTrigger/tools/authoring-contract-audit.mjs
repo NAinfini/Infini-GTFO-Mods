@@ -27,9 +27,14 @@ export function auditAuthoringContracts(logic, canonical, check, graphApi) {
         } else {
             check(definition.parameters.support === 'authoring-contract-only', 'authoring-only contract stays unregistered: ' + definition.id);
         }
+        // `unavailable` is authoring copy: it tells the editor why a row is withheld and which rows could
+        // stand in for it, and no runtime contract carries it — a capability row the SDK registers holds
+        // exactly id, owner, kind, label, version, parameters and graph. The row handed to the SDK is
+        // therefore the row the runtime would really register; every field both sides own stays compared.
+        const {unavailable, ...registerable} = definition;
         cases.push({id:definition.id, version:definition.version, shared,
             accepted:true, expectedCode:null,
-            seed:{providers:[provider], capabilities:[definition], bindings:[]}});
+            seed:{providers:[provider], capabilities:[registerable], bindings:[]}});
     }
     return graphMetadataVectors({schemaVersion:1, kind:'actual-authoring-registration-audit', gameVerified:false, cases}, graphApi, check);
 }

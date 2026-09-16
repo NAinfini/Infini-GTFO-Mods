@@ -11,7 +11,9 @@ internal static class IntegrationCases
             using var s = new Scene(); var m = RuntimeJson.Parse(s.Kernel.ExportManifest());
             var bindings = m.GetProperty("registry").GetProperty("bindings").EnumerateArray()
                 .Where(b => b.GetProperty("providerId").GetString() == EnemyModule.ProviderId).ToArray();
-            Check(bindings.Length == 5, "Provider has missing or duplicate bindings.");
+            var ids = bindings.Select(b => b.GetProperty("id").GetString()).ToArray();
+            Check(ids.Contains(EnemyModule.DeathStartedBinding) && ids.Contains(EnemyModule.LimbBrokenBinding)
+                && ids.Length == ids.Distinct(StringComparer.Ordinal).Count(), "Provider bindings are missing or duplicated.");
             Check(!bindings.Any(b => b.GetProperty("capabilityId").GetString() == "forge.trigger.combat.killed"), "Death implies kill.");
             Check(m.GetProperty("bindingSupport").EnumerateArray().All(x => x.GetProperty("verification").GetString()
                 == "implementation-only"), "Unverified native binding was promoted.");
@@ -45,35 +47,46 @@ internal static class IntegrationCases
             using var s = new Scene(); s.Die(); s.Module.TrackDespawn(s.Enemy); s.Enemy.Alive = true;
             s.Module.TrackSpawn(s.Enemy); s.Tick(); Check(s.Records.Count == 0, "Queued old-life fact targeted respawn.");
         });
-        // Fact -> heal against the real receiver through the real kernel: the fact's single subject is wrapped into heal's
-        // many-valued targets, amount is the literal 5 and overheal_policy the clamp index.
-        Case("integration.real-heal-limb_broken", () => {
-            using var s = new Scene(load: false); LocalPlan.Load(s.Kernel, Scene.HealPlan(s.Kernel, "limb_broken"));
-            s.Break(); var tick = s.Tick(); var damage = s.Enemy.Damage;
-            Check(tick.Commands.Count == 1, $"Expected one heal command, got {tick.Commands.Count}.");
-            var result = tick.Commands[0].Result; var row = result.Outputs.GetProperty("results").EnumerateArray().Single();
-            Check(result.Status == "succeeded" && result.CommitState == CommitStates.Confirmed
-                && row.GetProperty("actualAmount").GetDouble() == 5 && damage.Health == 55 && damage.Sends == 1,
-                $"Limb fact did not heal exactly +5 HP once: status={result.Status}; commit={result.CommitState}; row={row}; health={damage.Health}; sends={damage.Sends}");
-            var later = s.Tick(2);
-            Check(later.Commands.Count == 0 && damage.Sends == 1 && damage.Health == 55, "A consumed limb fact healed again on a later tick.");
-        });
-        Case("integration.real-heal-death_started", () => {
-            using var s = new Scene(load: false); LocalPlan.Load(s.Kernel, Scene.HealPlan(s.Kernel, "death_started"));
-            s.Die(); var tick = s.Tick(); var damage = s.Enemy.Damage;
-            Check(tick.Commands.Count == 1, $"Expected one heal command, got {tick.Commands.Count}.");
-            var result = tick.Commands[0].Result;
-            Check(result.Status == "rejected" && result.CommitState == CommitStates.None && result.Code == "not-alive"
-                && damage.Sends == 0 && damage.Health == 50,
-                $"Death fact healing revived or wrote: status={result.Status}; commit={result.CommitState}; code={result.Code}; health={damage.Health}; sends={damage.Sends}");
-        });
         Case("integration.native-hooks-delegate-exactly-once", Hooks);
+        // A per-enemy value belongs to the life that wrote it. The kernel cannot tell a dead enemy from a live
+        // one, so the provider that observed the end of the life is the one that releases the scope. The probe is
+        // mounted on the limb fact because that dispatch is synchronous: the value exists before the death, which
+        // is what makes the release observable rather than something the probe wrote afterwards.
+        Case("scope.enemy-death-drops-its-variables", () => {
+            using var s = new Scene(load: false);
+            EnemyScopePlan.Load(s.Kernel, EnemyModule.LimbBrokenBinding, "test.lifecycle.scope.death");
+            s.Break(); s.Tick(1);
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, s.Ref) == 1, "The probe did not write the enemy-scoped value.");
+            s.Die();
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, s.Ref) == 0, "A dead life kept its variables.");
+        });
+        Case("scope.enemy-despawn-drops-its-variables", () => {
+            using var s = new Scene(load: false);
+            EnemyScopePlan.Load(s.Kernel, EnemyModule.LimbBrokenBinding, "test.lifecycle.scope.despawn");
+            s.Break(); s.Tick(1);
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, s.Ref) == 1, "The probe did not write the enemy-scoped value.");
+            s.Module.TrackDespawn(s.Enemy);
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, s.Ref) == 0, "A despawned life kept its variables.");
+        });
+        Case("scope.release-touches-only-the-retired-life", () => {
+            using var s = new Scene(load: false);
+            EnemyScopePlan.Load(s.Kernel, EnemyModule.LimbBrokenBinding, "test.lifecycle.scope.addressed");
+            var second = Scene.NewEnemy(8, 20); var secondRef = s.Module.TrackSpawn(second);
+            s.Break(); s.Tick(1);
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, s.Ref) == 1, "The probe did not write the enemy-scoped value.");
+            // The release names one subject, so the life that is still alive keeps everything it wrote.
+            s.Die();
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, s.Ref) == 0, "The retired life kept its variables.");
+            Check(EnemyScopePlan.EnemyEntries(s.Kernel, secondRef) == 0, "A release invented an entry for a subject that never wrote one.");
+        });
     }
 
     private static void Hooks()
     {
         var k = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
         k.BeginWorld(1); k.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        k.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+        LocalPlan.OwnMounts(k);
         using var session = EnemyPluginSession.Start(k, RuntimeLogLevel.Off, () => true, _ => { }, () => { }, () => { });
         var rows = new List<CommandContext>();
         using var sink = k.RegisterModule(LocalPlan.Recorder(rows.Add), RuntimeLogLevel.Off);

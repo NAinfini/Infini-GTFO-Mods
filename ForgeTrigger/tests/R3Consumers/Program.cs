@@ -17,8 +17,11 @@ void Group(string name, Action action)
 Group("actors", () => R3ConsumerTests.Run(Check));
 Group("spatial", () => SpatialTests.Run(args[1], Check));
 Group("observers", () => ObserverContractTests.Run(Check));
-Group("recipient-filter", () => RecipientFilterTests.Run(args[2], Check));
+Group("observed-query", () => ObservedQueryTests.Run(Check));
+Group("observed-filter", () => ObservedFilterTests.Run(args[2], Check));
+Group("observed-space", () => ObservedSpaceTests.Run(Check));
 Group("weighted-composition", () => WeightedCompositionTests.Run(Check));
+Group("registry", () => RegistryTests.Run(Check, args[0]));
 var result = new { status = failures.Count == 0 ? "passed" : "failed", scope = "public-r3-consumer-integration",
     gameVerified = false, assertions, failures };
 File.WriteAllText(args[0], JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);

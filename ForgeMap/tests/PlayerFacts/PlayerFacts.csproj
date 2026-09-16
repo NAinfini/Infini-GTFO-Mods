@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production sources are compiled against, so
+         CS0436 fires on every mention of a shadowed type. Which definition wins is decided by the `Compile` list
+         below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The in-tree Framework build output, or an already built `ForgeRuntime.Framework.dll` for the window in
+         which the in-tree sources do not compile. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+  </Target>
+  <ItemGroup>
+    <!-- The production sources under test: the three contract files, the two observation halves, the value rows
+         and the three write actions. No GTFO assembly is referenced and no hook is installed; the game types are
+         the doubles in GameDoubles.cs, declared with the interop's own member shapes. -->
+    <Compile Include="../../PlayerStateContract.cs;../../PlayerEventContract.cs;../../PlayerCommandContract.cs" />
+    <Compile Include="../../Native/PlayerStateFacts.cs;../../Native/PlayerEventFacts.cs;../../Native/PlayerValueReads.cs;../../Native/PlayerCommandActions.cs;../../Native/PlayerHealthReceiver.cs" />
+    <Compile Include="AssemblyAttributes.cs;GameDoubles.cs;PlayerFactsWorld.cs;PlayerFactsTests.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

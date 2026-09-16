@@ -1,7 +1,9 @@
 using ForgeRuntime.Framework;
 
 ContractTests.Run();
+ObjectEntityResolutionTests.Run();
 InstanceResolutionTests.Run();
+SnapshotFieldTests.Run();
 if (args.Length == 2 && args[0] == "--wire") WireCases.Run(args[1]);
 if (args.Contains("--probe-registration")) RegistrationProbe.Run();
 Console.WriteLine($"Entity contracts: {Check.Passed} passed; {Check.Failed} failed. No native APIs exercised.");

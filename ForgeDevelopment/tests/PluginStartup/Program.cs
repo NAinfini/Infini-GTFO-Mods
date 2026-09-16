@@ -1,8 +1,10 @@
 using ForgeRuntime;
 using DevelopmentSettings = ForgeDevelopment.Native.Settings;
 
-string[] order = { "settings:bind", "settings:authoring", "diagnostics:init", "harmony:new", "hook:type:GenerationHook", "hook:patch",
-    "component:add:AuthoringMonitor", "component:add:PerformanceMonitor", "log:loaded" };
+string[] order = { "settings:bind", "settings:authoring", "settings:recorder", "diagnostics:init", "recorder:start",
+    "harmony:new", "hook:type:GenerationHook", "hook:patch",
+    "component:add:AuthoringMonitor", "capture:start", "component:add:ExperimentRunner", "component:add:ExperimentPanel",
+    "experiment:load", "component:add:PerformanceMonitor", "log:loaded" };
 
 foreach (var mode in new[] { RuntimeMode.Off, RuntimeMode.Play })
     Probe.Case(mode + " host mode keeps Development inactive", () => {
@@ -22,7 +24,9 @@ Probe.Case("Authoring starts exactly one collector set", () => {
 Probe.Case("performance logging opt-out skips only the performance collector", () => {
     DevelopmentSettings.PerformanceLogging.Value = false;
     var p = Probe.Plugin(RuntimeMode.Authoring); p.Load();
-    Probe.That(Probe.Components.Count == 1 && Probe.Components[0] is ForgeDevelopment.Native.AuthoringMonitor, "performance opt-out changed authoring collection");
+    Probe.That(Probe.Components.Count == 3 && Probe.Components[0] is ForgeDevelopment.Native.AuthoringMonitor
+        && Probe.Components.All(c => c is not ForgeDevelopment.Native.PerformanceMonitor), "performance opt-out changed authoring collection");
+    Probe.That(Probe.Calls.Contains("capture:start") && Probe.Calls.Contains("experiment:load"), "performance opt-out skipped the capture or the experiments");
     Probe.That(Probe.Calls.Contains("diagnostics:init") && Probe.Calls.Contains("hook:patch"), "authoring diagnostics skipped");
 });
 Probe.Case("successful Load cannot be repeated", () => {
@@ -64,6 +68,7 @@ Probe.Case("unwritable exception Data preserves the startup exception", () => {
     Probe.That(ReferenceEquals(Probe.LoadError(p), original), "error evidence attachment replaced original exception");
     Probe.That(Probe.Calls.Contains("diagnostics:stop"), "cleanup skipped with unwritable Data");
 });
+LoaderModes.Run(order);
 Console.WriteLine($"Development plugin bootstrap: {Probe.Checks} assertions passed; {Probe.Failures} scenarios failed.");
 Console.WriteLine("Production Development Plugin.cs with managed host/BepInEx/Unity/Harmony doubles; no game injection.");
 Environment.ExitCode = Probe.Failures == 0 ? 0 : 1;

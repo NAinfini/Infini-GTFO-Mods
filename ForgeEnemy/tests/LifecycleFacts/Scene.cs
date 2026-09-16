@@ -17,6 +17,9 @@ internal sealed class Scene : IDisposable
     internal Scene(bool load = true, bool start = true)
     {
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+        Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+        RegisterVariables(Kernel);
+        LocalPlan.OwnMounts(Kernel);
         Module = new(Kernel, RuntimeLogLevel.Off, () => Allowed, Messages.Add);
         Sink = Kernel.RegisterModule(LocalPlan.Recorder(c => { Records.Add(c); OnRecord?.Invoke(c); }), RuntimeLogLevel.Off);
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);
@@ -35,10 +38,6 @@ internal sealed class Scene : IDisposable
     internal static LocalPlan.Plan FactPlan(RuntimeKernel kernel, string suffix) => suffix == "death_started"
         ? LocalPlan.Build(kernel, "test.lifecycle.death_started", EnemyModule.DeathStartedBinding, LocalPlan.RecordBinding, ("enemy", "target"))
         : LocalPlan.Build(kernel, "test.lifecycle.limb_broken", EnemyModule.LimbBrokenBinding, LocalPlan.RecordBinding, ("target", "target"), ("limb", "limb_id"));
-    /// <summary>Fact -> real heal plan: the fact's subject is the wrapped target and the source.</summary>
-    internal static LocalPlan.Plan HealPlan(RuntimeKernel kernel, string suffix) => suffix == "death_started"
-        ? LocalPlan.Heal(kernel, "test.lifecycle.heal.death_started", EnemyModule.DeathStartedBinding, "enemy")
-        : LocalPlan.Heal(kernel, "test.lifecycle.heal.limb_broken", EnemyModule.LimbBrokenBinding, "target");
     internal void Load(string suffix, RuntimeLimits? budget = null)
     {
         var plan = FactPlan(Kernel, suffix);
@@ -56,4 +55,13 @@ internal sealed class Scene : IDisposable
     }
     internal TickResult Tick(long tick = 1) => Kernel.Advance(tick, true);
     public void Dispose() { Sink.Dispose(); Module.Dispose(); Kernel.StopRuntime(); }
+
+    /// <summary>The runtime's own variable family, stood up the way the host stands it up.
+    ///
+    /// The write capability a variable step pins belongs to a built-in provider, not to a domain package: its
+    /// factory and the built-in registration entry point are both internal to the SDK assembly, and a kernel
+    /// without it refuses a plan that writes a variable with `capability-unavailable` before the write ever
+    /// happens. Every other contract this suite needs is a public `Module()`; these two are reached directly
+    /// because this test assembly is named in the SDK's `InternalsVisibleTo`.</summary>
+    private static void RegisterVariables(RuntimeKernel kernel) => kernel.RegisterBuiltinModule(VariableContracts.Module());
 }

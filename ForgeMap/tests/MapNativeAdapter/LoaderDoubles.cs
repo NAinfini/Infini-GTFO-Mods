@@ -1,5 +1,11 @@
 namespace BepInEx
 {
+    /// <summary>The one install-root path the trigger-zone loader names when its caller supplies none.</summary>
+    public static class Paths
+    {
+        public static string BepInExRootPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "forge-map-noplugins");
+    }
+
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class BepInPlugin : Attribute { public BepInPlugin(string id, string name, string version) { } }
     [AttributeUsage(AttributeTargets.Class)]
@@ -38,17 +44,32 @@ namespace BepInEx.Unity.IL2CPP
     public sealed class TestLog
     {
         public bool ThrowInfo;
+        /// <summary>Throws on the one info line that carries this text, so a case can fail the load at a chosen
+        /// point of it instead of at whichever line happens to log first. Null means no line is singled out.</summary>
+        public string? ThrowOn;
         public readonly List<string> Infos = new(), Warnings = new(), Errors = new();
-        public void LogInfo(object message) { if (ThrowInfo) throw new IOException("fixture logger failure"); Infos.Add((string)message); }
+        public void LogInfo(object message)
+        {
+            if (ThrowInfo || (ThrowOn is { } text && ((string)message).Contains(text, StringComparison.Ordinal)))
+                throw new IOException("fixture logger failure");
+            Infos.Add((string)message);
+        }
         public void LogWarning(object message) => Warnings.Add((string)message);
         public void LogError(object message) => Errors.Add((string)message);
     }
 }
 namespace HarmonyLib
 {
-    [AttributeUsage(AttributeTargets.Class)]
-    public sealed class HarmonyPatch : Attribute { public HarmonyPatch(Type type, string name) { } }
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+    public sealed class HarmonyPatch : Attribute
+    {
+        public HarmonyPatch(Type type, string name) { }
+        /// <summary>The three-argument form several hooks use: the patched member plus the parameter types the
+        /// overload is bound by.</summary>
+        public HarmonyPatch(Type type, string name, Type[] argumentTypes) { }
+    }
     [AttributeUsage(AttributeTargets.Method)] public sealed class HarmonyPostfix : Attribute { }
+    [AttributeUsage(AttributeTargets.Method)] public sealed class HarmonyPrefix : Attribute { }
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class HarmonyPriority : Attribute { public HarmonyPriority(int priority) { } }
     public static class Priority { public const int First = 800, Last = 0; }

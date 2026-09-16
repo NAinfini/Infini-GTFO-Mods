@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -21,6 +20,58 @@ public sealed record NavMeshArea(int Index, string Name);
 public sealed record EnemyGroundNavigation(int AgentTypeId, double AgentRadius, double AgentHeight, uint WalkableAreaMask, bool AutoTraverseOffMeshLink);
 
 public sealed record EnemySizeRange(double Min, double Max);
+
+/// <summary>
+/// One enabled EnemyDataBlock row. Raw values only: the source reads them, the derivation below
+/// interprets them. Base prefabs are referenced by path so the prefab facts stay a separate row type.
+/// </summary>
+public sealed record EnemySpawnRow(
+    uint Id,
+    string Name,
+    uint MovementDataId,
+    uint BalancingDataId,
+    IReadOnlyList<string> BasePrefabPaths,
+    IReadOnlyList<EnemySizeRange> ModelSizeRanges,
+    IReadOnlyList<uint> ArenaDimensions);
+
+/// <summary>One enabled EnemyMovementDataBlock row.</summary>
+public sealed record EnemyMovementRow(uint Id, int LocomotionPathMove, bool AllowClimbDownLadders);
+
+/// <summary>One enabled EnemyBalancingDataBlock row.</summary>
+public sealed record EnemyBalancingRow(uint Id, double EnemyCollisionRadius, bool CanBePushed);
+
+/// <summary>
+/// One base prefab, reduced to the two facts the requirement table uses. A prefab without a
+/// NavMeshAgent has <see cref="NavMeshAgent"/> null, exactly like the offline evidence records it.
+/// </summary>
+public sealed record EnemyBasePrefabRow(string Path, EnemyGroundNavigation? NavMeshAgent, bool AirGraphAgent);
+
+/// <summary>
+/// Every typed row the derivation reads, whatever produced them: the pinned offline evidence in
+/// tests, the loaded DataBlocks and prefabs in the running game. Deliberately not JSON.
+/// </summary>
+public sealed record EnemySpawnInputs(
+    IReadOnlyList<NavMeshAgentType> AgentTypes,
+    IReadOnlyList<NavMeshArea> Areas,
+    IReadOnlyList<EnemySpawnRow> Enemies,
+    IReadOnlyList<EnemyMovementRow> MovementBlocks,
+    IReadOnlyList<EnemyBalancingRow> BalancingBlocks,
+    IReadOnlyList<EnemyBasePrefabRow> BasePrefabs);
+
+/// <summary>
+/// Where a written contract came from: the game build it describes and the SHA-256 of the exact
+/// bytes it was derived from (the pinned evidence file). Provenance is not part of the table
+/// itself, so a runtime table built from loaded DataBlocks carries none.
+/// </summary>
+public sealed record EnemySpawnRequirementProvenance(string GameBuild, string EvidenceSha256)
+{
+    internal void Validate()
+    {
+        if (GameBuild.Length == 0 || !GameBuild.All(c => c is >= '0' and <= '9')) throw new InvalidDataException("Game build must be a Steam build id.");
+        if (EvidenceSha256.Length != 64 || !EvidenceSha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
+            throw new InvalidDataException("Evidence hash must be lowercase SHA-256.");
+    }
+}
 
 /// <summary>
 /// Map-facing spawn requirement for one EnemyDataBlock. It is plain data: no native object, no
@@ -62,17 +113,15 @@ public sealed class EnemySpawnRequirementCatalog
 
     private readonly Dictionary<uint, EnemySpawnRequirement> _byId;
 
-    private EnemySpawnRequirementCatalog(string gameBuild, string evidenceSha256, IReadOnlyList<NavMeshAgentType> agentTypes,
+    private EnemySpawnRequirementCatalog(IReadOnlyList<NavMeshAgentType> agentTypes,
         IReadOnlyList<NavMeshArea> areas, IReadOnlyList<EnemySpawnRequirement> requirements)
     {
-        GameBuild = gameBuild; EvidenceSha256 = evidenceSha256; AgentTypes = agentTypes; Areas = areas; Requirements = requirements;
+        AgentTypes = agentTypes; Areas = areas; Requirements = requirements;
         _byId = new Dictionary<uint, EnemySpawnRequirement>();
         Validate();
         foreach (var requirement in requirements) _byId.Add(requirement.EnemyDataBlockId, requirement);
     }
 
-    public string GameBuild { get; }
-    public string EvidenceSha256 { get; }
     public IReadOnlyList<NavMeshAgentType> AgentTypes { get; }
     public IReadOnlyList<NavMeshArea> Areas { get; }
     public IReadOnlyList<EnemySpawnRequirement> Requirements { get; }
@@ -81,79 +130,73 @@ public sealed class EnemySpawnRequirementCatalog
     public EnemySpawnRequirement Get(uint enemyDataBlockId) =>
         _byId.TryGetValue(enemyDataBlockId, out var requirement)
             ? requirement
-            : throw new KeyNotFoundException("No spawn requirement for EnemyDataBlock " + enemyDataBlockId.ToString(CultureInfo.InvariantCulture) + ".");
+            : throw new KeyNotFoundException("No spawn requirement for EnemyDataBlock "
+                + enemyDataBlockId.ToString(CultureInfo.InvariantCulture)
+                + ": the running game did not load that row, or its internalEnabled is false, or the id does not exist.");
 
-    /// <summary>Interprets hash-pinned spawn-space evidence (tests/SpawnSpaceEvidence) exactly once.</summary>
-    public static EnemySpawnRequirementCatalog FromEvidence(byte[] evidenceUtf8)
+    /// <summary>
+    /// Single derivation: interprets typed rows into the requirement table. The same entry serves the
+    /// offline evidence in tests and the DataBlocks loaded at runtime, so the two cannot drift.
+    /// A row referencing a movement or balancing block, or a base prefab, that the inputs do not
+    /// carry is an error: nothing is guessed and no default body size is substituted.
+    /// </summary>
+    public static EnemySpawnRequirementCatalog Build(EnemySpawnInputs inputs)
     {
-        if (evidenceUtf8 == null) throw new ArgumentNullException(nameof(evidenceUtf8));
-        using var document = JsonDocument.Parse(evidenceUtf8);
-        var root = document.RootElement;
-        if (Int(root, "schemaVersion") != 1 || Str(root, "kind") != "gtfo-enemy-spawn-space-evidence" || Bool(root, "gameExecuted"))
-            throw new InvalidDataException("Unsupported spawn-space evidence.");
-        var agentTypes = Array(root, "navMeshAgentTypes").Select(a => new NavMeshAgentType(Int(a, "agentTypeId"),
-            Num(a, "radius"), Num(a, "height"), Num(a, "maxSlope"), Num(a, "stepHeight"))).ToArray();
-        var areas = Array(root, "navMeshAreas").Select(a => new NavMeshArea(Int(a, "index"), Str(a, "name"))).ToArray();
-        var bases = Array(root, "basePrefabs").ToDictionary(b => Str(b, "path"), StringComparer.Ordinal);
-        var movement = Array(root, "movementBlocks").ToDictionary(b => UInt(b, "id"));
-        var balancing = Array(root, "balancingBlocks").ToDictionary(b => UInt(b, "id"));
+        if (inputs == null) throw new ArgumentNullException(nameof(inputs));
+        var bases = Unique(inputs.BasePrefabs, prefab => prefab.Path, "base prefab");
+        var movement = Unique(inputs.MovementBlocks, block => block.Id, "movement");
+        var balancing = Unique(inputs.BalancingBlocks, block => block.Id, "balancing");
         var requirements = new List<EnemySpawnRequirement>();
-        foreach (var enemy in Array(root, "enemies"))
+        foreach (var enemy in inputs.Enemies)
         {
-            uint id = UInt(enemy, "id");
-            if (!Bool(enemy, "internalEnabled")) throw new InvalidDataException("Disabled EnemyDataBlock " + id + " in pinned evidence.");
-            var prefabs = Array(enemy, "basePrefabs").Select(p => bases.TryGetValue(p.GetString() ?? "", out var b) ? b
-                : throw new InvalidDataException("EnemyDataBlock " + id + " references an unextracted base prefab.")).ToArray();
-            var agents = prefabs.Select(p => p.GetProperty("navMeshAgent")).Where(a => a.ValueKind != JsonValueKind.Null).ToArray();
-            bool airGraph = prefabs.Any(p => Bool(p, "airGraphAgent"));
+            string label = "EnemyDataBlock " + enemy.Id.ToString(CultureInfo.InvariantCulture) + " ";
+            var prefabs = enemy.BasePrefabPaths.Select(path => bases.TryGetValue(path, out var prefab) ? prefab
+                : throw new InvalidDataException(label + "references base prefab " + path + ", which the source does not provide.")).ToArray();
+            var agents = prefabs.Where(p => p.NavMeshAgent != null).Select(p => p.NavMeshAgent!).ToArray();
+            bool airGraph = prefabs.Any(p => p.AirGraphAgent);
 
             var kind = EnemyMovementKind.Unresolved; string? reason; bool? ladder = null; EnemyGroundNavigation? ground = null;
-            uint movementId = UInt(enemy, "movementDataId");
-            if (movementId == 0) reason = "movement-datablock-absent";
+            if (enemy.MovementDataId == 0) reason = "movement-datablock-absent";
             else
             {
-                var block = Block(movement, movementId, "movement", id);
-                ladder = Bool(block, "allowClimbDownLadders");
-                int pathMove = Int(block, "locomotionPathMove");
+                var block = Row(movement, enemy.MovementDataId, "movement", label);
+                ladder = block.AllowClimbDownLadders;
+                int pathMove = block.LocomotionPathMove;
                 if (pathMove == PathMove && agents.Length == 1 && !airGraph)
                 {
-                    kind = EnemyMovementKind.Ground; reason = null;
-                    var a = agents[0];
-                    ground = new EnemyGroundNavigation(Int(a, "agentTypeId"), Num(a, "radius"), Num(a, "height"),
-                        checked((uint)a.GetProperty("walkableMask").GetInt64()), Bool(a, "autoTraverseOffMeshLink"));
+                    kind = EnemyMovementKind.Ground; reason = null; ground = agents[0];
                 }
                 else if (pathMove == PathMoveFlyer && agents.Length == 0 && airGraph) { kind = EnemyMovementKind.Flying; reason = null; }
                 else reason = pathMove is PathMove or PathMoveFlyer ? "locomotion-navigation-conflict" : "locomotion-state-unmapped";
             }
 
             double? radius = null; bool? pushed = null;
-            uint balancingId = UInt(enemy, "balancingDataId");
-            if (balancingId != 0)
+            if (enemy.BalancingDataId != 0)
             {
-                var block = Block(balancing, balancingId, "balancing", id);
-                radius = Num(block, "enemyCollisionRadius"); pushed = Bool(block, "canBePushed");
+                var block = Row(balancing, enemy.BalancingDataId, "balancing", label);
+                radius = block.EnemyCollisionRadius; pushed = block.CanBePushed;
             }
-            var arenas = Array(enemy, "arenaDimensions").Select(d => d.GetUInt32()).ToArray();
+            var arenas = enemy.ArenaDimensions;
             var unverified = new SortedSet<string>(StringComparer.Ordinal)
                 { "base-prefab-resolution", "datablock-overrides", "size-multiplier-effect", "spawn-clearance" };
             if (radius != null) unverified.Add("collision-radius-semantics");
             if (kind == EnemyMovementKind.Ground) unverified.Add("runtime-navmesh-agent-profile");
             if (kind == EnemyMovementKind.Flying) unverified.Add("air-graph-clearance");
-            if (arenas.Length > 0) unverified.Add("arena-dimension-requirement");
-            requirements.Add(new EnemySpawnRequirement(id, Str(enemy, "name"), kind, reason, ground, ladder, radius, pushed,
-                Array(enemy, "sizeRanges").Select(r => new EnemySizeRange(Num(r, "min"), Num(r, "max"))).ToArray(),
-                arenas, unverified.ToArray()));
+            if (arenas.Count > 0) unverified.Add("arena-dimension-requirement");
+            requirements.Add(new EnemySpawnRequirement(enemy.Id, enemy.Name, kind, reason, ground, ladder, radius, pushed,
+                enemy.ModelSizeRanges, arenas, unverified.ToArray()));
         }
-        return new EnemySpawnRequirementCatalog(Str(root, "build"), Convert.ToHexString(SHA256.HashData(evidenceUtf8)).ToLowerInvariant(),
-            agentTypes, areas, requirements.OrderBy(r => r.EnemyDataBlockId).ToArray());
+        return new EnemySpawnRequirementCatalog(inputs.AgentTypes, inputs.Areas, requirements.OrderBy(r => r.EnemyDataBlockId).ToArray());
     }
 
     /// <summary>Strict reader for the Map-facing contract; unknown or missing fields are rejected.</summary>
-    public static EnemySpawnRequirementCatalog Parse(string json)
+    public static EnemySpawnRequirementCatalog Parse(string json, out EnemySpawnRequirementProvenance provenance)
     {
         using var document = JsonDocument.Parse(json ?? throw new ArgumentNullException(nameof(json)));
         var root = Exact(document.RootElement, "format", "version", "gameBuild", "evidenceSha256", "navMeshAgentTypes", "navMeshAreas", "requirements");
         if (Str(root, "format") != Format || Int(root, "version") != Version) throw new InvalidDataException("Unsupported spawn requirement contract.");
+        provenance = new EnemySpawnRequirementProvenance(Str(root, "gameBuild"), Str(root, "evidenceSha256"));
+        provenance.Validate();
         var agentTypes = Array(root, "navMeshAgentTypes").Select(a => Exact(a, "agentTypeId", "radius", "height", "maxSlope", "stepHeight"))
             .Select(a => new NavMeshAgentType(Int(a, "agentTypeId"), Num(a, "radius"), Num(a, "height"), Num(a, "maxSlope"), Num(a, "stepHeight"))).ToArray();
         var areas = Array(root, "navMeshAreas").Select(a => Exact(a, "index", "name")).Select(a => new NavMeshArea(Int(a, "index"), Str(a, "name"))).ToArray();
@@ -175,17 +218,19 @@ public sealed class EnemySpawnRequirementCatalog
                 Array(r, "arenaDimensions").Select(d => d.GetUInt32()).ToArray(),
                 Array(r, "unverified").Select(u => u.GetString() ?? throw new InvalidDataException("Unverified code must be text.")).ToArray());
         }).ToArray();
-        return new EnemySpawnRequirementCatalog(Str(root, "gameBuild"), Str(root, "evidenceSha256"), agentTypes, areas, requirements);
+        return new EnemySpawnRequirementCatalog(agentTypes, areas, requirements);
     }
 
-    public string ToJson()
+    public string ToJson(EnemySpawnRequirementProvenance provenance)
     {
+        if (provenance == null) throw new ArgumentNullException(nameof(provenance));
+        provenance.Validate();
         using var stream = new MemoryStream();
         using (var w = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
             w.WriteStartObject();
             w.WriteString("format", Format); w.WriteNumber("version", Version);
-            w.WriteString("gameBuild", GameBuild); w.WriteString("evidenceSha256", EvidenceSha256);
+            w.WriteString("gameBuild", provenance.GameBuild); w.WriteString("evidenceSha256", provenance.EvidenceSha256);
             w.WriteStartArray("navMeshAgentTypes");
             foreach (var a in AgentTypes)
             {
@@ -229,9 +274,6 @@ public sealed class EnemySpawnRequirementCatalog
 
     private void Validate()
     {
-        if (GameBuild.Length == 0 || !GameBuild.All(c => c is >= '0' and <= '9')) throw new InvalidDataException("Game build must be a Steam build id.");
-        if (EvidenceSha256.Length != 64 || !EvidenceSha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
-            throw new InvalidDataException("Evidence hash must be lowercase SHA-256.");
         if (AgentTypes.Count == 0 || AgentTypes.Select(a => a.AgentTypeId).Distinct().Count() != AgentTypes.Count
             || AgentTypes.Any(a => !Positive(a.Radius) || !Positive(a.Height)))
             throw new InvalidDataException("NavMesh agent types must be unique with positive dimensions.");
@@ -261,10 +303,21 @@ public sealed class EnemySpawnRequirementCatalog
         }
     }
 
+    private static Dictionary<TKey, T> Unique<T, TKey>(IReadOnlyList<T> rows, Func<T, TKey> key, string kind) where TKey : notnull
+    {
+        var byKey = new Dictionary<TKey, T>();
+        foreach (var row in rows)
+            if (!byKey.TryAdd(key(row), row))
+                throw new InvalidDataException("Duplicate " + kind + " row " + Convert.ToString(key(row), CultureInfo.InvariantCulture) + " in the spawn requirement source.");
+        return byKey;
+    }
+
+    private static T Row<T>(Dictionary<uint, T> rows, uint id, string kind, string label) =>
+        rows.TryGetValue(id, out var row) ? row
+            : throw new InvalidDataException(label + "references " + kind + " block " + id.ToString(CultureInfo.InvariantCulture)
+                + ", which the source does not provide as an enabled row.");
+
     private static bool Positive(double value) => double.IsFinite(value) && value > 0;
-    private static JsonElement Block(Dictionary<uint, JsonElement> blocks, uint id, string kind, uint enemy) =>
-        blocks.TryGetValue(id, out var block) && Bool(block, "internalEnabled") ? block
-            : throw new InvalidDataException("EnemyDataBlock " + enemy + " references missing or disabled " + kind + " block " + id + ".");
     private static EnemyGroundNavigation ReadGround(JsonElement g) => new(Int(g, "agentTypeId"), Num(g, "agentRadius"), Num(g, "agentHeight"),
         g.GetProperty("walkableAreaMask").GetUInt32(), Bool(g, "autoTraverseOffMeshLink"));
     private static JsonElement Exact(JsonElement element, params string[] names)

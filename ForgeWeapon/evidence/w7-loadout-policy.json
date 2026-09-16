@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameExecuted": false,
+  "gameBuild": "20403457",
+  "gameRevision": "34873",
+  "dump": {
+    "name": "gtfo-inspection/dumper/dump.cs",
+    "length": 27985238,
+    "sha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+    "sameDumpAs": ["w1-native-hooks.json", "w1-native-world-paths.json", "w4-combat-hooks.json", "w4-deployable-hooks.json", "w5-gear-block.json", "w6-gear-parts.json"],
+    "note": "Local read-only copy used for this audit. dump.cs records the short type name, the il2cpp RVA and the exact parameter list."
+  },
+  "interop": {
+    "used": [
+      {
+        "name": "Modules-ASM.dll",
+        "length": 16777728,
+        "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63",
+        "readWith": "Mono.Cecil metadata reading (member kinds, field offsets and enum constants only)"
+      },
+      {
+        "name": "GlobalFramework-ASM.dll",
+        "length": 9728,
+        "sha256": "09CD7603D135E4AEC9C5243FEEE1DEB1B540C6B06419D3F4E943CD020A50FD32",
+        "readWith": "Mono.Cecil metadata reading; holds Globals.Global, which carries the static rundown id the policy activates on"
+      }
+    ]
+  },
+  "nativeImage": {
+    "file": "GameAssembly.dll",
+    "length": 57070592,
+    "sha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55",
+    "sameImageAs": ["w1-native-hooks.json", "w1-native-world-paths.json", "w4-combat-hooks.json", "w4-deployable-hooks.json", "w5-gear-block.json", "w6-gear-parts.json"]
+  },
+  "question": "Can a package replace the equipment a player may choose from — and the equipment the game equips by itself — without writing the game's own data or the player's saved file?",
+  "answer": {
+    "hook": "Two hooks and no data write. `Gear.GearManager.GetAllGearForSlot` postfix at `HarmonyPriority.Last` projects the array the picker is built from, and `Gear.GearManager.OnGearLoadingDone` prefix at `HarmonyPriority.First` narrows the three pool lists in place before `RescanFavorites` reads them.",
+    "whyTwo": "`GetAllGearForSlot` is the only source of a slot's selectable gear, so the postfix covers every consumer of the list at once, but a gear the game equips by itself is named by the player's saved favorites file rather than chosen from that list: narrowing the pool before `RescanFavorites` runs is what makes a saved vanilla name match nothing and fall back to the same pool's first entry.",
+    "activation": "`Globals.Global.get_RundownIdToLoad()`. A policy file is only in force for the rundown it names.",
+    "discovery": "`BepInEx/plugins/<exactly one directory>/forge/loadout.json`, read once during plugin Load.",
+    "identity": "Either the record text `Gear.GearIDRange.get_PlayfabItemInstanceId` holds — `OfflineGear_ID_<canonical decimal>`, the same spelling the `gear-block` mount uses — or `Gear.GearIDRange.GetCompID(eGearComponent.Category)`, which the website writes a craftable gear's own block id into.",
+    "safety": "The projection is published only when every entry of that slot's policy was recognised in the game's own list. One entry the game does not carry, a slot the game has not built, or a read that throws is a whole-pool and whole-policy fallback: the game's own list is left exactly as it was built, and a fault latches the policy off until restart.",
+    "noWrite": "`SaveFavoritesData` and `RegisterGearInSlotAsEquipped` are never called, no data block is touched, and the favorites file is left for the game to write itself."
+  },
+  "method": [
+    "Read-only static analysis. No assembly is loaded into the CLR, no game process is started, nothing is written to a profile or to the game directory.",
+    "Method bodies were disassembled from the same `GameAssembly.dll` this file hashes (Iced x64, `il2cpp` section), and every RVA below comes from that image; `rvaSharing` counts duplicate method entries in the local `dump.cs`, where 1 is unique.",
+    "Interop member kinds, field offsets and enum constants were read from the interop assemblies listed above with Mono.Cecil.",
+    "The native read set below is pinned by `native.exact-game-reads` in `tests/NativeLayout`, so a new native member this package reads fails that audit until it is reviewed here."
+  ],
+  "hooks": [
+    {
+      "hook": "GearOffersForSlot",
+      "type": "Gear.GearManager",
+      "name": "GetAllGearForSlot",
+      "signature": "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1<Gear.GearIDRange> Gear.GearManager::GetAllGearForSlot(Player.InventorySlot)",
+      "isVirtual": false,
+      "rva": "0x132FF50",
+      "rvaSharing": 1,
+      "body": "`GearManager.Current` → `[Current+0x30]` (= `m_gearPerSlot`) → array length check at `+0x18` → `[arr+slot*8+0x20]` where `slot` is the enum's own value (1/2/3) → `List<GearIDRange>.ToArray()`.",
+      "dispatch": { "kind": "Postfix", "priority": "Last", "patchedResult": "Il2CppReferenceArray<Gear.GearIDRange>" },
+      "callers": [
+        "CellMenu.CM_PlayerLobbyBar::UpdateWeaponWindowInfo (0x160A6F9) — the lobby's slot picker",
+        "CellMenu.CM_PlayerInventory::UpdateInventoryFlow (0x1601A16) — the in-level inventory flow"
+      ],
+      "readback": "the array the projection replaces, item by item, in the game's own order"
+    },
+    {
+      "hook": "GearPoolLoading",
+      "type": "Gear.GearManager",
+      "name": "OnGearLoadingDone",
+      "signature": "System.Void Gear.GearManager::OnGearLoadingDone()",
+      "isVirtual": false,
+      "rva": "0x13305E0",
+      "rvaSharing": 1,
+      "body": "First statement is `RescanFavorites()`; then one icon task per gear; then, for each member of `InventorySlot` in reverse, `m_lastEquippedGearPerSlot` (`+0x40`), else `m_favoriteGearPerSlot` (`+0x38`)[0], else `m_gearPerSlot` (`+0x30`)[0] → `PlayerBackpackManager::EquipLocalGear`.",
+      "dispatch": { "kind": "Prefix", "priority": "First" },
+      "callers": [
+        "Gear.GearManager::LoadOfflineGearDatas (0x1330250), which ends with `jmp OnGearLoadingDone`",
+        "Gear.GearManager::ParsePlayerPlayfabInventory (0x1331730), which calls it after the account inventory is stashed"
+      ],
+      "readback": "the three pool lists the narrowing rewrites in place, before `RescanFavorites` reads them"
+    }
+  ],
+  "pool": {
+    "field": "Gear.GearManager::m_gearPerSlot",
+    "offset": "0x30",
+    "shape": "Il2CppReferenceArray<Il2CppSystem.Collections.Generic.List<Gear.GearIDRange>>, indexed by `Player.InventorySlot`'s own value; the covered slots are GearStandard 1, GearSpecial 2 and GearClass 3.",
+    "neighbours": { "m_favoriteGearPerSlot": "0x38", "m_lastEquippedGearPerSlot": "0x40", "m_offlineSetupDone": "0x6A" },
+    "write": {
+      "members": ["Il2CppSystem.Collections.Generic.List<Gear.GearIDRange>::Clear", "Il2CppSystem.Collections.Generic.List<Gear.GearIDRange>::Add"],
+      "rule": "This package writes exactly one thing in the game: the contents of the three covered lists of this pool, one item at a time, through `Clear` and `Add` on the list instances the game itself built. The list instances and the array that holds them are never replaced, so every other holder of them sees the same contents.",
+      "restore": "The contents each slot had when this session first narrowed it are kept, and a rundown no policy is in force for — or a fault — puts them back in the same order."
+    },
+    "secondReader": "Gear.GearManager::TryGetGearFromCategory (0x1333F50) reads the same pool, which is what makes the lobby's predefined-gear path (`GS_Lobby::EquipPredefinedGearForSlot`, 0x1435DB0) fail to find a category that is no longer offered."
+  },
+  "readSet": {
+    "note": "Readers only. The layout audit pins this list exactly, so a new native read fails the build until it is reviewed here.",
+    "members": [
+      "Gear.GearIDRange::GetCompID",
+      "Gear.GearIDRange::get_PlayfabItemInstanceId",
+      "Gear.GearManager::GetAllGearForSlot",
+      "Gear.GearManager::OnGearLoadingDone",
+      "Gear.GearManager::get_m_gearPerSlot",
+      "Globals.Global::get_RundownIdToLoad",
+      "Player.GameStateManager::get_IsInExpedition"
+    ]
+  },
+  "gates": {
+    "notInExpedition": "`GameStateManager.get_IsInExpedition()` gates the projection only: no gear can be chosen inside a level, so filtering there has no benefit and would hide a gear the player is already carrying from the in-level inventory flow. The pool is built once before any level is entered, so the loading hook is not gated on it.",
+    "coveredSlots": "`Player.InventorySlot` 1/2/3 only. GearMelee, HackingTool, ResourcePack and every other slot are answered with the game's own list untouched.",
+    "hostOff": "Plugin.Load returns before any registration or native work when the host is configured Off, so with ForgeRuntime Off this package neither reads a policy file nor installs either hook.",
+    "unload": "Plugin.Unload returns false, so the hooks are never removed in-process; a policy file is read once and changing it needs a restart."
+  },
+  "authority": {
+    "perClient": "The pool is per-client local state built from the local data blocks and the local account inventory, and a gear choice is made locally (`CM_InventorySlotItem::PickWeapon` → `PlayerBackpackManager::EquipLocalGear`) before the synced copy is replicated. There is no host-side rejection path, so the filter is what each client applies to itself and no host validation is faked.",
+    "pins": "The policy's own pins — the game assembly digest, the pinned plugins and the pinned files — are read once and can only refuse the policy file that names them. They report a mismatched install; they cannot stop another machine from choosing."
+  },
+  "limits": [
+    "No claim about runtime behaviour: nothing here was executed. The two hook targets are pinned by RVA and signature, and the call edges above are literal call sites, not proof that this body ran in a game.",
+    "Whether the live pool is filled by `LoadOfflineGearDatas` (offline rows, instance text `OfflineGear_ID_<n>`) or by `ParsePlayerPlayfabInventory` (account instances), and whether the two ever both run in one process, cannot be decided statically. The projection therefore accepts either identity and refuses the whole slot when a policy entry is not recognised in the game's own list.",
+    "The saved favorites file on this machine stores `OfflineGear_ID_34` for `LastEquipped_Standard` and `OfflineGear_ID_31` for `LastEquipped_Special`, which is why the fallback a narrowed pool causes is a real path and not a theoretical one; the file itself is never written by this package.",
+    "`packetSha256` is carried by a policy for diagnostics only. It is a digest of the website's 54-slot canonical packet, and the native `pGearIDRange` has 20 component slots, so the game side cannot recompute it without a second copy of the website's encoder."
+  ]
+}

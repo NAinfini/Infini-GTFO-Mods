@@ -1,0 +1,59 @@
+{
+  "topic": "q-zone: which zone an entity stands in",
+  "package": "forge.module.gtfo.map",
+  "gameBuild": "20403457",
+  "method": "ilspycmd 11.0.0.9375 (already installed at %TEMP%\\codex-ilspy) against the QA profile's interop assemblies (%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop\\Modules-ASM.dll). No game was started; no profile was written.",
+  "findings": [
+    {
+      "kind": "member",
+      "type": "Agents.Agent",
+      "member": "public unsafe virtual AIG_CourseNode CourseNode { get; set; }",
+      "wrapper": "Il2CppInterop property; the getter is a virtual il2cpp_runtime_invoke and returns null when the native pointer is zero.",
+      "why": "The player agent and the enemy agent both derive from Agents.Agent, so one member answers 'which course node is this agent on' for both kinds."
+    },
+    {
+      "kind": "member",
+      "type": "AIGraph.AIG_CourseNode",
+      "member": "public unsafe LG_Zone m_zone { get; set; }",
+      "wrapper": "Il2CppInterop field accessor; null when the node is not placed in a zone.",
+      "why": "The course node's own zone is the level's answer to 'where is this node'; the responder reads it and nothing else."
+    },
+    {
+      "kind": "member",
+      "type": "LevelGeneration.LG_Zone",
+      "member": "public unsafe eDimensionIndex m_dimensionIndex; public unsafe LG_Layer m_layer; public unsafe eLocalZoneIndex LocalIndex;",
+      "wrapper": "Il2CppInterop field accessors.",
+      "why": "These three are exactly the coordinates ForgeMap's ZoneIndex already turns into a map-object address (ForgeMap/Native/ZoneIndex.cs, ZoneIndex.Coordinates): dimension, layer type and the zone's index inside the layer. Reusing them keeps one spelling of a zone, so a zone read by an entity and a zone a plan names are comparable."
+    },
+    {
+      "kind": "member",
+      "type": "LevelGeneration.LG_Layer",
+      "member": "public unsafe eLayerType m_type;",
+      "wrapper": "Il2CppInterop field accessor.",
+      "why": "The middle coordinate; read through the zone's own m_layer, as ZoneIndex does."
+    },
+    {
+      "kind": "member",
+      "type": "LevelGeneration.LG_Zone",
+      "member": "public unsafe List<AIG_CourseNode> m_courseNodes; public unsafe LG_NavInfo NavInfo;",
+      "wrapper": "Il2CppInterop field accessors.",
+      "why": "Not read by the responder: a zone's members are read from each entity's own course node instead, so a level with an unbuilt node list still answers for the entities that have one. Recorded here so the choice is explicit."
+    }
+  ],
+  "derived": [
+    {
+      "fact": "the zone of an entity",
+      "derivation": "agent.CourseNode.m_zone -> ZoneIndex.Coordinates -> (dimension, layer, zone), formatted by RuntimeZones.Id as `gtfo.zone:<dimension>:<layer>:<zone>`",
+      "refusal": "A null CourseNode, a null m_zone, a zone whose coordinates do not read, or an entity the module does not currently track answers null, which the kernel reports as entity-zone-unknown. It is never answered as 'outside every zone'."
+    }
+  ],
+  "notVerifiedInGame": [
+    "That a player's CourseNode is non-null for the whole time it stands in a zone (the hook that attaches the player half is the player spawn readback, which the player identity module already exercises at runtime).",
+    "That an enemy's CourseNode is set on the host for every tracked life (the enemy module tracks the agent from its spawn hook; the read is on the same instance it already resolves).",
+    "The exact coordinates of a real QA level's zones; the evidence above is type-level and the two coordinate readers are the ones ZoneIndex already uses for door and terminal addresses."
+  ],
+  "evidenceSources": {
+    "decompiled": "AIGraph.AIG_CourseNode.decompiled.cs (lines 326, 341, 356), Agents.Agent.decompiled.cs (line 774), LevelGeneration.LG_Zone.decompiled.cs (lines 385, 400, 557, 645, 874)",
+    "existingProductionReader": "ForgeMap/Native/ZoneIndex.cs (Coordinates, lines 184-190)"
+  }
+}

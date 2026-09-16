@@ -16,11 +16,13 @@ const logic = logicPrimitiveSeed();
 const registrations = [], resolutions = [];
 const seedFor = definition => ({providers: [logic.providers.find(p => p.id === definition.owner)],
     capabilities: [definition], bindings: []});
-function registration(name, definition, accepted) {
+/** One vector row. `base` is the definition a negative row mutates: the harness judges such a row against it, so a
+ *  mutation of a shape this runtime does not register is counted as uncovered instead of proving the mutation. */
+function registration(name, definition, accepted, base) {
     const seed = seedFor(definition);
     if (accepted) new ForgeRegistry(seed);
     else assert.throws(() => new ForgeRegistry(seed), undefined, name);
-    registrations.push({name, accepted, seed});
+    registrations.push({name, accepted, seed, baseSeed: base ? seedFor(base) : null});
 }
 for (const definition of logic.capabilities) {
     validateGraphMetadata(definition.graph, definition.id);
@@ -80,7 +82,7 @@ const mutations = {
 };
 for (const [name, change] of Object.entries(mutations)) {
     const definition = structuredClone(base); change(definition.graph);
-    registration('invalid:' + name, definition, false);
+    registration('invalid:' + name, definition, false, base);
 }
 const grouped = variable.find(d => d.graph.portGroups);
 if (grouped) {
@@ -95,7 +97,7 @@ if (grouped) {
     };
     for (const [name, change] of Object.entries(groupMutations)) {
         const definition = structuredClone(grouped); change(definition.graph);
-        registration('invalid:' + name, definition, false);
+        registration('invalid:' + name, definition, false, grouped);
     }
 }
 // Result-port reason codes (GraphPort.codes): heal already declares a valid, non-empty set,
@@ -112,7 +114,7 @@ const codesMutations = {
 };
 for (const [name, change] of Object.entries(codesMutations)) {
     const definition = structuredClone(heal); change(definition.graph);
-    registration('invalid:' + name, definition, false);
+    registration('invalid:' + name, definition, false, heal);
 }
 {
     const spec = count(base.graph);
@@ -127,8 +129,10 @@ for (const [name, change] of Object.entries(codesMutations)) {
     }
 }
 const {compileForgeRuntimePlan, validateForgeRuntimePlan} = await load('runtime-compiler');
-const {forgeRuntimeApiVersion} = await load('runtime-contracts');
+const {forgeRuntimeApiVersion, forgeRuntimeLimits} = await load('runtime-contracts');
 const provider = {id:'test.graphports', kind:'extension', version:'1.0.0', dependencies:[]};
+/** The one mount reference the vector plans carry; the harness owner answers exactly this level. */
+const mountReference = 'graph-port-expansion';
 const make = (name, kind, graph) => ({id:provider.id+'.'+name, owner:provider.id,
     kind, label:name, version:'1.0.0', parameters:{}, graph});
 const start = make('start', 'trigger', {domains:['logic'], execution:'host', inputs:[],
@@ -137,7 +141,9 @@ const start = make('start', 'trigger', {domains:['logic'], execution:'host', inp
 // shares its side with a result output: a port group, not a whole-side variadic.
 const action = make('action', 'action', {domains:['logic'], execution:'host',
     inputs:[{id:'in',type:'execution'},{id:'target',type:'entity'}],
-    outputs:[{id:'value_1',type:'number'},{id:'value_2',type:'number'},{id:'result',type:'result',schema:'test.graphports.result'}],
+    outputs:[{id:'value_1',type:'number'},{id:'value_2',type:'number'},{id:'result',type:'result',schema:'test.graphports.result',
+        fields:[{id:'target',type:'entity'},{id:'status',type:'enum',schema:'execution_outcome'},
+            {id:'committed',type:'enum',schema:'commit_state'},{id:'code',type:'string'}]}],
     parameters:[{id:'output_count',type:'integer',role:'structural',required:false,minimum:2,maximum:32}],
     recipients:{input:'target',target:'entity',cardinality:'one',requires:[],result:'result'}});
 const binding = (name, capability, role) => ({id:provider.id+'.binding.'+name,
@@ -148,8 +154,7 @@ const fixedSeed = {providers:[provider], capabilities:[start,action],
 const variableSeed = structuredClone(fixedSeed);
 variableSeed.capabilities[1].graph.portGroups = [{id:'values',side:'outputs',parameter:'output_count',
     minimum:2,maximum:32,slots:[{id:'value',type:'number'}]}];
-const limits = {maxEntrypoints:32,maxStepsPerEntrypoint:128,maxTotalSteps:512,
-    maxEventsPerTick:128,maxCommandsPerTick:512,maxQueuedEvents:1024,maxCausalDepth:16};
+const limits = {...forgeRuntimeLimits};
 const manifestFor = registry => ({schemaVersion:1,runtime:{id:'forge.runtime',version:'1.2.0',
     apiVersion:forgeRuntimeApiVersion,gameBuild:'synthetic-no-game'},registry,limits,
     bindingSupport:registry.bindings.map(b=>({bindingId:b.id,verification:'implementation-only',requiredPermissions:[]}))});
@@ -159,8 +164,11 @@ const graph = {schemaVersion:1,domain:'logic',authority:'host',entrypoints:['Sta
         {id:'Action',capabilityId:action.id,capabilityVersion:'1.0.0',bindingId:fixedSeed.bindings[1].id,parameters:{output_count:3}}],
     edges:[{from:{node:'Start',port:'out'},to:{node:'Action',port:'in'}},
         {from:{node:'Start',port:'target'},to:{node:'Action',port:'target'}}]};
+// A plan carries its mount targets, and a kind is only loadable while the provider that owns it has registered its
+// matcher, so the vector's plan mounts the one level the harness owner answers.
 const options = {planId:'graph-port-expansion',resource:{id:'test.resource',revision:'1'},
-    limits:{maxEventsPerTick:16,maxCommandsPerTick:16,maxQueuedEvents:32,maxCausalDepth:8}};
+    limits:{maxEventsPerTick:16,maxCommandsPerTick:16,maxQueuedEvents:32,maxCausalDepth:8},
+    attachments:[{kind:'level',reference:mountReference}]};
 const fixedPlan = compileForgeRuntimePlan(graph,fixedManifest,options).plan;
 validateForgeRuntimePlan(fixedPlan,fixedManifest);
 const variablePlan = compileForgeRuntimePlan(graph,variableManifest,options).plan;

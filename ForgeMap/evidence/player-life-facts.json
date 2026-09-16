@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "family": "player-life",
+  "slice": "s-player",
+  "verification": "metadata-and-interop-signatures-only",
+  "gameVerified": false,
+  "buildId": "20403457",
+  "evidenceSource": "%TEMP%\\covtrigb\\ilspy (Modules-ASM.dll interop, build 20403457) and ForgeMap/evidence/player-observation.json",
+  "capabilities": [
+    {
+      "id": "forge.trigger.player.downed",
+      "status": "implemented",
+      "hooks": ["PLOC_Downed.Enter() (virtual, public wrapper)", "PLOC_Downed.SyncEnter() (virtual, public wrapper)"],
+      "publishRule": "One fact per downed episode. Both enter bodies are hooked because the host runs one and a synced peer runs the other; the transition is judged from PlayerLocomotion.m_currentStateEnum == PLOC_State.Downed read back through the identity, so the second body is not a second fact.",
+      "ports": { "player": "EntityReference of the downed life (required)", "source": "JSON null: the game reports no downs source. PlayerAgent.m_attackers is a list of everyone who ever hit the player, so it is not a cause and is not published as one." }
+    },
+    {
+      "id": "forge.trigger.player.revive_started",
+      "status": "implemented",
+      "hooks": ["Interact_Revive.OnInteractorStateChanged(PlayerAgent sourceAgent, bool state) with state == true"],
+      "publishRule": "The interaction's own state callback opens one rescue; the argument is the rescuer and the instance's own PLOC_Base.m_owner is the downed player. Published once per rescue.",
+      "ports": { "player": "the downed life (required)", "rescuer": "the interacting player (required; a rescue whose actor this process tracks no life for publishes nothing and reports once)" }
+    },
+    {
+      "id": "forge.trigger.player.revive_cancelled",
+      "status": "implemented",
+      "hooks": ["Interact_Revive.OnInteractorStateChanged(PlayerAgent sourceAgent, bool state) with state == false"],
+      "publishRule": "The same callback closing a rescue that was published as started and whose revive has not run. reason is `left`. The game raises no dedicated abort callback on this interop surface: OnInteractionEvaluationAbort is a UnityEvent field, not a patchable method.",
+      "ports": { "player": "the downed life (required)", "rescuer": "the player who stopped, or JSON null when the actor is not identifiable", "reason": "left" }
+    },
+    {
+      "id": "forge.trigger.player.revived",
+      "status": "implemented",
+      "hooks": ["PLOC_Downed.OnPlayerRevived(pSetHealthData)"],
+      "publishRule": "The revive the downed state itself ran, which is the one native signal that separates a revive from the dead transition; the argument carries the restored health data. Published once per downed episode.",
+      "ports": { "player": "the revived life (required)", "rescuer": "ReviveInteraction.Agent read back through the identity, or JSON null when the interaction names nobody" }
+    },
+    {
+      "id": "forge.trigger.player.died",
+      "status": "implemented",
+      "hooks": ["Agents.Agent.Alive setter (virtual wrapper; PlayerAgent overrides it)"],
+      "publishRule": "The write that ends a life. The hook reads the value the native body was handed and confirms it through the identity's own Alive read, so a write to an agent this provider does not track publishes nothing.",
+      "ports": { "player": "the dead life (required)", "source": "JSON null: no native read names the kill that ended a life. The attacker list is not a cause." },
+      "unverified": ["whether any native path writes PlayerAgent.m_alive directly, which would bypass the setter"]
+    },
+    {
+      "id": "forge.trigger.player.teleported",
+      "status": "implemented",
+      "hooks": ["PlayerAgent.WarpTo(Vector3, Quaternion, pPlayerLocationData)"],
+      "publishRule": "WarpTo is the call that moves a player and carries the destination. from is the position this half read for the life (recorded at the first transition it saw for that life), to is the finite position the argument names. A life whose position was never read, or an argument that names no finite position, publishes nothing rather than an invented end of the move.",
+      "ports": { "from": "vector3 in metres", "to": "vector3 in metres" },
+      "unverified": ["whether every teleport path goes through this method (TeleportTo writes the position directly and is not hooked)"]
+    },
+    {
+      "id": "forge.trigger.player.respawned",
+      "status": "implemented",
+      "definedAs": "A player the replication path (re)created. The game has one spawn path for a level's first landing and for a checkpoint reload; there is no separate respawn entry, so this fact is defined as exactly that and is not distinguished from the first landing.",
+      "hooks": ["PlayerReplicationManager.OnSpawn(pPlayerSpawnData, PlayerReplicator)"],
+      "publishRule": "The identity records the level's lives first, the replication data's snetPlayer names which life it is, and the position is the one the game handed the spawn (pPlayerSpawnData.locationData), because the agent the spawn creates may not exist yet at that point in the native call.",
+      "ports": { "player": "the life (required)", "position": "vector3 in metres" },
+      "unverified": ["whether the agent is already in PlayerAgentsInLevel when OnSpawn returns, which decides whether the fact needs a later readback"]
+    }
+  ],
+  "sharedRules": {
+    "authority": "Only the host publishes; RuntimeKernel.ResolveEntityInstance and the identity's own CanObserve gate every read (SNet.IsMaster plus runtime readiness).",
+    "identity": "gtfo.player:<n>, the Map provider's existing life namespace (ForgeMap/Native/PlayerIdentityModule). No new entity kind is registered.",
+    "dedup": "Event id = gtfo.player.<fact>:<world epoch>:<life id>:<per-life transition>; the kernel's replay ledger answers a repeated transition with duplicate.",
+    "privacy": "No account key appears in any id, log or payload; ids carry the module's per-world player number."
+  },
+  "limits": [
+    "No native invocation, no game execution and no multiplayer were exercised; every hook is read from the interop assembly's own public wrapper.",
+    "Whether each hook's body runs on the simulation thread the module requires is not verified; the module rejects a wrong-thread call the way every other Map readback does.",
+    "The focused test project builds and runs without the game, but the plan-mount dispatch path is only covered by the Map package's own observation suite."
+  ]
+}

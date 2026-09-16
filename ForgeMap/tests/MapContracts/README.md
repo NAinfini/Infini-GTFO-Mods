@@ -9,12 +9,11 @@
 `ForgeMap.csproj` 排除 `tests/**/*.cs`，测试同时验证替身没有进入正式 Map 程序集。
 没有加载游戏 DLL、Harmony/BepInEx 插件或游戏 API；成功不提高 binding 验证等级。
 
-从模组仓库根运行，构建输出隔离在 Map 自己的忽略目录：
+从模组仓库根运行 xUnit 工程，构建输出隔离在 Map 自己的忽略目录：
 
 ```powershell
 $artifacts = Join-Path (Resolve-Path ForgeMap) 'bin/map1-artifacts'
-dotnet build ForgeMap/tests/MapContracts/MapContracts.csproj -c Release --artifacts-path $artifacts
-dotnet "$artifacts/bin/MapContracts/release/MapContracts.dll"
+dotnet test ForgeMap/tests/MapContracts/MapContracts.csproj -c Release --artifacts-path $artifacts --filter "Category!=Native"
 ```
 
 公共 SDK 有并发未完成改动时，完整构建应真实失败；不能引用旧 DLL 来伪装当前构建通过。

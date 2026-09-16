@@ -3,38 +3,19 @@ using System.Text.Json;
 using ForgeRuntime.Framework;
 using ForgeTrigger.Pure;
 
+/// <summary>The collection algebra the selector rows are built on, exercised directly. The cross-language vectors
+/// that used to drive this file came from the website's selector preview; that preview is gone with the selector
+/// rows' move to the `query` tier, so the pending cross-language half belongs to the batch that owns those rows and
+/// this file keeps the C#-side coverage instead of reading a fixture nothing produces.</summary>
 internal static class CollectionTests
 {
-    internal static void Run(string path, Action<bool, string> check)
+    internal static void Run(Action<bool, string> check)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(path));
-        var root = document.RootElement;
-        check(root.GetProperty("kind").GetString() == "test-only-collection-vectors", "collection fixture provenance");
-        check(!root.GetProperty("gameVerified").GetBoolean(), "collections are not game evidence");
-        check(root.GetProperty("canonicalIds").GetArrayLength() == 8, "eight existing collection semantics");
         void Reject(string name, string code, Action action)
         {
             try { action(); check(false, name + " unexpectedly accepted"); }
             catch (RuntimeContractException e) { check(e.Code == code, name + ": " + e.Code + " expected " + code); }
             catch (Exception e) { check(false, name + ": unexpected " + e.GetType().Name); }
-        }
-        foreach (var row in root.GetProperty("cases").EnumerateArray())
-        {
-            var name = row.GetProperty("id").GetString()!;
-            if (row.GetProperty("outcome").GetString() == "rejected")
-            {
-                Reject(name, row.GetProperty("expectedCode").GetString()!, () => Evaluate(row));
-                continue;
-            }
-            try
-            {
-                var actual = Evaluate(row); var expected = row.GetProperty("expected");
-                bool Equal(object value) => value is bool flag ? flag == expected.GetBoolean()
-                    : ((IEnumerable<EntityReference>)value).SequenceEqual(expected.EnumerateArray().Select(RuntimeJson.Entity));
-                check(Equal(actual), "collection shared value " + name);
-                check(Equal(Evaluate(row)), "collection repeated evaluation " + name);
-            }
-            catch (Exception e) { check(false, "collection value " + name + ": " + e.Message); }
         }
         var a = new EntityReference("test.entity:a", 1, 1);
         var b = new EntityReference("test.entity:b", 1, 1);
@@ -62,7 +43,6 @@ internal static class CollectionTests
         Reject("singleton validates seed", "pure-seed", () => ReferenceCollections.Random(new[] { a }, long.MaxValue, 1));
         Reject("invalid trailing reference", "invalid-integer", () => ReferenceCollections.Limit(new[] { a, b with { LifeEpoch = -1 } }, 1));
         Reject("duplicate input budget", "pure-collection-budget", () => ReferenceCollections.Distinct(Enumerable.Repeat(a, 4097).ToArray()));
-        Reject("unknown comparison", "pure-operation", () => ReferenceCollections.CountMatches(new[] { a }, (ScalarComparison)123, 0));
         var large = Enumerable.Range(0, 4096).Select(i => a with { Id = "test.entity:" + i }).ToArray();
         check(ReferenceCollections.Distinct(large).Count == 4096, "pure collection exact upper bound");
         Reject("union output budget", "pure-collection-output-budget", () => ReferenceCollections.Union(large, new[] { a }));
@@ -81,37 +61,5 @@ internal static class CollectionTests
             check(ReferenceCollections.Random(refs, seed, 2).Selected.SequenceEqual(permutation.Take(2)), "random is full permutation prefix " + seed);
             check(permutation.Distinct().Count() == refs.Length, "shuffle is without replacement " + seed);
         }
-    }
-    private static object Evaluate(JsonElement row)
-    {
-        var id = row.GetProperty("capabilityId").GetString()!;
-        var p = row.GetProperty("parameters"); var inputs = row.GetProperty("inputs");
-        EntityReference[] Refs(string name) => inputs.GetProperty(name).EnumerateArray().Select(RuntimeJson.Entity).ToArray();
-        int MaxTargets() => inputs.GetProperty("max_targets").GetInt32();
-        long Seed() => inputs.GetProperty("seed").GetInt64();
-        if (id.EndsWith(".count", StringComparison.Ordinal))
-            return ReferenceCollections.CountMatches(Refs("candidates"), inputs.GetProperty("operator").GetString() switch
-            {
-                "eq" => ScalarComparison.Equal, "ne" => ScalarComparison.NotEqual,
-                "lt" => ScalarComparison.Less, "lte" => ScalarComparison.LessOrEqual,
-                "gt" => ScalarComparison.Greater, "gte" => ScalarComparison.GreaterOrEqual,
-                _ => throw new InvalidOperationException("Unknown fixture comparison")
-            }, inputs.GetProperty("value").GetInt64());
-        var selected = id.Split('.')[^1] switch
-        {
-            "distinct" => ReferenceCollections.Distinct(Refs("candidates")),
-            "union" => ReferenceCollections.Union(Refs("a"), Refs("b")),
-            "intersection" => ReferenceCollections.Intersection(Refs("a"), Refs("b")),
-            "difference" => ReferenceCollections.Difference(Refs("a"), Refs("b")),
-            "limit" => ReferenceCollections.Limit(Refs("candidates"), MaxTargets()).Selected,
-            "shuffle" => ReferenceCollections.Shuffle(Refs("candidates"), Seed()),
-            "random" => ReferenceCollections.Random(Refs("candidates"), Seed(), MaxTargets()).Selected,
-            _ => throw new InvalidOperationException("Unknown collection fixture")
-        };
-        return ReferenceCollections.ApplyEmptyPolicy(selected, p.GetProperty("empty").GetString() switch
-        {
-            "emit-empty" => EmptySelectionPolicy.EmitEmpty, "skip" => EmptySelectionPolicy.Skip, "fail" => EmptySelectionPolicy.Fail,
-            _ => throw new InvalidOperationException("Unknown fixture empty policy")
-        });
     }
 }

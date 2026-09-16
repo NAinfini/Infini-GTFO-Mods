@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "evidenceFile": "ForgeEnemy/evidence/enemy-control-actions.json",
+  "area": "enemy-control-actions",
+  "buildId": "20403457",
+  "gameRevision": "34873",
+  "gameAssemblySha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55",
+  "gameExecuted": false,
+  "verification": "metadata-and-disassembly-static-native-call-sites",
+  "nativeRvaLock": {
+    "owner": null,
+    "note": "The three implemented rows submit members of the enemy's own state machines and AI (ES_HibernateWakeUp.ActivateState, EnemyBehaviour.ChangeState, EnemyAI.NavmeshAgentGoal). They are reached through the interop assembly by type and member name, so no test locks these RVAs; this file is the build-specific record of the members the actions write and the readback each commit is confirmed with."
+  },
+  "extraction": {
+    "tool": "Il2CppDumper dump.cs plus Iced 1.x x86-64 rel32 scan over .text and il2cpp, run offline from a scratch copy of ForgeEnemy/tests/NativeEvidence's extractor",
+    "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+    "imageBase": "0x180000000",
+    "callWindowBytes": 400,
+    "command": "Extract <GTFO game root> <dump.cs> <out.json> with the wanted type and hook lists in the file below",
+    "note": "The dump.cs used for the REVAs and call edges was produced by a previous NativeEvidence run against the same build and is carried at the QA profile's own build id; the interop assembly the plugin compiles against was re-decompiled in this task."
+  },
+  "interopConfirmation": {
+    "tool": "ilspycmd 11.0.0.9375",
+    "command": "%USERPROFILE%\\.dotnet\\tools\\ilspycmd.exe -t <type> -o <output> \"%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop\\Modules-ASM.dll\"",
+    "assembly": "QA profile BepInEx/interop/Modules-ASM.dll",
+    "assemblySha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63",
+    "assemblyHashFile": "565871abd714937729d0e74520563bec",
+    "typesConfirmed": [
+      "Enemies.EnemyBehaviour: m_currentStateName (EB_States, +0x99), ChangeState(EB_States). The interop wrapper exposes both as public members even though ChangeState is the game's own public member in dump.cs.",
+      "Enemies.EnemyLocomotion: m_agent (EnemyAgent), Hibernate (ES_Hibernate), HibernateWakeup (ES_HibernateWakeUp), CurrentStateEnum (ES_StateEnum), ChangeState(ES_StateEnum), ForceState(ES_Base), ForceNode(pCourseNode), get_LocallyOwned(), UpdateNetworkState()",
+      "Enemies.ES_HibernateWakeUp: ActivateState(Vector3 direction, float distance, float delay, bool isPropagatedWakeup), RecieveStateData(pES_HibernateWakeup), DoWakeup(bool turn, int index, float delay, bool isPropagatedWakeup), CommonUpdate(), DoHibernateWakeupPropagation(), Enter(), Exit()",
+      "Enemies.ES_Hibernate: Enter(), Exit(), CommonEnter(), MasterStartDetection(), MasterEndDetection(), Heartbeat(float, Vector3), RecieveStateData(pES_HibernateData)",
+      "Enemies.EnemyAI: m_enemyAgent (EnemyAgent, +0x30), m_locomotion (EnemyLocomotion, +0x40), m_behaviour (EnemyBehaviour, +0x48), m_detection (EnemyDetection, +0x58), NavmeshAgentGoal (Vector3), set_NavmeshAgentGoal, IsValidPath(float), set_Target(AgentTarget), SetDetectedAgent(Agent, AgentTargetDetectionType), InjectPropagatedTarget(Agent, AgentTargetPropagationType), SetTarget(Agent)",
+      "Agents.AgentAI: m_navMeshAgent (INavigation, +0x18), m_mode (AgentMode, +0x20), Mode (AgentMode), Target (AgentTarget), IsTargetValid (bool)",
+      "UnityEngine.AI.INavigation: speed, destination, SetDestination(Vector3), Warp(Vector3), ResetPath(), isOnNavMesh, isPathValid, remainingDistance, stoppingDistance. This is the interface EnemyAI.ProvideCurrentNavigationComponent returns.",
+      "Enemies.EnemyDetection: m_biggestDetectionBuildup (float, +0x50), m_biggestDetectionTarget (AgentTarget, +0x58)",
+      "Enemies.EnemySync: m_aiStatePacket (SNet_Packet<EnemySync.pEnemyStateData>), m_aiPathPacket (SNet_Packet<pEnemyPathData>), m_aiExtraBehaviourStatePacket (SNet_Packet<EnemySync.pExtraBehaviourStateData>), TryCollectCaptureData, UpdateStateData, ReplicateAIState, IncomingState, IncomingPath, IncomingExtraState"
+    ],
+    "note": "Every member above is present in the interop assembly the native plugin compiles against, with the visibility the wrapper exposes. The readback each action confirms its commit with is one of these members (m_currentStateName, CurrentStateEnum, NavmeshAgentGoal), never a value this package cached."
+  },
+  "hookMembers": [
+    {
+      "id": "ES_HibernateWakeUp.ActivateState",
+      "role": "awaken-write",
+      "type": "ES_HibernateWakeUp",
+      "name": "ActivateState",
+      "rawDeclaration": "void ActivateState(Vector3 direction, float distance, float delay, bool isPropagatedWakeup)",
+      "nativeRva": "0x17FCEE0",
+      "visibility": "public, non-virtual",
+      "observations": [
+        "3 callers, all hibernation detection paths of the same enemy: EB_Hibernating.UpdateDetection at 0x166CC65 and EB_Hibernating.OnNoiseDetected at 0x166C2BB and 0x166C124. It is what the game itself runs when something wakes an enemy.",
+        "the body loads the enemy transform's forward (Component.get_transform 0x17FCF32, Transform.get_forward 0x17FCF50), tests Vector3.Dot (0x17FCFA2) to decide whether the wake turns, and picks an animation index with EnemyLocomotion.GetRandomAnimIndex (0x17FD03C). Every one of those is a store into the state's own fields: m_isTurn, m_animationIndex, m_delayTime, m_isPropagatedWakeup",
+        "the state's four fields are declared as a replicated payload: pES_HibernateWakeup { byte animationIndex; bool isTurn; float delay; bool isPropagatedWakeup } is an Explicit-layout struct, and ES_HibernateWakeUp.RecieveStateData(pES_HibernateWakeup) is the client-side applier",
+        "the wake ends through ES_HibernateWakeUp.Exit, which calls EnemyBehaviour.ChangeState at 0x17FDAC3: leaving hibernation is a behaviour-machine transition, so the awakened fact and this action agree on what waking is"
+      ],
+      "usedBy": "ForgeEnemy/Native/EnemyControlActions.cs EnemyModule.Awaken"
+    },
+    {
+      "id": "EnemyBehaviour.ChangeState",
+      "role": "sleep-write",
+      "type": "EnemyBehaviour",
+      "name": "ChangeState",
+      "rawDeclaration": "void ChangeState(EB_States state)",
+      "nativeRva": "0x1567380",
+      "visibility": "public, non-virtual",
+      "observations": [
+        "writes m_currentStateName at +0x99 only when the incoming state differs (cmp [rdi+99h],bl; je), so a native write is always a transition and a no-op transition writes nothing",
+        "7 callers: EnemySync.IncomingState at 0x1580A6A (the replicated state a client applies), ES_DeadBase.Enter at 0x16DD49D, ES_Hitreact.DoHitReact at 0x16E2F73, ES_HitreactFlyer.DoHitReact at 0x16E18AC, EB_Patrolling_Investigate.UpdateBehaviour at 0x17F1C6B, ES_HibernateWakeUp.Exit at 0x17FDAC3, ES_ScoutScream.CommonUpdate at 0x1801D9A",
+        "EnemyBehaviour.UpdateState (0x1567EA0) calls EnemySync.ReplicateAIState at 0x1568038, which reaches UpdateStateData (0x15810F9) and TryCollectCaptureData (0x15813CB): the behaviour state the host writes is captured and replicated, and IncomingState is the client half of the same field"
+      ],
+      "usedBy": "ForgeEnemy/Native/EnemyControlActions.cs EnemyModule.Sleep"
+    },
+    {
+      "id": "EnemyAI.NavmeshAgentGoal",
+      "role": "move-to-write",
+      "type": "EnemyAI",
+      "name": "set_NavmeshAgentGoal",
+      "rawDeclaration": "void set_NavmeshAgentGoal(Vector3 value)",
+      "nativeRva": "0x155F110",
+      "visibility": "public, non-virtual; get_NavmeshAgentGoal at 0x155F040",
+      "observations": [
+        "the member every native move behaviour writes: EB_InCombat_MoveToTarget.UpdateBehaviour 0x17F0457, EB_InCombat_MoveToPoint.Enter 0x1671121, EB_InCombat_MoveToNextNode.Enter 0x1670547, _PathBlocked 0x1670602, _PathOpen 0x1670BF6, _DestroyDoor 0x166FE3E, EB_Patrolling.UpdateBehaviour 0x17F2570 and 0x17F25DC and 0x17F2744, EB_Patrolling_Investigate.Enter 0x17F184B and UpdateBehaviour 0x17F1B22, EB_FollowingGroup_MoveToNode.UpdateBehaviour 0x166B45A and 0x166B6C4 and 0x166BBA8, EB_Dash_Pouncer.UpdateBehaviour 0x166A97E, EB_InCombat_Pouncer_MoveToTarget.UpdateBehaviour 0x17F14B0 and 0x17F15A5, EB_InCombat_MoveToPoint_Flyer.Enter 0x1671275, EB_InCombatFlyer.FlyToTarget 0x166D926, EB_InCombatFlyer.UpdateBehaviour 0x166F088, EB_InCombatFlyer_FlyOutOfBoss.UpdateBehaviour 0x166D7B1, EB_InCombatFlyer_GeomorphTraversal.TryStartTraversal 0x166DC51, EB_PlayerHeld_Pouncer_Base.TryPeekCurrentEscapePosition 0x17F3432, EB_InCombat.TryOffsetGraphPosition 0x1672CBA, ES_ScoutDetection.Enter 0x16E9F16, SquidBossBehaviour.Move 0x15909E8 and CheckOutOfBounds 0x15903CC",
+        "EnemyAI.ProvideCurrentNavigationComponent (0x155D920, slot 14) returns the agent's INavigation, whose speed member is what a requested speed is written to; the interface declares speed get/set, destination get/set, SetDestination and Warp",
+        "the AI is simulated on the machine that owns the enemy: EnemyLocomotion.get_LocallyOwned is a virtual StateMachine member, and EnemyLocomotion.UpdateNetworkState (0x157BF00) is the path replication step; path data travels as pEnemyPathData { byte pathSteps; byte currentIndex; bool inPing; Vector3 p0..p3 }"
+      ],
+      "usedBy": "ForgeEnemy/Native/EnemyControlActions.cs EnemyModule.MoveTo"
+    },
+    {
+      "id": "ES_Hibernate.Enter",
+      "role": "sleep-locomotion-state",
+      "type": "ES_Hibernate",
+      "name": "Enter",
+      "rawDeclaration": "void Enter()",
+      "nativeRva": "0x17FE7F0",
+      "visibility": "public override of ES_Base.Enter",
+      "observations": [
+        "the body calls CommonEnter (0x17FE7FB), which sets the agent's position from the transform (EnemyAgent.set_Position 0x17FE138) and cross-fades the hibernation animation (Animator.CrossFadeInFixedTime 0x17FE1BD); the whole state object is the sleeper's presentation and detection",
+        "entering it is a locomotion transition: the state machine dispatches the entered state's Enter, and no rel32 edge into ES_Hibernate.Enter exists because the call is virtual",
+        "it is NOT the write the sleep row submits: the row's own member is EB_States.Hibernating on the behaviour machine, which is the state state_changed observes and EnemySync replicates. The locomotion state follows it."
+      ],
+      "usedBy": "evidence only: the sleep row keeps the behaviour machine as its one write, so a plan's result reports the state the row names"
+    },
+    {
+      "id": "EnemyLocomotion.UpdateNetworkState",
+      "role": "authority-of-the-simulating-machine",
+      "type": "EnemyLocomotion",
+      "name": "UpdateNetworkState",
+      "rawDeclaration": "void UpdateNetworkState()",
+      "nativeRva": "0x157BF00",
+      "observations": [
+        "the path replication step of the locomotion machine; it is driven by the machine that owns the enemy",
+        "EnemyLocomotion.get_LocallyOwned (0x157C120, slot 4) is the machine's own answer to whether this side simulates the enemy"
+      ],
+      "usedBy": "documents that the native AI runs on one machine and the other machines follow its replicated state; the Forge action is host-gated on top of that"
+    }
+  ],
+  "readFields": [
+    { "type": "EnemyBehaviour", "declaration": "EB_States m_currentStateName", "offset": "0x99", "note": "the awaken and sleep readback: the behaviour state the native write is confirmed against" },
+    { "type": "EnemyLocomotion", "declaration": "ES_StateEnum CurrentStateEnum", "offset": "0x? (property)", "note": "the awaken readback: ES_StateEnum.HibernateWakeUp (15) is the state the wake call enters" },
+    { "type": "EnemyLocomotion", "declaration": "ES_HibernateWakeUp HibernateWakeup", "offset": "0x100", "note": "the wake receiver this package submits through" },
+    { "type": "EnemyAI", "declaration": "Vector3 NavmeshAgentGoal", "offset": "0x? (property)", "note": "the move_to write and readback" },
+    { "type": "Agents.AgentAI", "declaration": "INavigation m_navMeshAgent", "offset": "0x18", "note": "the navigation interface a requested speed is written through" },
+    { "type": "Agents.AgentAI", "declaration": "AgentMode m_mode", "offset": "0x20", "note": "when_idle's idle check: AgentMode.Patrolling with no valid target and no detection build-up" },
+    { "type": "Enemies.EnemyDetection", "declaration": "float m_biggestDetectionBuildup", "offset": "0x50", "note": "when_idle's idle check; the same field alert_changed publishes" }
+  ],
+  "enumValues": [
+    { "type": "EB_States", "name": "Hibernating", "value": 0 },
+    { "type": "EB_States", "name": "Patrolling", "value": 1 },
+    { "type": "EB_States", "name": "Patrolling_Investigate", "value": 2 },
+    { "type": "EB_States", "name": "SquidBoss_Hibernating", "value": 12 },
+    { "type": "ES_StateEnum", "name": "Hibernate", "value": 14 },
+    { "type": "ES_StateEnum", "name": "HibernateWakeUp", "value": 15 },
+    { "type": "AgentMode", "name": "Off", "value": 0 },
+    { "type": "AgentMode", "name": "Agressive", "value": 1 },
+    { "type": "AgentMode", "name": "Patrolling", "value": 2 },
+    { "type": "AgentMode", "name": "Scout", "value": 3 },
+    { "type": "AgentMode", "name": "Hibernate", "value": 4 }
+  ],
+  "callEdges": [
+    { "site": "0x166CC65", "caller": "EB_Hibernating.UpdateDetection", "targetMethod": "ES_HibernateWakeUp.ActivateState" },
+    { "site": "0x166C2BB", "caller": "EB_Hibernating.OnNoiseDetected", "targetMethod": "ES_HibernateWakeUp.ActivateState" },
+    { "site": "0x166C124", "caller": "EB_Hibernating.OnNoiseDetected", "targetMethod": "ES_HibernateWakeUp.ActivateState" },
+    { "site": "0x17FDAC3", "caller": "ES_HibernateWakeUp.Exit", "targetMethod": "EnemyBehaviour.ChangeState" },
+    { "site": "0x17FDC6F", "caller": "ES_HibernateWakeUp.RecieveStateData", "targetMethod": "EnemyLocomotion.ForceState" },
+    { "site": "0x17FDC6F", "caller": "ES_HibernateWakeUp.RecieveStateData", "targetMethod": "ES_HibernateWakeUp.DoWakeup" },
+    { "site": "0x17FEB63", "caller": "ES_Hibernate.RecieveStateData", "targetMethod": "EnemyLocomotion.ForceState" },
+    { "site": "0x1580A6A", "caller": "EnemySync.IncomingState", "targetMethod": "EnemyBehaviour.ChangeState" },
+    { "site": "0x1568038", "caller": "EnemyBehaviour.UpdateState", "targetMethod": "EnemySync.ReplicateAIState" },
+    { "site": "0x15810F9", "caller": "EnemySync.ReplicateAIState", "targetMethod": "EnemySync.UpdateStateData" },
+    { "site": "0x15813CB", "caller": "EnemySync.TryCollectCaptureData", "targetMethod": "EnemySync.UpdateStateData" },
+    { "site": "0x1581056", "caller": "EnemySync.OnSpawn", "targetMethod": "EnemyAI.SetStartMode" },
+    { "site": "0x1671121", "caller": "EB_InCombat_MoveToPoint.Enter", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x17F0457", "caller": "EB_InCombat_MoveToTarget.UpdateBehaviour", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x17F2570", "caller": "EB_Patrolling.UpdateBehaviour", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x17F184B", "caller": "EB_Patrolling_Investigate.Enter", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x17F1B22", "caller": "EB_Patrolling_Investigate.UpdateBehaviour", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x166B45A", "caller": "EB_FollowingGroup_MoveToNode.UpdateBehaviour", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x15909E8", "caller": "SquidBossBehaviour.Move", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x166D926", "caller": "EB_InCombatFlyer.FlyToTarget", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" },
+    { "site": "0x16E9F16", "caller": "ES_ScoutDetection.Enter", "targetMethod": "EnemyAI.set_NavmeshAgentGoal" }
+  ],
+  "hostAuthority": {
+    "rule": "The Forge action is submitted by the host only, and the native write it submits is the member the simulating machine itself uses.",
+    "evidence": [
+      "SNet.IsMaster is checked before any target is read (EnemyModule.CanExecute), so a client never reaches the native call",
+      "the behaviour state and the locomotion state the actions write are replicated by the game's own sync: EnemySync.IncomingState applies the behaviour state (0x1580A6A) and ES_Hibernate.RecieveStateData / ES_HibernateWakeUp.RecieveStateData force the matching locomotion state on a client",
+      "the navigation goal is consumed by the simulating machine's own move behaviours, whose path output travels as pEnemyPathData through EnemySync.IncomingPath"
+    ]
+  },
+  "conclusions": [
+    {
+      "catalogId": "forge.action.enemy.awaken",
+      "status": "implemented",
+      "member": "ES_HibernateWakeUp.ActivateState(Vector3.zero, 0f, 0f, false)",
+      "ports": {
+        "enemies": "the tracked gtfo.enemy references; each is refused before the call when it is not asleep",
+        "result": "one row per recipient, in the plan's order"
+      },
+      "readback": "EnemyLocomotion.CurrentStateEnum == ES_StateEnum.HibernateWakeUp (15)",
+      "supported": ["wake_policy=immediate", "alert_amount absent or 0"],
+      "refusedByName": {
+        "wake_policy=gradual": "wake-policy-unsupported: the native call plays one wake with one delay, there is no gradual variant",
+        "source": "source-unsupported: the caller's reference is not a native agent this provider can resolve, so no direction and no distance can be derived from it",
+        "alert_amount != 0": "alert-amount-unsupported: the wake call has no alert parameter, and the detection build-up it would have to raise is not written by any native wake path"
+      },
+      "evidence": [
+        "the three callers of ActivateState are the game's own hibernation detection paths",
+        "the direction argument is only ever used for the turn test; the wake itself is the state entry, which is why the zero direction is submitted rather than an invented one",
+        "the locomotion state is the wake's own machine state, so the readback is read immediately after the call and before the game's next behaviour update"
+      ]
+    },
+    {
+      "catalogId": "forge.action.enemy.sleep",
+      "status": "implemented",
+      "member": "EnemyBehaviour.ChangeState(EB_States.Hibernating)",
+      "ports": {
+        "enemies": "the tracked gtfo.enemy references; each is refused before the call when it already reads as hibernating",
+        "result": "one row per recipient, in the plan's order"
+      },
+      "readback": "EnemyBehaviour.m_currentStateName == EB_States.Hibernating (0)",
+      "supported": ["sleep_policy=immediate", "sleep_policy=when_idle", "interrupt_policy=any", "duration absent or 0"],
+      "refusedByName": {
+        "duration != 0": "duration-unsupported: the hibernation state has no timer; a timed sleep is a plan-side composition (delay then awaken), not a native field",
+        "interrupt_policy=damage_only": "interrupt-policy-unsupported: what interrupts a sleeper is the game's own detection and hitreact logic, and no member of the hibernation state selects it",
+        "sleep_policy=when_idle on a busy enemy": "not-idle: AgentMode is not Patrolling, or the AI holds a valid target, or the detection build-up is above zero"
+      },
+      "evidence": [
+        "ChangeState writes the field only when it differs, so the write the action submits is a transition",
+        "the behaviour state is the one state_changed observes and the one EnemySync captures and replicates"
+      ],
+      "unverified": [
+        "the locomotion machine is not forced into ES_Hibernate by this action: the behaviour machine is the row's own member, and ES_HibernateWakeUp.Exit shows the game driving the behaviour state from the locomotion state, not the other way round. Whether the sleeping behaviour also pulls the locomotion machine into ES_Hibernate in the same frame is a game-in confirmation."
+      ]
+    },
+    {
+      "catalogId": "forge.action.enemy.move_to",
+      "status": "implemented",
+      "member": "EnemyAI.NavmeshAgentGoal = destination (and INavigation.speed when a speed is requested)",
+      "ports": {
+        "enemies": "the tracked gtfo.enemy references",
+        "destination": "the vector3 the goal is written from",
+        "speed": "written through the agent's own INavigation and read back; a write that does not take is an unknown commit",
+        "result": "one row per recipient, in the plan's order"
+      },
+      "readback": "EnemyAI.NavmeshAgentGoal equals the written goal (component-wise), and INavigation.speed equals the requested speed when one was asked for",
+      "supported": ["destination", "speed within 0.01..1000"],
+      "refusedByName": {
+        "area": "area-unsupported: the area field resource is a Forge reference with no native member behind it, and the navigation contract exposes no region restriction",
+        "arrival_tolerance": "arrival-tolerance-unsupported: neither INavigation nor EnemyAI keeps a caller-set arrival tolerance",
+        "speed outside 0.01..1000": "speed-out-of-range"
+      },
+      "evidence": [
+        "the goal is the member 24 native move behaviours write, so what the action sets is the same value the game's own movement logic sets",
+        "the goal is read back and compared, so a value the AI did not keep is an unknown commit rather than a claimed move"
+      ],
+      "unverified": [
+        "the AI's own move behaviours also drive the locomotion machine (ES_PathMove) and the course navigation; whether setting the goal alone is enough for every enemy type — flyers use EB_InCombatFlyer paths — is a game-in confirmation. What is verified statically is that the member is the game's own write point for a destination."
+      ]
+    },
+    {
+      "catalogId": "forge.action.enemy.target_set",
+      "status": "not-implemented",
+      "reason": "missing-provider-minted-handles",
+      "detail": "The row declares a `slot` output of type handle with handleKind `lease` and lifetime `entity_life`, and its recipient contract names that handle as the action's handle output. The runtime's handle pool is the kernel's own: RuntimeKernel.CreateHandle is private and only the control steps' timers use it, while RuntimeModuleHandle exposes Publish, CancelScope and Dispose and nothing else. A provider can therefore neither mint the handle its row declares nor register the native target slot that handle would name, and a handle this assembly invented would be a second handle namespace the kernel's CheckHandle does not own. What the action needs is the framework feature the runtime's own ABI plan already schedules (provider-minted handles plus a handle-to-native-object table and a cancel hook); until it exists this row cannot be implemented without faking it.",
+      "nativeWritePointFound": "AgentAI.set_Target(AgentTarget) / AgentAI.SetTarget(Agent) / EnemyAI.SetTarget(Agent) / AgentAI.SetDetectedAgent(Agent, AgentTargetDetectionType) are public and present, so the write itself is reachable when the handle feature exists"
+    },
+    {
+      "catalogId": "forge.action.enemy.target_clear",
+      "status": "not-implemented",
+      "reason": "missing-provider-minted-handles",
+      "detail": "The row's only recipient input is `slots`, a many handle of kind `lease` and lifetime `entity_life`: there is nothing to clear without a handle minted by target_set's row, which cannot be minted at all. The row is therefore not declared rather than declared and unusable."
+    },
+    {
+      "catalogId": "forge.action.enemy.state_request",
+      "status": "not-implemented",
+      "reason": "missing-provider-minted-handles",
+      "detail": "The row's recipient input is `machines`, a many handle of kind `lease` and lifetime `entity_life`, so it has the same missing prerequisite as target_clear. It also carries a second, independent shape problem: the native machine has two state enums. `EB_States` (29 members) is the behaviour machine EnemyBehaviour.ChangeState writes, and `ES_StateEnum` (34 members) is the locomotion machine EnemyLocomotion.ChangeState writes. The catalog's `ai_state` set has 12 members, and its members cannot be mapped one-to-one: `alerted` and `pursuing` both name EB_States.InCombat (5), `sleeping`/`waking`/`hibernating` name three different native members across the two machines, `disabled` has no native member at all, and `waking` is SquidBoss_Intro (13), which exists only on the boss. A state_request that accepted those members would silently fold several of them into one native state or invent a transition, which the row's own note forbids."
+    }
+  ],
+  "unverified": [
+    {
+      "topic": "client-side replication of the three writes",
+      "status": "game-in",
+      "note": "The static evidence shows the game's own replication paths for the behaviour state (EnemySync.IncomingState), the hibernation states (pES_HibernateState / pES_HibernateWakeup payloads with RecieveStateData appliers) and the path data (pEnemyPathData). Whether a host-side write of these members at an arbitrary moment — rather than inside the game's own update — produces the same packets on the same frame is not observable offline and needs host plus one client in game."
+    },
+    {
+      "topic": "area_field provider for move_to's area port",
+      "status": "not-this-slice",
+      "note": "The area port is refused here because no native navigation member consumes a region. If the map package's area_field provider later gives a region a meaning the navigation contract carries, the refusal can be lifted; the port stays in the row until then so the catalog and the binding do not drift."
+    }
+  ]
+}

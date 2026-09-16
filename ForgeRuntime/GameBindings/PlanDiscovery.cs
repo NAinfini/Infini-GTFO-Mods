@@ -6,14 +6,14 @@ using ForgeRuntime.Framework;
 
 namespace ForgeRuntime.GameBindings;
 
-/// <summary>I-PACK D-009 plan discovery. A pure function of the BepInEx root: it only touches the filesystem it is
+/// <summary>I-PACK plan discovery. A pure function of the BepInEx root: it only touches the filesystem it is
 /// given, so tests can point it at a temp directory instead of a real BepInEx install. The caller decides whether to
 /// scan at all (the Runtime.Mode gate lives in <see cref="GameRuntimeBridge"/>, since Off mode never reaches this far);
 /// this type only knows how to enumerate and read `.plan.json` candidates once asked to.</summary>
 internal static class PlanDiscovery
 {
-    /// <summary>Combined cap across every discovered file, D-009's second budget (distinct from the kernel's own
-    /// 128-plan cap, which applies after parsing).</summary>
+    /// <summary>Combined cap across every discovered file (distinct from the kernel's own 128-plan cap, which applies
+    /// after parsing).</summary>
     internal const int MaximumFileCount = 256;
     internal const long MaximumCombinedBytes = 64L * 1024 * 1024;
 

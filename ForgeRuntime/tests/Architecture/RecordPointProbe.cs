@@ -1,7 +1,8 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using ForgeRuntime.Framework;
 
-/// <summary>I-DIAG D-007 call-site rules for the kernel, checked on compiled IL: the record type carries no composed
+/// <summary>I-DIAG call-site rules for the kernel, checked on compiled IL: the record type carries no composed
 /// message and no inputs payload, the event-code constants are exactly the codes the kernel writes, and no record-point
 /// helper composes text. HostIntegration's Cecil probe additionally follows every record text field back to its producer
 /// and covers the compiled host; this probe is the part that needs no BepInEx reference and so runs beside the domain
@@ -36,78 +37,99 @@ internal static class RecordPointProbe
         check(recordPoints.Length >= 12, "the record-point walk found too few helpers: " + recordPoints.Length);
         var composed = recordPoints.SelectMany(m => BuildsText(m).Select(text => m.Name + "->" + text)).ToArray();
         check(composed.Length == 0, "a kernel record point composes text: " + string.Join(", ", composed));
-        // §3.2 line 619: only step.finished carries commit, so no other record point may set it.
+        // I-DIAG: only step.finished carries a commit, so no other record point may set one.
         var commitSites = recordPoints.Where(m => CommitStates(m) && m.Name != "LogStepFinished").Select(m => m.Name).ToArray();
         check(commitSites.Length == 0, "a record point other than step.finished set commit: " + string.Join(", ", commitSites));
     }
 
-    /// <summary>A record point sets commit when its IL calls the <c>Commit</c> setter of the result it builds. The record
-    /// types are readonly structs, so their object initializers call the setter directly (0x28) rather than virtual (0x6F);
-    /// both forms are read.</summary>
+    /// <summary>A record point sets commit when its IL stores a commit into the result it builds. The record types are
+    /// readonly structs, so their object initializers call the setter directly rather than virtually; a <c>ldnull</c>
+    /// reaching that setter stores no commit at all, which is why the walk reads the instruction before the call.</summary>
     private static bool CommitStates(MethodInfo method)
     {
         var text = method.GetMethodBody()?.GetILAsByteArray();
         if (text == null) return false;
+        var previous = OpCodes.Ldnull;
         for (var i = 0; i < text.Length;)
         {
-            if (text[i] == 0xFE) { i += 2 + OperandSize(text[i + 1]); continue; }
-            var size = OperandSize(text[i]);
-            if (size == 4 && text[i] is 0x28 or 0x6F)
+            var opcode = OpCode(text, i);
+            if (opcode.OperandType == OperandType.InlineMethod)
             {
                 var target = method.Module.ResolveMethod(BitConverter.ToInt32(text, i + 1));
-                if (target is { Name: "set_Commit", DeclaringType: { } owner } && owner == typeof(RuntimeLogResult)) return true;
+                if (target is { Name: "set_Commit", DeclaringType: { } owner } && owner == typeof(RuntimeLogResult)
+                    && previous != OpCodes.Ldnull) return true;
             }
-            i += 1 + size;
+            previous = opcode;
+            i += 1 + (opcode.Size == 2 ? 1 : 0) + OperandBytes(opcode.OperandType);
         }
         return false;
     }
 
-    /// <summary>Walks the whole method body: a helper that composed text would have to reach a System.String or
-    /// StringBuilder member (Concat/Format/Join/Append/...), and the walk reports every such call it finds.</summary>
-    private static string[] BuildsText(MethodInfo method)
+    /// <summary>The members that turn values into one string. A record point reaching any of them composes text, which is
+    /// the whole rule: the record carries fields and the writer renders the message. Comparisons, predicates and probes
+    /// (<c>op_Equality</c>, <c>IsNullOrEmpty</c>, <c>get_Length</c>, ...) read a string without building one, so they are
+    /// not on the list, and an interpolated string builds its text in <c>DefaultInterpolatedStringHandler</c>.</summary>
+    private static readonly string[] TextBuilders =
+    {
+        "System.String::Concat", "System.String::Format", "System.String::Join", "System.String::Copy",
+        "System.Text.StringBuilder::.ctor", "System.Text.StringBuilder::Append", "System.Text.StringBuilder::AppendFormat",
+        "System.Text.StringBuilder::AppendLine", "System.Text.StringBuilder::Insert", "System.Text.StringBuilder::Replace",
+        "System.Text.StringBuilder::ToString", "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::.ctor",
+        "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::AppendLiteral",
+        "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::AppendFormatted",
+        "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::ToStringAndClear",
+        "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::ToString",
+    };
+
+    /// <summary>Walks the whole method body: a helper that composed text would have to reach one of the composition members,
+    /// and the walk reports every such call it finds. The walk reads instruction widths off <see cref="OpCodes"/> rather
+    /// than a hand-written table, because one opcode read at the wrong width desyncs every instruction after it and turns
+    /// whatever bytes land on a token boundary into a phantom call.</summary>
+    internal static string[] BuildsText(MethodInfo method)
     {
         var text = method.GetMethodBody()?.GetILAsByteArray();
         if (text == null) return Array.Empty<string>();
         var violations = new List<string>();
         for (var i = 0; i < text.Length;)
         {
-            if (text[i] == 0xFE)
-            {
-                var prefixed = text[i + 1];
-                // String.Concat/Format/Join with a null argument count use the vararg forms; the SDK never needs them,
-                // but a text-building helper would reach for exactly these.
-                if (prefixed is >= 0x06 and <= 0x16 or 0x1C) violations.Add("System.String");
-                i += 2 + OperandSize(prefixed);
-                continue;
-            }
-            var size = OperandSize(text[i]);
-            if (size == 4 && text[i] is 0x28 or 0x6F or 0x73)
-            {
-                var token = BitConverter.ToInt32(text, i + 1);
-                var name = token == 0 ? null : method.Module.ResolveMethod(token)?.DeclaringType?.FullName;
-                if (name is "System.String" or "System.Text.StringBuilder") violations.Add(name!);
-            }
-            i += 1 + size;
+            var opcode = OpCode(text, i);
+            var size = OperandBytes(opcode.OperandType);
+            var call = opcode.OperandType == OperandType.InlineMethod && i + 5 <= text.Length;
+            var token = call ? BitConverter.ToInt32(text, i + 1) : 0;
+            i += 1 + (opcode.Size == 2 ? 1 : 0) + size;
+            if (!call || token == 0) continue;
+            var target = method.Module.ResolveMethod(token);
+            if (target != null && TextBuilders.Contains(target.DeclaringType?.FullName + "::" + target.Name, StringComparer.Ordinal))
+                violations.Add(target.DeclaringType!.FullName!);
         }
         return violations.ToArray();
     }
 
-    // Operand widths follow ECMA-335: a metadata or call-site token, a 4-byte branch target, a byte, an 8-byte integer,
-    // or nothing at all. The three token sets are the only opcodes this walk reads an operand from.
-    private static readonly HashSet<byte> TokenOperands = new(new byte[] {
-        0x27, 0x28, 0x29, 0x6F, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F, 0x80,
-        0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x8C, 0x8D, 0x8E, 0x8F, 0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98,
-        0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5 });
-    private static readonly HashSet<byte> ByteOperands = new(new byte[] {
-        0x0E, 0x10, 0x11, 0x12, 0x13, 0x1F, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37 });
-    private static readonly HashSet<byte> WideOperands = new(new byte[] { 0x0F, 0x1C, 0x20, 0x22, 0x38, 0x39, 0x3A, 0x3B,
-        0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43, 0x44, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF,
-        0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF, 0xC0, 0xC1, 0xC2,
-        0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xCE, 0xCF, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB,
-        0xDC, 0xDD, 0xDE });
+    // The opcode behind the byte at <paramref name="at"/>, or the two-byte opcode it introduces with the next byte. The
+    // runtime's own field table is the source of the encoding, so the walk cannot drift from it; every byte of a compiled
+    // body is an opcode that table holds, and a byte outside it is a bug in this walk rather than a body to guess at.
+    private static OpCode OpCode(byte[] text, int at)
+    {
+        var full = text[at] == 0xFE ? 0xFE00 | text[at + 1] : text[at];
+        foreach (var field in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+        {
+            // OpCode.Value is signed, so a two-byte opcode reads back negative while the encoding here is unsigned.
+            var candidate = (OpCode)field.GetValue(null)!;
+            if ((ushort)candidate.Value == full) return candidate;
+        }
+        throw new InvalidOperationException("IL byte 0x" + full.ToString("x4") + " is not an OpCodes opcode.");
+    }
 
-    private static int OperandSize(byte opcode)
-        => TokenOperands.Contains(opcode) || WideOperands.Contains(opcode) ? 4
-            : ByteOperands.Contains(opcode) ? 1
-            : opcode is 0x21 or 0x23 ? 8 : 0;
+    // ECMA-335 instruction operands are a metadata or call-site token, a four-byte branch target, a byte, an eight-byte
+    // integer, a four-byte float, a switch table or nothing at all.
+    private static int OperandBytes(OperandType type) => type switch
+    {
+        OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType or OperandType.InlineTok
+            or OperandType.InlineString or OperandType.InlineSig or OperandType.InlineBrTarget
+            or OperandType.InlineSwitch or OperandType.InlineI or OperandType.ShortInlineR => 4,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        _ => 0,
+    };
 }

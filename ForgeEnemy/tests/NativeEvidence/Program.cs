@@ -3,15 +3,17 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Mono.Cecil;
 
-if (args.Length != 5)
+if (args.Length > 0 && args[0] == "--generate") return GenerateSpec.Run(args[1..]);
+if (args.Length != 5 && args.Length != 6)
 {
-    Console.Error.WriteLine("Usage: NativeEvidence <BepInEx> <GTFO game root> <ForgeEnemy.Native.dll> <frozen spec.json> <report.json>");
+    Console.Error.WriteLine("Usage: NativeEvidence <BepInEx> <GTFO game root> <ForgeEnemy.Native.dll> <frozen spec.json> <report.json> [damage window.json]");
+    Console.Error.WriteLine("       NativeEvidence --generate <BepInEx> <ForgeEnemy.Native.dll> <frozen spec.json> <output.json>");
     return 2;
 }
 var checks = new List<EvidenceCheck>();
 void Check(string id, bool passed, string detail) => checks.Add(new(id, passed, detail));
 string Hash(string path) { using var stream = File.OpenRead(path); using var sha = SHA256.Create(); return Convert.ToHexString(sha.ComputeHash(stream)); }
-IEnumerable<TypeDefinition> Walk(TypeDefinition type) => new[] { type }.Concat(type.NestedTypes.SelectMany(Walk));
+IEnumerable<TypeDefinition> Walk(TypeDefinition type) => ForgeIl.Walk(type);
 void Shape(JsonElement element, string[] required, params string[] optional)
 {
     if (element.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Specification entries must be objects.");
@@ -22,31 +24,41 @@ void Shape(JsonElement element, string[] required, params string[] optional)
         throw new InvalidDataException($"Specification shape mismatch: unknown [{string.Join(",", unknown)}], missing [{string.Join(",", missing)}].");
 }
 string[] Strings(JsonElement array) => array.EnumerateArray().Select(x => x.GetString()!).ToArray();
-// Compiler-generated lambdas, local functions and state machines are attributed to the source method that owns them.
-string Caller(MethodDefinition method)
-{
-    var type = method.DeclaringType; string name = method.Name;
-    while (type.Name.StartsWith('<') && type.DeclaringType != null)
-    {
-        var generated = Regex.Match(type.Name, "^<([^>]+)>");
-        if (generated.Success && !name.StartsWith('<')) name = generated.Groups[1].Value;
-        type = type.DeclaringType;
-    }
-    var owner = Regex.Match(name, "^<([^>]+)>");
-    return type.FullName + "::" + (owner.Success ? owner.Groups[1].Value : name);
-}
+static string Open(string fullName) => ForgeIl.Open(fullName);
 static bool Resolves(JsonElement current, string[] segments)
 {
     if (segments.Length == 0) return true;
-    bool each = segments[0].EndsWith("[*]", StringComparison.Ordinal);
-    string name = each ? segments[0][..^3] : segments[0];
-    if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(name, out var next)) return false;
+    string segment = segments[0];
+    bool each = segment.EndsWith("[*]", StringComparison.Ordinal);
+    if (each) segment = segment[..^3];
+    int index = -1;
+    if (!each && segment.EndsWith("]", StringComparison.Ordinal))
+    {
+        int open = segment.LastIndexOf('[');
+        if (open <= 0 || !int.TryParse(segment[(open + 1)..^1], out index)) return false;
+        segment = segment[..open];
+    }
+    if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(segment, out var next)) return false;
+    if (index >= 0) return next.ValueKind == JsonValueKind.Array && index < next.GetArrayLength() && Resolves(next[index], segments[1..]);
     if (!each) return Resolves(next, segments[1..]);
     return next.ValueKind == JsonValueKind.Array && next.GetArrayLength() > 0 && next.EnumerateArray().All(item => Resolves(item, segments[1..]));
 }
 
 var areas = new HashSet<string>(StringComparer.Ordinal) { "identity", "spawn-requirements", "health", "damage-limbs-death", "ai-perception",
     "movement-space", "abilities", "birthing-scout", "attacks-projectiles", "appearance-animation", "cleanup-replication" };
+// The packet layouts the damage window evidence cites, in declaration order. The offsets themselves come from
+// the Il2CppDumper map, so what is checked here is that each packet still declares exactly these fields.
+var expectedPacketFields = new Dictionary<string, string[]>(StringComparer.Ordinal)
+{
+    ["pBulletDamageData"] = new[] { "LowResVector3 localPosition", "LowResVector3_Normalized direction", "pAgent source", "UFloat16 damage", "UFloat16 staggerMulti", "UFloat16 precisionMulti", "byte limbID", "bool allowDirectionalBonus", "uint gearCategoryId" },
+    ["pFullDamageData"] = new[] { "LowResVector3 localPosition", "LowResVector3_Normalized direction", "pAgent source", "UFloat16 damage", "UFloat16 staggerMulti", "UFloat16 precisionMulti", "UFloat16 backstabberMulti", "UFloat16 sleeperMulti", "bool skipLimbDestruction", "byte limbID", "byte damageNoiseLevel", "uint gearCategoryId" },
+    ["pExplosionDamageData"] = new[] { "LowResVector3 localPosition", "LowResVector3 force", "UFloat16 damage", "byte limbID", "uint gearCategoryId" },
+    ["pSmallDamageData"] = new[] { "UFloat16 damage", "pAgent source" },
+    ["pSetHealthData"] = new[] { "SFloat16 health" },
+    ["pAddHealthData"] = new[] { "SFloat16 health", "pAgent source" },
+    ["pMiniDamageData"] = new[] { "UFloat16 damage" },
+    ["pMediumDamageData"] = new[] { "UFloat16 damage", "pAgent source", "LowResVector3 localPosition", "byte limbID" },
+};
 var assemblies = new Dictionary<string, AssemblyDefinition>(StringComparer.Ordinal);
 var dataFiles = new Dictionary<string, JsonDocument>(StringComparer.Ordinal);
 var distribution = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -96,38 +108,13 @@ try
         if (exists) dataFiles.Add(relative, JsonDocument.Parse(File.ReadAllBytes(full)));
     }
 
-    // What the shipped Enemy plugin actually hooks and calls, read from its IL rather than asserted.
-    var gameScopes = assemblies.Keys.Select(f => f[..^4]).ToHashSet(StringComparer.Ordinal);
-    var ilHooks = new Dictionary<(string Type, string Name), SortedSet<string>>();
-    var ilCalls = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
-    using (var forge = AssemblyDefinition.ReadAssembly(args[2]))
-    {
-        foreach (var type in forge.MainModule.Types.SelectMany(Walk))
-        {
-            foreach (var patch in type.CustomAttributes.Where(a => a.AttributeType.FullName == "HarmonyLib.HarmonyPatch"))
-            {
-                if (patch.ConstructorArguments.Count != 2 || patch.ConstructorArguments[0].Value is not TypeReference target
-                    || patch.ConstructorArguments[1].Value is not string name)
-                    throw new InvalidDataException("Unsupported HarmonyPatch shape on " + type.FullName);
-                var kinds = type.Methods.Where(m => m.Name is "Prefix" or "Postfix"
-                        || m.CustomAttributes.Any(a => a.AttributeType.FullName is "HarmonyLib.HarmonyPrefix" or "HarmonyLib.HarmonyPostfix"))
-                    .Select(m => m.Name == "Prefix" || m.CustomAttributes.Any(a => a.AttributeType.FullName == "HarmonyLib.HarmonyPrefix") ? "prefix" : "postfix");
-                var key = (target.FullName, name);
-                if (!ilHooks.TryGetValue(key, out var set)) ilHooks[key] = set = new SortedSet<string>(StringComparer.Ordinal);
-                set.UnionWith(kinds);
-            }
-            foreach (var method in type.Methods.Where(m => m.HasBody))
-                foreach (var instruction in method.Body.Instructions)
-                {
-                    if (instruction.Operand is not MethodReference called) continue;
-                    string scope = called.DeclaringType.Scope.Name;
-                    if (scope.EndsWith(".dll", StringComparison.Ordinal)) scope = scope[..^4];
-                    if (!gameScopes.Contains(scope)) continue;
-                    if (!ilCalls.TryGetValue(called.FullName, out var callers)) ilCalls[called.FullName] = callers = new SortedSet<string>(StringComparer.Ordinal);
-                    callers.Add(Caller(method));
-                }
-        }
-    }
+    // What the shipped Enemy plugin actually hooks and calls, read from its IL rather than asserted. The
+    // specification generator reads the same IL through the same reader, so a frozen entry and a checked entry
+    // cannot drift apart in how a caller or a patch kind is spelled.
+    var gameScopes = assemblies.Keys.ToHashSet(StringComparer.Ordinal);
+    var usage = ForgeIl.Read(args[2], gameScopes);
+    var ilHooks = usage.Hooks;
+    var ilCalls = usage.Calls;
 
     var ids = new HashSet<string>(StringComparer.Ordinal);
     var frozen = new HashSet<string>(StringComparer.Ordinal);
@@ -144,8 +131,8 @@ try
         string typeName = expected.GetProperty("type").GetString()!;
         if (!frozen.Add(signature)) throw new InvalidDataException("Duplicate frozen signature: " + signature);
         var assembly = assemblies[expected.GetProperty("assembly").GetString()!];
-        var type = assembly.MainModule.Types.SelectMany(Walk).SingleOrDefault(t => t.FullName == typeName);
-        var matches = type?.Methods.Where(m => m.FullName == signature).ToArray() ?? Array.Empty<MethodDefinition>();
+        var type = assembly.MainModule.Types.SelectMany(Walk).SingleOrDefault(t => t.FullName == Open(typeName));
+        var matches = type?.Methods.Where(m => Open(m.FullName) == Open(signature)).ToArray() ?? Array.Empty<MethodDefinition>();
         bool passed = matches.Length == 1 && matches[0].IsStatic == expected.GetProperty("isStatic").GetBoolean()
             && matches[0].IsVirtual == expected.GetProperty("isVirtual").GetBoolean()
             && matches[0].IsPublic == expected.GetProperty("isPublic").GetBoolean();
@@ -170,8 +157,8 @@ try
         string methodName = Regex.Match(signature, @"::([^(]+)\(").Groups[1].Value;
         var hooks = Strings(expected.GetProperty("forgeHooks"));
         var callers = Strings(expected.GetProperty("forgeCallers"));
-        var ilHookKinds = ilHooks.TryGetValue((typeName, methodName), out var kindSet) ? kindSet.ToArray() : Array.Empty<string>();
-        var ilCallers = ilCalls.TryGetValue(signature, out var callerSet) ? callerSet.ToArray() : Array.Empty<string>();
+        var ilHookKinds = ilHooks.TryGetValue((typeName, methodName), out var hook) ? hook.Kinds.ToArray() : Array.Empty<string>();
+        var ilCallers = ilCalls.TryGetValue(signature, out var called) ? called.Callers.ToArray() : Array.Empty<string>();
         Check("forge-use." + id, hooks.SequenceEqual(ilHookKinds) && callers.SequenceEqual(ilCallers),
             $"IL hooks [{string.Join(",", ilHookKinds)}], IL callers [{string.Join(",", ilCallers)}].");
         if (hooks.Length > 0)
@@ -197,6 +184,93 @@ try
     Check("forge-use.call-coverage", unfrozenCalls.Length == 0, "Game APIs called by Forge but not frozen: [" + string.Join(",", unfrozenCalls) + "]");
     var missingStatic = NativeHealth.ReviewedRvas.Keys.Where(s => !staticNative.Contains(s)).ToArray();
     Check("evidence-level.static-native-coverage", missingStatic.Length == 0, "Decoded bodies not frozen as static-native: [" + string.Join(",", missingStatic) + "]");
+
+    // The damage window evidence file is a second frozen input. It is checked here because its assertions are
+    // about the same build: the RVA lock, the declared methods and their Il2Cpp parameter names, the frozen
+    // call edges (checked by re-decoding each reported site) and the packet field offsets it cites.
+    if (args.Length == 6)
+    {
+        using var windowDocument = JsonDocument.Parse(File.ReadAllText(args[5]));
+        var window = windowDocument.RootElement;
+        Shape(window, new[] { "schemaVersion", "evidenceFile", "area", "buildId", "gameRevision", "gameAssemblySha256",
+            "gameExecuted", "verification", "nativeRvaLock", "extraction", "damageMethods", "packetTypes",
+            "reviewedEntries", "callEdges", "callSiteWindows", "enumValues", "conclusions" });
+        Check("damage-window.schema", window.GetProperty("schemaVersion").GetInt32() == 1
+            && window.GetProperty("area").GetString() == "damage-window" && !window.GetProperty("gameExecuted").GetBoolean(),
+            "Damage window evidence must be schemaVersion 1, area damage-window, and must not claim game execution.");
+        Check("damage-window.build", window.GetProperty("buildId").GetString() == spec.GetProperty("buildId").GetString()
+            && window.GetProperty("gameAssemblySha256").GetString() == nativeHash,
+            "Damage window evidence must freeze the same build and native hash as the API specification.");
+        var windowMethods = window.GetProperty("damageMethods").EnumerateArray().ToArray();
+        Check("damage-window.methods", windowMethods.Length > 0 && windowMethods.Select(m => m.GetProperty("id").GetString()).Distinct().Count() == windowMethods.Length,
+            "Damage window methods must be present and uniquely identified.");
+        foreach (var expected in windowMethods)
+        {
+            Shape(expected, new[] { "id", "role", "type", "name", "il2cppSignature", "rawDeclaration", "parameters",
+                "nativeRva", "virtualSlot", "observations" }, "note");
+            string id = expected.GetProperty("id").GetString()!;
+            string owner = expected.GetProperty("type").GetString()!;
+            string name = expected.GetProperty("name").GetString()!;
+            var matches = assemblies.Values.SelectMany(a => a.MainModule.Types).SelectMany(Walk)
+                .Where(t => t.Name == owner && t.Namespace.Length == 0).SelectMany(t => t.Methods.Where(m => m.Name == name)).ToArray();
+            if (matches.Length != 1)
+            {
+                Check("damage-window.match." + id, false, $"{matches.Length} declarations named {owner}::{name} in the interop assemblies.");
+                continue;
+            }
+            var parameterNames = expected.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("name").GetString()).ToArray();
+            Check("damage-window.parameters." + id, parameterNames.SequenceEqual(matches[0].Parameters.Select(p => p.Name)),
+                $"Declared [{string.Join(",", parameterNames)}], interop [{string.Join(",", matches[0].Parameters.Select(p => p.Name))}].");
+            int declaredRva = Convert.ToInt32(expected.GetProperty("nativeRva").GetString()![2..], 16);
+            string signature = expected.GetProperty("il2cppSignature").GetString()!;
+            bool reviewed = NativeHealth.ReviewedRvas.TryGetValue(signature, out int lockedRva);
+            Check("damage-window.rva." + id, !reviewed || lockedRva == declaredRva,
+                reviewed ? $"Reviewed RVA 0x{lockedRva:X} vs declared 0x{declaredRva:X}." : "Not a reviewed body; the RVA is evidence, not a lock.");
+        }
+        // Field offsets come from the Il2CppDumper map, so they cannot be re-derived here; what is checked is
+        // that each packet the evidence cites declares the fields the damage path unpacks, in order.
+        foreach (var packet in window.GetProperty("packetTypes").EnumerateArray())
+        {
+            Shape(packet, new[] { "type", "fields" });
+            string packetType = packet.GetProperty("type").GetString()!;
+            var fields = packet.GetProperty("fields").EnumerateArray().Select(f => f.GetProperty("declaration").GetString()!).ToArray();
+            bool expectedShape = expectedPacketFields.TryGetValue(packetType, out var expectedFields) && fields.SequenceEqual(expectedFields);
+            Check("damage-window.packet." + packetType, expectedShape, $"Declared [{string.Join(",", fields)}].");
+        }
+        var edgeWindows = window.GetProperty("callSiteWindows").EnumerateArray()
+            .ToDictionary(w => w.GetProperty("site").GetString()!, w => w, StringComparer.Ordinal);
+        foreach (var edge in window.GetProperty("callEdges").EnumerateArray())
+        {
+            Shape(edge, new[] { "from", "to", "site", "targetRva", "section" });
+            string site = edge.GetProperty("site").GetString()!;
+            string to = edge.GetProperty("to").GetString()!;
+            string target = edge.GetProperty("targetRva").GetString()!;
+            bool known = edgeWindows.TryGetValue(site, out var windowEntry)
+                && windowEntry.GetProperty("targetMethod").GetString() == to;
+            Check("damage-window.edge." + site, known, $"Edge {edge.GetProperty("from").GetString()} -> {to} at {site} must have a frozen instruction window.");
+            // The edge is verified by looking for the decoded call to that exact target inside the frozen
+            // window. Instruction text prints the absolute address zero-padded to 16 hex digits, so the RVA is
+            // rebased onto the image base and padded the same way.
+            long absolute = Convert.ToInt64(target[2..], 16) + Convert.ToInt64(window.GetProperty("extraction").GetProperty("imageBase").GetString()![2..], 16);
+            string call = "call|" + absolute.ToString("X").PadLeft(16, '0') + "h";
+            bool calls = known && windowEntry.GetProperty("instructions").EnumerateArray()
+                .Any(i => i.GetProperty("text").GetString() == call);
+            Check("damage-window.edge-call." + site, calls, $"No decoded call to {target} inside the frozen window for {site}.");
+        }
+        foreach (var windowEntry in window.GetProperty("callSiteWindows").EnumerateArray())
+        {
+            Shape(windowEntry, new[] { "site", "section", "caller", "target", "targetMethod", "instructions" });
+            string site = windowEntry.GetProperty("site").GetString()!;
+            var instructions = windowEntry.GetProperty("instructions").EnumerateArray().ToArray();
+            Check("damage-window.site-window." + site, instructions.Length > 0
+                && windowEntry.GetProperty("caller").GetString()?.Length > 0,
+                "A frozen call site must decode to instructions and be attributed to a caller.");
+        }
+        Check("damage-window.conclusions", window.GetProperty("conclusions").EnumerateObject().Count() == 4,
+            "The four damage window questions must each have a conclusion.");
+        Count("use:damage-window");
+        NativeHealth.VerifyDamageWindow(nativePath, nativeHash, Check);
+    }
 
     foreach (var expected in spec.GetProperty("enumConstants").EnumerateArray())
     {

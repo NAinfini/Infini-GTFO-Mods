@@ -5,7 +5,10 @@ using ForgeRuntime.Framework;
 using ForgeEnemy.Native;
 using SNetwork;
 
-if (args.Length != 1) { Console.Error.WriteLine("Usage: ReceiverProbe <report.json>"); return 2; }
+if (args.Length != 2) { Console.Error.WriteLine("Usage: ReceiverProbe <report.json> <website directory>"); return 2; }
+// The authoring catalog lives in the website repository, so that directory is a required argument: a run that
+// cannot read it would skip exactly the contract comparison this suite exists for.
+string websiteRoot = Path.GetFullPath(args[1]);
 var checks = new List<ProbeCheck>();
 // Each scenario owns its kernel and doubles. A throwing scenario settles only its own ids; later scenarios still run.
 void Scenario(string[] ids, Func<(bool Passed, string Expected, string Observed)[]> body)
@@ -20,21 +23,53 @@ void Scenario(string[] ids, Func<(bool Passed, string Expected, string Observed)
     finally { SNet.IsMaster = true; SFloat16.Preview = (value, _) => value; }
 }
 void Case(string id, Func<(bool Passed, string Expected, string Observed)> body) => Scenario(new[] { id }, () => new[] { body() });
-EnemyAgent Enemy(long pointer = 10)
+EnemyAgent Enemy(long pointer = 10, ushort id = 7)
 {
-    var actor = new EnemyAgent { GlobalID = 7, Pointer = new IntPtr(pointer) };
+    var actor = new EnemyAgent { GlobalID = id, Pointer = new IntPtr(pointer) };
     actor.Damage = new Dam_EnemyDamageBase { Owner = actor, Pointer = new IntPtr(pointer + 100) };
     return actor;
 }
-(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) Scene()
+(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) Scene(Func<EnemyAgent, uint?>? enemyType = null)
 {
     var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
-    var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
+    kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+    LocalPlan.OwnMounts(kernel);
+    // The probe reads no native enemy data: the `enemy-type` matcher is registered only when a case declares the
+    // type its instances answer with, exactly as the session hands over the module's own read.
+    var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { }, null, enemyType);
     var actor = Enemy(); return (kernel, module, actor, module.TrackSpawn(actor));
 }
+// One mounted plan over the damage fact: the enemy's type is what the case's own reader answers for that agent.
+(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref, List<CommandContext> Records) MountScene(
+    string planId, object[] attachments, Func<EnemyAgent, uint?> enemyType)
+{
+    var scene = Scene(enemyType); var records = new List<CommandContext>();
+    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
+    LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, planId, EnemyModule.DamageBinding, LocalPlan.RecordBinding,
+        new[] { ("target", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject, attachments));
+    return (scene.Kernel, scene.Module, scene.Enemy, scene.Ref, records);
+}
+void Damage(EnemyModule module, EnemyAgent enemy)
+{
+    var observation = module.BeforeDamage(enemy.Damage)
+        ?? throw new InvalidOperationException("Mounted plan did not subscribe damage observation.");
+    enemy.Damage.Health = 40; module.AfterDamage(enemy.Damage, observation);
+}
+// A second provider for the mount's subject question: its own trigger carries one entity that is not an enemy.
+const string OtherTriggerBinding = "test.other.binding.ping";
+// The authoring catalog row the canonical combat contract is compared against, in this suite and in the website.
+const string DamageCapabilityId = "forge.action.combat.damage";
+const string OtherDomainRegistry = """
+{"providers":[{"id":"test.other","kind":"extension","version":"1.0.0","dependencies":[]}],
+"capabilities":[{"id":"test.other.trigger.ping","owner":"test.other","kind":"trigger","label":"QA ping","version":"1.0.0",
+"parameters":{},"graph":{"domains":["enemy"],"execution":"host","inputs":[],
+"outputs":[{"id":"next","type":"execution"},{"id":"subject","type":"entity"}],"parameters":[]}}],
+"bindings":[{"id":"test.other.binding.ping","capabilityId":"test.other.trigger.ping","providerId":"test.other",
+"handler":"test.ping","role":"observe","status":"implemented","dependencies":[],"requires":[]}]}
+""";
 // damage_applied -> record(target): observes exactly what the receiver publishes, with no heal in the loop.
-(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref, List<CommandContext> Records) DamageScene()
+(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref, List<CommandContext> Records) HitScene()
 {
     var scene = Scene(); var records = new List<CommandContext>();
     scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
@@ -56,7 +91,7 @@ CommandResult Heal(EnemyModule module, EntityReference target, double amount = 5
     // Source carries no targeting restriction; the probe reuses the target itself (self-source is valid).
     var context = (CommandContext)Activator.CreateInstance(typeof(CommandContext), BindingFlags.Instance | BindingFlags.NonPublic, null,
         new object[] { origin, 0L, "probe.command", "probe.plan", "probe.resource", "1", "probe.node",
-            RuntimeJson.From(new { overheal_policy = "clamp" }), RuntimeJson.From(new { targets = new[] { target }, source = target, amount }) }, null)!;
+            RuntimeJson.From(new { overheal_policy = "clamp" }), RuntimeJson.From(new { targets = new[] { target }, source = target, amount }), true }, null)!;
     return (CommandResult)typeof(EnemyModule).GetMethod("Heal", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(module, new object[] { context })!;
 }
 JsonElement HealRow(CommandResult result) => result.Outputs.GetProperty("results").EnumerateArray().First();
@@ -114,7 +149,7 @@ Case("E3-002.invalid-readback-commit", () =>
 });
 Case("E3-003.duplicate-damage-observation", () =>
 {
-    var damage = DamageScene();
+    var damage = HitScene();
     var observation = damage.Module.BeforeDamage(damage.Enemy.Damage);
     if (observation == null) throw new InvalidOperationException("Local plan did not subscribe to damage observation.");
     damage.Enemy.Damage.Health = 40;
@@ -269,7 +304,7 @@ Case("damage.no-subscribers", () =>
 });
 Case("damage.two-hits-same-tick", () =>
 {
-    var independent = DamageScene();
+    var independent = HitScene();
     var firstHit = independent.Module.BeforeDamage(independent.Enemy.Damage);
     independent.Enemy.Damage.Health = 40; independent.Module.AfterDamage(independent.Enemy.Damage, firstHit);
     var secondHit = independent.Module.BeforeDamage(independent.Enemy.Damage);
@@ -281,7 +316,7 @@ Case("damage.two-hits-same-tick", () =>
 });
 Case("damage.zero-window-consumed", () =>
 {
-    var zeroHit = DamageScene();
+    var zeroHit = HitScene();
     var zeroToken = zeroHit.Module.BeforeDamage(zeroHit.Enemy.Damage);
     zeroHit.Module.AfterDamage(zeroHit.Enemy.Damage, zeroToken);
     zeroHit.Enemy.Damage.Health = 40; zeroHit.Module.AfterDamage(zeroHit.Enemy.Damage, zeroToken);
@@ -290,7 +325,7 @@ Case("damage.zero-window-consumed", () =>
 });
 Case("damage.rejected-window-consumed", () =>
 {
-    var rejectedHit = DamageScene();
+    var rejectedHit = HitScene();
     var rejectedToken = rejectedHit.Module.BeforeDamage(rejectedHit.Enemy.Damage); rejectedHit.Enemy.Damage.Health = 40;
     SNet.IsMaster = false; rejectedHit.Module.AfterDamage(rejectedHit.Enemy.Damage, rejectedToken); SNet.IsMaster = true;
     rejectedHit.Module.AfterDamage(rejectedHit.Enemy.Damage, rejectedToken);
@@ -300,7 +335,7 @@ Case("damage.rejected-window-consumed", () =>
 Case("identity.late-damage-after-respawn", () =>
 {
     // A damage callback that finishes after its enemy was destroyed and the same GlobalID respawned.
-    var lateHit = DamageScene();
+    var lateHit = HitScene();
     var lateToken = lateHit.Module.BeforeDamage(lateHit.Enemy.Damage);
     lateHit.Module.TrackDespawn(lateHit.Enemy); var lateRespawn = lateHit.Module.TrackSpawn(lateHit.Enemy);
     lateHit.Enemy.Damage.Health = 40; lateHit.Module.AfterDamage(lateHit.Enemy.Damage, lateToken);
@@ -369,7 +404,7 @@ Case("health.damage-window-old-life", () =>
 });
 Case("damage.token-owner", () =>
 {
-    var issuer = DamageScene(); var impostor = DamageScene();
+    var issuer = HitScene(); var impostor = HitScene();
     var issuerToken = issuer.Module.BeforeDamage(issuer.Enemy.Damage); issuer.Enemy.Damage.Health = 40; impostor.Enemy.Damage.Health = 40;
     impostor.Module.AfterDamage(impostor.Enemy.Damage, issuerToken);
     issuer.Module.AfterDamage(issuer.Enemy.Damage, issuerToken);
@@ -379,7 +414,7 @@ Case("damage.token-owner", () =>
 });
 Case("damage.replaced-component", () =>
 {
-    var componentHit = DamageScene();
+    var componentHit = HitScene();
     var formerComponent = componentHit.Enemy.Damage; var componentToken = componentHit.Module.BeforeDamage(formerComponent);
     formerComponent.Health = 40; componentHit.Enemy.Damage = new Dam_EnemyDamageBase { Owner = componentHit.Enemy, Pointer = new IntPtr(999) };
     componentHit.Module.AfterDamage(formerComponent, componentToken);
@@ -452,9 +487,352 @@ Case("lifecycle.single-provider", () =>
     return (conflict && registry.Kernel.ExportManifest() == manifest && Heal(registry.Module, registry.Ref).Status == "succeeded",
         "A second Enemy provider is rejected without damaging the registered provider.", "Registry unchanged.");
 });
+// The `enemy-type` mount: one official enemy block id, matched against this provider's own instances.
+Case("mount.enemy-type-loads-and-dispatches", () =>
+{
+    var mounted = MountScene("test.receiver.mount.match", LocalPlan.EnemyTypeMount(7), _ => 7u);
+    Damage(mounted.Module, mounted.Enemy);
+    var tick = mounted.Kernel.Advance(1, true);
+    return (tick.Commands.Count == 1 && mounted.Records.Count == 1
+        && RuntimeJson.Entity(mounted.Records[0].Inputs.GetProperty("target")) == mounted.Ref,
+        "A plan mounted on an enemy type loads and dispatches for that type's own instance.",
+        $"commands={tick.Commands.Count}; records={mounted.Records.Count}");
+});
+Case("mount.enemy-type-other-type-ignored", () =>
+{
+    var unmounted = MountScene("test.receiver.mount.other", LocalPlan.EnemyTypeMount(8), _ => 7u);
+    Damage(unmounted.Module, unmounted.Enemy);
+    var tick = unmounted.Kernel.Advance(1, true);
+    return (tick.Commands.Count == 0 && unmounted.Records.Count == 0,
+        "A mount on another enemy type never dispatches for this instance.",
+        $"commands={tick.Commands.Count}; records={unmounted.Records.Count}");
+});
+Case("mount.enemy-type-only-that-type", () =>
+{
+    var herd = MountScene("test.receiver.mount.herd", LocalPlan.EnemyTypeMount(7), enemy => enemy.GlobalID == 7 ? 7u : 8u);
+    var sibling = Enemy(20, 8); var siblingRef = herd.Module.TrackSpawn(sibling);
+    Damage(herd.Module, herd.Enemy); Damage(herd.Module, sibling);
+    var tick = herd.Kernel.Advance(1, true);
+    return (tick.Commands.Count == 1 && herd.Records.Count == 1
+        && siblingRef != herd.Ref && RuntimeJson.Entity(herd.Records[0].Inputs.GetProperty("target")) == herd.Ref,
+        "One mounted type dispatches for its own instance and not for a sibling of another type.",
+        $"commands={tick.Commands.Count}; records={herd.Records.Count}");
+});
+Scenario(new[] { "mount.enemy-type-leading-zero", "mount.enemy-type-signed", "mount.enemy-type-negative",
+    "mount.enemy-type-above-uint", "mount.enemy-type-fractional" }, () =>
+{
+    // Every reference below is loadable plan text, so a mount that fired would prove the matcher reinterpreted it.
+    var spellings = new[] { "007", "+7", "-7", "4294967296", "7.0" };
+    return spellings.Select((reference, index) =>
+    {
+        var scene = MountScene("test.receiver.mount.spelling." + index, LocalPlan.Mount("enemy-type", reference), _ => 7u);
+        Damage(scene.Module, scene.Enemy);
+        var tick = scene.Kernel.Advance(1, true);
+        return (tick.Commands.Count == 0 && scene.Records.Count == 0,
+            "A reference that is not the canonical decimal text of one id never matches.", $"{reference}: commands={tick.Commands.Count}");
+    }).ToArray();
+});
+Scenario(new[] { "mount.enemy-type-empty-reference", "mount.enemy-type-untrimmed-reference" }, () =>
+{
+    // A reference the plan text cannot carry is refused before any matcher sees it: the mount list and the plan
+    // reader share one spelling rule, and an empty or padded reference is not that rule's text.
+    var spellings = new[] { "", " 7" };
+    return spellings.Select((reference, index) =>
+    {
+        var scene = Scene(_ => 7u);
+        scene.Kernel.RegisterModule(LocalPlan.Recorder(_ => { }), RuntimeLogLevel.Off);
+        var code = "loaded";
+        try
+        {
+            LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.mount.empty." + index, EnemyModule.DamageBinding,
+                LocalPlan.RecordBinding, new[] { ("target", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject,
+                LocalPlan.Mount("enemy-type", reference)));
+        }
+        catch (RuntimeContractException error) { code = error.Code; }
+        return (code == "invalid-string", "An unspellable enemy-type reference is refused when the plan loads.", $"{reference.Length} chars: {code}");
+    }).ToArray();
+});
+Case("mount.enemy-type-foreign-subject-ignored", () =>
+{
+    // The event belongs to another domain's provider and carries only its own entity: the enemy provider is
+    // asked whether it claims that subject, and it owns no such instance.
+    var scene = Scene(_ => 7u); var other = new EntityReference("test.other:1", 1, 1);
+    var records = new List<CommandContext>();
+    var domain = scene.Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, OtherDomainRegistry,
+        new Dictionary<string, CommandHandler>(), new[] { new BindingSupport(OtherTriggerBinding, "implementation-only", Array.Empty<string>()) },
+        new Dictionary<string, Func<EntityReference, bool>> { ["test.other"] = reference => reference == other }), RuntimeLogLevel.Off);
+    scene.Kernel.RegisterModule(LocalPlan.Recorder(records.Add), RuntimeLogLevel.Off);
+    LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.mount.foreign", OtherTriggerBinding,
+        LocalPlan.RecordBinding, new[] { ("subject", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject,
+        LocalPlan.EnemyTypeMount(7)));
+    var dispatch = domain.Publish(new RuntimeEvent("probe.ping", OtherTriggerBinding, 1, 0, "probe.scope", RuntimeJson.From(new { subject = other })));
+    var tick = scene.Kernel.Advance(1, true);
+    return (dispatch.Status == "ignored" && dispatch.Code == "attachment-mismatch" && tick.Commands.Count == 0 && records.Count == 0,
+        "Another domain's subject never matches an enemy type.",
+        $"dispatch={dispatch.Status}/{dispatch.Code}; commands={tick.Commands.Count}; records={records.Count}");
+});
+Case("mount.enemy-type-life-retired-while-reading", () =>
+{
+    // The type read is native, so the life it answered for can be retired before the answer is used. The module's
+    // own resolve decides, not the fact that a type was once readable.
+    EnemyModule? reading = null;
+    var retired = MountScene("test.receiver.mount.retired", LocalPlan.EnemyTypeMount(7),
+        enemy => { reading!.TrackDespawn(enemy); return 7u; });
+    reading = retired.Module;
+    Damage(retired.Module, retired.Enemy);
+    var tick = retired.Kernel.Advance(1, true);
+    return (tick.Commands.Count == 0 && retired.Records.Count == 0,
+        "A life retired while its type was read is not a match.",
+        $"commands={tick.Commands.Count}; records={retired.Records.Count}");
+});
+Case("mount.enemy-type-unregistered-kind", () =>
+{
+    // A session with no enemy-type read registers no such matcher, so the same plan is refused at load instead
+    // of being accepted and never dispatched.
+    var scene = Scene(); scene.Kernel.RegisterModule(LocalPlan.Recorder(_ => { }), RuntimeLogLevel.Off);
+    var code = "loaded";
+    try
+    {
+        LocalPlan.Load(scene.Kernel, LocalPlan.Build(scene.Kernel, "test.receiver.mount.unregistered", EnemyModule.DamageBinding,
+            LocalPlan.RecordBinding, new[] { ("target", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject,
+            LocalPlan.EnemyTypeMount(7)));
+    }
+    catch (RuntimeContractException error) { code = error.Code; }
+    return (code == "attachment-kind", "A mount kind no provider registered is refused at load.", code);
+});
 
-int failed = checks.Count(c => !c.Passed), passed = checks.Count - failed;
-using var sdkStream = File.OpenRead(typeof(RuntimeKernel).Assembly.Location);
+// --- forge.action.combat.damage: the action itself, dispatched straight into the receiver ---------------------
+// The probe compiles the production source against the stand-in receiver, so a submitted hit is counted by the
+// same `Attacks` field that counts a heal's `Sends`: no injection seam and no second write path exists.
+(RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) ActionScene(Action<EnemyAgent>? onAttack)
+{
+    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
+    kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
+    kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+    var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
+    var actor = Enemy();
+    // The stand-in receiver answers the one native entry call: a landed hit, a hit whose rules nullify it, or a
+    // throwing call, exactly as the frozen evidence describes the game's own receiver.
+    if (onAttack != null) actor.Damage.OnBulletDamage = _ => onAttack(actor);
+    return (kernel, module, actor, module.TrackSpawn(actor));
+}
+CommandResult Strike(EnemyModule module, EntityReference[] targets, double amount, string policy = "receiver_rules",
+    int kind = 0, int? limb = null)
+{
+    var origin = new RuntimeEvent("probe.damageaction", EnemyModule.DamageActionBinding, 1, 0, "probe.scope", RuntimeJson.EmptyObject);
+    // Source and instigator carry no targeting restriction; the probe reuses the first recipient for both. An
+    // omitted optional port is left out of the inputs instead of being written as null.
+    var inputs = new Dictionary<string, object?>
+    {
+        ["targets"] = targets, ["source"] = targets[0], ["instigator"] = targets[0], ["amount"] = amount, ["damage_kind"] = kind
+    };
+    if (limb.HasValue) inputs["limb"] = limb.Value;
+    var context = (CommandContext)Activator.CreateInstance(typeof(CommandContext), BindingFlags.Instance | BindingFlags.NonPublic, null,
+        new object[] { origin, 0L, "probe.command", "probe.plan", "probe.resource", "1", "probe.node",
+            RuntimeJson.From(new { mitigation_policy = policy }), RuntimeJson.From(inputs), true }, null)!;
+    return (CommandResult)typeof(EnemyModule).GetMethod("Damage", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(module, new object[] { context })!;
+}
+JsonElement[] HitRows(CommandResult result) => result.Outputs.GetProperty("results").EnumerateArray().ToArray();
+// A row's own field, or a marker that no assertion can accidentally accept when it is absent.
+string Field(JsonElement row, string name) => row.TryGetProperty(name, out var value) ? value.ToString() : "<missing:" + name + ">";
+Case("action.ports-match-contract", () =>
+{
+    var scene = ActionScene(null);
+    var contract = scene.Kernel.ResolveGraphContract("forge.action.combat.damage", "2.0.0", RuntimeJson.EmptyObject);
+    // The execution ports are the kernel's own frames, not handler arguments.
+    var declared = contract.GetProperty("inputs").EnumerateArray()
+        .Where(p => p.GetProperty("type").GetString() != "execution").Select(p => p.GetProperty("id").GetString()!)
+        .Concat(contract.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("id").GetString()!)).ToArray();
+    var shape = (HandlerShape)typeof(EnemyModule).GetField("DamagePorts", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+    var names = shape.InputPorts.Concat(shape.ParameterIds).ToArray();
+    return (declared.Length > 0 && names.OrderBy(n => n, StringComparer.Ordinal).SequenceEqual(declared.OrderBy(n => n, StringComparer.Ordinal)),
+        "The handler declares exactly the ports the registered contract declares.",
+        $"contract=[{string.Join(",", declared)}]; shape=[{string.Join(",", names)}]");
+});
+Case("action.host-commits", () =>
+{
+    var scene = ActionScene(enemy => enemy.Damage.Health = 40);
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    var row = HitRows(result)[0];
+    return (result.Status == "succeeded" && result.CommitState == CommitStates.Confirmed && scene.Enemy.Damage.Attacks == 1
+        && Field(row, "status") == "committed" && Field(row, "committed") == "confirmed"
+        && Field(row, "amount") == "10" && Field(row, "target_count") == "1",
+        "A landed hit commits, is submitted once, and answers one row.",
+        $"status={result.Status}; commit={result.CommitState}; attacks={scene.Enemy.Damage.Attacks}; row={row}");
+});
+Case("action.not-host-authority", () =>
+{
+    // The native entry point is not host-gated for this receiver type (its local-application gate reads a field
+    // Setup arms only for player bots), so the provider's own authority check is the one that refuses a client.
+    var scene = ActionScene(enemy => enemy.Damage.Health = 40); SNet.IsMaster = false;
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    return (result.Status == "rejected" && result.Code == "authority-or-phase" && scene.Enemy.Damage.Attacks == 0,
+        "A client cannot submit a damage action.", $"{result.Status}/{result.Code}; attacks={scene.Enemy.Damage.Attacks}");
+});
+Case("action.stale-entity", () =>
+{
+    var scene = ActionScene(null); scene.Module.TrackDespawn(scene.Enemy);
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    return (result.Status == "rejected" && result.Code == "stale-or-unsupported-recipient" && scene.Enemy.Damage.Attacks == 0,
+        "A retired life is refused before any native call.", $"{result.Status}/{result.Code}");
+});
+Case("action.missing-receiver", () =>
+{
+    var scene = ActionScene(null); scene.Enemy.Damage.IsSetup = false;
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    return (result.Code == "missing-health-receiver" && scene.Enemy.Damage.Attacks == 0,
+        "A receiver that is not set up is refused.", result.Code);
+});
+Case("action.dead-target", () =>
+{
+    var scene = ActionScene(null); scene.Enemy.Alive = false;
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    return (result.Code == "not-alive" && scene.Enemy.Damage.Attacks == 0, "Damage never revives or strikes a dead recipient.", result.Code);
+});
+Case("action.unseen-commit-is-unknown", () =>
+{
+    // The frozen native evidence: a hit the receiver's rules reduce to nothing and a rejected hit are
+    // indistinguishable from this side of the call, so neither may be reported as a commit.
+    var scene = ActionScene(null);
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    var row = HitRows(result)[0];
+    return (result.Status == "failed" && result.CommitState == CommitStates.Unknown && result.Code == "damage-unseen"
+        && scene.Enemy.Damage.Attacks == 1 && Field(row, "committed") == "unknown"
+        && Field(row, "status") == "unknown" && Field(row, "amount") == "10",
+        "A hit that moved no health is an unknown commit, never a success.",
+        $"status={result.Status}; commit={result.CommitState}; code={result.Code}; row={row}");
+});
+Case("action.commit-throws-unknown", () =>
+{
+    var scene = ActionScene(enemy => throw new InvalidOperationException("not in the query region"));
+    var result = Strike(scene.Module, new[] { scene.Ref }, 10);
+    return (result.Status == "failed" && result.CommitState == CommitStates.Unknown && result.Code == "native-commit-exception",
+        "A throwing entry point is an unknown commit that is never retried.", $"{result.Status}/{result.Code}");
+});
+Case("action.multiple-recipients-ordered", () =>
+{
+    var scene = ActionScene(null);
+    var second = Enemy(20, 8); second.Damage.OnBulletDamage = damage => damage.Health = 45;
+    scene.Enemy.Damage.OnBulletDamage = damage => damage.Health = 40;
+    var secondRef = scene.Module.TrackSpawn(second);
+    var result = Strike(scene.Module, new[] { scene.Ref, secondRef }, 10);
+    var rows = HitRows(result);
+    return (result.Status == "succeeded" && rows.Length == 2
+        && RuntimeJson.Entity(rows[0].GetProperty("target")) == scene.Ref && RuntimeJson.Entity(rows[1].GetProperty("target")) == secondRef
+        && rows.All(r => r.GetProperty("target_count").GetInt32() == 2),
+        "One row per recipient, in the plan's own order.",
+        $"status={result.Status}; code={result.Code}; rows={rows.Length}; first={(rows.Length > 0 ? RuntimeJson.Entity(rows[0].GetProperty("target")) == scene.Ref : false)};"
+        + $" second={(rows.Length > 1 ? RuntimeJson.Entity(rows[1].GetProperty("target")) == secondRef : false)};"
+        + $" counts=[{string.Join(",", rows.Select(r => Field(r, "target_count")))}];"
+        + $" codes=[{string.Join(",", rows.Select(r => Field(r, "code")))}];"
+        + $" health=[{string.Join(",", rows.Select(r => Field(r, "healthBefore") + "->" + Field(r, "healthAfter")))}];"
+        + $" attacks=[{scene.Enemy.Damage.Attacks},{second.Damage.Attacks}];"
+        + $" targets=[{string.Join(",", rows.Select(r => r.GetProperty("target").ToString()))}]");
+});
+Case("action.limb-id-resolves-to-index", () =>
+{
+    var scene = ActionScene(enemy => enemy.Damage.Health = 40);
+    var first = new Dam_EnemyDamageLimb { m_limbID = 3, m_base = scene.Enemy.Damage, Pointer = new IntPtr(300) };
+    var second = new Dam_EnemyDamageLimb { m_limbID = 7, m_base = scene.Enemy.Damage, Pointer = new IntPtr(301) };
+    scene.Enemy.Damage.DamageLimbs = new[] { first, second };
+    var named = Strike(scene.Module, new[] { scene.Ref }, 10, limb: 7);
+    var absent = Strike(scene.Module, new[] { scene.Ref }, 10, limb: 5);
+    return (named.Status == "succeeded" && absent.Status == "rejected" && absent.Code == "invalid-limb",
+        "A limb id no limb declares is refused; a declared one is submitted.",
+        $"named={named.Status}; absent={absent.Status}/{absent.Code}");
+});
+Case("action.kind-index-outside-set", () =>
+{
+    var scene = ActionScene(null);
+    var outside = Strike(scene.Module, new[] { scene.Ref }, 10, kind: 9);
+    var inside = Strike(scene.Module, new[] { scene.Ref }, 10, kind: 8);
+    return (outside.Status == "rejected" && outside.Code == "damage-kind-unsupported" && inside.Code != "damage-kind-unsupported",
+        "An index outside the declared damage_kind set is refused.", $"{outside.Code}; {inside.Code}");
+});
+Case("action.unsupported-mitigation", () =>
+{
+    var scene = ActionScene(null);
+    var ignored = Strike(scene.Module, new[] { scene.Ref }, 10, policy: "ignore_armor");
+    return (ignored.Status == "rejected" && ignored.Code == "mitigation-policy-unsupported" && scene.Enemy.Damage.Attacks == 0,
+        "A mitigation policy the native entry point cannot express is refused.", ignored.Code);
+});
+Case("action.amount-bounds", () =>
+{
+    var scene = ActionScene(null);
+    var zero = Strike(scene.Module, new[] { scene.Ref }, 0);
+    var huge = Strike(scene.Module, new[] { scene.Ref }, 1000001);
+    return (zero.Code == "amount-out-of-range" && huge.Code == "amount-out-of-range" && scene.Enemy.Damage.Attacks == 0,
+        "A non-positive or unbounded amount is refused before submission.", $"{zero.Code}/{huge.Code}");
+});
+
+// --- the canonical damage contract against the authoring catalog ----------------------------------------------
+// The catalog row is the shared contract's source of truth, so the declared capability has to be that row port
+// for port and column for column, and the provider's manifest has to advertise the binding that serves it.
+Case("contract.damage-row-verbatim", () =>
+{
+    string catalogPath = Path.Combine(websiteRoot, "catalog", "capability-catalog.json");
+    if (!File.Exists(catalogPath))
+        throw new FileNotFoundException("The authoring catalog this comparison needs is required: " + catalogPath);
+    var catalog = JsonDocument.Parse(File.ReadAllBytes(catalogPath)).RootElement.GetProperty("canonicalVocabulary")
+        .EnumerateArray().SingleOrDefault(row => row.GetProperty("id").GetString() == DamageCapabilityId);
+    var declared = JsonDocument.Parse(CombatContracts.Module().RegistryJson).RootElement.GetProperty("capabilities")
+        .EnumerateArray().SingleOrDefault(row => row.GetProperty("id").GetString() == DamageCapabilityId);
+    bool row = catalog.ValueKind == JsonValueKind.Object && declared.ValueKind == JsonValueKind.Object;
+    var columns = row ? declared.GetProperty("graph").GetProperty("outputs").EnumerateArray()
+        .Single(port => port.GetProperty("id").GetString() == "result").GetProperty("fields").EnumerateArray()
+        .Select(field => field.GetProperty("id").GetString()!).ToArray() : Array.Empty<string>();
+    var scene = ActionScene(null);
+    var binding = JsonDocument.Parse(scene.Kernel.ExportManifest()).RootElement.GetProperty("registry")
+        .GetProperty("bindings").EnumerateArray()
+        .SingleOrDefault(item => item.GetProperty("capabilityId").GetString() == DamageCapabilityId);
+    bool served = binding.ValueKind == JsonValueKind.Object
+        && binding.GetProperty("providerId").GetString() == EnemyModule.ProviderId
+        && binding.GetProperty("handler").GetString() == "gtfo.enemy.damage"
+        && binding.GetProperty("role").GetString() == "execute"
+        && binding.GetProperty("status").GetString() == "implemented";
+    return (row
+        && catalog.GetProperty("category").GetString() == declared.GetProperty("kind").GetString()
+        && catalog.GetProperty("labelZh").GetString() == declared.GetProperty("label").GetString()
+        && catalog.GetProperty("descriptionZh").GetString() == declared.GetProperty("parameters").GetProperty("description").GetString()
+        && SameGraph(catalog.GetProperty("graph"), declared.GetProperty("graph"))
+        && columns.Take(4).SequenceEqual(new[] { "target", "status", "committed", "code" })
+        && served,
+        "The canonical damage row equals the catalog row and the manifest advertises its binding.",
+        $"row={row}; columns=[{string.Join(",", columns)}]; binding={binding.ValueKind}; served={served}");
+});
+// Domains compare as a set, the way the two repositories compare every shared graph; every other field,
+// including the result columns, is compared field for field.
+bool SameGraph(JsonElement expected, JsonElement actual)
+{
+    var expectedDomains = expected.GetProperty("domains").EnumerateArray().Select(domain => domain.GetString()!).ToArray();
+    var actualDomains = actual.GetProperty("domains").EnumerateArray().Select(domain => domain.GetString()!).ToArray();
+    if (expectedDomains.Length != actualDomains.Length || !expectedDomains.All(actualDomains.Contains)) return false;
+    var left = expected.EnumerateObject().Where(field => field.Name != "domains").ToDictionary(field => field.Name, field => field.Value);
+    var right = actual.EnumerateObject().Where(field => field.Name != "domains").ToDictionary(field => field.Name, field => field.Value);
+    return left.Count == right.Count
+        && left.All(field => right.TryGetValue(field.Key, out var value) && Same(field.Value, value));
+}
+bool Same(JsonElement left, JsonElement right)
+{
+    if (left.ValueKind != right.ValueKind) return false;
+    if (left.ValueKind == JsonValueKind.Object)
+    {
+        var leftFields = left.EnumerateObject().ToDictionary(field => field.Name, field => field.Value);
+        var rightFields = right.EnumerateObject().ToDictionary(field => field.Name, field => field.Value);
+        return leftFields.Count == rightFields.Count
+            && leftFields.All(field => rightFields.TryGetValue(field.Key, out var value) && Same(field.Value, value));
+    }
+    if (left.ValueKind == JsonValueKind.Array)
+    {
+        var leftItems = left.EnumerateArray().ToArray();
+        var rightItems = right.EnumerateArray().ToArray();
+        return leftItems.Length == rightItems.Length
+            && leftItems.Zip(rightItems).All(pair => Same(pair.First, pair.Second));
+    }
+    return left.GetRawText() == right.GetRawText();
+}
+
+int failed = checks.Count(c => !c.Passed), passed = checks.Count - failed;using var sdkStream = File.OpenRead(typeof(RuntimeKernel).Assembly.Location);
 using var sdkHash = System.Security.Cryptography.SHA256.Create();
 var report = new { receiverSourceSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "EnemyModule.source.cs")))),
     scenarioRevision = "independent-scenarios-local-plans-v4", schemaVersion = 4, verification = "production-source-and-explicit-compiled-sdk-with-test-doubles", gameExecuted = false,

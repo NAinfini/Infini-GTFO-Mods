@@ -40,9 +40,20 @@ R3_MUTATIONS = [('actor-fallback',
   'ordered.ThenBy(row => ReferenceCollections.OrderKey(row.Row.Ref), StringComparer.Ordinal)',
   'ordered.ThenBy(row => "", StringComparer.Ordinal)')]
 
-R3_MUTATIONS += [('filter-reversed-relation', 'Targeting/ObservedRecipientFilter.cs', 'relations.Resolve(anchorSnapshot, row)', 'relations.Resolve(row, anchorSnapshot)'), ('filter-ignores-receiver', 'Targeting/ObservedRecipientFilter.cs', 'if (missingReceivers.Length > 0)', 'if (missingReceivers.Length < 0)'), ('filter-kind-as-relation', 'Targeting/ObservedRecipientFilter.cs', 'var relation = relations.Resolve(anchorSnapshot, row);', 'var relation = row.Kind == "enemy" ? "hostile" : "ally";'), ('filter-prefers-source', 'Targeting/ObservedRecipientFilter.cs', 'actors.Get(policy.Anchor)', 'actors.Get("source")'), ('filter-ignores-tags', 'Targeting/ObservedRecipientFilter.cs', 'if (missingTags.Length > 0)', 'if (missingTags.Length < 0)'), ('filter-truncates', 'Targeting/ObservedRecipientFilter.cs', 'throw new RuntimeContractException("recipient-target-limit", "Matched targets exceed the explicit limit; no partial selection is returned.");', 'selected = selected.Take(policy.Maximum).ToArray();')]
-
-R3_MUTATIONS.append(('filter-normalizes-receiver', 'Targeting/RecipientFilterPolicy.cs', 'copy[i] = TextValue(values[i]);', 'copy[i] = Text(RuntimeJson.From(values[i]));'))
+R3_MUTATIONS += [
+  ('filter-reversed-relation', 'Targeting/ObservedRecipientFilter.cs',
+   'relations.Resolve(anchorSnapshot, row)', 'relations.Resolve(row, anchorSnapshot)'),
+  ('filter-anchor-replaced', 'Targeting/ObservedRecipientFilter.cs',
+   'observed.Single(row => row.Ref == anchor)', 'observed.Single(row => row.Ref == captured[0])'),
+  ('filter-keeps-anchor', 'Targeting/ObservedRecipientFilter.cs',
+   'var candidatesSet = new HashSet<EntityReference>(captured);',
+   'var candidatesSet = new HashSet<EntityReference>(requested);'),
+  ('filter-unordered', 'Targeting/ObservedRecipientFilter.cs',
+   '.OrderBy(row => ReferenceCollections.OrderKey(row), StringComparer.Ordinal)',
+   '.OrderBy(row => string.Empty, StringComparer.Ordinal)'),
+  ('filter-cardinality-lies', 'Targeting/ObservedRecipientFilter.cs',
+   'new RecipientFilterSelection(matched, captured.Length, candidatesSet.Count)',
+   'new RecipientFilterSelection(matched, candidatesSet.Count, candidatesSet.Count)')]
 
 R3_MUTATIONS += [('capsule-exclusive', 'Targeting/ObservedSpatialNodes.cs', 'point[2])) <= radius,', 'point[2])) < radius,'), ('box-shallow', 'Targeting/ObservedSpatialNodes.cs', 'Delta(row.Position[1], point[1]) <= height / 2d && Delta(row.Position[2], point[2]) <= radius', 'Delta(row.Position[1], point[1]) <= radius && Delta(row.Position[2], point[2]) <= radius')]
 
@@ -51,7 +62,7 @@ def sources(site: Path) -> list[Path]:
     for directory in ['Pure','Targeting','tests/Pure','tests/R3Consumers','tests/Contracts','tests/Acceptance','tools']:
         paths += [p for p in (ROOT/directory).glob('*') if p.suffix in {'.cs','.csproj','.py','.mjs'}]
     paths += list((ROOT/'tests/fixtures').rglob('*.json'))
-    paths += list((ROOT.parent/'ForgeRuntime/Framework').glob('*.cs'))
+    paths += list((ROOT.parent/'ForgeRuntime/Framework').rglob('*.cs'))
     paths += [ROOT.parent/'ForgeRuntime/Framework/ForgeRuntime.Framework.csproj']
     paths += list((site/'site/forge').rglob('*.ts'))
     paths += [site/'Tools/register-typescript.ts',site/'catalog/capability-catalog.json']

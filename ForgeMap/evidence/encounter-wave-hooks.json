@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "purpose": "forge-enemy-encounter-wave-native-hooks",
-  "ownership": "ruling 49: encounter/wave/spawn_shortfall triggers and the encounter/wave actions belong to ForgeEnemy; this file is the native evidence handover and stays dual-read until the ForgeEnemy evidence set exists",
+  "ownership": "encounter/wave/spawn_shortfall triggers and the encounter/wave actions belong to ForgeEnemy; this file is the native evidence handover and stays dual-read until the ForgeEnemy evidence set exists",
   "verification": "metadata-and-static-native-call-graph-only",
   "gameVerified": false,
   "gameVerifiedNote": "Static evidence only: interop metadata from the Forge-MapEditor-QA profile, dump.cs of the same build, and direct x64 call sites decoded from GameAssembly.dll. Nothing was executed. Per-batch spawn timing, exhaustion and shortfall are NOT observable from metadata; only the fields that would carry them are listed.",
@@ -12,11 +12,11 @@
   "dumpSource": "C:\\Users\\nainf\\Github\\General Task\\gtfo-inspection\\dumper\\dump.cs",
   "interopSource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop",
   "gameAssemblySource": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
-  "rulingRefs": [
-    "rulings-step1.md 19: host authority; the wave lifecycle is master-side",
-    "rulings-step1.md 26: wave handle identity",
-    "rulings-step1.md 43: handle frames",
-    "rulings-step1.md 49: encounter/wave/spawn_shortfall are produced by ForgeEnemy"
+  "rules": [
+    "the host is the authority; the wave lifecycle is master-side",
+    "a wave is identified by its handle",
+    "a wave handle is carried in a frame",
+    "encounter/wave/spawn_shortfall are produced by ForgeEnemy"
   ],
   "assemblies": [
     { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
@@ -353,7 +353,7 @@
     }
   ],
   "catalogMismatches": [
-    "ruling 49 assigns encounter/wave/spawn_shortfall to ForgeEnemy, while this evidence file lives in ForgeMap/evidence; the file must be moved or mirrored when the ForgeEnemy evidence set is created.",
+    "encounter/wave/spawn_shortfall and the encounter/wave actions belong to ForgeEnemy, while this evidence file lives in ForgeMap/evidence; the file must be moved or mirrored when the ForgeEnemy evidence set is created.",
     "The catalog models an 'encounter' as a native object with start/pause/stop; the game has no encounter type. The nearest native owners are Mastermind (event list plus active groups), SurvivalWave (one event) and the door's ActiveEnemyWaveData.",
     "forge.trigger.encounter.encounter_paused and forge.action.map.encounter_pause have no native counterpart at all: the only pause-like states are internal wave timers (InitialPause, WaitForGroupSpawn) and the door suppression flag.",
     "forge.trigger.encounter.spawn_shortfall has no native event; the game only exposes requested cost and registered groups, so Forge must define the condition.",

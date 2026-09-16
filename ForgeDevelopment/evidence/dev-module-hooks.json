@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "family": "dev-module",
+  "verification": "source-and-catalog-reading-plus-focused-test-build",
+  "gameVerified": false,
+  "buildId": "20403457",
+  "decompileSource": "not required: every fact below is read from this repository's own sources and from the authoring catalog, not from a native assembly. No game type, no il2cpp interop type and no BepInEx type is named by any source this slice adds.",
+  "decompileLimit": "The seven rows are an authoring facility, not an observation of the game. What the rows can promise is therefore decided by the runtime SDK's handler surface and by what the kernel exposes to a handler, and both are read here from the working tree rather than decompiled.",
+  "capabilities": [
+    "forge.action.diagnostic.trace",
+    "forge.action.diagnostic.assert",
+    "forge.action.diagnostic.breakpoint",
+    "forge.action.diagnostic.inspect",
+    "forge.action.diagnostic.metric",
+    "forge.action.diagnostic.spawn_preview",
+    "forge.action.diagnostic.cost_estimate"
+  ],
+  "implemented": [
+    {
+      "capability": "forge.action.diagnostic.trace",
+      "conclusion": "implemented",
+      "evidence": [
+        "catalog/capability-catalog.json:40525 declares the row with targetOwner \"Development\", graph.execution \"presentation\", inputs in/session/graph/sample_rate and result fields target/status/committed/code/sample_rate",
+        "ForgeRuntime/Framework/Contracts.cs:423-453 CommandContext carries PlanId, ResourceId, NodeId, EventId, CauseId, CommandId, ScopeId, WorldEpoch and SimulationTick, which are exactly the identities the row's effectRequirements names (graphId/nodeId/eventId/causeId/sampleRate)",
+        "ForgeRuntime/Framework/RuntimeKernel.Handles.cs:38 RuntimeModuleHandle.CreateRequestHandle(string lifetime) is the only handle cast the SDK exposes for a session, and \"session\" is in RuntimeGraphContracts.HandleLifetimes:47",
+        "ForgeDevelopment/Native/DiagnosticsReport.cs:93 DiagnosticsReport.Event(category, stage, subject, fields, elapsedMs) is the existing record path; ForgeDevelopment/Native/AsyncReportWriter.cs:35 is the existing writer"
+      ],
+      "derivation": "none: the record is the handler's own decision, and every identity it writes is a value the dispatch handed it"
+    },
+    {
+      "capability": "forge.action.diagnostic.assert",
+      "conclusion": "implemented against the ruled shape",
+      "shapeChange": "policy enum narrowed from the catalog's {\"report\",\"halt\"} to {\"report\",\"record\"}",
+      "evidence": [
+        "catalog/capability-catalog.json:40705 declares policy with values report/halt",
+        "fwdesign/fwd-equip/design.md:152 rules that assert only does \"record and continue\" or \"count into the result row\", and that a halt is impossible because the kernel has no pause state",
+        "the kernel really has none: the only suspension in ForgeRuntime/Framework is RuntimeKernel.Lifecycle.cs:55, which marks the StartupState Failed and stops the runtime; Plugin.cs:34 IsSuspended only reports that state",
+        "ForgeRuntime/Framework/RuntimeGraphContracts.cs:470-481 allows a structural enum to narrow a whole set to a proper subset, but an inline member list that is not a subset of a named set is refused with enum-values; the two implemented members are therefore declared inline"
+      ],
+      "reshapeOwner": "the catalog batch must narrow the row's policy to the same two members or the row and the site disagree"
+    },
+    {
+      "capability": "forge.action.diagnostic.inspect",
+      "conclusion": "implemented against the ruled shape",
+      "shapeChange": "session handle kind changed from \"subscription\" to \"request\"",
+      "evidence": [
+        "catalog/capability-catalog.json:40836 declares inputs in/targets/fields/budget and outputs next/result/snapshot, with recipients.input \"targets\"",
+        "ForgeRuntime/Framework/RuntimeKernel.Entities.cs:139 InspectEntities(IReadOnlyList<EntityReference>) is public and budgeted (MaximumEntityReferencesPerQuery = 256, MaximumEntityQueriesPerTick = 64), and RuntimeKernel.cs:300 entity budget is per world/tick",
+        "RuntimeKernel.Entities.cs:263-278 InspectEntity answers a named failure per reference (entity-observer-unavailable, entity-observation-unavailable, entity-observation-mismatch) instead of an empty snapshot",
+        "EntityObservationContracts.cs:21-46 RuntimeEntitySnapshot carries exactly ref/kind/faction/lifeState/tags/receives/position, so the row's `fields` projection can only name those and anything else is refused by name",
+        "RuntimeKernel.Handles.cs:33-38: the SDK casts effect/lease/charge/transaction/pool/request; there is no subscription cast, so a session handle is a `request` handle (same reshape as trace)"
+      ],
+      "derivation": "none: the snapshot is the kernel's own budgeted read"
+    },
+    {
+      "capability": "forge.action.diagnostic.metric",
+      "conclusion": "implemented",
+      "evidence": [
+        "catalog/capability-catalog.json:40939 declares inputs in/session/value/window/sample_rate and result fields target/status/committed/code/value",
+        "the row's effectRequirements names name/value/unit/window/sampleRate; the row declares no `name` port, so the aggregate key is the node identity the dispatch carries (NodeId + PlanId), which is the only author-visible identity the row has",
+        "the aggregate, the window restart and the sample counter live in the session ledger (ForgeDevelopment/Native/DiagnosticSessions.cs), not in the kernel: no kernel state is written"
+      ]
+    }
+  ],
+  "notImplemented": [
+    {
+      "capability": "forge.action.diagnostic.breakpoint",
+      "reason": "no native evidence and no kernel state",
+      "evidence": [
+        "the kernel has no pause state: the only suspension is RuntimeKernel.Lifecycle.cs:55, which fails the runtime rather than pausing a plan",
+        "fwd-equip design.md:152 and the slice row's own note rule that the row is not registered until `pause_policy` is settled",
+        "registering it would mean a breakpoint that only writes a log line, which is a fake pause"
+      ]
+    },
+    {
+      "capability": "forge.action.diagnostic.spawn_preview",
+      "reason": "its input resource kind no longer exists and the solver it needs is not in the runtime",
+      "evidence": [
+        "catalog/capability-catalog.json:41064 still declares the recipient input `room` with resourceKind \"room\"",
+        "ruling 85 deleted the `room` resource kind; ForgeRuntime/Framework/RuntimeGraphContracts.cs:40-42 lists the kinds this runtime accepts and `room` is still present only because the catalog row that spells it has not been reshaped yet",
+        "no production provider owns `zone` either: the only resource provider in the working tree is ForgeMap/AlarmWaveContract.cs:360 (chained-puzzle), so a `zone`-shaped row would be refused resource-unavailable by every plan that pinned it",
+        "the spawn solver (forge.action.map.spawn_solve) is not in the working tree"
+      ]
+    },
+    {
+      "capability": "forge.action.diagnostic.cost_estimate",
+      "reason": "the kernel exposes no plan or graph IR to a handler, so no honest number can be produced",
+      "evidence": [
+        "catalog/capability-catalog.json:41149 declares the input `graph` (resourceKind behavior_graph) and effectRequirements costs/budgets/scenario",
+        "RuntimeJson.ResourceRefOf (ForgeRuntime/Framework/RuntimeJson.cs:194) reduces a resource value to {resourceKind, resourceId}: a handler never sees the graph itself",
+        "RuntimeKernel.cs:34-35 keeps `plans` private and ForgeRuntime/Framework/ForgeRuntime.Framework.csproj:15 grants InternalsVisibleTo to ForgeRuntime only, so no package can read a loaded plan or its steps",
+        "no provider owns the `behavior_graph` resource kind at all (only ForgeMap/AlarmWaveContract.ResourceProviders exists), so even the reference cannot be resolved",
+        "the row's own design note forbids filling an unknown handler cost with zero"
+      ]
+    }
+  ],
+  "runtimeSurface": [
+    {
+      "type": "ForgeRuntime.Framework.RuntimeKernel",
+      "assembly": "ForgeRuntime.Framework.dll",
+      "role": "the surface the diagnostic rows are registered against and the only world read they make",
+      "members": [
+        { "name": "RegisterModule", "signature": "RuntimeModuleHandle RuntimeKernel::RegisterModule(RuntimeModule, RuntimeLogLevel)", "usedFor": "the one registration path; a non-authoring caller never reaches it" },
+        { "name": "InspectEntities", "signature": "RuntimeEntityQueryResult RuntimeKernel::InspectEntities(IReadOnlyList<EntityReference>)", "usedFor": "inspect's only read, budgeted by the kernel" },
+        { "name": "CurrentTick", "signature": "long RuntimeKernel::get_CurrentTick()", "usedFor": "the per-tick record budget" },
+        { "name": "WorldEpoch", "signature": "long RuntimeKernel::get_WorldEpoch()", "usedFor": "the world a session belongs to" },
+        { "name": "ObserveLifecycle", "signature": "RuntimeLifecycleSubscription RuntimeModuleHandle::ObserveLifecycle(Action<RuntimeLifecycleEvent>, bool)", "usedFor": "the world boundary that opens and drops the session, taken from the kernel instead of a second game hook" }
+      ]
+    },
+    {
+      "type": "ForgeRuntime.Framework.RuntimeModuleHandle",
+      "assembly": "ForgeRuntime.Framework.dll",
+      "role": "the provider's own handle API; the session handle is cast through it",
+      "members": [
+        { "name": "CreateRequestHandle", "signature": "JsonElement RuntimeModuleHandle::CreateRequestHandle(string lifetime)", "usedFor": "the session handle; kind `request`, lifetime `session`" },
+        { "name": "RegisterNative", "signature": "void RuntimeModuleHandle::RegisterNative(JsonElement, object)", "usedFor": "the object the session handle stands for, so the kernel's own liveness check answers for it" },
+        { "name": "TryNative", "signature": "bool RuntimeModuleHandle::TryNative(JsonElement, out object?)", "usedFor": "the liveness probe: false means a released slot, a recycled generation or another provider's handle" }
+      ]
+    },
+    {
+      "type": "ForgeRuntime.Framework.RuntimeKernel.Presentation",
+      "assembly": "ForgeRuntime.Framework.dll",
+      "role": "the tier every diagnostic row is declared at, and the rule that decides what a handler may return",
+      "members": [
+        { "name": "ExecutePresentationCommand", "signature": "CommandResult RuntimeKernel::ExecutePresentationCommand(planId, stepIndex, commandId, eventId, scopeId, simulationTick, inputs)", "usedFor": "the recipient half; a handler result with any commit state but `none` is refused with presentation-commit" },
+        { "name": "MaximumPresentationInputBytes", "signature": "const int = 512", "usedFor": "the largest input frame one presentation step may carry" }
+      ]
+    },
+    {
+      "type": "ForgeRuntime.Framework.RuntimeJson",
+      "assembly": "ForgeRuntime.Framework.dll",
+      "role": "the only value construction the handlers use",
+      "members": [
+        { "name": "Handle", "signature": "void RuntimeJson::Handle(JsonElement)", "usedFor": "the handle grammar the kernel itself validates a handle value against" },
+        { "name": "Entity", "signature": "EntityReference RuntimeJson::Entity(JsonElement)", "usedFor": "decoding the references an inspect step was handed" }
+      ]
+    }
+  ],
+  "authorGate": {
+    "finding": "the author-only boundary already exists three times over and this slice adds no fourth marker",
+    "evidence": [
+      "catalog: every one of the seven rows carries targetOwner \"Development\"",
+      "Release/release.json:204-228 gives the ForgeDevelopment package audience \"author\", and the website's catalog/forge-release/forge-release.json carries the same field",
+      "ForgeDevelopment/Native/Plugin.cs:29-33 returns before binding settings or patching anything when HostPlugin.ConfiguredMode is not RuntimeMode.Authoring",
+      "ForgeDevelopment/Native/ForgeDevelopment.Native.csproj:18 includes Native/*.cs, so the new files need no csproj change"
+    ],
+    "consequence": "a player machine that does not install ForgeDevelopment has no endpoint at all, and a request naming one is answered no-consumer by the network layer"
+  },
+  "unverified": [
+    "nothing in this slice was run in the game: the rows are exercised by ForgeDevelopment/tests/DevelopmentModule over a fixture kernel, and whether the authoring session is actually reachable from an authored plan needs a game run",
+    "the catalog still spells the session handle kind as `subscription` and the assert policy as report/halt, so until the catalog batch lands the site's rows and the registered rows differ by those two members",
+    "the `fields` projection of inspect names the entity observation contract's own columns; a future snapshot field added by another provider would need the projection list extended here as well"
+  ]
+}

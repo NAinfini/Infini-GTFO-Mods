@@ -15,14 +15,19 @@ internal sealed class Scene : IDisposable
     {
         Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
-        Module = new(Kernel, RuntimeLogLevel.Off, () => Allowed, _ => { }, observe ? (actor, reference) => Reader(actor, reference) : null);
+        Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
+        Module = new(Kernel, RuntimeLogLevel.Off, () => Allowed, _ => { }, observe ? (actor, reference) => Reader(actor, reference) : null,
+            EnemyTypeReader.Read);
         Enemy = NewEnemy(); Ref = Module.TrackSpawn(Enemy);
         if (start) Kernel.StartRuntime(() => { });
     }
     internal static EnemyAgent NewEnemy(ushort id = 7, long pointer = 10)
     {
-        var actor = new EnemyAgent { GlobalID = id, Pointer = new(pointer) };
-        actor.Damage = new() { Owner = actor, Pointer = new(pointer + 100) }; return actor;
+        var actor = new EnemyAgent { GlobalID = id, Pointer = new(pointer), Position = (1, 2, 3) };
+        actor.Damage = new() { Owner = actor, Pointer = new(pointer + 100) };
+        // The official type block this life was built from: the `enemy-type` read answers its persistent id.
+        actor.EnemyData = new GameData.EnemyDataBlock { persistentID = 42 };
+        return actor;
     }
     internal RuntimeEntityQueryResult Query() => Kernel.InspectEntities(new[] { Ref });
     public void Dispose() => Module.Dispose();

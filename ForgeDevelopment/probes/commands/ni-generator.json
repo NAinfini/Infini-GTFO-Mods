@@ -1,0 +1,202 @@
+[
+  {
+    "id": "gen-unlock-type2",
+    "title": "Type 2 UnlockSecurityDoor 解锁准星所指的门",
+    "points": ["generator.puzzle2-unlock-events", "door.puzzle2-unlock-callers"],
+    "host": "host",
+    "target": "static:LevelGeneration.WorldEventManager",
+    "before": {
+      "screenshot": true
+    },
+    "steps": [
+      {
+        "worldEvent": {
+          "Type": 2,
+          "Delay": 0.0,
+          "WardenIntel": "<color=orange>experiment: lockdown lifted by a forced Type 2 event.</color>"
+        }
+      },
+      { "wait": { "frames": 20 } },
+      { "screenshot": "after-type2" },
+      { "wait": { "frames": 120 } },
+      { "screenshot": "after-type2-settled" }
+    ],
+    "cleanup": [
+      { "screenshot": "type2-cleanup" }
+    ]
+  },
+  {
+    "id": "gen-door-locked-read",
+    "title": "PuzzleType=3 门的锁状态与交互文案，以及所在区域的别名起点",
+    "points": ["generator.puzzle3-bypass", "generator.customtext-literal-vs-id", "generator.zone-fragment-render"],
+    "host": "any",
+    "target": "lookedAtDoor",
+    "steps": [
+      {
+        "read": [
+          "m_sync.m_stateReplicator.State.status",
+          "m_locks.m_lockedWithNoKey",
+          "m_locks.m_lockedWithNoKeyInteractionText.UntranslatedText",
+          "m_locks.m_lockedWithNoKeyInteractionText.Id"
+        ]
+      },
+      { "screenshot": "locked-door" },
+      {
+        "read": [
+          "m_linksTo.m_zone.m_settings.m_zoneData.ZoneAliasStart",
+          "m_linksTo.m_zone.DimensionIndex",
+          "m_linksTo.m_zone.Layer.m_type",
+          "m_linksTo.m_zone.LocalIndex"
+        ],
+        "target": "lookedAtDoor"
+      }
+    ]
+  },
+  {
+    "id": "gen-intel-zone-fragment",
+    "title": "WardenIntel 里的 [ZONE_n] 片段",
+    "points": ["generator.zone-fragment-render"],
+    "host": "host",
+    "target": "static:LevelGeneration.WardenObjectiveManager",
+    "steps": [
+      {
+        "call": "DisplayWardenIntel",
+        "named": {
+          "layer": "MainLayer",
+          "text": "experiment: door to [ZONE_4] has been unlocked."
+        }
+      },
+      { "wait": { "frames": 20 } },
+      { "screenshot": "intel-zone-fragment" }
+    ]
+  },
+  {
+    "id": "gen-intel-target-zone-fragment",
+    "title": "WardenIntel 里的 [TARGET_ZONE] / [GENERATOR_NAME] 片段",
+    "points": ["generator.intel-fragments"],
+    "host": "host",
+    "target": "static:LevelGeneration.WardenObjectiveManager",
+    "steps": [
+      {
+        "call": "DisplayWardenIntel",
+        "named": {
+          "layer": "MainLayer",
+          "text": "experiment: insert the cell in [GENERATOR_NAME] to unlock the door to [TARGET_ZONE]."
+        }
+      },
+      { "wait": { "frames": 20 } },
+      { "screenshot": "intel-target-zone" }
+    ]
+  },
+  {
+    "id": "gen-intel-localized-id",
+    "title": "WardenIntel 使用本地化 id（385112791 = LOCKDOWN ... LIFTED）",
+    "points": ["generator.customtext-literal-vs-id"],
+    "host": "host",
+    "target": "static:LevelGeneration.WardenObjectiveManager",
+    "steps": [
+      {
+        "call": "DisplayWardenIntel",
+        "named": {
+          "layer": "MainLayer",
+          "text": { "id": 385112791 }
+        }
+      },
+      { "wait": { "frames": 20 } },
+      { "screenshot": "intel-localized-id" }
+    ]
+  },
+  {
+    "id": "gen-intel-fragment-replace",
+    "title": "ReplaceFragmentsInString 对 [ZONE_n] 的实际替换结果",
+    "points": ["generator.intel-fragments", "generator.zone-fragment-render"],
+    "host": "any",
+    "target": "static:LevelGeneration.WardenObjectiveManager",
+    "steps": [
+      {
+        "call": "ReplaceFragmentsInString",
+        "named": {
+          "layer": "MainLayer",
+          "chainIndex": 0,
+          "incoming": "experiment [ZONE_1] [ZONE_4] [EXTRACTION_ZONE] [ALL_ITEMS]",
+          "replaceWithColor": true
+        }
+      },
+      { "wait": { "frames": 1 } }
+    ]
+  },
+  {
+    "id": "gen-cluster-state",
+    "title": "中央发电机集群的发电机组数与逐台状态",
+    "points": ["generator.cluster-requires-type9", "generator.placements-vs-count"],
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_PowerGeneratorCluster",
+    "steps": [
+      {
+        "read": [
+          "m_generators.Count",
+          "m_generators.0.m_serialNumber",
+          "m_generators.0.m_isWardenObjective",
+          "m_generators.0.m_stateReplicator.State.status",
+          "m_serialNumber"
+        ]
+      },
+      { "screenshot": "generator-cluster" }
+    ]
+  },
+  {
+    "id": "gen-cluster-objective-data",
+    "title": "Type 9 目标块里声明的发电机与电池数量",
+    "points": ["generator.cluster-requires-type9"],
+    "host": "any",
+    "target": "static:LevelGeneration.WardenObjectiveManager",
+    "steps": [
+      { "call": "GetWardenObjectiveBehaviour", "args": ["MainLayer", 0] },
+      { "call": "get_WardenObjectiveData", "target": "result" },
+      {
+        "read": [
+          "CentralPowerGenClustser_NumberOfGenerators",
+          "CentralPowerGenClustser_NumberOfPowerCells",
+          "Type"
+        ],
+        "target": "result"
+      },
+      { "screenshot": "cluster-objective-data" }
+    ]
+  },
+  {
+    "id": "gen-generator-status-wait",
+    "title": "等待某台发电机状态变化（插电池后的复制落地）",
+    "points": ["generator.puzzle2-unlock-events"],
+    "host": "any",
+    "target": "allOfType:LevelGeneration.LG_PowerGenerator_Core",
+    "steps": [
+      { "read": ["m_serialNumber", "m_isWardenObjective", "m_stateReplicator.State.status"] },
+      {
+        "wait": {
+          "path": "m_stateReplicator.State.status",
+          "changed": true,
+          "timeoutFrames": 1800
+        }
+      },
+      { "read": ["m_stateReplicator.State.status"], "screenshot": true }
+    ]
+  },
+  {
+    "id": "gen-hud-objective-progress",
+    "title": "目标面板上显示的发电机进度文字",
+    "points": ["generator.placements-vs-count"],
+    "host": "any",
+    "target": "guiManager",
+    "steps": [
+      {
+        "read": [
+          "m_playerLayer.m_wardenObjective.m_header.text",
+          "m_playerLayer.m_wardenObjective.m_items.text",
+          "m_playerLayer.m_wardenObjective.m_progressionObjectives.Count"
+        ]
+      },
+      { "screenshot": "objective-panel" }
+    ]
+  }
+]

@@ -141,7 +141,7 @@ internal sealed class EnemyHealthCommit : EnemyThreadBoundary
         }
 
         var outputs = Envelope(rows);
-        // r11: aggregation branches on whether any row committed, not on unknown==0/facts.Count==0. A committed
+        // Aggregation branches on whether any row committed, not on unknown==0/facts.Count==0. A committed
         // row (including zero-delta) alongside a rejected or unknown row is Partial with possibly-empty facts.
         if (rejected == 0 && unknown == 0) return CommandResult.Succeeded(outputs, facts.ToArray());
         if (committed > 0) return CommandResult.Partial(outputs, unknown > 0 ? CommitStates.Unknown : CommitStates.Confirmed, facts.ToArray());

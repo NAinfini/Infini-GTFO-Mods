@@ -8,7 +8,7 @@ internal static class D1InspectionReviewTests
         var declarations = new ProjectObjectDeclaration[]
         {
             new("exp", "zone", new ProjectZoneLocator(10, 0, 0, 1)),
-            new("exp", "room", new ProjectRoomLocator("zone",
+            new("exp", "room", new ProjectRoomLocator("zone", new ProjectRoomScope(0, 0, 1),
                 new ProjectResourcePin("room-a", new string('a', 64)), "Assets/Rooms/A.prefab"))
         };
         var layouts = new[] { new ProjectLayoutKey(10, 0, 0) };
@@ -30,14 +30,13 @@ internal static class D1InspectionReviewTests
         session.Start(layouts, 11);
         session.Start(layouts, 12); // Duplicate FactoryDone must not restart a started scan.
         scan.ObserveZone(new ProjectZoneCandidate(101, 10, 0, 0, 1));
-        scan.ObserveGeomorph(new ProjectGeomorphObservation(201, 101, "Assets/Rooms/A.prefab", false,
-            new[] { new ProjectAreaCandidate(301, 41) }));
+        scan.ObserveAreas(new ProjectGeomorphAreas(201, 101, new[] { new ProjectAreaCandidate(301, 41) }));
         session.Complete(13);
         var snapshot = scan.Snapshot();
         check(session.IsClosed && session.Outcome == "inspection_complete", "D1: native enumeration can complete once");
         check(snapshot.Groups[0].Status == ProjectReferenceStatus.Matched, "D1: explicit native zone tuple matches");
         check(snapshot.Groups[1].ReasonCode == ProjectReferenceReason.CreationContextUnverified,
-            "D1: even an identical prefab string without creation evidence cannot match an authored room");
+            "D1: a scan without the one room resolver refuses an authored room instead of matching it");
         var latest = Receipt(report, "after");
         check(latest.GetProperty("worldEpoch").GetInt64() == 7 &&
             latest.GetProperty("simulationTick").GetInt64() == 13, "D1: report uses the same scan epoch and completion tick");
@@ -75,6 +74,40 @@ internal static class D1InspectionReviewTests
         check(Receipt(oldReport, "old").GetProperty("worldEpoch").GetInt64() == 7 &&
             Receipt(nextReport, "next").GetProperty("worldEpoch").GetInt64() == 8,
             "D1: two reports retain independent receipts");
+        // The authored room is the one resolver's answer, asked in the zone the locator itself carries and joined
+        // to the areas this scan observed; the scan keeps no second matcher of its own to disagree with it.
+        ProjectObjectReferenceScan Resolved(ProjectRoomResolver rooms) => new(declarations, 7, 11,
+            ProjectSourceVerification.Matched, rooms);
+        ProjectReferenceGroup ResolvedGroup(string name, ProjectRoomResolver rooms)
+        {
+            var scan = Resolved(rooms);
+            var session = new ProjectInspectionSession(new DiagnosticsReport("d1-" + name), scan, 7);
+            session.Start(layouts, 11);
+            scan.ObserveZone(new ProjectZoneCandidate(101, 10, 0, 0, 1));
+            scan.ObserveAreas(new ProjectGeomorphAreas(201, 101, new[] { new ProjectAreaCandidate(301, 41) }));
+            session.Complete(12);
+            return scan.Snapshot().Groups[1];
+        }
+        var matched = ResolvedGroup("room-resolved", (epoch, prefab, zone) => epoch == 7 && prefab == "Assets/Rooms/A.prefab"
+            && zone == new ProjectRoomScope(0, 0, 1)
+            ? ProjectRoomAnswer.Answered(new[] { new ProjectRoomHit(201, 101) })
+            : ProjectRoomAnswer.Refused(ProjectReferenceReason.ZoneUnresolved));
+        check(matched.Status == ProjectReferenceStatus.Matched && matched.ReasonCode == ProjectReferenceReason.Unique,
+            "D1: the installed room resolver is what names an authored room");
+        var otherZone = ResolvedGroup("room-other-zone", (epoch, prefab, zone) => ProjectRoomAnswer.Answered(new[] { new ProjectRoomHit(201, 999) }));
+        check(otherZone.ReasonCode == ProjectReferenceReason.ZoneUnresolved,
+            "D1: a room the level built in another zone is not the referenced zone's room");
+        // 三种拒绝各说一件事：区域没有、区域里没有这个房间、区域里有多个同源房间。
+        var zoneGone = ResolvedGroup("room-no-zone", (epoch, prefab, zone) => ProjectRoomAnswer.Refused(ProjectReferenceReason.ZoneUnresolved));
+        check(zoneGone.ReasonCode == ProjectReferenceReason.ZoneUnresolved,
+            "D1: a zone this level does not have is its own refusal, not a missing room");
+        var noRoom = ResolvedGroup("room-none", (epoch, prefab, zone) => ProjectRoomAnswer.Refused(ProjectReferenceReason.NoCandidate));
+        check(noRoom.Status == ProjectReferenceStatus.Unverified && noRoom.ReasonCode == ProjectReferenceReason.NoCandidate,
+            "D1: a zone that holds no room of this source reports no candidate");
+        var several = ResolvedGroup("room-several", (epoch, prefab, zone) => ProjectRoomAnswer.Answered(
+            new[] { new ProjectRoomHit(201, 101), new ProjectRoomHit(202, 101) }));
+        check(several.Status == ProjectReferenceStatus.Ambiguous && several.ReasonCode == ProjectReferenceReason.MultipleCandidates,
+            "D1: two rooms of the same source in one zone are the candidates an author reads");
         var beforeStartScan = Scan();
         var beforeStart = new ProjectInspectionSession(new DiagnosticsReport("d1-cancel-before-start"), beforeStartScan, 7);
         beforeStart.Cancel(11, "cleanup_before_factory_done");

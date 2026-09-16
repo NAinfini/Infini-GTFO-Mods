@@ -9,14 +9,14 @@ using HostPlugin = ForgeRuntime.Plugin;
 namespace ForgeWeapon.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
 // Equipment owners are ForgeMap's gtfo.player references; without Map every backpack would stay ownerless.
-[BepInDependency("NAinfini.ForgeMap", "0.1.0")]
+[BepInDependency("NAinfini.ForgeMap", ">=0.1.0")]
 public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "NAinfini.ForgeWeapon";
     public const string PluginName = "Infini Forge Weapon";
-    public const string PluginVersion = "0.1.0";
+    public const string PluginVersion = "0.2.0";
     private bool _loadAttempted;
 
     public override void Load()
@@ -30,6 +30,13 @@ public sealed class Plugin : BasePlugin
             return;
         }
         var logLevel = LoggingLevel(Config);
+        if (HostPlugin.IsSuspended)
+        {
+            // A suspended host still publishes its kernel, which is how a package tells this apart from a host that never loaded.
+            Log.LogError("Forge Weapon cannot register: the Forge Runtime is suspended (reason "
+                + HostPlugin.SuspensionCode + "); no bindings or native hooks were installed.");
+            return;
+        }
         var kernel = HostPlugin.Runtime
             ?? throw new InvalidOperationException("Forge Runtime is unavailable; Weapon cannot initialize.");
         var harmony = new Harmony(PluginGuid);
@@ -40,10 +47,15 @@ public sealed class Plugin : BasePlugin
                 message => Log.LogWarning(message), message => Log.LogInfo(message),
                 () =>
                 {
-                    foreach (var type in WeaponNativeHooks.Types)
+                    // One list, one loop: every family's hooks are carried in `Installed`, so the package's
+                    // reload, placement, device and melee patches are installed with the ones it already had.
+                    foreach (var type in WeaponNativeHooks.Installed)
                         harmony.CreateClassProcessor(type).Patch();
-                }, harmony.UnpatchSelf);
-            Log.LogInfo("Forge Weapon registered equipment identity with gtfo.player owners; native bindings remain implementation-only.");
+                }, harmony.UnpatchSelf, Paths.BepInExRootPath);
+            Log.LogInfo("Forge Weapon authored equipment, shot, hit, reload, melee-hit and deployed-device facts"
+                + " with gtfo.player owners, and executes the game's own enemy tag, the ammunition add/consume"
+                + " pair, the three weapon instance overrides and the inventory give/consume pair; native bindings"
+                + " remain implementation-only.");
         }
         catch (Exception original)
         {
@@ -60,7 +72,7 @@ public sealed class Plugin : BasePlugin
     // Native IL2CPP hooks are process-lifetime; live reload has no validated recovery contract.
     public override bool Unload() => false;
 
-    // D-007: this package's own player-tier level, read once per Load and handed to the kernel with the registration.
+    // This package's own player-tier level, read once per Load and handed to the kernel with the registration.
     // A malformed value fails startup instead of silently selecting a default.
     private static RuntimeLogLevel LoggingLevel(ConfigFile config)
     {

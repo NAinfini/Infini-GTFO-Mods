@@ -24,12 +24,18 @@ const int CallWindow = 0x60;
 const int EntryWindow = 0x180;
 const int LongEntryWindow = 0x500;
 
-// The three entry points whose whole native body is decoded and whose RVA NativeHealth reviews.
-var reviewed = new (uint Rva, string Label, int Window)[]
+// The entry points whose whole native body is decoded and whose RVA NativeHealth reviews. `StopAtReturn` false
+// decodes the whole window linearly: the three gate bodies below return early on their first branch, and the
+// branch that consults the network flag only exists after that return.
+var reviewed = new (uint Rva, string Label, int Window, bool StopAtReturn)[]
 {
-    (0x161F790, "Dam_SyncedDamageBase.SendSetHealth", EntryWindow),
-    (0x1380D50, "Dam_EnemyDamageBase.ReceiveSetHealth", EntryWindow),
-    (0x137E570, "Dam_EnemyDamageBase.ProcessReceivedDamage", LongEntryWindow),
+    (0x161F790, "Dam_SyncedDamageBase.SendSetHealth", EntryWindow, true),
+    (0x1380D50, "Dam_EnemyDamageBase.ReceiveSetHealth", EntryWindow, true),
+    (0x137E570, "Dam_EnemyDamageBase.ProcessReceivedDamage", LongEntryWindow, true),
+    (0x161F4E0, "Dam_SyncedDamageBase.SendLocally", EntryWindow, false),
+    (0x161F5A0, "Dam_SyncedDamageBase.SendPacket", EntryWindow, false),
+    (0x16201B0, "Dam_SyncedDamageBase.Setup", EntryWindow, false),
+    (0x503EF0, "Dam_EnemyDamageBase.get_DamageBaseOwner", EntryWindow, true),
 };
 
 // The Il2Cpp types the evidence covers: method bodies, field offsets and enum members of the damage path.
@@ -65,6 +71,8 @@ var targets = new (string Type, string Name, string Role, string[] Parameters)[]
     ("Dam_SyncedDamageBase", "ReceiveAddHealth", "replication-receiver", new[] { "data" }),
     ("Dam_SyncedDamageBase", "AddHealth", "replication-sender", new[] { "addHealth", "sourceAgent" }),
     ("Dam_SyncedDamageBase", "SendSetHealth", "replication-sender", new[] { "health" }),
+    ("Dam_SyncedDamageBase", "SendLocally", "damage-gate", Array.Empty<string>()),
+    ("Dam_SyncedDamageBase", "SendPacket", "damage-gate", Array.Empty<string>()),
     ("Dam_EnemyDamageBase", "SendDestroyLimb", "replication-sender", new[] { "limbID", "destructionEventData" }),
     ("Dam_EnemyDamageBase", "Setup", "setup", new[] { "owner", "health", "healthMax" }),
     ("Dam_SyncedDamageBase", "Setup", "setup", Array.Empty<string>()),
@@ -102,6 +110,8 @@ var frozenSignatures = new Dictionary<string, string>(StringComparer.Ordinal)
     ["Dam_EnemyDamageBase.Setup"] = "System.Void Dam_EnemyDamageBase::Setup(Enemies.EnemyAgent,System.Single,System.Single)",
     ["Dam_EnemyDamageBase.InstantDead"] = "System.Void Dam_EnemyDamageBase::InstantDead(System.Boolean)",
     ["Dam_SyncedDamageBase.SendSetHealth"] = "System.Void Dam_SyncedDamageBase::SendSetHealth(System.Single)",
+    ["Dam_SyncedDamageBase.SendLocally"] = "System.Boolean Dam_SyncedDamageBase::SendLocally()",
+    ["Dam_SyncedDamageBase.SendPacket"] = "System.Boolean Dam_SyncedDamageBase::SendPacket()",
     ["Dam_SyncedDamageBase.GetHealthRel"] = "System.Single Dam_SyncedDamageBase::GetHealthRel()",
     ["Dam_SyncedDamageBase.get_Health"] = "System.Single Dam_SyncedDamageBase::get_Health()",
     ["Dam_SyncedDamageBase.get_HealthMax"] = "System.Single Dam_SyncedDamageBase::get_HealthMax()",
@@ -262,8 +272,8 @@ var conclusions = new Dictionary<string, object>(StringComparer.Ordinal)
         },
         unverified = new[]
         {
-            "Whether the sender is the shooting client or the host that relays the hit: no packet send site is decoded here.",
-            "The vtable slot invoked at 0x137E623 is not resolved to a named method.",
+            "Which side submits the hit (the shooting client, the host, or both) is outside this window: the send sites decoded here are the damage entry points' own (BulletDamage 0x137D37F, FallDamage 0x161E377).",
+            "The vtable slot invoked at 0x137E623 is resolved only through the slot numbering of the receive methods, not by reading a vtable.",
         },
     },
     ["q3-sentry-source"] = new
@@ -290,12 +300,13 @@ var conclusions = new Dictionary<string, object>(StringComparer.Ordinal)
             "BulletDamage calls SendLocally and SendPacket, and the packet receiver is what applies the hit, so one call covers the host application and the replication of the hit.",
             "Read the actual damage back through get_Health (health at +0x20) and the bounds through get_HealthMax and get_DamageMax.",
             "Limb destruction is a separate channel: CheckDestruction calls SendDestroyLimb (site 0x137D64D), so the hit itself only decides whether the limb breaks.",
+            "A client is not refused by the entry point. Dam_SyncedDamageBase.Setup (0x16201B0) writes m_onlyToMaster at +0x25 as (DamageBaseOwner == 1), and Dam_EnemyDamageBase.get_DamageBaseOwner (0x503EF0) is `mov eax,2; ret`, so every enemy damage receiver has the field zero. Both gates then answer true without reading the network flag: SendLocally (0x161F4E0) returns 1 before the flag load at [net+0xB8]+0xB9, and SendPacket (0x161F5A0) does the same before its `sete al`. The entry point therefore applies the hit locally and sends its own packet on a client as well; host-only submission has to be enforced by the caller.",
+            "A rejected hit cannot be told apart from one the receiver's rules reduce to nothing. BulletDamage returns void, and the Boolean ProcessReceivedDamage returns is consumed inside the receive methods (ReceiveBulletDamage 0x137EF68, ReceiveMeleeDamage 0x138076D), so the only observable afterwards is get_Health.",
+            "A null attacker reaches a receiver that ignores it. ProcessReceivedDamage's only use of the attacker argument is the virtual call at 0x137E623 through the method-pointer pair at owner-vtable + 0x240; the same encoding places ReceiveBulletDamage's declared slot 45 at +0x400, which makes +0x240 slot 17, the dump's slot for EnemyAgent.RegisterDamageInflictor(Agent). That body returns immediately when its argument answers `op_Inequality(inflictor, null) == false`, so a hit with no attacking agent is a shape the window accepts.",
         },
         unverified = new[]
         {
-            "Whether calling BulletDamage on a non-host client applies anything locally: the decoded senders do not call ProcessReceivedDamage, but the receiver gate is not decoded here.",
-            "Whether the packet send is skipped when the caller is not the host (m_onlyToMaster).",
-            "Whether a rejected hit can be told apart from a modifier that zeroes the damage; only the Boolean return and the health delta are observed.",
+            "Where a hit sent by a non-host goes: the send group and the two send paths behind SendPacket are outside this window.",
         },
     },
 };
@@ -478,7 +489,7 @@ string Describe(in Instruction instruction)
     int space = text.IndexOf(' ');
     return space < 0 ? text : text[..space] + "|" + text[(space + 1)..];
 }
-List<(uint Rva, string Text)> Decode(uint rva, int length)
+List<(uint Rva, string Text)> Decode(uint rva, int length, bool stopAtReturn)
 {
     var bytes = Read(rva, length);
     if (bytes.Length == 0) return new List<(uint, string)>();
@@ -491,19 +502,20 @@ List<(uint Rva, string Text)> Decode(uint rva, int length)
         var instruction = decoder.Decode();
         if (instruction.Code == Code.INVALID) break;
         decoded.Add(((uint)(instruction.IP - imageBase), Describe(instruction)));
-        if (instruction.Code == Code.Retnq || instruction.Code == Code.Int3) break;
+        if (stopAtReturn && (instruction.Code == Code.Retnq || instruction.Code == Code.Int3)) break;
     }
     return decoded;
 }
 var entries = new List<object>();
 foreach (var target in reviewed)
 {
-    var decoded = Decode(target.Rva, target.Window);
+    var decoded = Decode(target.Rva, target.Window, target.StopAtReturn);
     entries.Add(new
     {
         rva = "0x" + target.Rva.ToString("X"),
         method = target.Label,
         windowBytes = target.Window,
+        stopAtReturn = target.StopAtReturn,
         instructions = decoded.Select(d => new { rva = "0x" + d.Rva.ToString("X"), text = d.Text }).ToArray(),
     });
 }
@@ -515,7 +527,7 @@ var callSiteWindows = new List<object>();
 foreach (var edge in recordedEdges.OrderBy(e => e.Site))
 {
     if (!seenSites.Add(edge.Site)) continue;
-    var decoded = Decode(edge.Site, CallWindow);
+    var decoded = Decode(edge.Site, CallWindow, true);
     callSiteWindows.Add(new
     {
         site = "0x" + edge.Site.ToString("X"),

@@ -4,8 +4,12 @@ namespace BepInEx
     { public BepInPlugin(string guid, string name, string version) { } }
     [AttributeUsage(AttributeTargets.Class)] public sealed class BepInDependency : Attribute
     {
-        public enum DependencyFlags { SoftDependency }
-        public BepInDependency(string guid, DependencyFlags flags) { }
+        public enum DependencyFlags { HardDependency, SoftDependency }
+        public BepInDependency(string guid, DependencyFlags flags) { Guid = guid; }
+        // The shipped loader treats a versioned dependency as hard, so the host entry uses this constructor.
+        public BepInDependency(string guid, string version) { Guid = guid; Version = version; }
+        public string Guid { get; }
+        public string? Version { get; }
     }
 }
 namespace BepInEx.Logging
@@ -13,7 +17,7 @@ namespace BepInEx.Logging
     public sealed class ManualLogSource
     {
         public void LogInfo(object message) => Probe.Call(message.ToString()!.Contains(" loaded in ") ? "log:loaded" : "log:info");
-        public void LogWarning(object message) => Probe.Call("log:warning");
+        public void LogWarning(object message) => Probe.Call(message.ToString()!.Contains(" suspended (") ? "log:suspended" : "log:warning");
         public void LogError(object message) => Probe.Call("log:error");
     }
 }

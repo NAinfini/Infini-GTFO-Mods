@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production sources are compiled against, and the
+         interop assembly is referenced for its other members, so CS0436 fires on every mention of a shadowed type.
+         Which definition wins is decided by the `Compile` list below, not by reference order. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+    <!-- The SDK this suite is compiled against. The default is the in-tree Framework build output; an already
+         built `ForgeRuntime.Framework.dll` may be passed instead, for the window in which the in-tree sources do
+         not compile. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+    <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+    <Error Condition="!Exists('$(GTFOBepInExPath)/interop/Modules-ASM.dll')"
+      Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
+  </Target>
+  <ItemGroup>
+    <!-- The two production files this slice owns, compiled as they ship, plus the slice's game-independent
+         contract file. `EnemyModuleShim.cs` declares the members the combat handlers touch on the same partial
+         class — the entity table, the reference lookup, the kernel, the authority gate and the report sink —
+         because the package's own `EnemyModule` core is edited by a dozen sibling slices at once and cannot be
+         compiled here without also compiling their half-finished partials. Everything the handlers themselves do
+         is the production source, unchanged. The native hook classes and the plugin lifetime are not part of this
+         suite's statement: it dispatches the handlers, it does not install patches. -->
+    <Compile Include="../../Native/EnemyCombatActions.cs;../../Native/EnemyModule.Damage.cs;../../Native/EnemyCombatRegistration.cs;../../EnemyCombatContract.cs;../../AttackInstanceContract.cs" />
+    <Compile Include="../../ModuleDefinition.cs" />
+    <Compile Include="GameDoubles.cs;EnemyModuleShim.cs;Scene.cs;EnemyCombatTests.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+    <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
+    <!-- The observation sources this suite compiles alongside the combat handlers read a navmesh agent and a model
+         object, so the two interop modules those types live in are referenced here rather than shadowed. -->
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" />
+    <Reference Include="UnityEngine.AIModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AIModule.dll" />
+    <!-- `Enemies.EnemyAgent`, `Enemies.ES_HitreactBase` and `LimbForceApplicator` are declared in GameDoubles.cs
+         rather than taken from Modules-ASM: the interop assembly's own `ES_HitreactBase` is a sealed wrapper whose
+         class pointer is resolved at first static use, so a suite that bound it would install the interop's own
+         state machine instead of the double's. Every member the production code reads is declared there. -->
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

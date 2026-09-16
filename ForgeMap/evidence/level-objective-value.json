@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 2,
+  "family": "v-obj",
+  "capability": "forge.query.objective.state",
+  "gameBuild": "20403457",
+  "sources": [
+    "%TEMP%\\covtrigb\\ilspy (interop of GameData / Global / GTFOAPI / Modules / SNet / Utils)",
+    "%TEMP%\\fan\\nl-vobj\\ilspy (ilspycmd -t dumps of WardenObjectiveManager, pWardenObjectiveState, WO_Survival)",
+    "ForgeWeapon\\.artifacts\\w1-identity-20260912T143531174833Z\\native-map\\dump.cs (metadata dump, 717466 lines)",
+    "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll (read-only, PE header + .text scan)",
+    "%TEMP%\\fan\\nl-vobj\\xref.py, owner.py (this batch's read-only scanners)"
+  ],
+  "row": {
+    "kind": "state",
+    "execution": "query",
+    "tierNote": "Read-only value row. The runtime's binding-role check (RuntimeRegistry.cs:347) and its evaluator loop (:142) both accept `selector | condition | modifier` only, so `kind: state` needs the two whitelist edits ruling 102 names; they are written into integration.json. Until they land, the registration refuses this binding role.",
+    "input": "objective resource reference (resourceKind `objective`, schema `forge.resource.objective`), id spelling `layer:<main|secondary|third>` — the level-event rows' own spelling",
+    "noResourceProvider": "No package registers a provider for the `objective` resource kind in this worktree, so a plan that carries the reference in its resolved (resourceKind/resourceId) form needs that resolver; the compiled form (`{\"id\":\"layer:main\"}`) is accepted either way. Recorded in integration.json."
+  },
+  "members": [
+    {
+      "id": "objective-current-state",
+      "type": "WardenObjectiveManager",
+      "name": "CurrentState",
+      "signature": "pWardenObjectiveState WardenObjectiveManager::get_CurrentState()",
+      "kind": "static",
+      "side": "every process (the machine's replicated state)",
+      "notes": "One replicated state for the whole level, not one per layer: the three layer slots are fields of this struct."
+    },
+    {
+      "id": "objective-has-data",
+      "type": "WardenObjectiveManager",
+      "name": "HasWardenObjectiveDataForLayer",
+      "signature": "System.Boolean WardenObjectiveManager::HasWardenObjectiveDataForLayer(LG_LayerType)",
+      "kind": "static",
+      "side": "every process",
+      "notes": "The game's own answer to `is there an objective on this layer`. It is read before the state, because pWardenObjectiveState is a value type and answers a state even for a level that has none."
+    },
+    {
+      "id": "objective-try-get",
+      "type": "WardenObjectiveManager",
+      "name": "TryGetWardenObjective",
+      "signature": "System.Boolean WardenObjectiveManager::TryGetWardenObjective(LG_LayerType, System.Int32, out IWardenObjective)",
+      "kind": "static",
+      "side": "every process",
+      "notes": "Resolves the layer's running objective instance; `IWardenObjective.ObjectiveType` is the one member read from it, and a failed lookup reports eWardenObjectiveType.Empty (14) rather than guessing a type."
+    },
+    {
+      "id": "objective-layer-status",
+      "type": "pWardenObjectiveState",
+      "name": "GetLayerStatus",
+      "signature": "eWardenObjectiveStatus pWardenObjectiveState::GetLayerStatus(LG_LayerType)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "Per-layer accessor. eWardenObjectiveStatus values are 0/10/20/30/40, not an ordinal run."
+    },
+    {
+      "id": "objective-layer-sub-status",
+      "type": "pWardenObjectiveState",
+      "name": "GetLayerSubStatus",
+      "signature": "eWardenSubObjectiveStatus pWardenObjectiveState::GetLayerSubStatus(LG_LayerType, System.Boolean)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "Second parameter is `onlyGetHelpStatus` with a default; this row passes the layer alone, so the base step is read. eWardenSubObjectiveStatus has 10 members (0..9), the help variants included."
+    },
+    {
+      "id": "objective-chain-index",
+      "type": "pWardenObjectiveState",
+      "name": "GetChainIndexForLayer",
+      "signature": "System.Byte pWardenObjectiveState::GetChainIndexForLayer(LG_LayerType)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "The chain position the checklist row asks for."
+    },
+    {
+      "id": "objective-start-time",
+      "type": "pWardenObjectiveState",
+      "name": "GetStartTimeFromLayer",
+      "signature": "System.Single pWardenObjectiveState::GetStartTimeFromLayer(LG_LayerType)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "Published as `start_time_seconds`. The accessor takes the layer, which is the strongest available confirmation that the time field belongs to the objective machine's own clock."
+    },
+    {
+      "id": "objective-extra-time",
+      "type": "pWardenObjectiveState",
+      "name": "extraTime",
+      "signature": "System.Single pWardenObjectiveState::extraTime (field offset 0x30, dump.cs:589509)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "Not published. Ruling 124.2 withdrew the row's `time_left_seconds` port because the member's wire meaning is not established — see `openQuestions[extra-time-semantics]` — and the read layer no longer reads it either, so the row makes no claim about the field until `ForgeDevelopment/probes/points.tsv` settles it in game. The member record stays as the survey entry the port will be restored from. The parallel field on the interaction struct is `pWardenObjectiveInteraction.extraTime` at 0x14."
+    },
+    {
+      "id": "objective-extra-time-entry",
+      "type": "WardenObjectiveManager",
+      "name": "GetExtraTime / SetExtraTime",
+      "signature": "System.Single WardenObjectiveManager::GetExtraTime() / System.Void WardenObjectiveManager::SetExtraTime(System.Single)",
+      "kind": "static",
+      "rva": "0x1515AC0 / 0x151DE70",
+      "side": "host writes (SetExtraTime), every process reads",
+      "notes": "The engine has exactly two dedicated entries for the field. A read-only .text scan of GameAssembly.dll (this batch's xref.py) found one call site for GetExtraTime and two for SetExtraTime, all inside one compiler-generated coroutine of WardenObjectiveManager (the MoveNext at RVA 0x1683CD0); no call sites elsewhere in the image. GetExtraTime's own body could not be read — see openQuestions. These two entries are what the dev mod's trace point observes (`probes/points.tsv` row `objective.extra-time-semantics`): the mod never calls them, it records the game's own calls."
+    },
+    {
+      "id": "objective-flags",
+      "type": "pWardenObjectiveState",
+      "name": "forceWinOnDeath / exitWaveTriggered",
+      "signature": "System.Boolean pWardenObjectiveState::forceWinOnDeath (0x34), exitWaveTriggered (0x35)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "Two state flags published as they are read; neither is derived."
+    },
+    {
+      "id": "objective-item-tables",
+      "type": "pWardenObjectiveState",
+      "name": "ObjectiveItemStates / RequiredObjectiveItems",
+      "signature": "System.Byte[] pWardenObjectiveState::ObjectiveItemStates (0x38) / RequiredObjectiveItems (0x40)",
+      "kind": "instance",
+      "side": "every process",
+      "notes": "OBJECTIVE_ITEM_STATE_COUNT = 96 and REQUIRED_OBJECTIVE_ITEM_MAX_COUNT = 8 in dump.cs (589481-589483). The row publishes two counts of these tables (`items_solved`, `required_items`) and no per-item detail."
+    },
+    {
+      "id": "objective-data-times",
+      "type": "WardenObjectiveDataBlock",
+      "name": "Survival_TimeToActivate / Survival_TimeToSurvive",
+      "signature": "System.Single WardenObjectiveDataBlock::get_Survival_TimeToActivate / get_Survival_TimeToSurvive",
+      "kind": "instance",
+      "side": "data block, loaded on every process",
+      "rows": [],
+      "notes": "NOT read by this row and NOT published. They live on the objective's data block, not on its running state, and this batch found no decoded caller that would show which of the two (if either) seeds the countdown. Publishing either as the countdown baseline would be a derivation the metadata does not support."
+    }
+  ],
+  "hostClient": {
+    "read": "The state is replicated, so a read on the host is the authority. The row runs in the `query` tier, which the kernel only executes on the host; a client that runs the step gets the kernel's own query-authority refusal rather than a locally-read state.",
+    "write": "None. The row calls no setter, publishes no event and mutates nothing, so it needs no replication of its own and no late-join replay."
+  },
+  "verification": {
+    "nativeCompile": "ForgeMap/Native/LevelObjectiveValueReader.cs + ForgeMap/LevelObjectiveValueContract.cs compiled against the real interop (Modules-ASM / Il2CppInterop.Runtime / Il2Cppmscorlib / GlobalFramework-ASM / SNet_ASM / Utils-ASM / UnityEngine.CoreModule) from the QA profile, with the built ForgeMap.dll for LevelObjectiveValueContract's own cross-family references: Build succeeded, 0 error. Command and log recorded in %TEMP%\\fan\\nl-vobj\\nativecheck4.log.",
+    "focusedTests": "ForgeMap/tests/ObjectiveValueFacts: Passed 25 / Failed 0.",
+    "verifiedInGame": false
+  },
+  "openQuestions": [
+    {
+      "id": "extra-time-semantics",
+      "question": "Does `pWardenObjectiveState.extraTime` hold the seconds still to run (what the HUD countdown shows), or the seconds already granted, or a deadline on the objective machine's own clock?",
+      "whyNotAnswered": "The answer lives in the il2cpp method bodies. GameAssembly.dll carries no managed metadata (ilspycmd: 'PE file does not contain any managed metadata'), the interop assemblies are IL2CPP stubs whose bodies are runtime_invoke calls, and no disassembler (Il2CppDumper / Cpp2IL / IDA / objdump / Visual Studio) exists on this machine. The metadata dump gives the field, its offset, its type and its two engine entries, and nothing about how the value is produced or consumed.",
+      "whatWasRuledOut": [
+        "extraTime is not a copy of Survival_TimeToActivate or Survival_TimeToSurvive: those are data-block members and the state has no field that mirrors them by name or by the state's own layout.",
+        "There is no separate remaining-time member on the state: the full field list is main/second/third status+subObj+chainIndex+itemIndexPlusOne+onActivateEventBreakIndex+onActivateEventIndex+startTime, forceUpdate, forceUpdateFromLayer, customSubObjectiveHeaderID, customSubObjectiveTextID, extraTime, forceWinOnDeath, exitWaveTriggered, ObjectiveItemStates, RequiredObjectiveItems.",
+        "Nothing decrements the field outside the objective machine: the text scan found no other caller of SetExtraTime."
+      ],
+      "consequenceForTheRow": "The row carries no countdown port (ruling 124.2) and the read layer reads no countdown member, so nothing here can disagree with the game about the field. `timed` (derived from the objective type) stays, so an author can still tell a timer objective from one that has no timer. Restoring the port once the in-game trace settles the meaning is a one-line change in the contract's shape, its capability row and its payload, plus the one read in `Native/LevelObjectiveValueReader.cs`.",
+      "mustVerifyInGame": true
+    },
+    {
+      "id": "countdown-baseline",
+      "question": "Which member seeds the countdown a Survival objective displays?",
+      "whyNotAnswered": "Same reason: WO_Survival's body is not readable. What the metadata does show is that WO_Survival keeps only a `m_survivalObjectiveUpdateTimer` accumulator and a 0.25s update interval (dump.cs:601559-601561), i.e. it polls rather than holding a countdown.",
+      "consequenceForTheRow": "The two Survival_TimeTo* members are not published at all, so the row cannot disagree with the game about them."
+    }
+  ],
+  "unverified": [
+    "The countdown field's meaning on the wire (see openQuestions).",
+    "Whether the three layer slots are all meaningful in a real level, or whether a layer without data is the normal case: only the game's own HasWardenObjectiveDataForLayer answers that, and this batch could not run the game.",
+    "Whether a level with a checkpoint recall resets extraTime: the machine's own recall path was not readable."
+  ]
+}

@@ -14,10 +14,11 @@ namespace UnityEngine
     {
         private Transform? _transform;
         private GameObject? _gameObject;
+        public Component? ParentComponent;
         public virtual Transform transform => _transform ??= new Transform();
         public GameObject gameObject => _gameObject ??= new GameObject();
         public T? TryCast<T>() where T : class => this as T;
-        public T? GetComponentInParent<T>() where T : class => null;
+        public T? GetComponentInParent<T>() where T : class => ParentComponent as T;
     }
     public class Transform : Component
     {
@@ -120,6 +121,11 @@ namespace LevelGeneration
         public List<AIGraph.AIG_CourseNode>? m_courseNodes = new();
         public object? m_navInfo;
         public List<LG_ComputerTerminal> TerminalsSpawnedInZone = new();
+        public LG_ZoneSettings? m_settings;
+    }
+    public class LG_ZoneSettings
+    {
+        public GameData.ExpeditionZoneData? m_zoneData;
     }
     public class LG_Area : UnityEngine.Component
     {
@@ -168,6 +174,22 @@ namespace Gear
     public class ResourcePackPickup : ItemInLevel { public int m_packType; }
 }
 namespace SNetwork { public static class SNet { public static bool IsMaster = true; } }
+namespace GameData
+{
+    /// <summary>The zone's own data block, limited to the members the inspection reads. A live zone carries the
+    /// game's authored values; the default below is a disabled respawn policy so a double that never sets one is
+    /// still an honest live block.</summary>
+    public class ExpeditionZoneData
+    {
+        public bool EnemyRespawning;
+        public bool EnemyRespawnRequireOtherZone;
+        public int EnemyRespawnRoomDistance;
+        public float EnemyRespawnTimeInterval;
+        public float EnemyRespawnCountMultiplier = 1f;
+        public List<uint>? EnemyRespawnExcludeList = new();
+        public float HealthMulti = 1f, WeaponAmmoMulti = 1f, ToolAmmoMulti = 1f, DisinfectionMulti = 1f;
+    }
+}
 namespace ForgeDevelopment.Native
 {
     internal static class RuntimeDiagnostics

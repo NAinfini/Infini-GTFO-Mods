@@ -7,7 +7,7 @@
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Framework/*.cs" Link="Framework/%(Filename)%(Extension)" />
+    <Compile Include="../../Framework/**/*.cs" Exclude="../../Framework/bin/**/*.cs;../../Framework/obj/**/*.cs" Link="Framework/%(Filename)%(Extension)" />
     <Compile Include="../../Logging/RuntimeLogWriter.cs" Link="Production/RuntimeLogWriter.cs" />
     <Reference Include="BepInEx.Core" HintPath="$(GTFOBepInExPath)/core/BepInEx.Core.dll" />
     <Reference Include="SemanticVersioning" HintPath="$(GTFOBepInExPath)/core/SemanticVersioning.dll" />

@@ -9,8 +9,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Framework/**/*.cs" Exclude="../../Framework/bin/**/*.cs;../../Framework/obj/**/*.cs" Link="Framework/%(Filename)%(Extension)" />
-    <!-- D-017 R4-a: the frame's `compare` condition is the ForgeTrigger package's own module, so the SDK test hosts
-         the real one instead of restating its contract and its arithmetic. -->
-    <Compile Include="../../../ForgeTrigger/**/*.cs" Exclude="../../../ForgeTrigger/bin/**/*.cs;../../../ForgeTrigger/obj/**/*.cs;../../../ForgeTrigger/tests/**/*.cs;../../../ForgeTrigger/artifacts/**/*.cs" Link="ForgeTrigger/%(Filename)%(Extension)" />
+    <!-- The frame's `compare` condition is the ForgeTrigger package's own module, so the SDK test hosts the real one
+         instead of restating its contract and its arithmetic. Linked as source, not as a project reference: this
+         harness already compiles the SDK sources directly, and the built SDK assembly would split RuntimeModule into
+         two identities. The host itself no longer links or registers this package. -->
+    <Compile Include="../../../ForgeTrigger/**/*.cs" Exclude="../../../ForgeTrigger/bin/**/*.cs;../../../ForgeTrigger/obj/**/*.cs;../../../ForgeTrigger/tests/**/*.cs;../../../ForgeTrigger/artifacts/**/*.cs;../../../ForgeTrigger/Native/**/*.cs" Link="ForgeTrigger/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

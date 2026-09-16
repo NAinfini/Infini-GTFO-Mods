@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <AssemblyName>HookInstall</AssemblyName>
+    <RootNamespace>ForgeEnemy.HookInstall</RootNamespace>
+    <!-- This suite compiles nothing out of the package and references nothing: it reads the built
+         `ForgeEnemy.Native.dll` through reflection, so the assembly it judges is the one that ships rather than a
+         second compilation of the same sources. The BepInEx directory is a runtime argument, not a build input. -->
+  </PropertyGroup>
+</Project>

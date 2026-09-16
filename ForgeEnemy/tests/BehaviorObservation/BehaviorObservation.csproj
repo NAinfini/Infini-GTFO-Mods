@@ -3,13 +3,26 @@
     <OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework>
     <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
     <CheckEolTargetFramework>false</CheckEolTargetFramework><IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <Target Name="RequireSdk" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(ForgeFrameworkAssembly)')" Text="Pass an explicitly built production SDK." />
   </Target>
   <ItemGroup>
-    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
-    <Compile Include="../../Native/EnemyModule*.cs;../../Native/Observation/*.cs" />
+    <!-- The behaviour observation sources this suite states, compiled as they ship, plus the game types they read.
+         `EnemyModuleShim.cs` declares the members the pump touches on the provider's own partial class — the
+         entity table with its per-life watermarks, the reference lookup, the kernel and the authority gates —
+         because the package's own `EnemyModule` core is edited by a dozen sibling slices at once and cannot be
+         compiled here without also compiling their half-finished partials. Everything the pump itself does is the
+         production source, unchanged: the native hook classes and the plugin lifetime are not part of this suite's
+         statement, and a sibling family is not compiled at all. -->
+    <Compile Include="../../Native/EnemyModule.BehaviorFacts.cs;../../Native/EnemyModule.BehaviorObservation.cs" />
+    <!-- The behaviour readers, compiled as they ship. `EnemyEntityObserver` is not among them: it reads a navmesh
+         agent, which this suite deliberately has no Unity reference for, and the snapshot reader this suite drives
+         does not name it. -->
+    <Compile Include="../../Native/Observation/EnemyBehaviorObserver.cs;../../Native/Observation/EnemyBehaviorFactsObserver.cs;../../Native/Observation/EnemyAttackFactsObserver.cs" />
     <Compile Include="../NativePlugin/GameDoubles.cs" Link="GameDoubles.cs" />
+    <Compile Include="EnemyModuleShim.cs;Scene.cs;BehaviorFacts.cs;Program.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The two production sources compile here exactly as they ship. Neither needs the game, the loader or the host
+         assembly: the policy loader is a pure function of a root directory and an injected pin source, and the
+         filter never touches a native object. That is what lets this suite run with no profile and no game. -->
+    <Compile Include="../../Native/LoadoutPolicyData.cs;../../Native/GearLoadoutFilter.cs" />
+    <Compile Include="PolicyFixture.cs;LoadoutPolicyTests.cs;GearLoadoutFilterTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

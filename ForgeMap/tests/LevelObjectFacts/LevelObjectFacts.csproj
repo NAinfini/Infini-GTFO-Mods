@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable><EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The ForgeMap game-independent assembly does not compile in the shared worktree while another batch is
+         mid-edit (its map-object half currently names a native type), so this project compiles the two sources
+         under test itself instead of taking a ProjectReference: the contract and the publication half are the
+         whole surface these cases exercise, and neither reads a game type. -->
+    <ForgeRuntimeFrameworkAssembly Condition="'$(ForgeRuntimeFrameworkAssembly)' == ''">$(MSBuildThisFileDirectory)../../../.artifacts/dotnet/bin/ForgeRuntime.Framework/release/ForgeRuntime.Framework.dll</ForgeRuntimeFrameworkAssembly>
+  </PropertyGroup>
+  <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ForgeRuntimeFrameworkAssembly)')"
+      Text="Build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj first, or pass -p:ForgeRuntimeFrameworkAssembly=&lt;path&gt;." />
+  </Target>
+  <ItemGroup>
+    <Compile Include="../../LevelObjectContract.cs;../../LevelObjectModule.cs;../../ValueRowReading.cs" />
+    <Compile Include="AssemblyAttributes.cs;LevelObjectFactsTests.cs;LevelObjectWorld.cs" />
+    <!-- The one fixture that mounts a plan for a case whose observation point is the module's own publication
+         hook: the gate has to have a subscriber before the module builds an event at all. -->
+    <Compile Include="../Support/SubscriptionGateFixture.cs" />
+    <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

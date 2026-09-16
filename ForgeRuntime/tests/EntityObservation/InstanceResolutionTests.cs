@@ -81,8 +81,8 @@ static class InstanceResolutionTests
         Check.That(world.Kernel.ResolveEntityInstance("test.entity", world.Instance) == new EntityReference("test.entity:1", 1, 1),
             "registered instance resolver answers before unregistration");
         world.Handle.Dispose();
-        Check.Reject(() => world.Kernel.ResolveEntityInstance("test.entity", world.Instance),
-            "unregistering the provider removes its instance resolver", "entity-resolver");
+        Check.That(world.Kernel.ResolveEntityInstance("test.entity", world.Instance) == null,
+            "unregistering the provider removes its instance resolver");
     }
 
     private static void Readiness()
@@ -120,12 +120,18 @@ static class InstanceResolutionTests
     private static void Failures()
     {
         var world = new World().Register();
-        Check.Reject(() => world.Kernel.ResolveEntityInstance("test.unknown", world.Instance), "unknown kind has no instance resolver", "entity-resolver");
+        // Ruling 53: an optional domain package that is not installed leaves the kind unresolved. Only a kind name
+        // no provider could ever register is a contract violation, and it is refused before the registry is read.
+        Check.That(world.Kernel.ResolveEntityInstance("test.unknown", world.Instance) == null,
+            "unknown kind has no instance resolver, which is unresolved rather than refused");
+        foreach (var malformed in new[] { "test", "Test.entity", "test..entity", "test.entity." })
+            Check.Reject(() => world.Kernel.ResolveEntityInstance(malformed, world.Instance),
+                "malformed kind name " + malformed, "entity-resolver");
         var observed = Kernel(); observed.BeginWorld(1);
         observed.RegisterModule(Module("test.entities", new() { ["test.entity"] = _ => true }, null), RuntimeLogLevel.Off);
         observed.StartRuntime(() => { });
-        Check.Reject(() => observed.ResolveEntityInstance("test.entity", new Native()),
-            "resolver-only namespace does not enumerate or guess an instance", "entity-resolver");
+        Check.That(observed.ResolveEntityInstance("test.entity", new Native()) == null,
+            "resolver-only namespace does not enumerate or guess an instance");
 
         world.Answer = _ => throw new InvalidOperationException("account " + Secret);
         RuntimeContractException? error = null;

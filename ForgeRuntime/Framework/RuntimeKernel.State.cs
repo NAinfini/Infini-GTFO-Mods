@@ -36,7 +36,7 @@ public sealed partial class RuntimeKernel
             RuntimeJson.Require(!cancelled.Contains((owner.ProviderId, request.ScopeId)), "scope-cancelled", request.ScopeId);
             CheckEntity(request.Target); if (request.Source != null) CheckEntity(request.Source);
             var key = owner.ProviderId + "\0lease\0" + request.LeaseId;
-            var fingerprint = Fingerprint(request);
+            var fingerprint = LedgerFingerprint(RuntimeJson.StableText(RuntimeJson.From(request)));
             if (history.TryGetValue(key, out var previous)) return new NumericLeaseResult(previous == fingerprint ? "duplicate" : "rejected", previous == fingerprint ? "duplicate-lease" : "lease-id-conflict", null);
             RuntimeJson.Require(history.Count < MaximumEventHistory, "event-history-budget", "Replay ledger capacity reached.");
             // Cleanup precedes capacity/key checks so expired contributions never block a new source lease.

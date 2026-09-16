@@ -25,7 +25,7 @@ public static class RuntimeLogConfiguration
 /// <summary>Rate-limit tier the writer applies; Elevated is irreversible for the session.</summary>
 public enum RuntimeLogTier { Player, Elevated }
 
-/// <summary>Single source of the I-DIAG event codes the kernel writes (§3.2 code table). `adapter.attached` and
+/// <summary>Single source of the I-DIAG event codes the kernel writes. `adapter.attached` and
 /// `adapter.failed` are absent until I-ADAPTER-SCHEMA rules them, and so are the per-package native diagnostic codes.</summary>
 public static class RuntimeLogCodes
 {
@@ -52,7 +52,8 @@ public static class RuntimeLogCodes
 /// graph, step result and event groups are all carried by the exception or result that produced them).</summary>
 public static class RuntimeLogReasonCodes
 {
-    /// <summary>§3.2 result-combination rule: an illegal handler result is recorded as failed/unknown under this code.</summary>
+    /// <summary>An illegal handler result is recorded as failed/unknown under this code, the one combination the
+    /// result rules do not otherwise express.</summary>
     public const string InvalidHandlerResult = "invalid-handler-result";
     public const string LifecycleObserverFailed = "lifecycle-observer-failed";
 }

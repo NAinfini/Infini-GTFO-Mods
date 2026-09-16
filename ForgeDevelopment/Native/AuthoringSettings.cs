@@ -15,5 +15,6 @@ internal static partial class Settings
             new ConfigDescription("Cooperative inspection budget per frame. A native call cannot be interrupted; actual maximum cost is reported.", new AcceptableValueRange<float>(0.25f, 5f)));
         if (!float.IsFinite(InspectionBudget.Value)) InspectionBudget.Value = 2f;
         ProjectManifest = config.Bind("Authoring", "ProjectManifest", "", "Optional local Forge project manifest path, relative to BepInEx. Used for declared dependencies, expected objects and source identifiers. Never downloads or executes code.");
+        // The recorder's own keys live in their own section; see RecSettings.cs.
     }
 }

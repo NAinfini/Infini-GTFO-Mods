@@ -1,0 +1,131 @@
+{
+  "family": "enemy-combat",
+  "slice": "C-enemy-combat",
+  "gameBuild": "20403457",
+  "assemblies": [
+    "Modules-ASM.dll (interop, QA profile Forge-MapEditor-QA)",
+    "Utils-ASM.dll (MachineState<T>, the base of ES_Base)"
+  ],
+  "decompile": {
+    "tool": "%TEMP%\\codex-ilspy\\ilspycmd.exe (11.0.0.9375)",
+    "command": "& $exe -t <TypeName> <interop>\\Modules-ASM.dll",
+    "products": [
+      "%TEMP%\\fwdesign\\fwd-combat\\ilspy\\ES_HitreactBase.cs",
+      "%TEMP%\\fwdesign\\fwd-combat\\ilspy\\ES_Hitreact.cs",
+      "%TEMP%\\fwdesign\\fwd-combat\\ilspy\\ES_HitreactType.cs",
+      "%TEMP%\\fwdesign\\fwd-combat\\ilspy\\ES_EnemyAttackBase.cs",
+      "%TEMP%\\fwdesign\\fwd-combat\\ilspy\\Dam_EnemyDamageLimb.cs",
+      "%TEMP%\\covtrigb\\ilspy\\Modules\\Agents\\IForceApplyer.cs",
+      "%TEMP%\\covtrigb\\ilspy\\Modules\\Agents\\FakeForceBody.cs",
+      "%TEMP%\\covtrigb\\ilspy\\Modules\\LimbForceApplicator.cs",
+      "%TEMP%\\covtrigb\\ilspy\\Modules\\ImpactDirection.cs",
+      "%TEMP%\\covtrigb\\ilspy\\Modules\\DamageNoiseLevel.cs",
+      "%TEMP%\\fan\\c-enemy-combat\\ilspy\\EnemyLocomotion.cs",
+      "%TEMP%\\fan\\c-enemy-combat\\ilspy\\ES_Base.cs",
+      "%TEMP%\\fan\\c-enemy-combat\\ilspy\\ES_HitreactFlyer.cs"
+    ]
+  },
+  "rows": [
+    {
+      "capability": "forge.action.combat.stagger",
+      "conclusion": "registered; implemented against the ruled shape (reaction + immunity_policy)",
+      "nativeEntry": "ES_HitreactBase.CanHitreact(ES_HitreactType suggestedType, bool overrideTimer = false) -> bool, then ES_HitreactBase.ActivateState(ES_HitreactType hitreactType, ImpactDirection impactDirection, bool attackerIsPlayer, Agent attacker, Vector3 damagePos, DamageNoiseLevel noiseLevel)",
+      "reach": "EnemyAgent.Locomotion (EnemyLocomotion) -> .Hitreact (ES_HitreactBase, public instance field in the interop)",
+      "enum": {
+        "ES_HitreactType": ["Unspecified", "None", "Micro", "Light", "Heavy", "ToDeath", "InstantRagdollDeath"],
+        "rowsUsed": ["Micro", "Light", "Heavy"],
+        "excluded": "ToDeath and InstantRagdollDeath are kills, not staggers (ruling 88); the row offers three members."
+      },
+      "readback": "ES_HitreactBase.CurrentReactionType (public getter) is the only proof a write landed; a submission whose readback disagrees is reported as an unknown commit.",
+      "hostClient": "ActivateState is a virtual state-machine entry; ES_Hitreact drives SNet_Packet<pES_HitreactData> (m_hitreactPacket) and ES_HitreactBase.SyncUpdate, so the game replicates the reaction itself. Forge writes on the host only (SNet.IsMaster gate), matching every other write row in this provider.",
+      "derivation": "none - the reaction is read back, never synthesized",
+      "unresolved": [
+        "ImpactDirection: the ruled shape has no direction port, so Unspecified is submitted; a direction would need a vector3 input and ES_Hitreact.GetDirection(Transform, Vector3).",
+        "attacker Agent: this provider cannot name the native object behind another provider's entity reference, so attackerIsPlayer=false and attacker=null are submitted instead of a guessed attribution.",
+        "Needs in-game confirmation: whether ActivateState on the host produces the same reaction on clients (fwd-combat evidence.md section 6 item 4)."
+      ]
+    },
+    {
+      "capability": "forge.action.combat.attack_interrupt",
+      "conclusion": "registered; reshaped to `enemies:entity/many` (kind gtfo.enemy) with no handle and no structural parameter",
+      "shapeChange": {
+        "dropped": [
+          "attack:handle/handleKind=transaction/lifetime=invocation - no provider in either repository casts an attack-instance transaction handle, so the input made the row unreachable.",
+          "reason:string - a single free-form string cannot be attributed to the per-enemy result rows.",
+          "refund_policy{none,partial,full} - it existed only because the row consumed a transaction; with no transaction there is no reservation to refund."
+        ],
+        "added": [
+          "enemies:entity/cardinality=many, kind gtfo.enemy - the enemies whose in-flight attack is to be interrupted.",
+          "result fields target,status,committed,code,target_count and the controlled refusal code enemy-not-attacking."
+        ],
+        "recipients": {"input": "enemies", "target": "entity", "cardinality": "many", "requires": ["attack.interrupt"], "result": "result"}
+      },
+      "nativeJudgement": "ES_EnemyAttackBase has exactly five types in Modules-ASM - ES_StrikerAttack, ES_TankAttack, ES_TankMultiTargetAttack, ES_ShooterAttack and ES_ShooterAttackFlyer (: ES_ShooterAttack) - and EnemyLocomotion declares exactly the four base-typed properties StrikerAttack, TankAttack, TankMultiTargetAttack and ShooterAttack (type-walk over all 3109 top-level types and their nested types of the QA-profile Modules-ASM.dll, Mono.Cecil). ES_EnemyAttackBase declares `public virtual bool IsPerformingAttack()` and `public virtual bool IsChargingAttack()`. The handler asks all four properties and treats either answer as in flight, so the set is the whole attack surface, and a flying shooter (whose state object is an ES_ShooterAttackFlyer) is judged through the ShooterAttack property like any other. ES_StrikerMelee is `: ES_Base`, not an attack state, so a melee striker's attack is read through StrikerAttack. EnemyLocomotion itself also exposes `IsAttacking()` and `IsChargingAttack()`; the row's judged predicate is the attack state's own pair, because that is the state the interrupt has to leave.",
+      "nativeEntry": "the interruption is the same hitreact state machine stagger uses: ES_HitreactBase.CanHitreact(ES_HitreactType.Light, false) then ActivateState(Light, ImpactDirection.Unspecified, false, null, Vector3.zero, DamageNoiseLevel.Normal), read back through CurrentReactionType",
+      "refusalSemantics": "An enemy whose four attack states are all absent, or all report neither performing nor charging, is answered `enemy-not-attacking` with the row's `committed` column `none`, before any native call. A gate that throws is `hitreact-gate-exception` (rejected, nothing written); a write that throws is `native-commit-exception` (unknown), because the call may have reached the state machine before it failed.",
+      "readback": "ES_HitreactBase.CurrentReactionType after the write",
+      "hostClient": "same channel as stagger: the hitreact state machine replicates the reaction itself (ES_Hitreact.SyncUpdate over SNet_Packet<pES_HitreactData>); the write is host-only behind SNet.IsMaster.",
+      "derivation": "the attack is read from the enemy's own locomotion fields; no handle table, no ledger and no cross-provider lookup is involved",
+      "unresolved": [
+        "Whether an in-flight ES_EnemyAttackBase actually leaves its state when the hitreact state machine is activated is a game-internal ordering question; the gating CanHitreact call plus the reaction readback are what this provider can prove.",
+        "The melee flyer's own hitreact state is ES_HitreactFlyer (: ES_HitreactBase), which is not one of the four attack properties on EnemyLocomotion, so this row cannot judge a flyer that is mid-hitreact; it reads the enemy through the same Hitreact property stagger uses, which is what the flying hitreact state is a subclass of."
+      ]
+    },
+    {
+      "capability": "forge.action.combat.impulse",
+      "conclusion": "NOT registered this round: the handler and the native write path are implemented and tested, but the audit judged the effect unreachable in game and a submission unverifiable, so the row waits for the user's review. Its row text stays in `EnemyCombatContract.ImpulseCapabilityRow`/`ImpulseBindingRow` and its reason in `EnemyCombatContract.Unregistered`.",
+      "nativeEntry": "LimbForceApplicator.AddForce(Vector3 force, float duration) -> void; LimbForceApplicator.m_body is the Rigidbody it integrates against in its own FixedUpdate",
+      "reach": "EnemyAgent.Damage (Dam_EnemyDamageBase) -> .DamageLimbs (Il2CppReferenceArray<Dam_EnemyDamageLimb>) -> [index].ForceApplicator -> LimbForceApplicator",
+      "affectedEnemies": "Submitted-to: any enemy, because the write entry is the damage limb's own LimbForceApplicator and every enemy carries damage limbs. Actually movable: only the flying archetypes, which are the only enemies the game gives a force body to. The force machinery the build declares is the flyer family - FloaterLocomotion, FlyerAnimationController, FlyerAttackEffectsController, FlyerWeakspotsController, the states ES_HitreactFlyer, ES_FloaterHitreact, ES_PathMoveFlyer, ES_DeadFlyer, ES_ScreamFlyer and ES_ShooterAttackFlyer, and the game's own achievement type Achievement_KillArmoredFlyerWithSpear names an Armored Flyer - while no ground archetype (striker, tank, shooter, scout, boss) has one. Enumerating the enemy roster by name is not possible from the interop assemblies: the enemy types live in game data blocks, and GameData-ASM.dll exposes no EnemyDataBlock with fields. Ground enemies are driven by EnemyLocomotion/navmesh, so a limb force there has nothing to move.",
+      "absence": [
+        "IForceApplyer has no managed implementer in the enemy surface: a type-walk over every type and nested type of the QA-profile Modules-ASM.dll (Mono.Cecil, 3109 top-level types) finds no class whose interface list contains Agents.IForceApplyer, and no method body in the assembly calls IForceApplyer.AddForce/AddTorque. The only members typed Agents.IForceApplyer are ES_HitreactFlyer.m_forceApplyer and Enemies.ES_ShooterAttackFlyer.m_forceApplyer - both flyer state machines, both fed by the native side. Agents.FakeForceBody mirrors the interface's four methods verbatim and is the debug body its name says it is; no other type in the assembly declares an `AddForce`/`AddTorque` for an agent.",
+        "IForceApplyer is not the interface this row writes through: its own signature is AddForce(Vector3 applyDirection, Vector3 applyPosition, float magnitude, float delay?) plus AddTorque, while LimbForceApplicator.AddForce takes (Vector3 force, float duration) on the limb's Rigidbody. The two are separate force paths, and only the limb applicator is reachable from an EnemyAgent.",
+        "Agent and EnemyAgent declare no writable velocity, impulse or force member (public member listing of Agent.cs and EnemyAgent.cs).",
+        "LimbForceApplicator (`: MonoBehaviour`) is the only type in the assembly that gives an enemy a physics body: `m_body: Rigidbody`, a queued `Forces` list and `AddForce(Vector3, float)`/`CopyFromOther`. Its `AddForce` is not the IForceApplyer path - the signatures differ - and it has no return value and no readable displacement."
+      ],
+      "readback": "none - AddForce returns void and the displacement is produced later by the applicator's FixedUpdate, so every submitted shove is reported as an unknown commit (submitted-unverified), never as a confirmed displacement.",
+      "hostClient": "LimbForceApplicator is a per-instance MonoBehaviour with no replication channel of its own; the write is host-only, and whether clients see the shove needs in-game confirmation.",
+      "derivation": "limb id -> array index reuses EnemyNativeWrite.TryNameLimb (the same reverse mapping the damage row uses, since the entry point takes the array position, not m_limbID)",
+      "unresolved": [
+        "mass_policy=scaled submits force*magnitude and absolute submits the authored vector; the game does not expose an agent mass, so neither member reads one.",
+        "Needs in-game confirmation: whether a limb force on a navigation-driven enemy survives its locomotion step."
+      ]
+    }
+  ],
+  "rowShapes": {
+    "forge.action.combat.stagger": {
+      "registered": true,
+      "inputs": ["in", "targets", "source"],
+      "outputs": ["next", "result"],
+      "parameters": ["reaction", "immunity_policy"],
+      "resultFields": ["target", "status", "committed", "code", "reaction", "target_count"],
+      "recipients": { "input": "targets", "target": "entity", "cardinality": "many", "requires": ["motion.stagger"] }
+    },
+    "forge.action.combat.attack_interrupt": {
+      "registered": true,
+      "inputs": ["in", "enemies", "source"],
+      "outputs": ["next", "result"],
+      "parameters": [],
+      "resultFields": ["target", "status", "committed", "code", "target_count"],
+      "recipients": { "input": "enemies", "target": "entity", "cardinality": "many", "requires": ["attack.interrupt"] }
+    },
+    "forge.action.combat.impulse": {
+      "registered": false,
+      "inputs": ["in", "targets", "source", "force", "magnitude", "duration", "limb"],
+      "outputs": ["next", "result"],
+      "parameters": ["mass_policy"],
+      "resultFields": ["target", "status", "committed", "code", "target_count"],
+      "recipients": { "input": "targets", "target": "entity", "cardinality": "many", "requires": ["motion.impulse"] }
+    }
+  },
+  "permissions": {
+    "forge.module.gtfo.enemy.binding.stagger": ["gtfo.enemy.motion.write"],
+    "forge.module.gtfo.enemy.binding.attack_interrupt": ["gtfo.enemy.motion.write"],
+    "forge.module.gtfo.enemy.binding.impulse": ["gtfo.enemy.motion.write"]
+  },
+  "verification": {
+    "command": "dotnet test ForgeEnemy/tests/EnemyCombat/EnemyCombat.csproj --artifacts-path %TEMP%\\fan\\c-enemy-combat2\\art -p:ForgeRuntimeFrameworkAssembly=<artifacts>\\bin\\ForgeRuntime.Framework\\debug\\ForgeRuntime.Framework.dll",
+    "result": "35/35 passed",
+    "covers": "registration and shape (both registered rows and the shelved impulse row), the declared result code sets, multi-target row order, host/phase refusals, stale life and dead-target refusals, both native gate answers, the unknown-commit readback paths, and every refusal code the two handlers answer with."
+  }
+}

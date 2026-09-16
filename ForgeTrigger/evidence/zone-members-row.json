@@ -1,0 +1,36 @@
+{
+  "topic": "q-zone: the zone_members row and the zone read it is built on",
+  "package": "forge.module.trigger",
+  "capabilityId": "forge.selector.target.zone_members",
+  "method": "Framework-level evidence: the row is a query row of ForgeTrigger and reads the world only through RuntimeQuerySession. The one world read it needs — which zone an entity stands in — is not a snapshot field, so this batch added it to the framework; see ForgeMap/evidence/zone-reader.json for the native members that answer it.",
+  "shape": {
+    "inputs": [
+      { "id": "candidates", "type": "entity", "cardinality": "many" },
+      { "id": "zone", "type": "resource", "resourceKind": "zone", "schema": "forge.resource.zone" }
+    ],
+    "outputs": [{ "id": "targets", "type": "entity", "cardinality": "many" }],
+    "parameters": [{ "id": "empty", "type": "enum", "role": "structural", "required": true, "set": "empty_policy" }]
+  },
+  "reads": [
+    {
+      "call": "RuntimeQuerySession.TryZone(candidate)",
+      "boundedBy": "RuntimeKernel.MaximumEntityReferencesPerQuery (256) and the tick budget (64 queries, 1024 references); one query is charged per candidate, so a set read one entity at a time costs the same as the set read in one call",
+      "refusals": [
+        "entity-zone-unavailable: the kind's owner registered no zone responder",
+        "entity-zone-unknown: the owner cannot place the entity right now",
+        "entity-zone-failed: the responder threw",
+        "entity-zone-kind: the responder answered a reference that is not a zone",
+        "entity-query-tick-budget: the tick's queries are spent",
+        "stale-world / stale-entity: the reference is not current"
+      ]
+    },
+    {
+      "call": "RuntimeQuerySession.TryZone(the plan's zone resource id)",
+      "why": "The row reads its own port first, so a plan naming a zone this level does not have is refused before any candidate is read; the entity it answers with is the kernel's own reference, which is what the candidates are compared against."
+    }
+  ],
+  "notVerifiedInGame": [
+    "The per-tick budget behaviour of a zone filter over a full candidate set inside a real dispatch (the unit case covers 256 candidates and the budget code, but the game's own tick pacing is not exercised).",
+    "Whether the host's tick rate makes a 256-candidate zone filter cheap enough to run every frame; the row is a query step, so it is evaluated on demand and memoized per activation."
+  ]
+}

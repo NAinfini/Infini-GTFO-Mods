@@ -11,12 +11,12 @@
   "dumpSource": "C:\\Users\\nainf\\Github\\General Task\\gtfo-inspection\\dumper\\dump.cs",
   "interopSource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop",
   "gameAssemblySource": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
-  "rulingRefs": [
-    "rulings-step1.md 19: host authority; client-local triggers go through a command-request channel",
-    "rulings-step1.md 26: handle and resource-reference plan value types",
-    "rulings-step1.md 31: doors/terminals/alarms/scans belong to ForgeMap",
-    "rulings-step1.md 43: FrameHandle is bit-identical to FrameEntity; provider index in the 24 B slot",
-    "rulings-step1.md 49: objective triggers drop the resource output port; structural resource parameter plus instance handle output"
+  "rules": [
+    "the host is the authority; a client-local trigger reaches the host through a command-request channel",
+    "a handle and a resource reference are plan value types",
+    "doors, terminals, alarms and scans belong to ForgeMap",
+    "a FrameHandle is bit-identical to a FrameEntity; the provider index sits in the same 24-byte value",
+    "the objective triggers have no resource output port: the objective is a structural resource parameter and the runtime instance is a handle output"
   ],
   "assemblies": [
     { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
@@ -84,7 +84,7 @@
     { "id": "bioscan-sync-publish", "member": "ChainedPuzzles.CP_Bioscan_Sync.SetStateData", "frequency": "periodic while scanning, rate unproven", "basis": "no direct caller decoded; the sync component owns the publish cadence" },
     { "id": "bioscan-local", "member": "ChainedPuzzles.CP_PlayerScanner.StartScan / MasterScan", "frequency": "local scanner tick", "basis": "CP_PlayerScanner.MasterScan 0x17327F0 and CheckLocalPlayerIsCLose 0x1732780 are local-player checks" },
     { "id": "door-lock", "member": "LevelGeneration.LG_SecurityDoor_Locks.OnDoorState", "frequency": "event-driven", "basis": "called by every Setup* variant (verified callers) and on lock state change" },
-    { "id": "terminal", "member": "LevelGeneration.LG_ComputerTerminal.OnStateChange", "frequency": "event-driven", "basis": "state-replicator callback; the manager funnels client requests through WantToChangeTerminalState (ruling 19 pattern)" }
+    { "id": "terminal", "member": "LevelGeneration.LG_ComputerTerminal.OnStateChange", "frequency": "event-driven", "basis": "state-replicator callback; the manager funnels client requests through WantToChangeTerminalState, the command-request channel that reaches the host" }
   ],
   "hooks": [
     {
@@ -123,7 +123,7 @@
       "isVirtual": true, "rva": "0x1510920", "slot": 15, "dumpLine": 589577, "bodyBytes": 689,
       "entry": "iSNet_StateReplicatorProvider interaction channel plus local-player paths (OnLocalPlayerFoundObjectiveItem, OnLocalPlayerEnterNewLayerType, OnExitScanProgressUpdate, UpdateFromInLevel)",
       "reads": "pWardenObjectiveInteraction (type, layer, item index, extra time, custom sub-objective ids)",
-      "side": { "execution": "both", "basis": "interface-slot-plus-local-callers", "verified": false, "note": "ruling 19: local triggers must be routed to the host; this member is the objective-side request entry" },
+      "side": { "execution": "both", "basis": "interface-slot-plus-local-callers", "verified": false, "note": "a local trigger has to reach the host; this member is the objective-side request entry" },
       "rows": ["forge.action.map.objective_state", "forge.action.map.objective_progress", "forge.action.map.objective_phase"],
       "harmony": "prefix is the action entry; suppressing the original would block the native objective machine, so the action should call the original after its own validation"
     },
@@ -263,7 +263,7 @@
       "isVirtual": false, "rva": "0x15A7480", "dumpLine": 688079, "bodyBytes": 501,
       "entry": "door interaction path; callers are LG_SecurityDoor.OnBulkheadDCUnlock, SetupPowerGeneratorLock closure and a Setup closure",
       "reads": "the interacting SNet_Player; reads ChainedPuzzleInstance.IsSolved (verified direct edge)",
-      "side": { "execution": "both", "basis": "player-interaction-entry", "verified": false, "note": "the player side of the door alarm; per ruling 19 the request must be forwarded to the host" },
+      "side": { "execution": "both", "basis": "player-interaction-entry", "verified": false, "note": "the player side of the door alarm; the request has to be forwarded to the host" },
       "rows": ["forge.trigger.objective.alarm_started"],
       "harmony": "prefix; carries the player who triggered the alarm"
     }
@@ -273,7 +273,7 @@
     { "id": "objective-started", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Boolean WardenObjectiveManager::get_IsExpeditionStarted()", "rva": "0x1524840", "note": "distinguishes lobby from running expedition" },
     { "id": "objective-layer", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "LevelGeneration.LG_LayerType WardenObjectiveManager::get_LastUpdatedLayer()", "rva": "0x15248A0" },
     { "id": "objective-local-layer", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "LevelGeneration.LG_LayerType WardenObjectiveManager::get_LocalPlayerLayer()", "rva": "0x1524900", "isStatic": true },
-    { "id": "objective-datablock", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Boolean WardenObjectiveManager::TryGetActiveWardenObjectiveData(LevelGeneration.LG_LayerType,GameData.WardenObjectiveDataBlock&)", "rva": "0x1520600", "note": "author-defined objective behind a layer, matches the structural resource parameter of ruling 49" },
+    { "id": "objective-datablock", "assembly": "Modules-ASM.dll", "type": "WardenObjectiveManager", "signature": "System.Boolean WardenObjectiveManager::TryGetActiveWardenObjectiveData(LevelGeneration.LG_LayerType,GameData.WardenObjectiveDataBlock&)", "rva": "0x1520600", "note": "the author-defined objective behind a layer; it is the structural resource parameter an objective trigger takes, not a resource output" },
     { "id": "bioscan-state", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "signature": "ChainedPuzzles.pBioscanState ChainedPuzzles.CP_Bioscan_Core::get_State()", "rva": "0x18657E0" },
     { "id": "bioscan-finished", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "signature": "System.Boolean ChainedPuzzles.CP_Bioscan_Core::IsFinished()", "rva": "0x1862E00" },
     { "id": "bioscan-players-on-scan", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Core", "signature": "Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent> ChainedPuzzles.CP_Bioscan_Core::get_PlayersOnScan()", "rva": "0x46D980", "rvaShared": true, "note": "shared stub RVA; the getter is callable but not a Harmony target by RVA" },
@@ -314,7 +314,7 @@
     { "id": "bioscan-sync-set-state", "assembly": "Modules-ASM.dll", "type": "ChainedPuzzles.CP_Bioscan_Sync", "name": "SetStateData", "signature": "System.Void ChainedPuzzles.CP_Bioscan_Sync::SetStateData(ChainedPuzzles.eBioscanStatus,System.Single,Il2CppSystem.Collections.Generic.List`1<Player.PlayerAgent>,System.Int32,Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray`1<System.Boolean>)", "rva": "0x1867F80", "role": "publishes scan state into the replicator; no direct caller in the image (delegate/closure dispatch)" },
     { "id": "terminal-set-chain-puzzle", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "SetChainPuzzleForCommand", "signature": "System.Void LevelGeneration.LG_ComputerTerminal::SetChainPuzzleForCommand(LevelGeneration.TERM_Command,System.Int32,ChainedPuzzles.ChainedPuzzleInstance)", "rva": "0x12987D0", "role": "binds a chained puzzle (terminal alarm/scan) to a terminal command; the per-command instance identity" },
     { "id": "terminal-sync-change-state", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "SyncChangeState", "signature": "System.Void LevelGeneration.LG_ComputerTerminal::SyncChangeState(LevelGeneration.TERM_State,Player.PlayerAgent)", "rva": "0x129C070", "role": "host-applied terminal state change with the requesting player" },
-    { "id": "terminal-manager-want-change-state", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "WantToChangeTerminalState", "signature": "System.Void LevelGeneration.LG_ComputerTerminalManager::WantToChangeTerminalState(System.UInt32,LevelGeneration.TERM_State,Player.PlayerAgent)", "rva": "0x143DD80", "isStatic": true, "role": "client-side command request channel for terminals (ruling 19 pattern)" },
+    { "id": "terminal-manager-want-change-state", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "WantToChangeTerminalState", "signature": "System.Void LevelGeneration.LG_ComputerTerminalManager::WantToChangeTerminalState(System.UInt32,LevelGeneration.TERM_State,Player.PlayerAgent)", "rva": "0x143DD80", "isStatic": true, "role": "client-side command request channel for terminals: a client-local state request reaches the host instead of being applied locally" },
     { "id": "terminal-manager-get-terminal", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "GetTerminal", "signature": "LevelGeneration.LG_ComputerTerminal LevelGeneration.LG_ComputerTerminalManager::GetTerminal(System.UInt32)", "rva": "0x143D790", "isStatic": true, "role": "resolves a terminal by its stable uint SyncID, the terminal identity source" },
     { "id": "landing-stop-ambient-alarm", "assembly": "Modules-ASM.dll", "type": "ElevatorShaftLanding", "name": "StopAmbientAlarm", "signature": "System.Void ElevatorShaftLanding::StopAmbientAlarm()", "rva": "0x167C9E0", "isStatic": true, "role": "native alarm stop used by the terminal DEACTIVATE_ALARMS closure and by ObjectiveStatusCheck (verified edges)" },
     { "id": "elevator-start-ride", "assembly": "Modules-ASM.dll", "type": "ElevatorRide", "name": "StartElevatorRide", "signature": "System.Void ElevatorRide::StartElevatorRide()", "rva": "0x1678BB0", "isStatic": true, "role": "extraction ride start; not a Harmony instance hook" },
@@ -426,7 +426,7 @@
     {
       "row": "forge.action.map.objective_state", "entry": { "kind": "hook", "id": "ObjectiveAttemptInteract" },
       "nativeCall": "WardenObjectiveManager.AttemptInteract(pWardenObjectiveInteraction) with type DiscoverObjective(0)|StartObjective(1)|UpdateSubObjective(5)|CustomSubObjectiveUpdate(8)|SetItemSolved(9)|SetExtraTime(11)|SetSolveOnDeath(12)|SetExitWaveTriggered(13); forced completion through ForceCompleteObjective/ForceCompleteObjectiveAll",
-      "sync": "the interaction goes into the replicated objective state (m_stateReplicator); host authority per ruling 19",
+      "sync": "the interaction goes into the replicated objective state (m_stateReplicator); the host is the authority for it",
       "verifiedInGame": false
     },
     {
@@ -482,7 +482,7 @@
     }
   ],
   "catalogMismatches": [
-    "ruling 49 removes the resource output port of forge.trigger.objective.*, but the current catalog still declares resource outputs (objective/alarm/scan) on every objective trigger row; the rows also declare no handle output yet.",
+    "the objective triggers have no resource output port, but the current catalog still declares resource outputs (objective/alarm/scan) on every objective trigger row; the rows also declare no handle output yet.",
     "forge.trigger.objective.scan_paused and forge.action.map.scan_pause have no native counterpart: eBioscanStatus has no paused value and pBioscanState has no pause flag.",
     "forge.trigger.objective.scan_failed maps only onto eBioscanStatus.TimedOut, which is a timeout, not a documented failure; failure semantics must be defined by Forge.",
     "forge.action.map.scan_progress has no native setter; the catalog row implies an amount/rate write that the game does not expose.",

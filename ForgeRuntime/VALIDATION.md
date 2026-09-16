@@ -1,10 +1,98 @@
 # ForgeRuntime 验证记录
 
-**上次更新：2026-09-14**（内容合并自 R1、R2a、R2a-cleanup、R2b-1、R3a、R4a 六份交接记录与旧采集版验证记录）。
+**上次更新：2026-09-15。** 最新一节是 R-ABI 批 A 的执行帧形状与合同词表；其下依次是挂载匹配器按"要不要事件主体"拆分、ForgeTrigger 独立成包后的宿主摘除、三处宿主修正（日志后台线程、哈希不符挂起、生命周期钩子改用 GTFO-API）与更早的记录（内容合并自六份交接记录与旧采集版验证记录）。
 
 计划与状态见两仓统一框架第 6 节 U-RUNTIME（链接见[仓库 README](../README.md)）。本文只记录 Runtime 侧各次交付的实际内容、复跑命令与仍然存在的失败；没有任何游戏、安装、多人或恢复验收。
 
-## D-007 阶段 C — 内核记录点（2026-09-14）
+## R-ABI 批 A：执行帧形状与合同词表（2026-09-15）
+
+帧层在原有描述符上加形状，不动计划装载与派发：`ValueKind` 尾部追加 `Resource = 10`、`Event = 11`、`Result = 12`，前十个值不变；`RuntimeValueTypes` 追加 `handle`/`resource`/`event`，`ValueKind - 2` 仍是端口类型的密集下标（`RuntimeFrames.ValidateTables` 每次装载计划时断言）。
+
+- `RuntimeGraphContracts.FramePort` / `ResultRowWidth` / `ResultFieldOffsets`（`Framework/RuntimeGraphContracts.cs`）：`execution` 零槽；`boolean`/`integer`/`number`/`string`/`enum`/`entity`/`handle` 一槽（`vector3` 三槽，头槽带 x）；`resource` 两槽（头槽是 `ResourceKinds` 下标、第二槽是 id 的字符串槽）；`event` 一槽（本次派发事件行的下标）；`result` 无头槽，行宽是声明字段宽度之和，字段偏移按声明顺序累加。集合是「一头槽 + 256 个元素槽」，元素按自身宽度走（`vector3` 集合按 3 槽一个元素预留）；只有 `boolean`/`integer`/`number`/`string`/`vector3`/`entity`/`handle` 七种元素类型有集合形式，`resource`/`event`/`result` 声明成集合按 `unsupported-port` 拒绝，`result` 的 `cardinality: many` 同样拒绝。
+- `Framework/Frame/Frames.cs`：`FrameResource`、`Frame.Resource`/`TryResource`/`EventRow`/`ResultRow`/`Count`/`Element` 与各类型元素读取；`FrameWriter.SetSegment` 加 `SetBoolean`…`SetHandle`（含 `many handle` 的 provider 下标）逐元素写、`SetResource`/`SetEvent` 写单值、`SetEntities` 保留为集合入口。顺带修掉三处半成品：`FrameValue.OfResource` 把种类下标和字符串偏移写进同一个 24 字节字段、`vector3` 声明宽度 3 槽却按 4 槽读写、`FrameSpace.SlotCapacity` 从未赋值导致写入器把任何写都当成越界。
+- `Framework/Frame/PlanFrames.cs`：常量池只接受编译期 resource 引用（`{id, revision}` 字面量 + 端口的 `resourceKind` → 两槽），`handle` 字面量按 `handle-literal` 拒绝（装载器已先拒，这里是不可达断言），`event`/`result`/`policy` 按 `unsupported-port` 拒绝；每步 64 值槽预算只算解码的值，集合整段、`handle`、`resource` 与结果行只受计划帧字节预算约束（`frame-slot-budget` / `frame-bytes-budget`）；入口事件载荷帧不再为 trigger 的 result 端口预留槽，结果行由 `ResultPorts` 单独占一段，`fromEventSlot` 对应的端口顺序不变。
+- 词表只做尾部追加：`EnumSetTable` 在原有 22 个集合之后接 `commit_state`（下标 22）、`agent_modifier`(23)、`rundown_tier`(24)、`door_state`(25)；`ai_state` 尾加 `patrolling`/`hibernating`，`commit_state` 为 `none`/`confirmed`/`unknown`/`partial`。`ResourceKinds` 尾加 `chained-puzzle`/`zone`（`room` 保留），`HandleKinds` 尾加 `pool`/`request`（`pool_membership`/`transaction` 保留到目录改形批）。`objective`/`movement`/`generator`/`container` 四个状态集没有原生成员证据，本批不建。`RuntimeAbiCodes` 增 `resource-unavailable`、`event-port-kind` 两个码（消费方分别在批 C、批 D）。
+- **网站镜像必须按同一顺序改**：`graphEnumSets` 的位置就是编译进 `layout.valueSet` 的下标，模组侧现在锁定的是 `compare_operator`(0)…`pulse_start`(21)、`commit_state`(22)、`agent_modifier`(23)、`rundown_tier`(24)、`door_state`(25)。计划 `schemaVersion` 与 `apiVersion` 本批都不动（批 B/F 一次性翻转）。
+
+新增 `tests/Framework/FrameShapeTests.cs`（注册在 `Program.cs` 末尾），断言分六组：十一个旧 `ValueKind` 与三个新值的编号、每种端口类型的槽宽与三种非法集合的拒绝、结果行宽度与字段偏移、七种元素（含 handle 的 provider、`vector3` 的三槽元素）经 `FrameWriter`/`Frame` 往返、资源两槽与 event/result 读取、以及经 `PlanFrames.Build` 的真实描述符——集合/资源/结果行不计值槽而计入帧字节（多一个标量即 `frame-slot-budget`，字节预算调小即 `frame-bytes-budget`），常量池里 resource 的两槽往返与 handle/event/result 字面量拒绝。最后锁定枚举集合名→下标（`Layout` 的 `valueSet`）与 `ResourceKinds`/`HandleKinds` 的既有下标。
+
+实际执行（`dotnet build/run … -c Release`，`GTFO_BEPINEX_PATH` 指向只读的 `Forge-MapEditor-QA` profile 的 `BepInEx` 目录）：`ForgeRuntime.Framework` 与宿主 `ForgeRuntime` 构建 0 警告 0 错误；`ForgeRuntime/tests/Framework` 631 项通过、`--fixtures Tests/Forge/fixtures/runtime` 684 项通过（真实网站编译计划照常装载并按新形状展开帧）；同时重新构建 `Architecture`、`EntityObservation`、`HostConfiguration`、`HostIntegration`、`LifecycleWork`、`PluginStartup`、`RuntimeLog`、`Network`、`GraphContracts`、`GameBindings` 工程，除下列两处与本批无关的并行工作树问题外均为 0 错误。
+
+未跑与未验证：`tests/LifecycleWork` 运行失败在 `forge.module.gtfo.enemy` 注册期——某个 binding 的 `requires` 指向尚未注册的 `forge.module.gtfo.enemy.binding.damage_applied`，属 ForgeEnemy 侧并行改动（`EnemyModule.AttackFacts.cs`），与本批帧/词表无关；`tests/Architecture` 构建被 `ForgeMap/ExpeditionContract.cs` 的 `CS0103 Array` 拦住，`tests/GameBindings` 被 `ForgeEnemy/Native/EnemyModule.cs` 的 `AttackWindupBinding` 未定义拦住，两者同样是并行工作树的半成品。`tests/GraphContracts` 未重跑（需先按网站仓重新生成向量，且 `layout` 权威翻转属批 B）。原生执行、游戏、多人、恢复仍未验证。
+
+## 挂载匹配器按主体拆分（2026-09-15）
+
+原先 `RuntimeKernel.Control.MatchesAttachments` 对 `attachment.Kind == "level"` 直接返回 true，`RuntimePlan.ParseAttachments` 也对 `level` 免掉"必须有匹配器"的检查：内核自己拥有了一种挂载种类。
+
+- `Framework/Contracts.cs` 新增 `AttachmentScopeMatcher`（`(category, reference) => bool`）与 `AttachmentMatcherRegistration`：`BySubject(AttachmentMatcher)` 与 `ByScope(AttachmentScopeMatcher)` 是唯一的构造入口，构造时就确定了这个 kind 要不要事件主体，两者不会同时存在。`RuntimeModule.AttachmentMatchers` 的值改为该注册记录。
+- `Framework/RuntimeRegistry.cs` 的注册校验只要求 kind 在计划词表里、注册项非空，`kind != "level"` 的特例删除；注销清理（`RuntimeKernel.RemoveModule`）不变，仍按 owner 移除整个 kind。
+- `Framework/RuntimeKernel.Control.cs` 逐挂载判定：scope 注册项直接从挂载目标判定，不看事件；subject 注册项仍问事件的 source 与触发载荷的实体端口。世界、计时与脉冲事件不带主体，因此在此之前只有 `level` 能被它们判到。
+- `Framework/RuntimePlan.cs` 的 `level` 豁免删除：没有匹配器的 kind（含 `level`）一律在装载期按 `attachment-kind` 拒收，杜绝"计划被接受但永不派发"。`RuntimeGraphContracts.cs`、`RuntimeKernel.cs`、`RuntimePlan.cs` 的相关注释同步；计划词表 `AttachmentKinds` 仍是 `attachments[].kind` 的取值集合，只是内核不再对其中任何一个有特殊语义。
+- 测试：`tests/Framework` 的 fixture 新增一个只认所给 reference 集合的 scope provider（`example.mounts`，默认参考 `fixture-level`），`Scenario`/`TimingScenario`/各独立内核与 `QueryPresence`/`RuntimeContext`/`RuntimeCandidateSource` 在装载前注册它；`--fixtures` 分支的替身由网站夹具自己声明的 level reference 脚本化。`AttachmentRegistryTests` 把"level 挂载无匹配器也能装载"的断言反过来，并覆盖 scope kind 的注册与注销；`PlanAbiTests` 的 harness 常驻注册 `level` scope 匹配器，新增一个**不带任何 entity 端口**的世界触发能力与 `PublishWorld`，新增四条用例：无主体挂载判到无主体事件、scope 不匹配时 `attachment-mismatch`、主体与无主体混合挂载各走各路、无匹配器 kind 装载期拒收。`GameBindings`、`LifecycleWork`、`RuntimeLog` 的计划夹具各自注册 `level` 替身（`GameBindings` 用脚本化的 `31:A:0`，本地计划一并改成该拼写）。
+
+实际结果（本次实际执行的命令与输出，`--artifacts-path %TEMP%\lvlm\artifacts`，`GTFO_BEPINEX_PATH` 指向只读的 `Forge-MapEditor-QA` profile）：`ForgeRuntime.Framework`、宿主、`ForgeTrigger.Native`、`ForgeMap.Native`、`ForgeWeapon.Native`、`ForgeEnemy.Native`、`ForgeDevelopment.Native` 构建各 0 警告 0 错误；`tests/Framework` 482 项通过、`--fixtures` 535 项通过（consumes 网站夹具的两份合法计划，其 `level` 挂载此刻是 `31:A:0` / `31:A:1`，非法 `attachment-*` 用例仍按 `cases.json` 记录的拒绝码失败）；`PluginStartup` 54 项、`HostConfiguration` 68 项、`HostIntegration --host` 66 项、`RuntimeLog` 239 项、`Network` 393 项、`EntityObservation` 78/78、`Architecture` 无断言失败；`GameBindings` 默认与 `--fixtures` 均 exit 0（后者 107 项断言、BLOCKED 0）。
+
+未通过/未运行：`tests/LifecycleWork --fixtures` 6 组全失败，根因是**并发的网站任务在本任务进行中重新生成了网站夹具**（`Tests/Forge/fixtures/runtime/` 52 个文件有改动，`native-manifest.json` 现在把 `forge.trigger.enemy.*` 声明为 `forge.module.gtfo.enemy` 自己拥有并带上对应 binding），而该夹具的敌模块按 `capabilities = Array.Empty<object>()` 注册，因此注册期报 `missing-capability`（binding `forge.module.gtfo.enemy.binding.alert_changed`）；HEAD 版本的同一夹具里根本没有这条 binding（只有 `forge.trigger.enemy.death_started`，owner 是 `forge.contract.combat`），所以这不是本次改动造成的。`tests/GraphContracts` 未运行：网站侧的向量生成器 `ForgeRuntime/tests/GraphContracts/generate.mjs` 在 `site/forge/runtime-schema.ts` 里抛 `Missing runtime field: manifest.limits.maxAttachmentsPerPlan`（生成器自建的内联 manifest 没有该字段，而网站的校验器现在要求它）；两个问题都不在本次改动范围内，交付报告里已列出。
+
+## 宿主不再内联 ForgeTrigger 源码（2026-09-15）
+
+ForgeTrigger 现在与 ForgeMap/ForgeWeapon/ForgeEnemy 一样是独立插件包，由 `ForgeTrigger/Native/Plugin.cs` 通过公开的 `RegisterModule` 注册 `forge.module.trigger`。
+
+- `ForgeRuntime.csproj` 删除 `Compile Include="..\ForgeTrigger\**\*.cs"`；宿主程序集只保留 SDK 自有的 `forge.contract.combat` 与 `forge.contract.control`。
+- `GameRuntimeBridge.Initialize` 删除 `RegisterBuiltinModule(ForgeTrigger.ModuleDefinition.Create())`。`RegisterBuiltinModule` 仍被上面两个内置 provider 使用，没有变成死代码；`Framework/**` 一行未改。
+- `tests/GameBindings` 与 `tests/Framework` 仍以源码方式链接该包（这两个 harness 直接编译 SDK 源码，改引用会把 `RuntimeModule` 变成两个身份），排除项加上 `ForgeTrigger/Native/**`。
+- `tests/HostIntegration/HostAssemblyProbe.cs` 新增两条断言：宿主程序集不含 `ForgeTrigger*` 命名空间的类型，也不含指向该命名空间的成员调用。
+
+实际结果：`ForgeRuntime.Framework` 构建 0 警告 0 错误；宿主构建成功、1 条既有 CS8602（`Logging/RuntimeLogWriter.cs:183`）；`ForgeTrigger.Native` 构建 0 警告 0 错误；PluginStartup 46/46、HostIntegration 66/66（含新增两条，host 为本次编译产物）、HostConfiguration 68/68，退出码均为 0。未跑：`tests/Architecture`（构建被 `ForgeMap/MapObjectObservation.cs:28` 的 `MapObjectAddress` 重复定义拦住，属 ForgeMap 侧并发改动）、`tests/Framework`、`tests/GameBindings`、`tests/RuntimeLog`、`tests/GraphContracts`、`tests/LifecycleWork`（分别需要网站生成的向量、网站夹具或测试替身同步到 rtabi 的计划 v4/结果行形状）。本文件早前那条「宿主链接 ForgeTrigger 源码并注册 `forge.module.trigger`」的描述已被本节取代。
+
+## 宿主三处修正 — 日志线程、哈希挂起、生命周期钩子（2026-09-15）
+
+**实现与测试都已写好；下表是实际执行结果，未列出的检查没有运行。**
+
+**1. 后台写盘线程不再调用 BepInEx 日志。** 证据是改前的 `Logging/RuntimeLogWriter.cs`：后台线程在 `Run`/`Open`/`Append`/`Retain` 里直接调 `console.LogError`/`LogWarning`（改前 99、129-130、136、155、175 行）。BepInEx 把一条消息同步分发给所有 `ILogListener`，QA profile 装了 CConsole，ForgeDevelopment 也注册了监听器，监听器在未注册线程上碰 IL2CPP 对象会带走进程。现在：
+
+- `log.level` 行与每条被接受的记录都在 `Write()` 里（调用方的内核线程上）先 `Mirror` 再入队，error 走 `LogError`、info 走 `LogInfo`，trace 不镜像——与合同「控制台只镜像 info 及以上」一致。
+- 后台线程只做序列化、写文件、保留清理，一次 `ManualLogSource` 调用都没有。文件建不出来、写失败、保留清理失败只记 `Interlocked` 计数与原因字符串（`BackgroundFailure`）。
+- 后台状况由下一次内核线程上的 `Write()`（`EngineFailures()`）或 `Dispose()`（`DrainEngineFailures()`）折进合同已有的 `log.dropped`：`count` 是没写进文件的条数，message 形如 `Records were not written to <文件或目录>: <原因>`，没有新增记录码或旁路通道。
+- 没有第二条「后台也能打日志」的路径；`FilePath` 改成 `volatile` 字段，供内核线程与测试在后台线程写完后读取。
+- 语义变化一条：文件创建失败时改前会立刻在控制台报一次，现在要等第一条记录入队后由内核线程报出（`log.dropped`）。队列仍按原来的每 tick/队列上限丢记录，两类丢失合并进同一个 `count`。
+
+**2. GameAssembly 哈希不符改为挂起。** 改前 `GameBindings/GameRuntimeBridge.cs`（14-15、36-41 行）直接抛 `InvalidOperationException`，`Plugin.Load` 回滚并重新抛出，BepInEx 标记插件失败，`Plugin.Runtime` 为 null，领域插件随后抛 `"Forge Runtime is unavailable"`。现在：
+
+- `Initialize` 先建好 writer、kernel 与 Runtime 自己的三个内置 provider，再核对哈希；不符时走 `SuspendStartup`：置 `Suspension = "startup-failed"`、kernel 停在 `Registering`（不 `BeginWorld`）、写一条 `runtime.suspended`（`result.status = failed`、`reason = startup-failed`，message 含期望与实际哈希）。哈希读不出来时（`IOException`/`UnauthorizedAccessException`）同样挂起，message 写读取失败原因。
+- 挂起后 kernel 仍然发布，这是依赖包区分「挂起」与「宿主根本没加载」的唯一依据；`FixedTick` 在挂起时直接返回，因此不导出 manifest、不扫描计划、不 `StartRuntime`。挂起是进程级的，哈希是二进制属性，没有恢复路径。
+- 新增 `Plugin.IsSuspended` 与 `Plugin.SuspensionCode`（唯一事实来源在桥接的 `Suspension`）。`ForgeEnemy`、`ForgeMap`、`ForgeWeapon` 的 `Native/Plugin.cs` 在自己的 `Load` 里、`ConfiguredMode == Off` 之后查 `HostPlugin.IsSuspended`：命中就写一条 `Log.LogError`（含包名与 reason）后 `return`，不建 session、不装原生 Hook。这三处改动超出了任务说明的「负责文件」清单，见报告；它们只改挂起分支，其余注册流程不变。
+- `GameAssemblySha256` 从 `const` 改为 `static readonly`：编译后元数据检查改读字段初值，测试可以用反射把它换掉，在同一个进程里跑通「哈希不符」分支（`--bridge` 的第二个场景）。
+
+**3. 关卡生命周期改用 GTFO-API。** 依据是 QA profile 里随 BepInExPack_GTFO 装好的 `plugins/GTFO-API.dll`（0.5.0，反编译逐成员核对）与上游 `GTFO-Modding/GTFO-API` 的 `main` 源码：
+
+- 可用事件：`LevelAPI.OnBuildStart`/`OnBuildDone`/`OnEnterLevel`/`OnLevelCleanup`/`OnBeforeBuildBatch`/`OnAfterBuildBatch`/`OnFactoryStart`/`OnFactoryDone`、`EventAPI.OnExpeditionStarted`/`OnManagersSetup`/`OnAssetsLoaded`。触发点：`OnBuildStart`/`OnBuildDone` 是 `LevelGeneration.Builder.Build`/`BuildDone` 的 postfix，`OnLevelCleanup` 是 `Global.OnLevelCleanup` 的 postfix，`OnEnterLevel` 经 `RundownManager.OnExpeditionGameplayStarted` → `EventAPI.OnExpeditionStarted`，即玩家能移动时；插件 GUID 为 `dev.gtfomodding.gtfo-api`。
+- 该版本**没有** `EventAPI.OnGameStateChanged`（`main` 分支后来加了 `GameStateChanged`/`OnCheckpointReloaded`/`OnCheckpointReached`，装的 0.5.0 里没有），因此 `GameStateManager.DoChangeState` 的原始补丁没有等价事件可换。
+- 删掉 `FrameworkStateChanged`、`FrameworkWorldCleanup`、`FrameworkSessionReset`；新增 `GameBindings/LevelLifecycle.cs` 订阅 `OnBuildStart`/`OnEnterLevel`/`OnLevelCleanup`，由 `Plugin.Load` 在 `PatchAll` 之后订阅、启动回滚时退订。`GameRuntimeBridge` 的 `StateChanged` 与 `EndWorld` 一并删除（已被 `BeginGeneration`/`EnterLevel`/`LeaveLevel` 取代）。`NativeHooks.cs` 只剩 `FrameworkCheckpointRestore`（`CheckpointManager.OnStateChange`），`Plugin.cs` 加 `BepInDependency(GtfoApiGuid, HardDependency)`，csproj 按现有写法加 `GTFO-API` 引用（`$(GTFOBepInExPath)\plugins\GTFO-API.dll`，与 InfiniTweaks 一致）。
+- 时点差异逐条：① `Generating` → `OnBuildStart` 都在关卡生成开始时，但 `OnBuildStart` 是 `Builder.Build` 的 postfix，**不覆盖**原来 `DoChangeState` 里 Lobby/NoLobby/Offline 那几个分支——原来那些分支只做一件事：放行 `_blockedUntilLobby`。现在这个放行合并进 `BeginGeneration`（新一次生成比游戏状态名更强的保证），因此等待新远征的挂起（检查点恢复、主机迁移）会在下一次 `OnBuildStart` 释放；如果这一局再没有新生成，运行时保持挂起（见 ④）。② `InLevel` → `OnEnterLevel`：原来在 `DoChangeState` 后置补丁里按 `if (!_inLevel)` 取一次主机基线，现在同样只取一次，所以同一关卡内的重复事件不会重置基线（依赖包的主机迁移判定不受影响）。③ `OnLevelCleanup` 一条覆盖原来 `GameStateManager.OnLevelCleanup` 与 `OnResetSession` 两个前缀的 `EndWorld` 语义（关卡消失即作废旧世界）。④ 检查点恢复与主机迁移保留补丁/轮询：该版本没有检查点重载事件，迁移仍需在 tick 上比较 `SNet.IsMaster` 与 `MasterManagement.IsMigrating`。⑤ `OnBuildDone` 有意不订阅：宿主需要的是「新世界已开始、可以在里面建东西」，不是「建完了」。
+- 已知风险（未实测，需实机确认）：`Global.OnLevelCleanup` 与 `CheckpointManager` 在检查点重载时的先后顺序没有实机证据；改法把 `_blockedUntilLobby` 的放行点从「回到大厅」改成「开始新生成」，正常情况下等价，但若某条重载路径只重载不重新生成，运行时会保持挂起（不会错误恢复，属于更保守的一侧）。
+
+**测试（已写好）。** `tests/RuntimeLog`：新增「后台文件失败由后续 write 折成一条 log.dropped」用例（把目录路径占成文件来强制建文件失败），「console mirrors error and info only」改为同时断言每个 BepInEx 事件的线程号等于调用线程，「queue full」用例改为在 `log.level` 的监听器里阻塞（镜像现在发生在调用线程，这正是队列被压满的确定性来源），size cap 用例的断言语改为新的 message 文案。`tests/GameBindings`：`State` 助手改为按 GTFO-API 的方式发事件（`Generating`→`RaiseBuildStart`、`InLevel`→`RaiseEnterLevel`、`Lobby/NoLobby/Offline`→`RaiseLevelCleanup`），新增 `GtfoApiDoubles.cs`（最小 `GTFO.API` 替身）、`GameBindings.csproj` 编译 `LevelLifecycle.cs`、新增「哈希不符挂起」场景（反射换掉期望哈希，断言 kernel 停在 `Registering`、epoch 0、计划 0、`runtime.suspended` 恰一条且 message 含两个哈希、manifest 目录不生成、挂起时生命周期事件不启动任何东西），`NativeEvidence` 的期望宿主补丁组缩为 `{FrameworkCheckpointRestore}` 并新增「宿主引用 GTFO-API」「`LevelLifecycle` 订阅且退订三个事件」「`Plugin.Load` 调 `LevelLifecycle.Subscribe`」断言，同时删掉 `GameStateManager` 三个已不再打补丁的签名检查。`tests/PluginStartup`：`LevelLifecycle` 替身 + 订阅/退订平衡断言 + `HardDependency` 与 GUID 断言 + 新增「挂起宿主向依赖包发布门槛并告警」用例（`IsSuspended`/`SuspensionCode`/`CanExecuteGameplay == false`/`log:suspended`）。
+
+**复跑结果。** 命令一律为 `GTFO_BEPINEX_PATH` 指向只读的 `Forge-MapEditor-QA` profile，输出到隔离目录 `$env:TEMP\dsh-rthostfix\artifacts`：
+
+| 套件与参数 | 实际结果 | 退出码 |
+| --- | --- | --- |
+| `tests/PluginStartup` | 46 断言通过，0 场景失败 | 0 |
+| `tests/HostIntegration --host $env:TEMP\dsh-rthostfix\artifacts\bin\ForgeRuntime\release\ForgeRuntime.dll` | 64 断言通过，0 组失败（含 `production assembly boundary`） | 0 |
+| `tests/GameBindings --fixtures <网站夹具目录>` | 83 原生模块边界断言通过；2 例 BLOCKED（`discovery.junction-plans-rejected-not-followed`、`discovery.junction-sibling-package-no-effect`）——本机禁止子进程用 `mklink /J`/`New-Item -ItemType Junction` 建 NTFS junction，这 2 例是环境限制，不是断言失败 | 0 |
+
+失败后修掉的三处，根因都不是生产代码：
+
+- `PluginStartup` 的「挂起宿主」与「回滚穿过清理与上报错误」两例：`Plugin.Load` 的单次尝试闩锁是实例字段而就绪标志是静态字段（都改成进程级），测试替身的 `GameRuntimeBridge.CanExecute` 没有把挂起算进去（恒为 true，断言空转），且 `Probe.Case` 只复位替身状态、不复位 `Plugin` 的进程级闩锁，导致第一个用例跑完后后续用例全部在 single-attempt 守卫处抛异常。
+- `HostIntegration` 的 `production assembly boundary`：边界检查写死「宿主不得有任何 `BepInDependency`」，把 GTFO-API 这个必需基础依赖也拒了。检查保留并收窄为「只允许 GTFO-API 这一个硬依赖」，新增「该依赖必须声明为 HardDependency」与「宿主元数据必须引用 GTFO-API」两条断言，并把 Cecil 的枚举实参读取改为直接读特性 blob（本工程没有 BepInEx 引用，解析枚参会失败）。
+- `RuntimeLog` 的 `RecordFixture` 里 `ActionModule` 与 `SecondActionModule` 都声明了 `test.entity`，注册第二个模块时命中 `entity-namespace-conflict`（10 个用例全部卡在构造 `RecordFixture`）。实体解析器只由 `ActionModule` 声明（两个入口的 action 都经它解析同一个事件实体）。改动已落盘，但**未能复跑验证**：见下。
+
+**未运行的检查。** `tests/RuntimeLog --root <仓库外新目录>` 与 `tests/GameBindings --bridge <游戏目录>` 未能完整复跑。`Framework/**` 在编写本文时正被另一任务改到半途：`RuntimeKernel.cs` 第 661 行没有跟上 `EvaluationContext` 新增的 `query` 参数、`RuntimePlan.cs` 第 253 行引用了不存在的 `Optional`，只读复制的快照构建也失败，所以这两个套件既不能重新构建也不能复跑（`RuntimeLog` 最近一次跑出的生产源码就是这份半成品）。宿主自身同样无法重新构建：`Network/ForgeNetworkTransport.cs` 的 `NetworkAPI.RegisterEvent` 实参顺序与 `SNet` 合同不符（12 个 CS1503），该目录不在本任务范围。表中 `--host` 与 `--fixtures` 用的是本批改动编译出的宿主 DLL 与套件 DLL（构建时间早于上述两处半成品）。原生执行、游戏、多人仍未验证。
+
+**仍需 Claude 复核的相邻套件。** `ForgeEnemy/tests/NativeLayout`（`pending`）：`host.exact-hook-set` 的期望已改成 `{FrameworkCheckpointRestore}`。`ForgeEnemy/tests/NativePlugin`：替身补 `Plugin.IsSuspended`/`SuspensionCode` 与 `TestLog.LogError`；挂起时三个生命周期入口直接返回，不在未启动的内核上开世界。
+
+## 执行日志阶段 C — 内核记录点（2026-09-14）
 
 **现状盘点（改前，逐码）。** 已有记录点只有三处：`plan.rejected`（`Framework/RuntimeKernel.cs` 的 `LogPlanRejected`，被 8 个计划拒绝分支调用）、`plan.loaded`（同文件的 `LogPlanLoaded`，1 处）、`log.level` 与 `log.dropped`（`Logging/RuntimeLogWriter.cs` 的 71/100/136 行附近）。其余 13 个内核可见的事件码没有任何记录点。从 `TickResult` 转日志的旧路径有两处，都在 `GameBindings/GameRuntimeBridge.cs`：`FixedTick` 里按 `result.Commands`/`result.Events` 逐条 `LogWarning`（改动前的 84-88 行），以及 `ReportLifecycleFaults` 把内核的观察者故障计数镜像成 `LogWarning`（改动前的 135-141 行）。`Suspend` 直接写 `PluginLog.LogError`。
 
@@ -49,13 +137,13 @@
 5. `runtime.suspended` 的 level：契约把它列在 error 组，本实现一律记 error。正常 `StopRuntime` 不写这条记录（停止不是暂停，reason 表也没有对应码；`runtime-stopped` 在契约「不写入日志的内核码」表里）。如果契约要求「停止也记一条」，需要先给它一个进日志的 reason 码。
 6. `budget.exceeded` 的适用范围：契约 651 行用「reason 不以 `-budget` 结尾」定义 `event.rejected`，652 行却把 `budget.exceeded` 写成「派发阶段因预算拒收事件」。本实现按后缀规则分流全部拒绝（发布期的 `queue-budget`、`event-history-budget`、`plan-queue-budget` 也走 `budget.exceeded`），否则发布期的预算拒绝会落进 `event.rejected` 与 651 行的定义冲突。需要网站确认 652 行的「派发阶段」是否要按字面收窄。
 
-**未做/未验证。** 没有实机运行、没有加载 GTFO、没有导出 `forge-logs` jsonl 作为 I-DIAG 仲裁物；领域包自己的记录点（经 `RuntimeModuleHandle` 写出）与本包内部原生诊断码仍不在本批；`adapter.*` 待 I-ADAPTER-SCHEMA；没有性能测量，内核记录点的开销只有「未启用时一次门比较」这条静态保证。`TickResult` 的字段与语义没有改动，仍按原样返回给宿主。
+**未做/未验证。** 没有实机运行、没有加载 GTFO、没有导出 `forge-logs` jsonl 作为诊断证据；领域包自己的记录点（经 `RuntimeModuleHandle` 写出）与本包内部原生诊断码仍不在本批；`adapter.*` 待适配器事件码定稿；没有性能测量，内核记录点的开销只有「未启用时一次门比较」这条静态保证。`TickResult` 的字段与语义没有改动，仍按原样返回给宿主。
 
-## D-007 阶段 A — 注册时必填日志级别（2026-09-14）
+## 执行日志阶段 A — 注册时必填日志级别（2026-09-14）
 
-> 本节按任务要求放在顶部；本文件其余章节仍是按交付时间顺序排列的历史记录，下面 D-007 阶段 B 一节里的"只有 Runtime 自身有条目"是当时的记录，已被本节的注册级别取代。
+> 本节按任务要求放在顶部；本文件其余章节仍是按交付时间顺序排列的历史记录，下面执行日志阶段 B 一节里的"只有 Runtime 自身有条目"是当时的记录，已被本节的注册级别取代。
 
-**改动。** SDK 的注册入口改为 `RegisterModule(RuntimeModule module, RuntimeLogLevel level)`，单参数重载删除，不留兼容路径；`level` 只接受 off、error、info，传 trace 报 `log-level`（提级是唯一的 trace 入口）。级别不放进 `RuntimeModule`：内核在注册成功时为该 provider 建 `RuntimeLogGate(level)`，注销时移除。`LogGate` 对已注册 provider 返回其级别，对未注册 provider 仍报 `log-provider-unregistered`；级别表在注册、注销与提级时发布新快照，snapshot 因此总是包含已注册 provider。提级之后再注册的 provider 也是 Trace，不是它的 cfg 值。Runtime 自己的条目（`Identity.Id`）由宿主构造建立，注册与注销两侧都跳过它，模块即使声明同一个 provider id 也不能替换或删除。Runtime 自己随宿主注册的 CombatContracts、ControlContracts 与 Trigger 框架模块没有包 cfg：它们走 `internal RegisterBuiltinModule`（Framework 程序集加 `InternalsVisibleTo("ForgeRuntime")`，只有宿主程序集能调用），取 Runtime 自己的级别，不经公开参数伪造。
+**改动。** SDK 的注册入口改为 `RegisterModule(RuntimeModule module, RuntimeLogLevel level)`，单参数重载删除，不留兼容路径；`level` 只接受 off、error、info，传 trace 报 `log-level`（提级是唯一的 trace 入口）。级别不放进 `RuntimeModule`：内核在注册成功时为该 provider 建 `RuntimeLogGate(level)`，注销时移除。`LogGate` 对已注册 provider 返回其级别，对未注册 provider 仍报 `log-provider-unregistered`；级别表在注册、注销与提级时发布新快照，snapshot 因此总是包含已注册 provider。提级之后再注册的 provider 也是 Trace，不是它的 cfg 值。Runtime 自己的条目（`Identity.Id`）由宿主构造建立，注册与注销两侧都跳过它，模块即使声明同一个 provider id 也不能替换或删除。Runtime 自己随宿主注册的 CombatContracts、ControlContracts 没有包 cfg：它们走 `internal RegisterBuiltinModule`（Framework 程序集加 `InternalsVisibleTo("ForgeRuntime")`，只有宿主程序集能调用），取 Runtime 自己的级别，不经公开参数伪造。（本节当时还列有 Trigger 框架模块，该模块此后已随 ForgeTrigger 独立成包退出宿主，见顶部 2026-09-15 一节。）
 
 新增 `RuntimeLogConfiguration.ParseLevel(string)` 作为宿主 cfg 与各包 cfg 共用的文本词表（off/error/info，大小写与首尾空白不敏感，非法值抛同一条消息）；`RuntimeSettings` 改用它，行为不变。SDK 仍然不读任何 cfg。
 
@@ -177,7 +265,7 @@ handler 不感知提升：dispatch 把事件送来的值并回 Parameters，再�
 | GraphContracts | 1911，0 失败；verify.py 通过 |
 | GameBindings | 默认 31；`--fixtures` 64 |
 | 宿主 | Architecture 36；HostIntegration 默认 42、`--host` 51（`2a20d18` 删除原型探针时去掉 2 项）；PluginStartup 35；HostConfiguration 66；LifecycleWork `--fixtures` 57；EntityObservation 75、`--probe-registration` 76 |
-| Enemy | LifecycleFacts 52/52（生成的计划与当时的 `examples/limb-broken-heal.plan.json` 一致；该示例已在 D-004 批次随 heal 2.0.0 删除）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
+| Enemy | LifecycleFacts 52/52（生成的计划与当时的 `examples/limb-broken-heal.plan.json` 一致；该示例已在 heal 2.0.0 改为多值输入时删除）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
 | Map / Weapon | MapContracts 通过；IdentityDispatchReview 20/20 |
 | Trigger | 完整入口通过，见 [Trigger 验证记录](../ForgeTrigger/VALIDATION.md) |
 
@@ -213,9 +301,9 @@ Q3 落地：enum 的运行期/wire 值是集合内的成员下标，而不是成
 | GraphContracts | verify.py 1770 项通过，0 失败；`EnumSetTable` 与网站 `contracts.ts` 的 22 个集合逐项一致，未发现漂移 |
 | GameBindings | 默认 31；`--native` 51 |
 | 宿主 | Architecture 36；HostIntegration 默认 61（含 `--host`）；PluginStartup 39；HostConfiguration 90 |
-| Enemy | NativePlugin 24/24；EntityObservation 66/66；LifecycleFacts 50/52，BLOCKED 2（J-003，与 enum 无关）；**ReceiverProbe 43/44，BLOCKED 1（此前 36/44 BLOCKED 8，7 个伤害用例随 R4 恢复执行，仅剩 J-003 一项）**；**CommitAudit 68/68，BLOCKED 0（此前 62/68 BLOCKED 6，6 个伤害用例随 R4 恢复执行）**；ReceiverProbe 变体 8/8（`observation-replay`、`late-damage-retargeted` 随 R4 恢复检出）；LifecycleFacts 变体 7/7 |
+| Enemy | NativePlugin 24/24；EntityObservation 66/66；LifecycleFacts 50/52，BLOCKED 2（heal 多值输入缺口，与 enum 无关）；**ReceiverProbe 43/44，BLOCKED 1（此前 36/44 BLOCKED 8，7 个伤害用例随 R4 恢复执行，仅剩 heal 多值输入一项）**；**CommitAudit 68/68，BLOCKED 0（此前 62/68 BLOCKED 6，6 个伤害用例随 R4 恢复执行）**；ReceiverProbe 变体 8/8（`observation-replay`、`late-damage-retargeted` 随 R4 恢复检出）；LifecycleFacts 变体 7/7 |
 
-`Framework --fixtures` 与 `LifecycleWork --fixtures` 仍然崩溃，但栈顶已经从 `DamageObserved.damage_kind`（R4 未开放时）变成 `HealExplicitRecipient.targets`——即本次改动已经让这两个夹具测试越过枚举端口这一关，卡在的是另一个已知且无关的缺口：网站 `Tests/Forge/fixtures/runtime` 里的合法计划仍按 D-004 之前的 Heal 单值 `targets` 形状编写，与当前需要多值输入的 Heal 合同不符（J-003，由另一工作树的 heal 合并处理，不在本批范围）。两处均用 `git stash` 在改动前的 HEAD 上重新构建验证过：改动前后这两个夹具用例都是同样的 "0 assertions passed"/未捕获异常收场，只是失败原因从 damage_kind 换成了 targets，本次改动没有引入新的回归，也没有为字符串枚举常量添加任何兼容层。
+`Framework --fixtures` 与 `LifecycleWork --fixtures` 仍然崩溃，但栈顶已经从 `DamageObserved.damage_kind`（R4 未开放时）变成 `HealExplicitRecipient.targets`——即本次改动已经让这两个夹具测试越过枚举端口这一关，卡在的是另一个已知且无关的缺口：网站 `Tests/Forge/fixtures/runtime` 里的合法计划仍按 Heal 改成多值输入之前的单值 `targets` 形状编写，与当前需要多值输入的 Heal 合同不符（由另一工作树的 heal 合并处理，不在本批范围）。两处均用 `git stash` 在改动前的 HEAD 上重新构建验证过：改动前后这两个夹具用例都是同样的 "0 assertions passed"/未捕获异常收场，只是失败原因从 damage_kind 换成了 targets，本次改动没有引入新的回归，也没有为字符串枚举常量添加任何兼容层。
 | --- | --- | --- |
 | Framework | 0 | `Framework checks: 255 passed.` |
 | EntityObservation | 0 | `Entity contracts: 118 passed; 0 failed. No native APIs exercised.` |
@@ -228,9 +316,9 @@ Q3 落地：enum 的运行期/wire 值是集合内的成员下标，而不是成
 
 本批没有重跑 GameBindings 的 `--fixtures` / `--bridge` / `--native`、HostIntegration、PluginStartup、HostConfiguration、GraphContracts、Enemy 与 Trigger 套件。全部是托管替身证据，没有加载 GTFO。
 
-## D-007 阶段 B — 执行日志 sink、宿主 JSONL writer 与提级（2026-09-13）
+## 执行日志阶段 B — sink、宿主 JSONL writer 与提级（2026-09-13）
 
-分支 `feat/runtime-log-writer`，基于 `d09d6bb`（已含 Weapon/Map 的实例解析）。行为说明见 [README](README.md#执行日志d-007-阶段-b) 与 [Framework README](Framework/README.md#执行日志-sink-与级别d-007-阶段-b)。`Contracts.cs` 与 `RuntimeKernel.cs` 未改：内核构造重载、级别表和提级都放在新的 partial 文件 `RuntimeKernel.Logging.cs` 里。
+分支 `feat/runtime-log-writer`，基于 `d09d6bb`（已含 Weapon/Map 的实例解析）。行为说明见 [README](README.md#执行日志) 与 [Framework README](Framework/README.md#执行日志-sink-与级别)。`Contracts.cs` 与 `RuntimeKernel.cs` 未改：内核构造重载、级别表和提级都放在新的 partial 文件 `RuntimeKernel.Logging.cs` 里。
 
 **记录点尚未接入，玩家层现在不会写出任何业务记录。** 当前只有 Runtime 自身 provider 的级别（来自 `[Logging] Level`）。领域包的级别条目在阶段 A 随必填参数 `RegisterModule(RuntimeModule, RuntimeLogLevel)` 加入，在那之前查领域 provider 抛 `log-provider-unregistered`。
 
@@ -257,15 +345,15 @@ rebase 到 `d09d6bb` 之后的验证记录如下。构建使用 `dotnet build <�
 
 本批没有跑 GameBindings `--fixtures` / `--bridge`、EntityObservation `--probe-registration`、GraphContracts、Enemy、Map、Weapon 与 Trigger 套件，也没有检查内核或领域记录点的开销（记录点不存在）。以下仍未验证：游戏内 `ManualLogSource` 从后台线程调用、真实退出时序、进程强杀时丢失的队列与最后一行 `log.dropped`。以上都是托管替身、编译后元数据与本地原生签名证据，没有加载 GTFO，也没有安装。
 
-## J-003 与 r11：字面量/单转多输入、heal 结果聚合修正（2026-09-14）
+## 字面量与单转多输入、heal 结果聚合修正（2026-09-14）
 
-D-006①②（J-003）：schemaVersion 2 的 step 输入行只能是 `{slot, fromEventSlot}`（wired）或 `{slot, value}`（literal）二选一，两者同时出现报 `literal-with-event-source`；literal 值类型或类别（entity 一律禁止）与目标端口不符报 `literal-wrong-type`；非空的 one 输出接多输入端口时由加载器按 `RuntimeGraphContracts.ValueTypeMatches`（新拆出，忽略 cardinality）与显式 nullable 检查后原地包成一元素集合，其余端口维度不符仍按原 `port-mismatch`/`nullable-port` 拒绝。落地在 `RuntimeGraphContracts.cs`（`SameValue` 拆成精确匹配 + `ValueTypeMatches` 两个函数）、`RuntimePlan.cs`（step 输入解析改写）、`RuntimeKernel.cs`（dispatch 时按 `StepInput.Literal`/`Wrap` 取值）。
+schemaVersion 2 的 step 输入行只能是 `{slot, fromEventSlot}`（wired）或 `{slot, value}`（literal）二选一，两者同时出现报 `literal-with-event-source`；literal 值类型或类别（entity 一律禁止）与目标端口不符报 `literal-wrong-type`；非空的 one 输出接多输入端口时由加载器按 `RuntimeGraphContracts.ValueTypeMatches`（新拆出，忽略 cardinality）与显式 nullable 检查后原地包成一元素集合，其余端口维度不符仍按原 `port-mismatch`/`nullable-port` 拒绝。落地在 `RuntimeGraphContracts.cs`（`SameValue` 拆成精确匹配 + `ValueTypeMatches` 两个函数）、`RuntimePlan.cs`（step 输入解析改写）、`RuntimeKernel.cs`（dispatch 时按 `StepInput.Literal`/`Wrap` 取值）。
 
 r11（heal 结果聚合，кernel 级、与 provider 无关）：`Contracts.cs` 的 `CommandResultRules.TryValidate` 对 Partial 只再要求 commit 为 confirmed 或 unknown，不再要求非空 `Facts`——一个满血目标 commit 时 `actualAmount=0` 不产生 fact，与另一个被拒绝目标合并后仍是 Partial，facts 可以为空。`RuntimeKernel.cs` 的 entrypoint 派发循环相应改为只在 rejected/failed/cancelled/expired，或 partial+unknown 时停止；partial+confirmed 不再停止，后续 step 继续执行。`EnemyModule.Heal` 与 `EnemyHealthCommit.Execute` 的 21 个拒绝码改成 `CombatContracts.cs` 里已提交的 kebab-case 形式，聚合逻辑按有无 committed 行重写（不再按 `unknown==0`/`facts.Count==0` 判断），删除 `heal-no-state-change`。
 
 同批修正了两处被 r11 改变的既有断言：`ForgeRuntime/tests/Framework/ExecutionResultTests.cs` 里"partial without/with known commit"的两条旧断言（原假设 partial+confirmed/unknown 且空 facts 一定非法，现改为验证合法）与"partial stops the entrypoint after its invoked step"整段场景（confirmed-commit partial 不再停止，2 步都执行，2 条 fact 都发布排队）；`ForgeEnemy/tests/CommitAudit/CommitCases.cs` 的 `heal.multi-full-and-rejected-is-no-state-change`、`heal.multi-full-and-unknown-is-failed` 两个用例按 r11 改写为 `-is-partial-confirmed`/`-is-partial-unknown`。
 
-website `Tests/Forge/fixtures/runtime` 的 27 个非法计划（不是任务文本原先假设的 28 个）逐一核对了 sha256（未直接采信既有记录）：`cases.json` d5e355d8…、`native-heal.plan.json` 475363c2…、`native-manifest.json` 731a166f…、`MANIFEST.json` e5020919… 均与站内 `MANIFEST.json` 登记值一致；27 个 `invalid/*.plan.json` 中含 `literal-with-event-source.plan.json`、`literal-wrong-type.plan.json` 两个 J-003 专属负例。
+website `Tests/Forge/fixtures/runtime` 的 27 个非法计划（不是任务文本原先假设的 28 个）逐一核对了 sha256（未直接采信既有记录）：`cases.json` d5e355d8…、`native-heal.plan.json` 475363c2…、`native-manifest.json` 731a166f…、`MANIFEST.json` e5020919… 均与站内 `MANIFEST.json` 登记值一致；27 个 `invalid/*.plan.json` 中含 `literal-with-event-source.plan.json`、`literal-wrong-type.plan.json` 两个字面量输入专属负例。
 
 隔离构建，`Forge.Architecture.sln` 与各测试工程 0 警告 0 错误：
 
@@ -277,23 +365,23 @@ website `Tests/Forge/fixtures/runtime` 的 27 个非法计划（不是任务文�
 | GraphContracts `verify.py --website ..\Infini-GTFO-Model-Site`（非 `--integration`） | typescript 生成 exit 0；graph-contracts 1770 passed，0 failed；`sourceStable=true` |
 | GraphContracts `mutations.py <本次生成的 vectors.json>` | control 通过，5/5 错误实现（含 `plan-skips-expansion`）全部检出 |
 | GameBindings（默认） | PASS 39，BLOCKED 0 |
-| GameBindings `--fixtures <站内 fixtures/runtime>` | PASS 70，BLOCKED 0（此前记录的 `fixtures.valid-plan-heal-dispatch`/`fixtures.invalid-plan-rejections` 版本比对阻塞已随 J-003 解除） |
+| GameBindings `--fixtures <站内 fixtures/runtime>` | PASS 70，BLOCKED 0（此前记录的 `fixtures.valid-plan-heal-dispatch`/`fixtures.invalid-plan-rejections` 版本比对阻塞已随 heal 合并解除） |
 | CommitAudit | 68/68，BLOCKED 0 |
 | ReceiverProbe | 43/44，BLOCKED 1；`verify_mutations.py` 8/8 mutants 检出 |
 | LifecycleFacts | 50/52，BLOCKED 2；`verify_mutations.py` 7/7 mutants 检出 |
 | ForgeTrigger T1（`validate-trigger.py --mutations` 的 t1 阶段） | PASS 911 C# assertions |
 
-**LifecycleWork `--fixtures` 本批未通过，退出码 1，0 assertions passed，6 组失败。** 根因不在 J-003/r11：`tests/LifecycleWork/WorkFixture.cs` 的 `Event()` 用固定 payload `{ target, actual_damage }` 构造 `damage_applied` 触发事件，但站内当前 `native-manifest.json` 里该 trigger 的输出端口是 `next/source/target/amount/damage_kind/limb` 且均非 `optional`——字段名早已不是 `actual_damage`（应为 `amount`），且缺 `source`/`damage_kind`/`limb`，命中 `RuntimeKernel.ValidateEvent` 的 `RuntimeJson.Shape` 检查报 `unknown-field`。这是独立于本批改动的既有失效夹具。
+**LifecycleWork `--fixtures` 本批未通过，退出码 1，0 assertions passed，6 组失败。** 根因不在本批的字面量与 heal 改动：`tests/LifecycleWork/WorkFixture.cs` 的 `Event()` 用固定 payload `{ target, actual_damage }` 构造 `damage_applied` 触发事件，但站内当前 `native-manifest.json` 里该 trigger 的输出端口是 `next/source/target/amount/damage_kind/limb` 且均非 `optional`——字段名早已不是 `actual_damage`（应为 `amount`），且缺 `source`/`damage_kind`/`limb`，命中 `RuntimeKernel.ValidateEvent` 的 `RuntimeJson.Shape` 检查报 `unknown-field`。这是独立于本批改动的既有失效夹具。
 
-同日修复：`WorkFixture.Event()` 改为按目录行构造 `{ source: null, target, amount: 10, damage_kind: null, limb: null }`（与 `EnemyModule` 发布 `damage_applied` 的形状一致）。复跑 `LifecycleWork.dll --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime`：构建 0 警告 0 错误，57 assertions passed，0 groups failed，退出码 0。至此 J-003 要求的 Framework、GameBindings、LifecycleWork 三组 `--fixtures` 全部通过。
+同日修复：`WorkFixture.Event()` 改为按目录行构造 `{ source: null, target, amount: 10, damage_kind: null, limb: null }`（与 `EnemyModule` 发布 `damage_applied` 的形状一致）。复跑 `LifecycleWork.dll --fixtures ../Infini-GTFO-Model-Site/Tests/Forge/fixtures/runtime`：构建 0 警告 0 错误，57 assertions passed，0 groups failed，退出码 0。至此 heal 合并要求的 Framework、GameBindings、LifecycleWork 三组 `--fixtures` 全部通过。
 
-**ReceiverProbe 的 `commit.kernel-unknown-no-retry` 与 LifecycleFacts 的 `integration.real-heal-death_started`/`integration.real-heal-limb_broken` 仍列 BLOCKED。** 根因是 `ForgeEnemy/tests/Shared/Blockers.cs` 的 `Heal` 常量与其在 `ReceiverProbe/Program.cs`、`LifecycleFacts` 里的引用是硬编码的无条件阻塞，文本仍写"J-003 未实现"——J-003 本批已经落地并经 Framework `--fixtures`/CommitAudit 验证，但这三个用例没有随之自动解除，因为阻塞判断本身没有读取任何运行时状态。解除需要新写用 `LocalPlan` 从内核注册表构造 事实→Heal 计划并恢复 +5HP 断言（README 里已写明的解除条件），属于新增测试基础设施，不在本次 J-003 loader 实现 + heal 合并的范围内，留作后续修复项。`GameBindings/Program.cs` 里同类的 `HealBlocker`/`bridge.configured-heal-plan-commits-5hp` 未见于本批 `--fixtures`/默认运行的失败或阻塞列表中（该 bridge 场景未在本次跑的两个模式里触发），未重新核实，一并留作后续检查项。
+**ReceiverProbe 的 `commit.kernel-unknown-no-retry` 与 LifecycleFacts 的 `integration.real-heal-death_started`/`integration.real-heal-limb_broken` 仍列 BLOCKED。** 根因是 `ForgeEnemy/tests/Shared/Blockers.cs` 的 `Heal` 常量与其在 `ReceiverProbe/Program.cs`、`LifecycleFacts` 里的引用是硬编码的无条件阻塞，文本仍写"heal 未实现"——heal 本批已经落地并经 Framework `--fixtures`/CommitAudit 验证，但这三个用例没有随之自动解除，因为阻塞判断本身没有读取任何运行时状态。解除需要新写用 `LocalPlan` 从内核注册表构造 事实→Heal 计划并恢复 +5HP 断言（README 里已写明的解除条件），属于新增测试基础设施，不在本次加载器实现 + heal 合并的范围内，留作后续修复项。`GameBindings/Program.cs` 里同类的 `HealBlocker`/`bridge.configured-heal-plan-commits-5hp` 未见于本批 `--fixtures`/默认运行的失败或阻塞列表中（该 bridge 场景未在本次跑的两个模式里触发），未重新核实，一并留作后续检查项。
 
-`ForgeTrigger/tools/validate-trigger.py --mutations` 的 `pure` 与 `independent` 两个阶段在 TypeScript 向量生成步骤失败（`previewLogicPrimitive is not a function`、`preview is not a function`），栈顶都在站内 `site/forge` 的 TS 导出函数缺失，与本批改动的 C# 文件无关，也不是 J-003/r11 涉及的路径；只有 t1 阶段（消费共享 SDK 的 C# 断言）被跑到并通过。这个 TS 侧失败未进一步排查。
+`ForgeTrigger/tools/validate-trigger.py --mutations` 的 `pure` 与 `independent` 两个阶段在 TypeScript 向量生成步骤失败（`previewLogicPrimitive is not a function`、`preview is not a function`），栈顶都在站内 `site/forge` 的 TS 导出函数缺失，与本批改动的 C# 文件无关，也不是本批字面量与 heal 改动涉及的路径；只有 t1 阶段（消费共享 SDK 的 C# 断言）被跑到并通过。这个 TS 侧失败未进一步排查。
 
 ## U-RUNTIME/R4 调研：完整 lowering 卡在计划格式（2026-09-14）
 
-按工作顺序（heal 合并 → J-003 → R4 → player bindings）开始 R4 完整 lowering。范围是契约里点名的四项：步骤间数据边、pure 节点运行期求值（selector/condition/modifier）、条件分支、control 节点。逐项核对源码后结论是：**这四项在当前 I-PLAN schemaVersion 2 wire 格式里都不存在，C# 与网站两侧完全对称地卡在同一处，不是本仓单独能补的缺口。**
+按工作顺序（heal 合并 → 字面量输入 → R4 → player bindings）开始 R4 完整 lowering。范围是契约里点名的四项：步骤间数据边、pure 节点运行期求值（selector/condition/modifier）、条件分支、control 节点。逐项核对源码后结论是：**这四项在当前 I-PLAN schemaVersion 2 wire 格式里都不存在，C# 与网站两侧完全对称地卡在同一处，不是本仓单独能补的缺口。**
 
 核对依据（只读，未改动网站仓库）：
 
@@ -328,13 +416,13 @@ python ForgeRuntime/tests/GraphContracts/verify.py --website ..\Infini-GTFO-Mode
 | CommitAudit | 68/68，BLOCKED 0 |
 | GraphContracts `verify.py --website ..\Infini-GTFO-Model-Site`（非 `--integration`） | typescript 生成 exit 0；graph-contracts 1770 passed，0 failed；`sourceStable: true`，`changedSources: []` |
 
-以上数字与 09cdb70/17b3078（J-003、r11）落地时记录的一致，确认本批调研没有改动任何生产源码，也没有引入回归。本批没有跑 HostIntegration、PluginStartup、HostConfiguration、EntityObservation、ReceiverProbe、LifecycleFacts、RuntimeLog、Trigger、Map、Weapon 套件。以上都是托管替身与编译后元数据证据，没有加载 GTFO。
+以上数字与 09cdb70/17b3078（字面量与 heal 改动）落地时记录的一致，确认本批调研没有改动任何生产源码，也没有引入回归。本批没有跑 HostIntegration、PluginStartup、HostConfiguration、EntityObservation、ReceiverProbe、LifecycleFacts、RuntimeLog、Trigger、Map、Weapon 套件。以上都是托管替身与编译后元数据证据，没有加载 GTFO。
 
 R4 完整 lowering 的四项（步骤间数据边、pure 节点运行期求值、条件分支、control 节点）需要的计划格式扩展提案见本次交接消息，不写入本文件（本文件按 §2.8 只放带日期的运行记录，不放"当前结论"之外的规格文字；规格提案是待网站与用户裁决的内容，归属 FORGE-FRAMEWORK.md §8.1/§3.2，由网站会话落笔）。
 
-## D-017 R4-a — schemaVersion 3 运行时内核（2026-09-14）
+## schemaVersion 3 运行时内核（2026-09-14）
 
-按 FORGE-FRAMEWORK.md §3.2「I-PLAN schemaVersion 3（D-017 R4-a）」与 §6 U-RUNTIME 落地 v3 wire 格式：入口 `start`、步骤 `nodeKind`（`action`/`control`/`pure`）与 `successors`、`{slot, fromStepSlot}` 数据边、`evaluate` 角色与 `RuntimeModule.Evaluators`、Kahn 拓扑序校验、SDK 自有的 `forge.contract.control` 分支合同，以及 ForgeTrigger 的 `forge.condition.predicate.compare` 求值绑定。**v2 不再读取**，没有任何兼容分支。
+按 FORGE-FRAMEWORK.md §3.2「I-PLAN schemaVersion 3」与 §6 U-RUNTIME 落地 v3 wire 格式：入口 `start`、步骤 `nodeKind`（`action`/`control`/`pure`）与 `successors`、`{slot, fromStepSlot}` 数据边、`evaluate` 角色与 `RuntimeModule.Evaluators`、Kahn 拓扑序校验、SDK 自有的 `forge.contract.control` 分支合同，以及 ForgeTrigger 的 `forge.condition.predicate.compare` 求值绑定。**v2 不再读取**，没有任何兼容分支。
 
 验证入口与隔离产物目录 `%TEMP%\forge-r4a-v3-20260914`，`GTFO_BEPINEX_PATH` 指向 `Forge-MapEditor-QA` profile（仅供编译引用）：
 
@@ -362,23 +450,23 @@ dotnet $out/bin/Architecture/release/Architecture.dll
 | Framework（默认） | `Framework checks: 336 passed.` | 0 |
 | Framework `--fixtures $fx` | `Framework checks: 379 passed.`（加入 `successor-pure-target` 负例后） | 0 |
 | GameBindings（默认） | PASS 39，BLOCKED 0 | 0 |
-| GameBindings `--fixtures $fx` | PASS 85，BLOCKED 0（加入 `successor-pure-target` 后；本批从「PASS 32 + 2 BLOCKED」变为全通：站内夹具已删掉 D-009 的 `grantedPermissions` 负例，本仓不再读计划内的 `validPlan` 键） | 0 |
+| GameBindings `--fixtures $fx` | PASS 85，BLOCKED 0（加入 `successor-pure-target` 后；本批从「PASS 32 + 2 BLOCKED」变为全通：站内夹具已删掉 `grantedPermissions` 负例，本仓不再读计划内的 `validPlan` 键） | 0 |
 | GameBindings `--bridge <GTFO 根目录>` | PASS 74，BLOCKED 0 | 0 |
 | GameBindings `--export-manifest` | 导出 8499 字节；sha256 `4d6c74bb819efc36a3be5fe213670f71dd3ac4fb59c6026712875c8db612c4a9` | 0 |
 | LifecycleWork `--fixtures $fx` | `Lifecycle work: 57 assertions passed; 0 groups failed.` | 0 |
 | Architecture | `PASS 41 architecture boundary assertions.` | 0 |
 
-导出的运行期清单与站内 `Tests/Forge/fixtures/runtime/native-manifest.json` 逐字段相等（四家 provider、7 条 capability、7 条 binding、7 行 bindingSupport、permissions 与 `runtime` 身份完全一致）。这是本批最关键的一条证据：宿主 `ForgeRuntime.csproj` 现在链接 ForgeTrigger 源码并注册 `forge.module.trigger`，SDK 自己声明 `forge.contract.control`，因此真实注册表与网站编译器写出的夹具不再有偏差。
+导出的运行期清单与站内 `Tests/Forge/fixtures/runtime/native-manifest.json` 逐字段相等（四家 provider、7 条 capability、7 条 binding、7 行 bindingSupport、permissions 与 `runtime` 身份完全一致）。这是本批最关键的一条证据：宿主 `ForgeRuntime.csproj` 现在链接 ForgeTrigger 源码并注册 `forge.module.trigger`，SDK 自己声明 `forge.contract.control`，因此真实注册表与网站编译器写出的夹具不再有偏差。（该内联链接与代注册此后已由独立插件 `ForgeTrigger/Native/Plugin.cs` 取代，见顶部 2026-09-15 一节；本段其余数字仍是当次实测。）
 
-本批新增/改写的负例与断言（只列 R4-a 相关的重点）：
+本批新增/改写的负例与断言（只列本批相关的重点）：
 
-- **拒绝码单元覆盖**：`node-kind`（步骤 kind 与能力 kind 不符、control 步骤自称 pure、pure 步骤绑 action 能力）、`control-unsupported`（R4-a 只路由 `forge.control.flow.branch`）、`successor-shape`（后继帧长度/越界）、`successor-index`（后继只能向后）、`entry-start`（`start` 必须落在 action/control 步骤内）、`pure-successor`（pure 步骤没有后继）、`unreachable-step`、`from-step-kind`、`from-step-port`、`from-step-slot`、`execution-slot`、`port-mismatch`、`event-port-missing`、`missing-input`、`missing-evaluator`、`unused-evaluator`。
+- **拒绝码单元覆盖**：`node-kind`（步骤 kind 与能力 kind 不符、control 步骤自称 pure、pure 步骤绑 action 能力）、`control-unsupported`（只路由 `forge.control.flow.branch`）、`successor-shape`（后继帧长度/越界）、`successor-index`（后继只能向后）、`entry-start`（`start` 必须落在 action/control 步骤内）、`pure-successor`（pure 步骤没有后继）、`unreachable-step`、`from-step-port`、`from-step-slot`、`execution-slot`、`port-mismatch`、`event-port-missing`、`missing-input`、`missing-evaluator`、`unused-evaluator`。
 - **Kahn 顺序**：正例由夹具按同一算法现算并逐项断言；`step-order` 的负例在本仓线性图里**无法手工构造**（每个 action/control 步骤恰好一个前驱，凡是边都向前且步骤全部可达的数组必然就是规范序）。该码由站内 `invalid/step-order.plan.json` 覆盖，`--fixtures` 运行会对同一段代码断言，`ForgeRuntime/tests/Framework/Program.cs` 里写明了这个取舍。
 - **分支路由派发**：`then` 命中 action 命令、`otherwise` 收敛回执且零命令，两种结果都断言，常数真/常数假求值器都过不了。
 - **真实 `compare` 求值**：Framework 用 `ForgeTrigger.ModuleDefinition.Create()` 跑 7 组 `(left, right, operator, tolerance, expected)`，覆盖容差把 `lte`/`gt` 翻转的两种方向，操作数以成员集下标上线、handler 收到成员名。断言的是命令是否真的产生，常数求值器或忽略 operator 的实现都会失败。
 - **枚举帧**：枚举端口的 `valueSet` 取 SDK 表内的声明下标；测试夹具用反射读同一张表，不再手抄集合顺序。
 
-本轮**没有**跑 HostIntegration、PluginStartup、HostConfiguration、RuntimeLog、EntityObservation、Map、Weapon 套件；`ForgeRuntime/ForgeRuntime.csproj` 新链接了 ForgeTrigger 源码，这些套件理论上不受影响，但没有实测，不在此声称。ForgeEnemy 侧同批：LifecycleFacts 52/52、ReceiverProbe 48/48、CommitAudit 68/68，退出码均 0；NativeEvidence 544/544 与其负例 22/22 只在实现批次的工作树里跑过，下面的隔离复跑没有包含。
+本轮**没有**跑 HostIntegration、PluginStartup、HostConfiguration、RuntimeLog、EntityObservation、Map、Weapon 套件；`ForgeRuntime/ForgeRuntime.csproj` 新链接了 ForgeTrigger 源码（该链接此后已由独立插件取代，见顶部 2026-09-15 一节），这些套件理论上不受影响，但没有实测，不在此声称。ForgeEnemy 侧同批：LifecycleFacts 52/52、ReceiverProbe 48/48、CommitAudit 68/68，退出码均 0；NativeEvidence 544/544 与其负例 22/22 只在实现批次的工作树里跑过，下面的隔离复跑没有包含。
 
 **审查修正与隔离复跑（同日）**。对照网站 `validateForgeRuntimePlan`，加载器补了两处检查：
 - 非 `null` 后继指向 `pure` 步骤记 `successor-index`。此前只查下标方向，向后指向纯步骤的计划会被加载。网站夹具新增 `invalid/successor-pure-target.plan.json` 覆盖这一条。

@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "purpose": "forge-map-door-terminal-observation-native-hooks",
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameVerified": false,
+  "gameVerifiedNote": "Static evidence only: interop metadata from the Forge-MapEditor-QA profile, dump.cs of the same build, and the rows already frozen in objective-hooks.json. No side, no ordering, no frequency and no in-game behaviour was executed or observed; every claim about which peer runs a member, and about the order in which the command entry and the state callback fire, is inference and is marked as such (side.verified=false) or listed in inGameVerificationPlan. The door and terminal action members carry `evidenceLevel` and, where the member is a method, the bytes at its own address; no action was invoked either, so which member carries an action out in a running game and what a written line does stays in `unproven` and in `inGameVerificationPlan`.",
+  "buildId": "20403457",
+  "gameAssemblySha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55",
+  "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+  "codeSection": "il2cpp",
+  "dumpSource": "C:\\Users\\nainf\\Github\\General Task\\gtfo-inspection\\dumper\\dump.cs",
+  "interopSource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop",
+  "assemblies": [
+    { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" }
+  ],
+  "relatedEvidence": [
+    "evidence/objective-hooks.json freezes LG_SecurityDoor_Locks.OnDoorState, LG_SecurityDoor.OnSyncDoorStatusChange, LG_ComputerTerminal.OnStateChange and the terminal manager readbacks; this file adds the command entry and the exact members the door/terminal observation reads, and does not restate the rows above.",
+    "evidence/map-hooks.json is the layout audit's hook spec: it lists the player readbacks, the three map-object hooks of this file with the patch target, postfix shape and dump RVA the audit checks them against, the native members the door and terminal addresses are read through, and the action layer's own declared write entries (its `writes` array). Each door or terminal write row is a member row of this file; the player health row is documented by evidence/player-health.json, which owns that domain."
+  ],
+  "sideVocabulary": {
+    "both": "the member is reached from a state-replication callback or a replicated component, so both peers run it; mark verified=false because no body or runtime observation backs the claim",
+    "host": "the member is only reached from master-only paths; inference, not observed",
+    "unknown": "no static evidence about the executing peer"
+  },
+  "evidenceVocabulary": {
+    "evidenceLevel": "metadata — the interop signature and the dump declaration are frozen and nothing else was read; static-native — metadata plus the bytes at the member's own file offset in GameAssembly.dll of build 20403457, read to tell a real body from this build's folded empty stub",
+    "bodyShape": "implemented — the bytes at the member's address are a real function body; empty-stub — the address holds `ret 0` plus alignment padding and many dump entries share it, so the member carries no implementation and can never change state",
+    "entry": "read — a member the door/terminal action layer reads before it writes, declared among the readbacks; write — a member the action layer calls to carry an action out, declared in the hook spec's write set; none — the member is recorded because this evidence set must not mistake it for an entry"
+  },
+  "hooks": [
+    {
+      "hook": "DoorStateReadback",
+      "assembly": "Modules-ASM.dll",
+      "type": "LevelGeneration.LG_SecurityDoor_Locks",
+      "name": "OnDoorState",
+      "signature": "System.Void LevelGeneration.LG_SecurityDoor_Locks::OnDoorState(LevelGeneration.pDoorState,System.Boolean)",
+      "isVirtual": true,
+      "rva": "0x159F2D0",
+      "slot": 27,
+      "dumpLine": 687024,
+      "entry": "lock state dispatch; called by every Setup* variant of the same type (Setup, SetupForChainedPuzzle, SetupForGateKey, SetupForPowerGenerator, SetupForBulkheadDC, SetupAsLockedNoKey) per objective-hooks.json",
+      "reads": "the patched component's own m_door (0xA8) to reach the door; the door then reports LastStatus, m_locks and its own door type, and its address is read from the level's zone list",
+      "harmony": "postfix with HarmonyPriority(Priority.Last), SNet.IsMaster first; the callback's pDoorState argument is never read, the door is re-read from the component after the body",
+      "rows": [
+        "forge.trigger.interaction.door_state",
+        "forge.trigger.interaction.lock_state"
+      ],
+      "side": { "execution": "both", "basis": "replicated-lock-component", "verified": false }
+    },
+    {
+      "hook": "TerminalStateReadback",
+      "assembly": "Modules-ASM.dll",
+      "type": "LevelGeneration.LG_ComputerTerminal",
+      "name": "OnStateChange",
+      "signature": "System.Void LevelGeneration.LG_ComputerTerminal::OnStateChange(LevelGeneration.pComputerTerminalState,LevelGeneration.pComputerTerminalState,System.Boolean)",
+      "isVirtual": true,
+      "rva": "0x1297E80",
+      "slot": 32,
+      "dumpLine": 682276,
+      "entry": "state-replicator callback of the terminal",
+      "reads": "the terminal's own CurrentStateName (0x140) after the body; the actor of a session comes from m_hasInteractingPlayer (0x280) and m_syncedInteractionSource (0x100)",
+      "harmony": "postfix with HarmonyPriority(Priority.Last), SNet.IsMaster first; oldState/newState are never read",
+      "rows": [
+        "forge.trigger.interaction.terminal_session",
+        "forge.trigger.interaction.terminal_result"
+      ],
+      "side": { "execution": "both", "basis": "state-replicator-provider", "verified": false }
+    },
+    {
+      "hook": "TerminalCommandReadback",
+      "assembly": "Modules-ASM.dll",
+      "type": "LevelGeneration.LG_ComputerTerminalManager",
+      "name": "WantToSendTerminalCommand",
+      "signature": "System.Void LevelGeneration.LG_ComputerTerminalManager::WantToSendTerminalCommand(System.UInt32,LevelGeneration.TERM_Command,System.String,System.String,System.String)",
+      "isVirtual": false,
+      "isStatic": true,
+      "rva": "0x143DEC0",
+      "dumpLine": 683351,
+      "entry": "the manager's terminal-command entry; the manager also owns the authoritative action SNet_AuthorativeAction<LG_ComputerTerminalManager.pTerminalCommand> m_sendTerminalCommand (0x28) that carries the same command to the host",
+      "reads": "the terminalID and the TERM_Command the entry itself carried; the terminal instance is resolved from that id by the level's own zone table (the terminal lists the zones spawned), not by the manager's registry, before the fact is published",
+      "harmony": "postfix with HarmonyPriority(Priority.Last), SNet.IsMaster first; no state is read from the manager, the instance is resolved by the id the entry carried",
+      "rows": [
+        "forge.trigger.interaction.terminal_command"
+      ],
+      "side": { "execution": "host", "basis": "master-only publish plus manager entry", "verified": false }
+    }
+  ],
+  "members": [
+    { "id": "door-status", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "LastStatus", "signature": "LevelGeneration.eDoorStatus LevelGeneration.LG_SecurityDoor::get_LastStatus()", "dumpLine": 688203, "role": "the door's own state; the source of the state string and of interaction_phase" },
+    { "id": "door-type", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "m_securityDoorType", "signature": "LevelGeneration.eSecurityDoorType LevelGeneration.LG_SecurityDoor::get_m_securityDoorType()", "dumpLine": 688120, "role": "the game's own door type (Security / Apex / Bulkhead); a `Bulkhead` door is a layer transition rather than a zone entrance, so it is never addressed" },
+    { "id": "door-linked-zone-data", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "LinkedToZoneData", "signature": "GameData.ExpeditionZoneData LevelGeneration.LG_SecurityDoor::get_LinkedToZoneData()", "dumpLine": 688206, "role": "the door's own data-block entry; registered as a read-back point and the fallback the address plan names, but the address does not read it — a door is addressed by the zone it is the entrance gate of" },
+    { "id": "door-locks", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "m_locks", "dumpLine": 688100, "role": "the interface slot the concrete lock component is read through; m_locksComp (0x78) is the Component form of the same object" },
+    { "id": "lock-door", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "m_door", "dumpLine": 686931, "role": "the door a lock callback belongs to" },
+    { "id": "lock-no-key", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "m_lockedWithNoKey", "dumpLine": 686929, "role": "a lock condition that is not a status value" },
+    { "id": "lock-key-item", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "m_gateKeyItemNeeded", "dumpLine": 686926, "role": "the key item the lock currently requires; its PublicName is the key the lock_state row publishes" },
+    { "id": "zone-source-gate", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Zone", "name": "m_sourceGate", "signature": "LevelGeneration.LG_Gate LevelGeneration.LG_Zone::get_m_sourceGate()", "dumpLine": 696493, "role": "the zone's own entrance gate: a door is addressed only when it is the spawned door of one zone's m_sourceGate" },
+    { "id": "gate-spawned-door", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Gate", "name": "SpawnedDoor", "signature": "LevelGeneration.iLG_Door_Core LevelGeneration.LG_Gate::get_SpawnedDoor()", "dumpLine": 684905, "role": "the door instance of a gate; the level's zone list is indexed by it, which is what turns a door callback into a zone" },
+    { "id": "zone-layer", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Zone", "name": "m_layer", "signature": "LevelGeneration.LG_Layer LevelGeneration.LG_Zone::get_m_layer()", "dumpLine": 694828, "role": "the zone's layer object; its own m_type is the layer coordinate of the address" },
+    { "id": "layer-type", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Layer", "name": "m_type", "signature": "LevelGeneration.LG_LayerType LevelGeneration.LG_Layer::get_m_type()", "dumpLine": 695130, "role": "the layer coordinate (MainLayer 0 / SecondaryLayer 1 / ThirdLayer 2)" },
+    { "id": "zone-dimension", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Zone", "name": "m_dimensionIndex", "signature": "LevelGeneration.eDimensionIndex LevelGeneration.LG_Zone::get_m_dimensionIndex()", "dumpLine": 694836, "role": "the dimension coordinate of the address" },
+    { "id": "zone-local-index", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Zone", "name": "LocalIndex", "signature": "LevelGeneration.eLocalZoneIndex LevelGeneration.LG_Zone::get_LocalIndex()", "dumpLine": 698146, "role": "the zone coordinate of the address (eLocalZoneIndex Zone_0..)" },
+    { "id": "zone-terminals", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Zone", "name": "TerminalsSpawnedInZone", "signature": "Il2CppSystem.Collections.Generic.List`1<LevelGeneration.LG_ComputerTerminal> LevelGeneration.LG_Zone::get_TerminalsSpawnedInZone()", "dumpLine": 698169, "rva": "0x3A5F30", "fileOffset": "0x3A3F30", "dumpEntriesAtRva": 32, "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "8B 92 38 05 00 00 48 83 C4 20 5B 48 FF E0 CC CC", "role": "the terminals the zone spawned, in the zone's own order; a terminal's placement index is its position in this list and the list is what resolves an address back to a terminal. The dump line was 698256, which is the declaration of an unrelated struct; it is the member's own line now, and the address it names is shared by 32 dump entries (a generated accessor thunk, not a unique body)." },
+    { "id": "zone-settings", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Zone", "name": "m_settings", "signature": "LevelGeneration.LG_ZoneSettings LevelGeneration.LG_Zone::get_m_settings()", "dumpLine": 696459, "role": "the zone's build settings, reached for the zone data block when the entrance gate is read" },
+    { "id": "zone-settings-data", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ZoneSettings", "name": "m_zoneData", "signature": "GameData.ExpeditionZoneData LevelGeneration.LG_ZoneSettings::get_m_zoneData()", "dumpLine": 697019, "role": "the zone's own data block entry. Registered as a read-back point for the export-side blocking rules that the level's own data decides (specific terminal placements); the address itself does not consult it" },
+    { "id": "zone-specific-terminals", "assembly": "Modules-ASM.dll", "type": "GameData.ExpeditionZoneData", "name": "SpecificTerminalSpawnDatas", "signature": "Il2CppSystem.Collections.Generic.List`1<GameData.SpecificTerminalSpawnData> GameData.ExpeditionZoneData::get_SpecificTerminalSpawnDatas()", "dumpLine": 636076, "role": "the zone's second terminal list. A zone whose list is not empty places terminals outside its own terminal list, so the position in TerminalsSpawnedInZone is not the zone's whole placement order and no terminal of that zone is addressed; the address itself reads the count and nothing else" },
+    { "id": "level-builder-current", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_LevelBuilder", "name": "Current", "signature": "LevelGeneration.LG_LevelBuilder LevelGeneration.LG_LevelBuilder::get_Current()", "isStatic": true, "dumpLine": null, "role": "the level singleton the zone list is enumerated from; whether it is already assigned when a hook first runs is not verified" },
+    { "id": "level-builder-floor", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_LevelBuilder", "name": "m_currentFloor", "signature": "LevelGeneration.LG_Floor LevelGeneration.LG_LevelBuilder::get_m_currentFloor()", "dumpLine": null, "role": "the floor the zone list belongs to" },
+    { "id": "floor-zones", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_Floor", "name": "allZones", "signature": "Il2CppSystem.Collections.Generic.List`1<LevelGeneration.LG_Zone> LevelGeneration.LG_Floor::get_allZones()", "dumpLine": null, "role": "every zone of the level: the one table the door, the terminal and the address resolution all read" },
+    { "id": "terminal-spawn-node", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "SpawnNode", "signature": "AIGraph.AIG_CourseNode LevelGeneration.LG_ComputerTerminal::get_SpawnNode()", "dumpLine": 681801, "role": "the course node a terminal was spawned on; registered as a read-back point and the alternative reading the address plan names, but the address does not read it — a terminal's zone and its placement index both come from the zone's own TerminalsSpawnedInZone list, so the two can never disagree" },
+    { "id": "course-node-zone", "assembly": "Modules-ASM.dll", "type": "AIGraph.AIG_CourseNode", "name": "m_zone", "signature": "LevelGeneration.LG_Zone AIGraph.AIG_CourseNode::get_m_zone()", "dumpLine": null, "role": "the zone of a course node; reached only through SpawnNode, which the address does not read" },
+    { "id": "terminal-sync-id", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "SyncID", "signature": "System.UInt32 LevelGeneration.LG_ComputerTerminal::get_SyncID()", "dumpLine": 681781, "role": "an observation fact only: the id is handed out while the level is built, so it is not part of any address" },
+    { "id": "terminal-state", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "CurrentStateName", "signature": "LevelGeneration.TERM_State LevelGeneration.LG_ComputerTerminal::get_CurrentStateName()", "dumpLine": 681795, "role": "the terminal's own state; the source of the state string, of the session flag and of the outcome" },
+    { "id": "terminal-interacting", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "m_hasInteractingPlayer", "dumpLine": 681714, "role": "whether a player currently sits at the terminal" },
+    { "id": "terminal-interaction-source", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "m_syncedInteractionSource", "dumpLine": 681643, "role": "the PlayerAgent of that session; the entity is resolved through the player domain's own instance lookup" },
+    { "id": "door-action-interaction-allowed", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "InteractionAllowed", "signature": "System.Boolean LevelGeneration.LG_SecurityDoor::get_InteractionAllowed()", "dumpLine": 688228, "rva": "0x15A6B80", "fileOffset": "0x15A5180", "dumpEntriesAtRva": 2, "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "40 53 48 83 EC 20 80 3D CE BD D9 01 00 48 8B D9", "entry": "read", "role": "the door's own interaction gate; the open action refuses on it instead of asking a door that says no. The address carries a second dump entry (the compiler-generated `<Setup>b__60_1` of the same type), so the two share one body." },
+    { "id": "door-action-attempt-open-close", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "AttemptOpenCloseInteraction", "signature": "System.Void LevelGeneration.LG_SecurityDoor::AttemptOpenCloseInteraction(System.Boolean)", "dumpLine": 688234, "rva": "0x159E550", "fileOffset": "0x159CB50", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 10 57 48 83 EC 50 80 3D", "entry": "write", "role": "the door's own interaction entry and the only member that opens or closes a security door. It toggles, so the action reads the door's own status first and passes the entry's own `onlyUnlock` flag as false for a plain open or close." },
+    { "id": "door-action-force-open", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "ForceOpenSecurityDoor", "signature": "System.Void LevelGeneration.LG_SecurityDoor::ForceOpenSecurityDoor()", "dumpLine": 688231, "rva": "0x159EAE0", "fileOffset": "0x159D0E0", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 10 57 48 83 EC 50 80 3D", "entry": "write", "role": "the door's own force entry: the one member a force-open request may go through" },
+    { "id": "lock-action-set-active-enemy-wave", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "SetActiveEnemyWaveEnabled", "signature": "System.Void LevelGeneration.LG_SecurityDoor_Locks::SetActiveEnemyWaveEnabled(System.Boolean)", "dumpLine": 687039, "rva": "0x159FE50", "fileOffset": "0x159E450", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "0F B6 81 B1 00 00 00 FE C8 88 91 B2 00 00 00 A8 F7 75 07", "entry": "write", "role": "the door's own active-enemy-wave flag: the body reads m_lastStatus (0xB1) and writes m_hasActiveEnemyWave (0xB2) and nothing else. It is not an alarm encounter, so the alarm action is named as this flag and no alarm instance is created." },
+    { "id": "lock-action-setup-for-gate-key", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "SetupForGateKey", "signature": "LevelGeneration.eDoorStatus LevelGeneration.LG_SecurityDoor_Locks::SetupForGateKey(LevelGeneration.GateKeyItem)", "dumpLine": 687042, "rva": "0x15A0470", "fileOffset": "0x159EA70", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 18 55 57 41 56 48 81 EC A0 00 00 00", "entry": "write", "role": "the lock condition a `specific` key lock sets, reached on the lock component rather than on the door; it answers with the status it set" },
+    { "id": "lock-action-setup-as-locked-no-key", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor_Locks", "name": "SetupAsLockedNoKey", "signature": "LevelGeneration.eDoorStatus LevelGeneration.LG_SecurityDoor_Locks::SetupAsLockedNoKey(Localization.LocalizedText)", "dumpLine": 687054, "rva": "0x15A0030", "fileOffset": "0x159E630", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 08 48 89 74 24 10 57 48 81 EC 90 00 00", "entry": "write", "role": "the lock condition a `none` key lock sets. The prompt it takes is the text a player is shown at the door, so a request without one is refused rather than sent as an empty prompt." },
+    { "id": "terminal-action-add-line", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "AddLine", "signature": "System.Void LevelGeneration.LG_ComputerTerminal::AddLine(LevelGeneration.TerminalLineType,System.String,System.Single)", "dumpLine": 682133, "rva": "0x1295520", "fileOffset": "0x1293B20", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 83 EC 48 48 8B 89 B0 00 00 00 48 85 C9 74 19", "entry": "write", "role": "the terminal's own line buffer, and the one overload of three that carries a line kind (the other two take a line id at 0x12954F0 or a plain line at 0x12954C0, so the member is claimed by signature and not by name). The third argument is passed as its own zero because this evidence set does not establish what it means." },
+    { "id": "terminal-action-command-interpreter", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminal", "name": "m_command", "signature": "LevelGeneration.LG_ComputerTerminalCommandInterpreter LevelGeneration.LG_ComputerTerminal::get_m_command()", "dumpLine": 681633, "fieldOffset": "0xB0", "evidenceLevel": "metadata", "entry": "read", "role": "the terminal's own command interpreter. It is a field in this build and is read through the interop property the generator emits for it, so the member has no RVA of its own; the command action asks that interpreter to parse the typed line." },
+    { "id": "terminal-action-try-get-command", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalCommandInterpreter", "name": "TryGetCommand", "signature": "System.Boolean LevelGeneration.LG_ComputerTerminalCommandInterpreter::TryGetCommand(System.String,LevelGeneration.TERM_Command&,System.String&,System.String&)", "dumpLine": 682753, "rva": "0x1292CB0", "fileOffset": "0x12912B0", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 18 55 56 41 57 48 83 EC 20 80 3D 95", "entry": "write", "role": "the terminal's own parse of a typed line into a command and its two parameters, and the outer gate of the command whitelist. It is declared as an action entry and not as a readback: this evidence set does not establish that the parse leaves the interpreter untouched." },
+    { "id": "terminal-action-manager-current", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "Current", "signature": "LevelGeneration.LG_ComputerTerminalManager LevelGeneration.LG_ComputerTerminalManager::get_Current()", "dumpLine": 683316, "isStatic": true, "fieldOffset": "0x0", "evidenceLevel": "metadata", "entry": "read", "role": "the manager the static command entry belongs to. It is a static field in this build and is read through the interop property the generator emits for it, so the member has no RVA of its own; the command action refuses when it reads nothing." },
+    { "id": "terminal-action-send-command", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_ComputerTerminalManager", "name": "WantToSendTerminalCommand", "signature": "System.Void LevelGeneration.LG_ComputerTerminalManager::WantToSendTerminalCommand(System.UInt32,LevelGeneration.TERM_Command,System.String,System.String,System.String)", "dumpLine": 683351, "rva": "0x143DEC0", "fileOffset": "0x143C4C0", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 08 48 89 74 24 10 55 57 41 56 48 8D", "entry": "write", "isStatic": true, "role": "the manager's own command entry, already frozen as the command readback and now also the member the command action sends through: the first member of this evidence set that is both observed and written. The command and its two parameters are the interpreter's own output, never a table of this provider's." },
+    { "id": "localized-text-has-value", "assembly": "Modules-ASM.dll", "type": "Localization.LocalizedText", "name": "HasValue", "signature": "System.Boolean Localization.LocalizedText::get_HasValue()", "dumpLine": 607886, "rva": "0x12E1000", "fileOffset": "0x12DF600", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 83 39 00 74 03 B0 01 C3 83 79 08 00 0F 97 C0", "entry": "read", "role": "whether the prompt a no-key lock carries holds text; the first `Localization.` member this module reads, and the action refuses an empty prompt instead of sending one. The struct is three fields (0x0/0x8/0xC) and its `.ctor(string)` is 0x12E0FE0, neither of which this module calls." },
+    { "id": "door-action-attempt-damage", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_SecurityDoor", "name": "AttemptDamage", "signature": "System.Void LevelGeneration.LG_SecurityDoor::AttemptDamage(LevelGeneration.eDoorDamageType,UnityEngine.Vector3,Agents.Agent)", "dumpLine": 688237, "rva": "0x353190", "fileOffset": "0x351790", "dumpEntriesAtRva": 2102, "rvaShared": true, "evidenceLevel": "static-native", "bodyShape": "empty-stub", "bodyBytes": "C2 00 00 CC CC CC CC CC CC CC CC CC CC CC CC CC", "entry": "none", "role": "NOT AN ENTRY. The address holds `ret 0` plus alignment padding and 2102 dump entries share it, so this override carries no implementation and a call to it could only fake a damage. The addressed door kind therefore has no structural damage path; DoorActions.Damage refuses with `door-not-damageable` and this member is deliberately absent from the hook spec's write set." },
+    { "id": "door-action-weak-damage", "assembly": "Modules-ASM.dll", "type": "LevelGeneration.LG_WeakDoor", "name": "AttemptDamage", "signature": "System.Void LevelGeneration.LG_WeakDoor::AttemptDamage(LevelGeneration.eDoorDamageType,UnityEngine.Vector3,Agents.Agent)", "dumpLine": 688975, "rva": "0x15C2200", "fileOffset": "0x15C0800", "evidenceLevel": "static-native", "bodyShape": "implemented", "bodyBytes": "48 89 5C 24 10 48 89 6C 24 18 56 41 56 41 57 48", "entry": "none", "role": "the contrast row: damage exists for a door kind this provider never addresses. A zone entrance is an LG_SecurityDoor and no address names a weak door, which is what makes the refusal above the right answer rather than a missing feature." }
+  ],
+  "stateVocabulary": [
+    {
+      "id": "eDoorStatus",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 688662,
+      "values": {
+        "None": 0, "Closed": 1, "Closed_BrokenCantOpen": 2, "Closed_LockedWithKeyItem": 3,
+        "Closed_LockedWithChainedPuzzle_Alarm": 4, "Closed_LockedWithChainedPuzzle": 5,
+        "Closed_LockedWithPowerGenerator": 6, "Closed_LockedWithNoKey": 7, "ChainedPuzzleActivated": 8,
+        "Unlocked": 9, "Open": 10, "Destroyed": 11, "GluedMax": 12, "TryOpenStuckInGlue": 13,
+        "TryOpenStuckBroken": 14, "Closed_LockedWithBulkheadDC": 15, "Opening": 16
+      },
+      "publishedAs": "the lower-case member name, e.g. closed_locked_with_chained_puzzle_alarm; a value outside the enum is refused, never reported as closed"
+    },
+    {
+      "id": "TERM_State",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 681541,
+      "values": {
+        "Sleeping": 0, "Awake": 1, "PlayerInteracting": 2, "DataMining": 3, "Hacked": 4, "CodePuzzle": 5,
+        "InputTest": 6, "ReactorError": 7, "AskToPlayLogAudio": 8, "DoPlayAudioFile": 9, "AudioLoopError": 10,
+        "Ping": 11, "PasswordProtected": 12, "EnterPassword": 13
+      },
+      "publishedAs": "the lower-case member name; PlayerInteracting is the one state that is a session, DataMining and Hacked are a succeeded outcome, ReactorError and AudioLoopError a failed one"
+    },
+    {
+      "id": "TERM_Command",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 682525,
+      "note": "None=0 .. Info=43, MAX_COUNT=44 is the enum's array-size sentinel and is not a command. Published under the lower-case member name (ViewSecurityLog -> view_security_log)."
+    }
+  ],
+  "actionVocabulary": [
+    {
+      "id": "eDoorDamageType",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 688705,
+      "values": { "EnemyLight": 0, "EnemyHeavy": 1, "MeleeWeaponLight": 2, "MeleeWeaponHeavy": 3, "Explosion": 4, "MeleeWeaponMinimal": 5 },
+      "role": "the whole vocabulary the door damage entry takes. There is no bullet kind, so the catalog's damage_kind (direct, melee, explosion, dot, shrapnel, collision, fall, environment, reflection) cannot be mapped member for member; a request that names a value outside this enum is refused by name."
+    },
+    {
+      "id": "TerminalLineType",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 682577,
+      "values": { "Normal": 0, "Fail": 1, "SpinningWaitDone": 2, "SpinningWaitNoDone": 3, "ProgressWait": 4, "Warning": 5 },
+      "role": "the terminal's own line kinds. A printed line uses three of them: info prints Normal, warning prints Warning, error prints Fail; the three wait kinds belong to the terminal's own progress rendering and no action prints one."
+    }
+  ],
+  "refusals": [
+    {
+      "id": "door-damage",
+      "member": "LevelGeneration.LG_SecurityDoor::AttemptDamage",
+      "code": "door-not-damageable",
+      "meaning": "The addressed door kind has no damage implementation to ask: on build 20403457 its AttemptDamage address is the folded empty body (`ret 0` at 0x353190, 2102 dump entries on that address) while the damageable LG_WeakDoor has its own body at 0x15C0800, and no address names a weak door. The member row is recorded with `bodyShape: empty-stub` and `entry: none`, and it is deliberately absent from the hook spec's write set, so this evidence cannot be read as a damage entry that succeeds."
+    },
+    {
+      "id": "door-unlock",
+      "member": "LevelGeneration.LG_SecurityDoor::AttemptOpenCloseInteraction(System.Boolean)",
+      "meaning": "door_unlock has no honest native entry. The interaction entry's own `onlyUnlock` flag is the only candidate and nothing but the parameter name says it unlocks without opening; UseChainedPuzzleOrUnlock needs a player at the door. Nothing is declared, so the action is refused (or refused by name when a request reaches it) instead of being reported as an unlock."
+    },
+    {
+      "id": "door-alarm",
+      "member": "LevelGeneration.LG_SecurityDoor_Locks::SetActiveEnemyWaveEnabled(System.Boolean)",
+      "meaning": "door_alarm is only the door's active-enemy-wave flag. The member body writes m_hasActiveEnemyWave (0xB2) and forces it off while m_lastStatus is Closed or Unlocked; it starts no alarm encounter, so the catalog's alarm resource has no counterpart here and no alarm instance is named or created."
+    },
+    {
+      "id": "door-close-policies",
+      "members": ["LevelGeneration.LG_SecurityDoor::AttemptOpenCloseInteraction(System.Boolean)"],
+      "codes": ["door-crush-unsupported", "door-force-close-unsupported"],
+      "meaning": "The door's own interaction entry carries neither an occupancy decision nor a force flag, so `crush` and `force` closes are refused by name rather than quietly run as a plain close and reported as the requested one."
+    },
+    {
+      "id": "terminal-command-actor",
+      "members": ["LevelGeneration.LG_ComputerTerminalManager::WantToSendTerminalCommand(System.UInt32,LevelGeneration.TERM_Command,System.String,System.String,System.String)"],
+      "meaning": "The native command entry carries no player (the replicated payload is a terminal id, a command and three strings), so an `actor` a row resolves is not passed on and no player is invented for it. This matches the command readback row, whose `actor` output is declared optional and never published."
+    }
+  ],
+  "addressFormat": {
+    "shape": "<category>/<dimension>/<layer>/<zone>/<key>",
+    "category": "the lower-case MapObjectKind name: `door` or `terminal`",
+    "coordinates": "the coordinates of the zone the object belongs to, as native values: dimension is LG_Zone.m_dimensionIndex (eDimensionIndex), layer is LG_Zone.m_layer.m_type (LG_LayerType), zone is LG_Zone.LocalIndex (eLocalZoneIndex). Every coordinate is a decimal written without a leading zero.",
+    "doorKey": "the fixed token `security`: a zone's entrance gate, which is at most one per zone. A door is addressed only when it is the spawned door of exactly one zone's m_sourceGate, so a door that is not an entrance — weak, node, decorative — and a bulkhead transition door have no address.",
+    "terminalKey": "the zero-based index of the terminal in its own zone's TerminalsSpawnedInZone list, which is the placement order the level spawned the zone's terminals in. A terminal whose zone does not list it — a reactor or mission terminal — has no address.",
+    "examples": ["door/0/2/4/security", "terminal/1/1/2/1"],
+    "refusals": [
+      "a door that is no zone's entrance gate is not addressed at all (the category reports it once and publishes nothing for it)",
+      "a bulkhead transition door is its own native door type and is not a zone entrance, so it is not addressed",
+      "a zone whose m_layer or m_dimensionIndex does not read yields no coordinates, so its door and its terminals are not addressed",
+      "a terminal the zone it was spawned in does not list is not addressed",
+      "a terminal of a zone whose data block declares specific terminal spawns is not addressed: that zone places terminals outside its own terminal list, so a position in the list would rename the terminals it does not cover",
+      "an address text whose category is not the expected one, whose segment count is not five, whose key is empty, or whose coordinates are not plain decimals is refused instead of reinterpreted"
+    ],
+    "identity": "the entity id is `gtfo.map_object:<address>` with the world epoch; it is derived from the address alone, so it reverses without a table, and a level change invalidates every earlier id through the kernel's world epoch while the one zone table is rebuilt for the new world"
+  },
+  "catalogRows": [
+    {
+      "id": "forge.trigger.interaction.door_state",
+      "execution": "host",
+      "outputsImplemented": ["next", "door", "state", "phase"],
+      "phase": "the interaction_phase member the status itself is: ChainedPuzzleActivated -> requested, Opening -> started, Closed_BrokenCantOpen/Unlocked/Open/Destroyed/GluedMax/TryOpenStuckInGlue/TryOpenStuckBroken -> completed, every other status (including the locked ones) carries no phase",
+      "catalogMismatch": "the catalog declares `phase` as a required output, but a native status that is not an interaction transition has no phase at all, so this provider registers the port optional and leaves it absent for those statuses"
+    },
+    {
+      "id": "forge.trigger.interaction.lock_state",
+      "execution": "host",
+      "outputsImplemented": ["next", "door", "locked", "key"],
+      "locked": "the door's own status is a locked state, or the lock component reports m_lockedWithNoKey or holds a key item",
+      "key": "the PublicName of the GateKeyItem the lock currently requires, falling back to its DataBlockID; empty when the lock requires no key"
+    },
+    {
+      "id": "forge.trigger.interaction.terminal_command",
+      "execution": "host",
+      "outputsImplemented": ["next", "terminal", "command"],
+      "outputsAbsent": ["actor"],
+      "catalogMismatch": "the catalog declares an `actor` output; WantToSendTerminalCommand carries no player (LG_ComputerTerminalManager.pTerminalCommand is only ID + command + input strings), so the port is registered optional and is never published — no player is invented for it"
+    },
+    {
+      "id": "forge.trigger.interaction.terminal_result",
+      "execution": "host",
+      "outputsImplemented": ["next", "terminal", "command", "outcome"],
+      "command": "the command this terminal's own entry last carried, so a result reports the command that caused it; the empty string when no command was observed for that terminal in this world, because the row declares the port required",
+      "outcome": "DataMining/Hacked -> succeeded, ReactorError/AudioLoopError -> failed, any other state carries no result at all"
+    },
+    {
+      "id": "forge.trigger.interaction.terminal_session",
+      "execution": "host",
+      "outputsImplemented": ["next", "terminal", "actor", "active"],
+      "active": "true exactly for TERM_State.PlayerInteracting",
+      "actor": "the terminal's m_syncedInteractionSource while a player is at it, resolved through the player domain's instance lookup; absent when the terminal reports no interacting player"
+    }
+  ],
+  "publicationRules": [
+    "only the host publishes: every hook returns before reading when SNet.IsMaster is false, and the module refuses a non-authoritative peer again with one diagnostic",
+    "one state is published once: a repeated native sync of an unchanged status, lock reading or terminal state is not a second event, and the fact id carries the subject's own transition number",
+    "the fact reports what a re-read produced: the instance is read after the native body returned, and a read whose address no longer matches the reference publishes nothing"
+  ],
+  "unproven": [
+    "whether LG_Zone.m_sourceGate is the gate a player enters that zone through, and whether the zone the level starts in has none: the address rule reads `m_sourceGate.SpawnedDoor` as the zone's entrance, so a zone whose entrance is not that gate would be addressed at the wrong door",
+    "whether a zone's entrance gate is always an LG_SecurityDoor: a gate whose spawned door is not one is not addressed by this reader at all",
+    "whether LG_Zone.TerminalsSpawnedInZone orders its terminals the way the zone's TerminalPlacements are ordered, which is what makes a placement index meaningful; the reactor, mission and specific terminal spawns that are not placements would shift a zone's indices if they are listed among them",
+    "whether LG_LevelBuilder.Current.m_currentFloor.allZones is already populated when a hook first runs, which decides whether a door or terminal read before that can be addressed",
+    "whether the level's zones can share coordinates across dimensions, and whether m_dimensionIndex is the same numbering the exported DimensionDatas carry",
+    "which peer runs WantToSendTerminalCommand: the static entry has no side evidence, so the host-only publish is a publish rule and not a claim that clients never call it",
+    "that the command entry runs before the state change it causes, which is what lets terminal_result report that command; the result row reports the empty command when nothing was observed",
+    "whether LG_ComputerTerminal.m_syncedInteractionSource is already cleared when the state leaves PlayerInteracting, which decides whether the closing session fact carries its actor",
+    "whether a bullet's collider really has the door or the terminal above it: the hit path reaches this kind with the object the shot was resolved against and climbs with UnityEngine.Component.GetComponentInParent, so a door blade or a terminal screen that is not parented under its own map object would resolve to nothing instead of to an invented address",
+    "whether AttemptOpenCloseInteraction(onlyUnlock: true) unlocks a door without opening it: only the parameter name says so, so door_unlock is not implemented from it. If a game test confirms it, that flag is the only candidate unlock entry this build has.",
+    "whether SetActiveEnemyWaveEnabled(true) starts the door's wave or only arms the flag the body writes (m_hasActiveEnemyWave, 0xB2): the body also forces the flag off while m_lastStatus is Closed (1) or Unlocked (9), so the alarm action is a flag write and not a claim that a wave starts",
+    "whether a line added through AddLine reaches clients: the replicated terminal state carries used and removed commands, not lines, so a printed line is host-local until a game test says otherwise",
+    "whether a LocalizedText built from a raw string renders as the door's interaction prompt, which is what makes the no-key lock's own text a player-visible prompt",
+    "whether WantToSendTerminalCommand accepts a command while no player sits at the terminal: the manager's own DoTerminalCommandValidation is the authority and was not read, so the command path is a call and not a claim that the terminal acts on it",
+    "whether the interpreter's own parse (TryGetCommand) leaves the interpreter untouched: it is declared as an action entry rather than a pure read because this evidence set does not establish that",
+    "whether a security door can be damaged by any other path, for example iLG_Door_Sync.AttemptDoorInteraction(eDoorInteractionType.DoDamage, ...), whose val1/val2 meanings are not established"
+  ],
+  "catalogGaps": [
+    {
+      "id": "forge.trigger.door.opened",
+      "finding": "listed in plannedCanonical as not-delivered-in-this-batch with owner forge-native, but it has no canonicalVocabulary row, so there is no label, domain list or port set to implement against",
+      "resolution": "not registered; forge.trigger.interaction.door_state carries the door's open state"
+    },
+    {
+      "rows": [
+        "forge.trigger.interaction.requested", "forge.trigger.interaction.started", "forge.trigger.interaction.progressed",
+        "forge.trigger.interaction.completed", "forge.trigger.interaction.cancelled", "forge.trigger.interaction.failed",
+        "forge.trigger.interaction.power_state", "forge.trigger.interaction.generator_state",
+        "forge.trigger.interaction.item_placed", "forge.trigger.interaction.item_removed",
+        "forge.trigger.interaction.container_state", "forge.trigger.interaction.transport_state"
+      ],
+      "finding": "the generic interaction lifecycle and the power, generator, item, container and transport rows have no door/terminal native entry in this evidence set: door and terminal state is carried by the two replicated callbacks above, and no native member read here reports a generator, container or transport state",
+      "resolution": "not registered by this provider; they stay unimplemented rather than being bound to a callback that does not carry their subject"
+    }
+  ],
+  "inGameVerificationPlan": [
+    "Address confirmation 1 — that a zone's entrance gate is LG_Zone.m_sourceGate.SpawnedDoor: on a level whose plan the website exported, print every zone's (m_dimensionIndex, m_layer.m_type, LocalIndex) together with whether m_sourceGate and its SpawnedDoor read, and confirm the played level has exactly one LG_SecurityDoor addressed as each non-start zone's `security` door and none for the zone the level starts in",
+    "Address confirmation 2 — that LG_Zone.TerminalsSpawnedInZone follows the zone's TerminalPlacements order: on a level with one zone holding at least two placed terminals and one specific terminal, print that zone's LocalIndex, the count of TerminalPlacements and SpecificTerminalSpawnDatas, and the SyncID sequence of TerminalsSpawnedInZone, then compare the list order against the exported placement indices",
+    "Address confirmation 3 — that LG_LevelBuilder.Current.m_currentFloor.allZones is populated before the first door or terminal callback of a level: log the zone count on the first callback of a level and confirm it matches the level's zone count, and that the first door and terminal of that level are addressed rather than reported unaddressable",
+    "Open and close a door of each lock variant in a level and confirm the door_state and lock_state facts carry the expected status, locked and key values",
+    "Confirm a door the level did not create as a zone entrance stays unaddressed (one diagnostic, no fact), and that a bulkhead transition door is not addressed as any zone's entrance",
+    "Type a command at a terminal and confirm terminal_command fires once with the command, terminal_result reports the same command with its outcome, and terminal_session opens and closes with the right actor",
+    "Run the same level as a client and confirm no map-object fact is published locally",
+    "Hit confirmation 1 — that a bullet's collider resolves to the map object it stands on: shoot a zone's entrance door and a terminal in the same level and confirm one weapon.hit-fact line per hit carries `target=gtfo.map_object:<the door's or the terminal's own address>`, while a shot into world geometry, an enemy or a player still carries no map-object target",
+    "Hit confirmation 2 — that a hit object with no map object above it stays unresolved: shoot a weak door and a bulkhead transition door and confirm the weapon's hit fact carries no `target` port, that no map-object address is invented for either, and that this provider reports each refusal cause once",
+    "Change level and confirm the previous level's door and terminal identities are refused and the new level publishes its own",
+    "Action confirmation 1 — ask a closed, unlocked security door to open and read its own status through the door_state fact: the address must publish opening then open",
+    "Action confirmation 2 — ask an open door to open again and confirm the door did not close, which is what the status-first check exists for because the native entry toggles",
+    "Action confirmation 3 — force a locked door open and confirm the lock conditions were ignored exactly as the game's own force entry ignores them, and that a `crush` or `force` close is refused by name instead of closing the door",
+    "Action confirmation 4 — lock a door with a key item and with no key, then read lock_state: the lock must report the key it was given and the locked flag, and a request without a prompt must be refused rather than sent empty",
+    "Action confirmation 5 — print one line on a terminal as host and read the same terminal on a client: this decides whether a printed line is host-local only, which is the open covmap item",
+    "Action confirmation 6 — send one whitelisted command and one command the terminal does not know: the unknown line must never reach the manager entry, and the known one must arrive with the interpreter's own parameters",
+    "Action confirmation 7 — damage a weak door of a level (a door no address names) through AttemptDamage and confirm it is the implemented path, so the refusal this layer returns for a zone entrance is the right one"
+  ]
+}

@@ -1,0 +1,487 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Native evidence for the five alarm/wave/scan action rows: forge.action.map.{alarm_start,alarm_stop,scan_start,wave_start,wave_stop}. Every hook signature, RVA and field layout below is read from the QA-profile interop assembly and the build 20403457 dump; every call edge is read out of GameAssembly.dll's own code section and is marked as a static scan, not as a game-verified observation.",
+  "verification": "implementation",
+  "gameVerified": false,
+  "gameVerifiedNote": "No claim in this file was observed in a running game. The call edges were recovered by scanning the native code section for direct relative calls into the named method bodies; a call whose target lands on a jump stub, a virtual dispatch or an indirect call is not visible to that scan and is not claimed. Each such gap is stated per entry.",
+  "buildId": "20403457",
+  "gameAssemblySha256": "see objective-hooks.json (same build and same assembly)",
+  "codeSection": "il2cpp",
+  "dumpSource": "C:\\Users\\nainf\\Github\\General Task\\gtfo-inspection\\dumper\\dump.cs",
+  "interopSource": "%APPDATA%\\r2modmanPlus-local\\GTFO\\profiles\\Forge-MapEditor-QA\\BepInEx\\interop",
+  "gameAssemblySource": "E:\\SteamLibrary\\steamapps\\common\\GTFO\\GameAssembly.dll",
+  "recoveredBy": "a-alarm (this slice)",
+  "rules": [
+    "A write must go through the entry the game itself runs on the host and replicates; a private field write is not a write path.",
+    "An interop wrapper is public even when the native member is private (Il2CppInterop calls it through il2cpp_runtime_invoke), so 'callable' is not evidence of 'intended'; each entry below says which native caller exists.",
+    "A call edge recovered by byte scan is a hypothesis with a stated method; nothing here claims behaviour that was not read from the code."
+  ],
+  "types": [
+    {
+      "id": "ChainedPuzzleInstance",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "base": "UnityEngine.MonoBehaviour",
+      "dumpLine": 610075,
+      "note": "The one native instance kind behind both the alarm and the scan; the author's reference is a ChainedPuzzleDataBlock and the runtime identity is this component."
+    },
+    {
+      "id": "ChainedPuzzleManager",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "base": "Globals.GlobalManager",
+      "dumpLine": 610548,
+      "note": "The level's own puzzle list. `m_instances` is a field in the dump (no RVA) and is exposed by the interop as a public property."
+    },
+    {
+      "id": "Mastermind",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "base": "Globals.GlobalManager",
+      "dumpLine": 592392,
+      "note": "The wave system's host-side owner; its event list is the wave registry."
+    },
+    {
+      "id": "SurvivalWave",
+      "assembly": "Modules-ASM.dll",
+      "type": "SurvivalWave",
+      "base": "Mastermind.MastermindEvent",
+      "dumpLine": 592027,
+      "note": "The only subclass of Mastermind.MastermindEvent in this build, so every live event is a wave."
+    }
+  ],
+  "hooks": [
+    {
+      "id": "ChainedPuzzleAttemptInteract",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "name": "AttemptInteract",
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::AttemptInteract(ChainedPuzzles.eChainedPuzzleInteraction)",
+      "rva": "0x1733280",
+      "offset": "0x1731880",
+      "dumpLine": 610176,
+      "interopVisibility": "public wrapper for a public native method",
+      "role": "The write path this slice uses for alarm_start/scan_start (Activate) and as the native stop entry for a single alarm (Deactivate).",
+      "reads": "the interaction enum only",
+      "sync": "the entry hands the interaction to the instance's own SNet_StateReplicator<pChainedPuzzleState,pChainedPuzzleInteraction> through InteractWithState (direct call recovered at file offset 0x17319C0 inside this body, target 0x1817331982). The replicator's provider callback is OnStateChange, which is where the master side runs.",
+      "harmony": "not a hook target for this slice; it is the call target",
+      "verified": false
+    },
+    {
+      "id": "ChainedPuzzleStateChange",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "name": "OnStateChange",
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::OnStateChange(ChainedPuzzles.pChainedPuzzleState,ChainedPuzzles.pChainedPuzzleState,System.Boolean)",
+      "rva": "0x1734BF0",
+      "offset": "0x17331F0",
+      "slot": 4,
+      "dumpLine": 610188,
+      "interopVisibility": "public wrapper for a public virtual method",
+      "role": "The master-side state machine of one puzzle and the call site of its activation.",
+      "reads": "old and new pChainedPuzzleState (status, currentSurvivalWave_EventID, isActive, isSolved)",
+      "newCallEdges": [
+        {
+          "id": "puzzle-state-change.calls-master-activate",
+          "from": "0x17337C4 (inside OnStateChange)",
+          "to": "0x1817334D0 ChainedPuzzleInstance.MasterActivate",
+          "meaning": "the transition into the active state is what runs the master activation, which is why this slice drives the public AttemptInteract entry instead of calling MasterActivate directly",
+          "method": "byte scan for the direct relative call into the method body"
+        },
+        {
+          "id": "puzzle-state-change.calls-master-deactivate",
+          "from": "0x1733853 (inside OnStateChange)",
+          "to": "0x181733A90 ChainedPuzzleInstance.MasterDeactivate",
+          "meaning": "the deactivation branch runs the master deactivation",
+          "method": "byte scan for the direct relative call into the method body"
+        }
+      ],
+      "harmony": "postfix diff on status gives Active (alarm/scan running) and Solved (alarm cleared) without any native field access",
+      "verified": false
+    },
+    {
+      "id": "ChainedPuzzleMasterActivate",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "name": "MasterActivate",
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::MasterActivate()",
+      "rva": "0x17334D0",
+      "offset": "0x1731AD0",
+      "dumpLine": 610206,
+      "interopVisibility": "private native method, public interop wrapper (Il2CppInterop invokes it through il2cpp_runtime_invoke)",
+      "role": "The master half of an alarm/scan activation.",
+      "reads": "the instance's own fields; the body's direct calls are string helpers and Debug logging only, and no call into the state replicator was found in it",
+      "sync": "not this method: activation replicates through OnStateChange, which is why the slice calls AttemptInteract",
+      "callers": ["0x17337C4 inside ChainedPuzzleInstance.OnStateChange (byte scan)"],
+      "callerCount": 0,
+      "callerCountNote": "the interop attribute records 0 direct native callers, which is consistent with the byte scan finding exactly one call inside the same class",
+      "verified": false
+    },
+    {
+      "id": "ChainedPuzzleMasterDeactivate",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "name": "MasterDeactivate",
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::MasterDeactivate()",
+      "rva": "0x1733A90",
+      "offset": "0x1732090",
+      "dumpLine": 610209,
+      "interopVisibility": "private native method, public interop wrapper",
+      "role": "The master half of stopping one alarm in place.",
+      "reads": "the instance's own fields; the body contains Debug logging and string building",
+      "callers": ["0x1733853 inside ChainedPuzzleInstance.OnStateChange (byte scan)"],
+      "callerCount": 0,
+      "sync": "not proven. Whether the deactivation publishes a new pChainedPuzzleState was not established, so alarm_stop does not claim it (see unimplementedRows).",
+      "verified": false
+    },
+    {
+      "id": "ChainedPuzzleTriggerEnemyWave",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "name": "TriggerEnemyWave",
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::TriggerEnemyWave()",
+      "rva": "0x1736600",
+      "offset": "0x1734C00",
+      "dumpLine": 610212,
+      "interopVisibility": "private native method, public interop wrapper",
+      "role": "The puzzle's own wave start: an alarm starts its wave from here, not from the action.",
+      "reads": "the instance's own survival-wave id, which the class stores through SetSurvivalWaveID and publishes in pChainedPuzzleState.currentSurvivalWave_EventID",
+      "callers": ["0x1731F51 and 0x1731F6B inside ChainedPuzzleInstance.MasterActivate (byte scan)"],
+      "callerCount": 1,
+      "verified": false
+    },
+    {
+      "id": "MastermindTriggerSurvivalWave",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "name": "TriggerSurvivalWave",
+      "signature": "System.Boolean Mastermind::TriggerSurvivalWave(AIGraph.AIG_CourseNode,System.UInt32,System.UInt32,System.UInt16&,SurvivalWaveSpawnType,System.Single,System.Single,System.Boolean,System.Boolean,UnityEngine.Vector3,System.String)",
+      "rva": "0x14F8280",
+      "offset": "0x14F6880",
+      "dumpLine": 592466,
+      "interopVisibility": "public wrapper for a public native method; the interop exposes exactly this overload, so the position overload below is not callable from the interop",
+      "role": "The write path of wave_start.",
+      "reads": "the course node, the two author data block ids, the spawn type and the timing arguments",
+      "returns": "whether the master accepted the wave; the out parameter carries the EventID it registered",
+      "sync": "the position overload forwards to SurvivalWave.Spawn (callEdges mastermind-wave-position.calls-wave-spawn in encounter-wave-hooks.json) and the wave object replicates through SurvivalWave.OnSpawn",
+      "callers": "none found in this slice's scan range; the entry is reached from the objective and door code paths outside the scanned ranges",
+      "verified": false
+    },
+    {
+      "id": "MastermindTriggerSurvivalWaveAtPosition",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "name": "TriggerSurvivalWave",
+      "signature": "System.Boolean Mastermind::TriggerSurvivalWave(AIGraph.AIG_CourseNode,System.UInt32,System.UInt32,System.UInt16&,SurvivalWaveSpawnType,System.Single,System.Single,UnityEngine.Vector3,System.Boolean,System.Boolean,UnityEngine.Vector3,System.String)",
+      "rva": "0x14F8520",
+      "offset": "0x14F6B20",
+      "dumpLine": 592467,
+      "interopVisibility": "not exposed by the QA-profile interop assembly (only the node overload is), so no plan action can call it from this build's wrapper",
+      "role": "The same start with an explicit position instead of a node-relative origin.",
+      "verified": false
+    },
+    {
+      "id": "MastermindTryGetEvent",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "name": "TryGetEvent",
+      "signature": "System.Boolean Mastermind::TryGetEvent(System.UInt16,Mastermind/MastermindEvent&)",
+      "rva": "0x14F8880",
+      "offset": "0x14F6E80",
+      "dumpLine": 592483,
+      "interopVisibility": "public wrapper for a public native method",
+      "role": "The lookup a wave stop needs: EventID to the live event object.",
+      "callers": [
+        "0x151E22E inside WardenObjectiveManager.StopAllWardenObjectiveEnemyWaves (byte scan)",
+        "0x1733325 inside ChainedPuzzleInstance.OnStateChange (byte scan)"
+      ],
+      "newCallEdges": [
+        {
+          "id": "puzzle-state-change.calls-try-get-event",
+          "from": "0x1733325 (inside OnStateChange)",
+          "to": "0x1814F8880 Mastermind.TryGetEvent",
+          "meaning": "a puzzle resolves its own wave by EventID from the Mastermind, which is how a solved alarm stops the wave it started",
+          "method": "byte scan for the direct relative call into the method body; the pre-existing callEdges entry carried the same edge from the RVA pair"
+        }
+      ],
+      "verified": false
+    },
+    {
+      "id": "MastermindEventStopEvent",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind.MastermindEvent",
+      "name": "StopEvent",
+      "signature": "System.Void Mastermind/MastermindEvent::StopEvent()",
+      "slot": 7,
+      "dumpLine": 592527,
+      "rva": null,
+      "rvaNote": "the dump records RVA -1 for the abstract declaration; the live implementation is SurvivalWave.StopEvent at 0x13F5BE0 / offset 0x13F41E0",
+      "interopVisibility": "public abstract method, so the interop call is a virtual dispatch on the concrete object",
+      "role": "The native stop of one wave, and the call a wave_stop would make once a handle resolves to the event.",
+      "sync": "SurvivalWave.StopEvent calls Mastermind.RemoveEvent (callEdges wave-stop-event.calls-remove-event in encounter-wave-hooks.json)",
+      "verified": false
+    },
+    {
+      "id": "MastermindCurrent",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "name": "Current",
+      "kind": "static-field",
+      "dumpLine": 592392,
+      "interopVisibility": "public static property",
+      "role": "The singleton the wave start resolves before it writes.",
+      "verified": false
+    },
+    {
+      "id": "ChainedPuzzleManagerCurrent",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "name": "Current",
+      "kind": "static-field",
+      "dumpLine": 610548,
+      "interopVisibility": "public static property",
+      "role": "The singleton whose instance list is the level's puzzle registry.",
+      "verified": false
+    },
+    {
+      "id": "ChainedPuzzleManagerInstances",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "name": "m_instances",
+      "kind": "field",
+      "signature": "Il2CppSystem.Collections.Generic.List<ChainedPuzzles.ChainedPuzzleInstance> ChainedPuzzles.ChainedPuzzleManager::m_instances",
+      "rva": null,
+      "rvaNote": "a field; the dump lists it without an RVA and the interop exposes it as a public property",
+      "interopVisibility": "public property over the field",
+      "role": "The enumeration and resolution source of the chained-puzzle resource kind.",
+      "verified": false
+    }
+  ],
+  "stateShapes": [
+    {
+      "id": "pChainedPuzzleState",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 610077,
+      "layout": "[StructLayout(LayoutKind.Explicit)] status at 0, currentSurvivalWave_EventID at 2, isActive at 4, isSolved at 5",
+      "replicatedBy": "SNet_StateReplicator<ChainedPuzzleState, pChainedPuzzleInteraction> ChainedPuzzleInstance.m_stateReplicator",
+      "note": "The replicator is what makes AttemptInteract a sync entry: the interaction goes in, the state callback comes out."
+    },
+    {
+      "id": "pChainedPuzzleInteraction",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 610088,
+      "layout": "[StructLayout(LayoutKind.Explicit)] type (eChainedPuzzleInteraction) at 0",
+      "note": "The interaction carries the enum and nothing else, which is why the request has no room for a per-request parameter."
+    }
+  ],
+  "stateVocabulary": [
+    {
+      "id": "eChainedPuzzleInteraction",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 610067,
+      "values": { "Activate": 0, "Solve": 1, "Deactivate": 2 },
+      "note": "Read from the interop enum file, which is decompiled from the interop assembly and matches the game's own order."
+    },
+    {
+      "id": "eChainedPuzzleStatus",
+      "assembly": "Modules-ASM.dll",
+      "dumpLine": 610057,
+      "values": { "Disabled": 0, "Active": 1, "Solved": 2 },
+      "note": "Carried by objective-hooks.json; the values are the ones the status transitions of OnStateChange compare."
+    }
+  ],
+  "identity": [
+    {
+      "kind": "chained-puzzle",
+      "authorReference": "GameData.ChainedPuzzleDataBlock: the game's own alarm/scan data block, whose PublicAlarmName is the author-facing name and whose TriggerAlarmOnActivate says whether the block is an alarm or a scan",
+      "runtimeInstance": "ChainedPuzzles.ChainedPuzzleInstance, found through ChainedPuzzleManager.Current.m_instances",
+      "resourceIdConvention": "This provider publishes the instance's own m_puzzleUID (assigned by the instance while it is set up, one counter per instance) and also resolves the data block's PublicAlarmName, so an author may address an alarm by either spelling. The convention is this slice's own decision and is not a native id: the evidence does not establish that PublicAlarmName is unique in a level, so both keys are matched and a resourceId that names two live instances resolves to neither.",
+      "invalidatedBy": "ChainedPuzzleInstance.OnDestroy (the object leaves the manager's list)",
+      "unproven": "the exact format of m_puzzleUID is not established; nothing here depends on its format, only on its being non-empty and per-instance"
+    },
+    {
+      "kind": "wave",
+      "authorReference": "the pair (GameData.SurvivalWaveSettingsDataBlock.persistentID, GameData.SurvivalWavePopulationDataBlock.persistentID) — the two ids Mastermind.TriggerSurvivalWave takes",
+      "runtimeInstance": "the Mastermind event the start entry registers: Mastermind.MastermindEvent.EventID (ushort) on a SurvivalWave object",
+      "resourceIdConvention": "`<settingsId>:<populationId>`, the order the native entry takes the two ids in; it is the provider's own spelling of the author pair and is written into the plan as the compiled resource id",
+      "note": "A wave resource is a definition, not a running wave: the same resource can be started more than once and each start registers its own EventID. The running instance is therefore a handle, which is why wave_stop takes a handle and not this resource."
+    }
+  ],
+  "readbacks": [
+    {
+      "id": "puzzle-manager",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "isStatic": true,
+      "signature": "ChainedPuzzles.ChainedPuzzleManager ChainedPuzzles.ChainedPuzzleManager::get_Current()",
+      "note": "The level's puzzle registry; every resolution of a chained-puzzle resource starts here and a level with no manager refuses with `chained-puzzle-manager-unavailable`."
+    },
+    {
+      "id": "puzzle-instance-list",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleManager",
+      "isStatic": false,
+      "signature": "Il2CppSystem.Collections.Generic.List`1<ChainedPuzzles.ChainedPuzzleInstance> ChainedPuzzles.ChainedPuzzleManager::get_m_instances()",
+      "note": "Read by enumeration and by every action's resolution; the game adds a puzzle to this list while it builds the level."
+    },
+    {
+      "id": "puzzle-uid",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "isStatic": false,
+      "signature": "System.String ChainedPuzzles.ChainedPuzzleInstance::get_m_puzzleUID()",
+      "note": "The instance's own id, which this provider publishes as the resourceId of a chained-puzzle resource. Its format is not established and nothing here depends on it."
+    },
+    {
+      "id": "puzzle-active",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "isStatic": false,
+      "signature": "System.Boolean ChainedPuzzles.ChainedPuzzleInstance::get_IsActive()",
+      "note": "Read by alarm_start/scan_start to answer 'the state the request asked for already holds' without writing."
+    },
+    {
+      "id": "puzzle-solved",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "isStatic": false,
+      "signature": "System.Boolean ChainedPuzzles.ChainedPuzzleInstance::get_IsSolved()",
+      "note": "Read to refuse an alarm the game already solved, which is terminal for that instance."
+    },
+    {
+      "id": "puzzle-datablock",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "isStatic": false,
+      "signature": "GameData.ChainedPuzzleDataBlock ChainedPuzzles.ChainedPuzzleInstance::get_Data()",
+      "note": "The data block behind the instance, which is where the author alarm name is read."
+    },
+    {
+      "id": "puzzle-cores",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "isStatic": false,
+      "signature": "System.Int32 ChainedPuzzles.ChainedPuzzleInstance::NRofPuzzles()",
+      "note": "A puzzle with no core cannot be activated by the game; the action refuses it by name rather than calling into it."
+    },
+    {
+      "id": "wave-event-lookup",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "isStatic": false,
+      "signature": "System.Boolean Mastermind::TryGetEvent(System.UInt16,Mastermind/MastermindEvent&)",
+      "rva": "0x14F8880",
+      "note": "Resolves a running wave from the ushort EventID that pChainedPuzzleState and pSurvivalWaveSpawnData already carry. This is the lookup a handle-resolved wave_stop would use; the action layer does not call it while the handle table is missing."
+    },
+    {
+      "id": "mastermind-current",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "isStatic": true,
+      "signature": "Mastermind Mastermind::get_Current()",
+      "note": "The wave system's singleton; a level without it refuses with `wave-mastermind-unavailable`."
+    },
+    {
+      "id": "course-node-list",
+      "assembly": "Modules-ASM.dll",
+      "type": "AIGraph.AIG_CourseNode",
+      "isStatic": true,
+      "signature": "Il2CppSystem.Collections.Generic.List`1<AIGraph.AIG_CourseNode> AIGraph.AIG_CourseNode::get_s_allNodes()",
+      "note": "The level's own course node list. wave_start passes the first node it holds, because the row carries no position, no entity and no node of its own and the native entry requires one; a level with no node refuses with `wave-course-node-unavailable`."
+    },
+    {
+      "id": "wave-settings-block",
+      "assembly": "GameData-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1",
+      "isStatic": true,
+      "signature": "GameData.SurvivalWaveSettingsDataBlock GameData.GameDataBlockBase`1<GameData.SurvivalWaveSettingsDataBlock>::GetBlock(System.UInt32)",
+      "note": "The author settings block a wave resource names; a wave whose block this build did not load is refused as `resource-unavailable` rather than handed to the master."
+    },
+    {
+      "id": "wave-population-block",
+      "assembly": "GameData-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1",
+      "isStatic": true,
+      "signature": "GameData.SurvivalWavePopulationDataBlock GameData.GameDataBlockBase`1<GameData.SurvivalWavePopulationDataBlock>::GetBlock(System.UInt32)",
+      "note": "The author population block a wave resource names, validated the same way as the settings block."
+    },
+    {
+      "id": "wave-blocks-enumeration",
+      "assembly": "GameData-ASM.dll",
+      "type": "GameData.GameDataBlockBase`1",
+      "isStatic": true,
+      "signature": "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase`1<GameData.SurvivalWaveSettingsDataBlock> GameData.GameDataBlockBase`1<GameData.SurvivalWaveSettingsDataBlock>::GetAllBlocks()",
+      "note": "The wave resource provider's enumeration source, together with the population block's own GetAllBlocks; a wave is a definition the author loaded, not a running instance."
+    }
+  ],
+  "writes": [
+    {
+      "id": "chained-puzzle-interaction-entry",
+      "assembly": "Modules-ASM.dll",
+      "type": "ChainedPuzzles.ChainedPuzzleInstance",
+      "isStatic": false,
+      "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::AttemptInteract(ChainedPuzzles.eChainedPuzzleInteraction)",
+      "role": "the puzzle's own interaction entry and the only member a Forge alarm/scan request writes through. It hands the interaction to the instance's own state replicator (InteractWithState), whose provider callback is OnStateChange, so the master side of an activation runs where the game already runs it. `Activate` is alarm_start and scan_start; `Deactivate` is the single-instance stop an alarm_stop would issue once its handle resolves."
+    },
+    {
+      "id": "mastermind-survival-wave-entry",
+      "assembly": "Modules-ASM.dll",
+      "type": "Mastermind",
+      "isStatic": false,
+      "signature": "System.Boolean Mastermind::TriggerSurvivalWave(AIGraph.AIG_CourseNode,System.UInt32,System.UInt32,System.UInt16&,SurvivalWaveSpawnType,System.Single,System.Single,System.Boolean,System.Boolean,UnityEngine.Vector3,System.String)",
+      "role": "the host's wave start and the only member a wave_start writes through. It answers whether it accepted the wave and hands back the EventID it registered, which the wave facts and a handle-resolved wave_stop both name. The request's budget, count, seed and interval are not arguments of it: they are fields of the author's SurvivalWaveSettingsDataBlock or of the level, so a request naming one is refused rather than run without it."
+    }
+  ],
+  "readbacksAlarmWave": "the rows above are the reads of this slice; the two writes are in `writes`",
+  "unproven": [
+    "Whether MasterDeactivate publishes a new pChainedPuzzleState (and therefore replicates) was not established; the body contains no call into the state replicator that this scan found, and the class's push into the replicator was only found inside AttemptInteract. alarm_stop does not rely on it and is unimplemented for that reason.",
+    "The bodies of MasterActivate and MasterDeactivate were scanned for direct calls only; an indirect call, a virtual dispatch or a call through a function pointer inside them is invisible to that method.",
+    "The frequency of ChainedPuzzleManager.CreatePuzzleInstance was not measured, so no provider polls its list; both the resource enumeration and every action read it on demand.",
+    "PublicAlarmName uniqueness inside a level is not established.",
+    "Whether the alarm puzzle's own wave is registered against the objective manager for every author entry point is not established; RegisterSurvivalWaveID is called from Mastermind.TriggerSurvivalWave (callEdges mastermind-wave-node.calls-register-wave-id), and the puzzle's TriggerEnemyWave reaches the master by a path this slice did not trace to the end."
+  ],
+  "catalogMismatches": [
+    "forge.action.map.wave_start declares budget/count/seed/interval inputs, but the only interop-visible native start entry takes neither a budget, a count, a seed nor an interval: the population budget and the group cadence are fields of the author's SurvivalWaveSettingsDataBlock, and the seed is the level's own. A request that carries one of the four is refused with `wave-knob-unsupported` rather than run without it.",
+    "forge.action.map.scan_start declares an `anchor` (vector3) and a `quorum` (integer). No native entry takes either: a puzzle is created at a position (ChainedPuzzleManager.CreatePuzzleInstance), an existing puzzle cannot be moved per request, and the number of players a scan requires is a field of its own data block (read by CP_Bioscan_Core). The anchor is therefore not applied and the quorum is echoed back in the result row, never written.",
+    "forge.action.map.alarm_stop declares `existing_enemies_policy` with `keep` and `clear`. Nothing native takes that decision: whether the wave started by the puzzle survives the puzzle's end is the data block's own DisableSurvivalWaveOnComplete, and clearing already-spawned enemies would be a second, Forge-owned enemy deletion path. `clear` is refused with `alarm-clear-unsupported`.",
+    "forge.action.map.wave_stop declares `pending_spawns_policy` with `cancel` and `finish`. The native stop removes the event, which is `cancel`; no entry lets a wave spend its remaining budget first, so `finish` is refused with `wave-pending-finish-unsupported`.",
+    "forge.action.map.wave_start and wave_stop are recorded in rows.tsv as belonging to ForgeEnemy (ruling 83: wave facts and wave control are the enemy package's), while this slice's specification names ForgeMap files. The declaration is written so the wave half can be moved without touching a native hook; the integration batch has to decide which package registers it.",
+    "The catalog's alarm_start/scan_start declare a `handle` output (alarm_handle/scan_handle) and the two stop rows declare a handle input. This runtime has no entry point that mints a provider handle and no table that turns one back into a native object, so the start rows publish their result only and the stop rows refuse with `handle-native-unavailable`."
+  ],
+  "unimplementedRows": [
+    {
+      "row": "forge.action.map.alarm_stop",
+      "state": "未实现",
+      "missing": "provider 铸句柄 + 句柄↔原生对象表 (R-ABI 批 C)",
+      "detail": "The row's only subject input is an effect handle. Resolving it to the ChainedPuzzleInstance it named needs the handle-to-native table, and minting that handle in alarm_start needs the provider-side handle factory. Both are batch C of %TEMP%\\rabi-audit\\implementation-plan.md.",
+      "integrationPoint": "RuntimeModuleHandle.CreateEffectHandle(kind, lifetime) + RegisterNative(handle, object) / TryNative(handle, out object), then Mastermind.TryGetEvent(eventId) + MastermindEvent.StopEvent() for a wave and ChainedPuzzleInstance.MasterDeactivate for a puzzle",
+      "refusalCode": "handle-native-unavailable"
+    },
+    {
+      "row": "forge.action.map.wave_stop",
+      "state": "未实现",
+      "missing": "provider 铸句柄 + 句柄↔原生对象表 (R-ABI 批 C)",
+      "detail": "Same gap on the wave side; the event id the start entry answers with is the handle payload, and without the table it cannot be turned back into the MastermindEvent.",
+      "integrationPoint": "the same batch-C entry points, then Mastermind.TryGetEvent + SurvivalWave.StopEvent",
+      "refusalCode": "handle-native-unavailable"
+    },
+    {
+      "row": "forge.action.map.alarm_start (alarm_handle output)",
+      "state": "部分实现",
+      "missing": "provider 铸句柄 (R-ABI 批 C)",
+      "detail": "The action itself runs: the named puzzle is activated through its own interaction entry. Only the row's declared `alarm_handle` output cannot be produced, so a plan that consumes that port gets nothing and the handle-dependent stop row cannot be driven.",
+      "integrationPoint": "RuntimeModuleHandle.CreateEffectHandle(\"effect\", \"encounter\") after the interaction is issued"
+    },
+    {
+      "row": "forge.action.map.scan_start (scan_handle output)",
+      "state": "部分实现",
+      "missing": "provider 铸句柄 (R-ABI 批 C)",
+      "detail": "Same as alarm_start's handle: the activation runs, the handle output has no producer."
+    }
+  ],
+  "integrationNotes": [
+    "The integration batch must add `ResourceProviders` for the two kinds this slice declares (`chained-puzzle`, `wave`). Without a registered owner of a kind, a plan that carries a compiled resource reference of that kind is refused at load with `stale-resource` (RuntimePlan.ResolveResourceLiteral reads the registry's static declaration), so the two start rows cannot be driven end-to-end until the provider is registered.",
+    "The chained-puzzle provider belongs to whichever package owns the puzzle instance table; this slice publishes it from ForgeMap because the alarm and scan rows are declared there.",
+    "The plan ABI reads a resource port's value as {\"resourceKind\",\"resourceId\"} and the kernel validates the kind against the port's own declaration, so the handler never has to guess a kind."
+  ]
+}

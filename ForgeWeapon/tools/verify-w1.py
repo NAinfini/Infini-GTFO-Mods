@@ -11,6 +11,19 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import xml.etree.ElementTree as ElementTree
+
+TRX_NAMESPACE = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
+
+
+def trx_results(path: Path) -> tuple[int, int, list[str]]:
+    """(total, passed, failed test names) from a dotnet test TRX report."""
+    root = ElementTree.parse(path).getroot()
+    definitions = {d.get("id"): d.get("name") for d in root.iter(TRX_NAMESPACE + "UnitTest")}
+    names = [definitions.get(r.get("testId"), "") for r in root.iter(TRX_NAMESPACE + "UnitTestResult")]
+    failed = [definitions.get(r.get("testId"), "") for r in root.iter(TRX_NAMESPACE + "UnitTestResult")
+              if r.get("outcome") != "Passed"]
+    return len(names), len(names) - len(failed), failed
 
 
 def fingerprint(path: Path) -> str:
@@ -69,7 +82,7 @@ def main() -> int:
         print("RUN", name, flush=True)
         with log.open("w", encoding="utf-8") as stream:
             result = subprocess.run(command, cwd=repo, stdout=stream, stderr=subprocess.STDOUT,
-                                    timeout=180, check=False)
+                                    timeout=900, check=False)
         receipt["stages"].append({"name": name, "argv": command, "exitCode": result.returncode,
                                    "log": log.name})
         if result.returncode != 0:
@@ -91,21 +104,26 @@ def main() -> int:
                                    "--audit-dll", str(auditor), "--bepinex", str(bep), "--game", str(game),
                                    "--output-root", str(output / "native-tests")])
         if not args.metadata_only:
-            build_project("identity-build", weapon / "tests/Identity/Identity.csproj")
-            run("identity-tests", ["dotnet", str(build / "bin/Identity/release/Identity.dll")])
-            rows = (output / "identity-tests.log").read_text(encoding="utf-8").splitlines()
-            summary = json.loads(next(row.removeprefix("RESULT ") for row in rows if row.startswith("RESULT ")))
-            receipt["managedIdentityTests"] = summary
+            results = output / "results"
+            run("identity-tests", ["dotnet", "test", str(weapon / "tests/Identity/Identity.csproj"),
+                                   "-c", "Release", "--artifacts-path", str(build),
+                                   "--results-directory", str(results),
+                                   "-p:GTFOBepInExPath=" + str(bep), "-p:NuGetAudit=false", "--ignore-failed-sources"])
+            total, passed, failed = trx_results(results / "identity-tests.trx")
+            if not total or failed:
+                raise RuntimeError("Managed identity suite failed: " + ", ".join(failed))
+            receipt["managedIdentityTests"] = {"testCount": total, "passed": passed, "failures": 0}
             for suite in ("IdentityAcceptance", "IdentityDispatchReview"):
                 stage = suite.lower()
-                build_project(stage + "-build", weapon / ("tests/" + suite + "/" + suite + ".csproj"))
-                report_path = output / (stage + ".json")
-                run(stage + "-tests", ["dotnet", str(build / ("bin/" + suite + "/release/" + suite + ".dll")),
-                                      "--report", str(report_path)])
-                report = json.loads(report_path.read_text(encoding="utf-8"))
-                if report["failures"] != 0 or not report["tests"] or any(t["status"] != "passed" for t in report["tests"]):
-                    raise RuntimeError("Independent identity suite failed: " + suite)
-                receipt[suite] = {"testCount": len(report["tests"]), "failures": 0, "report": report_path.name}
+                results = output / ("results-" + stage)
+                run(stage + "-tests", ["dotnet", "test", str(weapon / ("tests/" + suite + "/" + suite + ".csproj")),
+                                       "-c", "Release", "--artifacts-path", str(build),
+                                       "--results-directory", str(results),
+                                       "-p:GTFOBepInExPath=" + str(bep), "-p:NuGetAudit=false", "--ignore-failed-sources"])
+                total, passed, failed = trx_results(results / (stage + "-tests.trx"))
+                if not total or failed:
+                    raise RuntimeError("Independent identity suite failed: " + suite + " -> " + ", ".join(failed))
+                receipt[suite] = {"testCount": total, "failures": 0}
         if args.architecture:
             build_project("architecture-build", repo / "ForgeRuntime/tests/Architecture/Architecture.csproj")
             run("architecture-tests", ["dotnet", str(build / "bin/Architecture/release/Architecture.dll")])

@@ -6,7 +6,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ForgeRuntime.Framework</AssemblyName>
     <RootNamespace>ForgeRuntime.Framework</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.2.0</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
@@ -14,6 +14,19 @@
          RegisterBuiltinModule. That path is internal, so no domain package can reach it through the public SDK surface. -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>ForgeRuntime</_Parameter1>
+    </AssemblyAttribute>
+    <!-- The SDK's own checks read the boundary validators and the plan loader directly. The other test projects compile
+         these sources in, which would give the SDK a second assembly identity; this one hosts the framework as an
+         assembly, so it is named here instead. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>EntityObservation</_Parameter1>
+    </AssemblyAttribute>
+    <!-- The lifecycle fact suite drives the enemy provider through the runtime's own internal entry points: the
+         built-in variable module a plan that writes a scope needs, and the layout derivation its plan builder
+         reads back instead of restating. Both are internal to the SDK, so the suite is named here rather than
+         reaching them by reflection. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>LifecycleFacts</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 </Project>

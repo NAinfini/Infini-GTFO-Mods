@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- One self-contained assembly: the runtime framework, the game-independent level-event contract and module,
+         and the fixtures. Nothing is referenced from a built package, so this project builds and runs while other
+         batches hold their packages mid-flight. At integration time these same sources are the ones
+         `ForgeRuntime.Framework.dll` and `ForgeMap.dll` ship, so the presentation tier is the framework's own
+         file and not a hand-copied stand-in. -->
+    <Compile Include="../../../ForgeRuntime/Framework/**/*.cs"
+             Exclude="../../../ForgeRuntime/Framework/obj/**/*.cs" />
+    <Compile Include="../../../ForgeMap/LevelEventContract.cs;../../../ForgeMap/LevelEventModule.cs" />
+    <Compile Include="AssemblyAttributes.cs;ProviderDeclaration.cs;LevelEventWorld.cs;LevelEventFactsTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

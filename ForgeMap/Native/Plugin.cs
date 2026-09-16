@@ -9,7 +9,9 @@ using HostPlugin = ForgeRuntime.Plugin;
 namespace ForgeMap.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]
+// A versioned dependency is a SemVer range, so the version literal is a floor: this package loads on the
+// release it was built against or any later one.
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
 public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "NAinfini.ForgeMap";
@@ -29,6 +31,13 @@ public sealed class Plugin : BasePlugin
             return;
         }
         var logLevel = LoggingLevel(Config);
+        if (HostPlugin.IsSuspended)
+        {
+            // A suspended host still publishes its kernel, which is how a package tells this apart from a host that never loaded.
+            Log.LogError("Forge Map cannot register: the Forge Runtime is suspended (reason "
+                + HostPlugin.SuspensionCode + "); no bindings or native hooks were installed.");
+            return;
+        }
         var kernel = HostPlugin.Runtime
             ?? throw new InvalidOperationException("Forge Runtime is unavailable; Map cannot initialize.");
         var harmony = new Harmony(PluginGuid);
@@ -63,7 +72,7 @@ public sealed class Plugin : BasePlugin
     // Native IL2CPP hooks are process-lifetime; live reload has no validated recovery contract.
     public override bool Unload() => false;
 
-    // D-007: this package's own player-tier level, read once per Load and handed to the kernel with the registration.
+    // This package's own player-tier level, read once per Load and handed to the kernel with the registration.
     // A malformed value fails startup instead of silently selecting a default.
     private static RuntimeLogLevel LoggingLevel(ConfigFile config)
     {

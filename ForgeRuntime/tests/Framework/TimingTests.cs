@@ -357,15 +357,26 @@ sealed class TimingScenario
     public readonly List<CommandContext> Calls = new();
     public readonly Dictionary<string, long> Lives = new(StringComparer.Ordinal);
     public long World = 1;
-    public TimingScenario(RuntimeLimits? limits = null) { Kernel = new RuntimeKernel(Fixture.Identity, limits); Kernel.BeginWorld(World); }
+    public TimingScenario(RuntimeLimits? limits = null)
+    {
+        Kernel = new RuntimeKernel(Fixture.Identity, limits); Kernel.BeginWorld(World);
+        Kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
+    }
     public EntityReference Entity(string provider, string name) => new(provider + ":" + name, World, Lives[provider + ":" + name]);
-    public RuntimeEvent Event(string provider, string id, long tick = 0) => new(id, Fixture.Trigger(provider), World, tick, "scope", RuntimeJson.From(new { target = Entity(provider, "target") }), Entity(provider, "source"));
+    /// <summary>The two entities a schedule's template is about, both in the trigger's own payload: the recipient
+    /// the plan acts on and the entity the event came from. A dispatch has no subject beside its payload, so a case
+    /// that ends the life of one of them names it in the port that carries it.</summary>
+    public RuntimeEvent Event(string provider, string id, long tick = 0) => new(id, Fixture.Trigger(provider), World, tick, "scope",
+        RuntimeJson.From(new { target = Entity(provider, "target"), source = Entity(provider, "source") }));
     public RuntimeModuleHandle Register(string provider, bool replay = true, bool unsafeSecondAction = false, bool targetList = false, CommandHandler? handler = null)
     {
         Lives[provider + ":target"] = 1; Lives[provider + ":source"] = 1;
         CommandHandler apply = ctx => { Calls.Add(ctx); return handler?.Invoke(ctx) ?? CommandResult.Succeeded(RuntimeJson.EmptyObject); };
         var module = Fixture.Module(provider, apply); var json = JsonNode.Parse(module.RegistryJson)!;
         foreach (var cap in json["capabilities"]!.AsArray()) if (replay) cap!["parameters"]!["scheduleReplay"] = "fixed-inputs";
+        // The trigger declares the entity the event came from beside the recipient, so a scheduled template can be
+        // ended one entity at a time: the event-level subject this fixture used to set no longer exists.
+        json["capabilities"]![0]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"source\",\"type\":\"entity\",\"optional\":true,\"nullable\":true}"));
         if (targetList)
         {
             json["capabilities"]![0]!["graph"]!["outputs"]![1]!["cardinality"] = "many";
@@ -379,6 +390,7 @@ sealed class TimingScenario
             var binding = JsonNode.Parse(json["bindings"]![1]!.ToJsonString())!;
             binding["id"] = provider + ".binding.unsafe"; binding["capabilityId"] = provider + ".unsafe"; binding["handler"] = provider + ".handler.unsafe"; json["bindings"]!.AsArray().Add(binding);
             module = module with { Handlers = new Dictionary<string, CommandHandler> { [Fixture.Handler(provider)] = apply, [provider + ".handler.unsafe"] = apply },
+                Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(provider)] = Fixture.Shape(provider), [provider + ".handler.unsafe"] = Fixture.Shape(provider) },
                 BindingSupport = module.BindingSupport.Append(new BindingSupport(provider + ".binding.unsafe", "implementation-only", Fixture.Permissions)).ToArray() };
         }
         return Kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), EntityResolvers = new Dictionary<string, Func<EntityReference, bool>> {
@@ -400,7 +412,7 @@ sealed class TimingScenario
         var parameters = new JsonObject(); if (valueType != null) parameters["valueType"] = valueType;
         json["capabilities"] = new JsonArray(JsonNode.Parse(RuntimeJson.From(new { id, owner = provider, kind = "state", label = "Numeric contribution", version = "1.0.0", parameters }).GetRawText()));
         json["bindings"] = new JsonArray();
-        return Kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), BindingSupport = Array.Empty<BindingSupport>() }, RuntimeLogLevel.Off);
+        return Kernel.RegisterModule(module with { RegistryJson = json.ToJsonString(), Handlers = new Dictionary<string, CommandHandler>(), Shapes = new Dictionary<string, HandlerShape>(), BindingSupport = Array.Empty<BindingSupport>() }, RuntimeLogLevel.Off);
     }
     public NumericLeaseRequest Lease(string provider, string id, EntityReference target, double additive = 5, double multiplier = 1)
         => new(id, State, "1.0.0", target, "scope", "speed", Entity(provider, "source"), 10, additive, multiplier);

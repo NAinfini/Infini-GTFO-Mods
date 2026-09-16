@@ -20,59 +20,6 @@ public static class CombatContracts
       ],
       "capabilities": [
         {
-          "id": "forge.trigger.combat.damage_applied",
-          "owner": "forge.contract.combat",
-          "kind": "trigger",
-          "label": "实际伤害提交完成",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "伤害真的打上去了，数字是实际值。"
-          },
-          "graph": {
-            "domains": [
-              "enemy",
-              "weapon",
-              "tool",
-              "consumable",
-              "player"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "source",
-                "type": "entity",
-                "nullable": true
-              },
-              {
-                "id": "target",
-                "type": "entity"
-              },
-              {
-                "id": "amount",
-                "type": "number",
-                "unit": "hp"
-              },
-              {
-                "id": "damage_kind",
-                "type": "enum",
-                "schema": "damage_kind",
-                "nullable": true
-              },
-              {
-                "id": "limb",
-                "type": "integer",
-                "nullable": true
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
           "id": "forge.action.combat.heal",
           "owner": "forge.contract.combat",
           "kind": "action",
@@ -80,6 +27,9 @@ public static class CombatContracts
           "version": "2.0.0",
           "parameters": {
             "description": "给你选中的目标回血。溢出规则：截断只回到上限；丢弃是会溢出就整次不治疗；溢出允许超过上限，做不到的目标会拒绝。",
+            "summary": "给你选中的目标回血。溢出规则：截断只回到上限；丢弃是会溢出就整次不治疗；溢出允许超过上限，做不到的目标会拒绝。",
+            "summaryEn": "Puts health back on the targets you picked. Clamp stops at maximum health; discard skips the whole heal if it would overflow; overheal may exceed the maximum, and targets that cannot are rejected.",
+            "labelEn": "Heal",
             "support": "authoring-contract-only"
           },
           "graph": {
@@ -150,6 +100,35 @@ public static class CombatContracts
                   "readback-exception",
                   "heal-all-rejected",
                   "heal-all-unknown"
+                ],
+                "fields": [
+                  {
+                    "id": "target",
+                    "type": "entity"
+                  },
+                  {
+                    "id": "status",
+                    "type": "enum",
+                    "schema": "execution_outcome"
+                  },
+                  {
+                    "id": "committed",
+                    "type": "enum",
+                    "schema": "commit_state"
+                  },
+                  {
+                    "id": "code",
+                    "type": "string"
+                  },
+                  {
+                    "id": "amount",
+                    "type": "number",
+                    "unit": "hp"
+                  },
+                  {
+                    "id": "target_count",
+                    "type": "integer"
+                  }
                 ]
               }
             ],
@@ -178,91 +157,140 @@ public static class CombatContracts
           }
         },
         {
-          "id": "forge.trigger.combat.health_changed",
+          "id": "forge.action.combat.damage",
           "owner": "forge.contract.combat",
-          "kind": "trigger",
-          "label": "生命值变化",
-          "version": "1.0.0",
+          "kind": "action",
+          "label": "提交有来源与命中上下文的伤害",
+          "version": "2.0.0",
           "parameters": {
-            "description": "生命值变了。"
-          },
-          "graph": {
-            "domains": [
-              "enemy",
-              "weapon",
-              "tool",
-              "consumable",
-              "player"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "target",
-                "type": "entity"
-              },
-              {
-                "id": "value",
-                "type": "number",
-                "unit": "hp"
-              },
-              {
-                "id": "delta",
-                "type": "number",
-                "unit": "hp"
-              }
-            ],
-            "parameters": []
-          }
-        },
-        {
-          "id": "forge.trigger.enemy.death_started",
-          "owner": "forge.contract.combat",
-          "kind": "trigger",
-          "label": "死亡流程开始",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "敌人的死亡流程开始。"
+            "description": "对你选中的目标扣血，实际扣多少由对方的护甲和规则决定。",
+            "summary": "对你选中的目标扣血，实际扣多少由对方的护甲和规则决定。",
+            "summaryEn": "Takes health off the targets you picked; armour and rules decide how much actually lands.",
+            "labelEn": "Deal damage",
+            "support": "authoring-contract-only"
           },
           "graph": {
             "domains": [
               "map",
               "room",
               "enemy",
-              "logic"
+              "weapon",
+              "tool",
+              "consumable",
+              "player"
             ],
             "execution": "host",
-            "inputs": [],
+            "inputs": [
+              {
+                "id": "in",
+                "type": "execution"
+              },
+              {
+                "id": "targets",
+                "type": "entity",
+                "cardinality": "many"
+              },
+              {
+                "id": "source",
+                "type": "entity",
+                "optional": true
+              },
+              {
+                "id": "instigator",
+                "type": "entity"
+              },
+              {
+                "id": "amount",
+                "type": "number",
+                "unit": "hp"
+              },
+              {
+                "id": "damage_kind",
+                "type": "enum",
+                "schema": "damage_kind"
+              },
+              {
+                "id": "limb",
+                "type": "integer",
+                "optional": true
+              }
+            ],
             "outputs": [
               {
                 "id": "next",
                 "type": "execution"
               },
               {
-                "id": "enemy",
-                "type": "entity"
-              },
-              {
-                "id": "source",
-                "type": "entity",
-                "nullable": true
+                "id": "result",
+                "type": "result",
+                "schema": "forge.result.combat.damage",
+                "fields": [
+                  {
+                    "id": "target",
+                    "type": "entity"
+                  },
+                  {
+                    "id": "status",
+                    "type": "enum",
+                    "schema": "execution_outcome"
+                  },
+                  {
+                    "id": "committed",
+                    "type": "enum",
+                    "schema": "commit_state"
+                  },
+                  {
+                    "id": "code",
+                    "type": "string"
+                  },
+                  {
+                    "id": "amount",
+                    "type": "number",
+                    "unit": "hp"
+                  },
+                  {
+                    "id": "target_count",
+                    "type": "integer"
+                  }
+                ]
               }
             ],
-            "parameters": []
+            "parameters": [
+              {
+                "id": "mitigation_policy",
+                "type": "enum",
+                "role": "structural",
+                "required": true,
+                "values": [
+                  "receiver_rules",
+                  "ignore_armor",
+                  "explicit_profile"
+                ]
+              }
+            ],
+            "recipients": {
+              "input": "targets",
+              "target": "entity",
+              "cardinality": "many",
+              "requires": [
+                "health.damage"
+              ],
+              "result": "result"
+            }
           }
         },
         {
-          "id": "forge.trigger.combat.limb_broken",
+          "id": "forge.action.combat.revive",
           "owner": "forge.contract.combat",
-          "kind": "trigger",
-          "label": "可破坏部位破坏完成",
-          "version": "1.0.0",
+          "kind": "action",
+          "label": "执行有明确规则的救援",
+          "version": "2.0.0",
           "parameters": {
-            "description": "某个可破坏部位被打断了。"
+            "description": "按明确规则把倒地的人救起来。",
+            "summary": "按明确规则把倒地的人救起来。",
+            "summaryEn": "Picks a downed target back up under rules you set.",
+            "labelEn": "Revive",
+            "support": "authoring-contract-only"
           },
           "graph": {
             "domains": [
@@ -273,23 +301,103 @@ public static class CombatContracts
               "player"
             ],
             "execution": "host",
-            "inputs": [],
+            "inputs": [
+              {
+                "id": "in",
+                "type": "execution"
+              },
+              {
+                "id": "targets",
+                "type": "entity",
+                "cardinality": "many"
+              },
+              {
+                "id": "source",
+                "type": "entity"
+              },
+              {
+                "id": "duration",
+                "type": "integer",
+                "unit": "tick"
+              },
+              {
+                "id": "restored_health",
+                "type": "number",
+                "unit": "hp"
+              }
+            ],
             "outputs": [
               {
                 "id": "next",
                 "type": "execution"
               },
               {
-                "id": "target",
-                "type": "entity"
-              },
-              {
-                "id": "limb",
-                "type": "integer",
-                "nullable": true
+                "id": "result",
+                "type": "result",
+                "schema": "forge.result.combat.revive",
+                "fields": [
+                  {
+                    "id": "target",
+                    "type": "entity"
+                  },
+                  {
+                    "id": "status",
+                    "type": "enum",
+                    "schema": "execution_outcome"
+                  },
+                  {
+                    "id": "committed",
+                    "type": "enum",
+                    "schema": "commit_state"
+                  },
+                  {
+                    "id": "code",
+                    "type": "string"
+                  },
+                  {
+                    "id": "duration",
+                    "type": "integer",
+                    "unit": "tick"
+                  },
+                  {
+                    "id": "target_count",
+                    "type": "integer"
+                  }
+                ]
               }
             ],
-            "parameters": []
+            "parameters": [
+              {
+                "id": "interrupt_policy",
+                "type": "enum",
+                "role": "structural",
+                "required": true,
+                "values": [
+                  "cancel",
+                  "continue"
+                ]
+              },
+              {
+                "id": "cost_policy",
+                "type": "enum",
+                "role": "structural",
+                "required": true,
+                "values": [
+                  "none",
+                  "charge",
+                  "consume"
+                ]
+              }
+            ],
+            "recipients": {
+              "input": "targets",
+              "target": "entity",
+              "cardinality": "many",
+              "requires": [
+                "health.revive"
+              ],
+              "result": "result"
+            }
           }
         }
       ],

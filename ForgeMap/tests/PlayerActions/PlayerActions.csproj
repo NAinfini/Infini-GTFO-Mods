@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- `GameDoubles.cs` deliberately declares the game types the production action layer is compiled against, so
+         CS0436 fires on every mention of a shadowed type. No GTFO assembly is referenced: every native member this
+         slice reads is part of its own double, the way `tests/MapNativeAdapter` does it. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The production player-action sources under test, compiled against the doubles; no built ForgeMap.Native.dll
+         is needed, and no hook is installed. `PlayerIdentityModule` and `PlayerObservation` travel with them
+         because the action layer resolves every recipient through that one identity path. -->
+    <Compile Include="../../Native/PlayerActions.cs;../../Native/PlayerIdentityModule.cs;../../Native/PlayerObservation.cs" />
+    <Compile Include="AssemblyAttributes.cs;PlayerActionWorld.cs;PlayerActionTests.cs;GameDoubles.cs;LifeWorldDoubles.cs" />
+    <!-- The capability rows, binding rows, support rows and handler shapes come from the game-independent Map
+         assembly: the same declaration the runtime manifest and the website read. -->
+    <ProjectReference Include="../../ForgeMap.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

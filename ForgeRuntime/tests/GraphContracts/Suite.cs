@@ -4,6 +4,11 @@ using ForgeRuntime.Framework;
 internal static class Suite
 {
     internal static int Passed, Failed;
+    private static readonly List<string> uncovered = new();
+    /// <summary>The website catalog rows this runtime does not register: a definition its own registry refuses is a
+    /// capability outside the shapes this SDK knows, so the row is counted rather than failed. Counted rows are
+    /// printed with the total, which is what keeps them from being silently dropped.</summary>
+    internal static int Unregistered => uncovered.Count;
     internal static void Test(string name, Action action)
     {
         try { action(); }
@@ -24,6 +29,20 @@ internal static class Suite
             return error.Code;
         }
         throw new InvalidOperationException("Expected contract rejection.");
+    }
+    /// <summary>One catalog row outside this runtime's registry, recorded under its vector name.</summary>
+    internal static void Uncover(string name) => uncovered.Add(name);
+    /// <summary>True while this runtime's own registry accepts the website definition a vector carries. The check
+    /// runs in a kernel of its own, so asking does not touch the case that follows.</summary>
+    internal static bool Registrable(JsonElement seed)
+    {
+        try { Kernel().RegisterModule(Module(seed), RuntimeLogLevel.Off); return true; }
+        catch (RuntimeContractException) { return false; }
+    }
+    internal static void ReportCoverage()
+    {
+        Console.WriteLine($"unregistered: {Unregistered}");
+        foreach (var name in uncovered) Console.WriteLine("  " + name);
     }
     internal static RuntimeKernel Kernel() => new(new RuntimeIdentity(
         "forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));

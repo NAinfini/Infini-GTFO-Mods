@@ -6,11 +6,16 @@ using System.Text.Json;
 
 namespace ForgeRuntime.Framework;
 
-/// <summary>Explicit actor roles supplied by the caller. No role is inferred from another.</summary>
+/// <summary>Explicit actor roles supplied by the caller. No role is inferred from another, and a role the dispatch
+/// leaves unreadable is refused by name rather than answered from a neighbouring one.</summary>
 public sealed class RuntimeActorContext
 {
     private readonly IReadOnlyDictionary<string, EntityReference> actors;
-    public RuntimeActorContext(IReadOnlyDictionary<string, EntityReference> values)
+    private readonly bool ambiguousSelf;
+    public RuntimeActorContext(IReadOnlyDictionary<string, EntityReference> values) : this(values, false) { }
+    /// <summary>The same context for a dispatch whose own mount accepted more than one entity: `self` has no single
+    /// answer there, so <see cref="Get"/> refuses it — a step that never reads the role still runs.</summary>
+    internal RuntimeActorContext(IReadOnlyDictionary<string, EntityReference> values, bool ambiguousSelf)
     {
         ArgumentNullException.ThrowIfNull(values);
         RuntimeJson.Require(values.Count <= 5, "actor-budget", "Only the five explicit roles are supported.");
@@ -20,12 +25,25 @@ public sealed class RuntimeActorContext
             ValidateRole(pair.Key); copy.Add(pair.Key, RuntimeEntityReferences.Validate(pair.Value));
         }
         actors = new ReadOnlyDictionary<string, EntityReference>(copy);
+        this.ambiguousSelf = ambiguousSelf;
     }
     internal static void ValidateRole(string role)
-        => RuntimeJson.Require(role is "self" or "source" or "owner" or "instigator" or "event-target",
-            "actor-role", "Unknown actor role.");
+        => RuntimeJson.Require(RuntimeActorRoles.IsRole(role), "actor-role", "Unknown actor role.");
+    /// <summary>The role's actor, or null when the dispatch does not carry it. `self` is the one role that can be
+    /// unreadable rather than absent — a mount that accepted several entities has no single subject — and it is
+    /// refused by name here instead of being reported as a missing role.</summary>
     public EntityReference? Get(string role)
-    { ValidateRole(role); return actors.TryGetValue(role, out var value) ? value : null; }
+    {
+        ValidateRole(role);
+        if (ambiguousSelf && role == "self")
+            throw new RuntimeContractException("actor-ambiguous", "The plan's mount accepted more than one entity for this event.");
+        return actors.TryGetValue(role, out var value) ? value : null;
+    }
+    /// <summary>The role's actor, or a refusal when the event that reached this handler did not carry it. A role a
+    /// contract does not allow to be absent reads itself through here, so the refusal names the role and never looks
+    /// like a missing world entity.</summary>
+    public EntityReference Require(string role)
+        => Get(role) ?? throw new RuntimeContractException("actor-missing", "The event carries no " + role + " actor.");
     public IReadOnlyDictionary<string, EntityReference> Actors => actors;
     public static RuntimeActorContext FromJson(JsonElement input)
     {

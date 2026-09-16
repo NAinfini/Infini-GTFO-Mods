@@ -1,11 +1,12 @@
 using System;
+using System.Linq;
+using System.Text.Json;
 using ForgeRuntime.Framework;
 
 namespace ForgeTrigger.Pure;
 
-public enum ScalarOperation { Add, Subtract, Multiply, Divide, Minimum, Maximum, Power }
+public enum ScalarOperation { Add, Subtract, Multiply, Divide, Minimum, Maximum }
 public enum ScalarComparison { Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual }
-public enum IntervalBoundary { Inclusive, Exclusive }
 public enum ScalarRounding { Floor, Ceiling, Nearest, Truncate }
 /// <summary>The website divide node's structural zero_policy.</summary>
 public enum DivisionZeroPolicy { Reject, Zero, Passthrough }
@@ -26,7 +27,6 @@ public static class ScalarNodes
             ScalarOperation.Divide => Divide(a, b, DivisionZeroPolicy.Reject),
             ScalarOperation.Minimum => Math.Min(a, b),
             ScalarOperation.Maximum => Math.Max(a, b),
-            ScalarOperation.Power => Math.Pow(a, b),
             _ => throw new RuntimeContractException("pure-operation", "Unknown scalar operation.")
         };
         return PureNumbers.Result(value);
@@ -70,27 +70,20 @@ public static class ScalarNodes
         };
         return PureNumbers.Result(rounded);
     }
-
-    public static double Lerp(double a, double b, double weight)
-    {
-        PureNumbers.Input(a); PureNumbers.Input(b); PureNumbers.Probability(weight);
-        // All inputs were validated before preserving an identical endpoint.
-        if (a == b) return PureNumbers.Result(a);
-        // Same weighted-sum order as the authoring preview. No silent weight clamp.
-        return PureNumbers.Result(a * (1d - weight) + b * weight);
-    }
-
-    public static double SelectValue(bool condition, double whenTrue, double whenFalse)
-    {
-        // An unselected input must still satisfy its typed finite-number contract.
-        PureNumbers.Input(whenTrue); PureNumbers.Input(whenFalse);
-        return PureNumbers.Result(condition ? whenTrue : whenFalse);
-    }
 }
 
 /// <summary>Pure predicates; never reads an entity, infers a missing actor or mutates state.</summary>
 public static class PureConditions
 {
+    /// <summary>The value classes the catalog's parameterized comparison orders, in the parameter's own member
+    /// order (`value_type` in `Tools/Forge/capability-rules-query.ts`, whose inline list this repeats because the
+    /// compiled constant indexes it).</summary>
+    public static readonly string[] ValueTypes = { "number", "integer", "string", "entity" };
+
+    /// <summary>The catalog's comparison member names, in the order the C# enum declares them, which is the order
+    /// the `compare_operator` set carries.</summary>
+    public static readonly string[] Operators = { "eq", "ne", "lt", "lte", "gt", "gte" };
+
     /// <summary>Website compare: tolerance widens equality and shifts the ordered comparisons towards acceptance.</summary>
     public static bool Compare(double left, double right, ScalarComparison operation, double tolerance)
     {
@@ -109,16 +102,71 @@ public static class PureConditions
         };
     }
 
-    public static bool InRange(double value, double minimum, double maximum, IntervalBoundary boundary)
+    /// <summary>The typed comparison the catalog's `forge.condition.predicate.compare` row performs: one row for
+    /// the four classes its structural `value_type` parameter offers, so `g-compare` is no longer one row per
+    /// type. `valueType` is the member the plan compiled, `<c>null</c>` when the author left the optional
+    /// parameter unwritten, which resolves to the first member exactly as the contract does.
+    ///
+    /// The numbers use <see cref="Compare(double,double,ScalarComparison,double)"/>, so tolerance keeps its one
+    /// definition. Text compares by ordinal rank, which is what makes `eq` byte equality and the ordering a total
+    /// order; entities compare by identity (id, world epoch, life epoch), which is the identity every other row of
+    /// this vocabulary reads them by. A tolerance a non-numeric member cannot honour, a value of another class, and
+    /// an unknown operator or member are all refused rather than answered as `false`, because a comparison that
+    /// could not be made must not read like a world in which the answer is no.</summary>
+    public static bool Compare(JsonElement left, JsonElement right, ScalarComparison operation, double? tolerance,
+        string? valueType)
     {
-        PureNumbers.Input(value); PureNumbers.Bounds(minimum, maximum);
-        return boundary switch
+        var member = valueType ?? ValueTypes[0];
+        if (!ValueTypes.Contains(member, StringComparer.Ordinal))
+            throw new RuntimeContractException("pure-operation", "Unknown value type member: " + member);
+        if (member == "entity")
         {
-            IntervalBoundary.Inclusive => value >= minimum && value <= maximum,
-            IntervalBoundary.Exclusive => value > minimum && value < maximum,
-            _ => throw new RuntimeContractException("pure-operation", "Unknown interval boundary.")
-        };
+            RequireNoTolerance(tolerance);
+            var first = RuntimeJson.Entity(left); var second = RuntimeJson.Entity(right);
+            var order = string.Equals(first.Id, second.Id, StringComparison.Ordinal) ? first.WorldEpoch.CompareTo(second.WorldEpoch)
+                : string.CompareOrdinal(first.Id, second.Id);
+            if (order == 0) order = first.LifeEpoch.CompareTo(second.LifeEpoch);
+            return Ordered(order, operation);
+        }
+        if (member == "string")
+        {
+            RequireNoTolerance(tolerance);
+            return Ordered(string.CompareOrdinal(Text(left), Text(right)), operation);
+        }
+        var leftNumber = Number(left); var rightNumber = Number(right);
+        // An integer comparison answers about counts, so a non-integral operand is refused rather than truncated:
+        // the frame would otherwise accept a value its own contract says the port never carries.
+        if (member == "integer" && (leftNumber != Math.Truncate(leftNumber) || rightNumber != Math.Truncate(rightNumber)))
+            throw new RuntimeContractException("pure-operation", "An integer comparison requires integral operands.");
+        return Compare(leftNumber, rightNumber, operation, tolerance ?? 0d);
     }
+
+    private static bool Ordered(int order, ScalarComparison operation) => operation switch
+    {
+        ScalarComparison.Equal => order == 0,
+        ScalarComparison.NotEqual => order != 0,
+        ScalarComparison.Less => order < 0,
+        ScalarComparison.LessOrEqual => order <= 0,
+        ScalarComparison.Greater => order > 0,
+        ScalarComparison.GreaterOrEqual => order >= 0,
+        _ => throw new RuntimeContractException("pure-operation", "Unknown comparison operation.")
+    };
+
+    private static void RequireNoTolerance(double? tolerance)
+    {
+        if (tolerance != null)
+            throw new RuntimeContractException("pure-operation", "Only a numeric comparison carries a tolerance.");
+    }
+
+    private static double Number(JsonElement value)
+        => value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number)
+            ? PureNumbers.Input(number)
+            : throw new RuntimeContractException("pure-operation", "A numeric comparison requires numeric operands.");
+
+    private static string Text(JsonElement value)
+        => value.ValueKind == JsonValueKind.String
+            ? value.GetString()!
+            : throw new RuntimeContractException("pure-operation", "A text comparison requires text operands.");
 
     public static bool All(bool a, bool b) => a && b;
     public static bool Any(bool a, bool b) => a || b;
@@ -147,12 +195,5 @@ internal static class PureNumbers
         Input(minimum); Input(maximum);
         if (minimum > maximum)
             throw new RuntimeContractException("pure-reversed-range", "Minimum must not exceed maximum.");
-    }
-
-    internal static void Probability(double value)
-    {
-        Input(value);
-        if (value < 0d || value > 1d)
-            throw new RuntimeContractException("pure-weight-range", "Probability/interpolation weight must be in [0, 1].");
     }
 }

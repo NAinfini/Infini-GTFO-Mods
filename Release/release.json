@@ -46,6 +46,8 @@
       "providerIds": [
         "forge.contract.combat",
         "forge.contract.control",
+        "forge.contract.observation",
+        "forge.contract.trigger",
         "forge.runtime"
       ],
       "version": "1.2.0",
@@ -55,7 +57,8 @@
       ],
       "identity": {
         "csprojs": [
-          "ForgeRuntime/ForgeRuntime.csproj"
+          "ForgeRuntime/ForgeRuntime.csproj",
+          "ForgeRuntime/Framework/ForgeRuntime.Framework.csproj"
         ],
         "plugin": "ForgeRuntime/Plugin.cs",
         "module": null
@@ -106,6 +109,10 @@
       "providerIds": [
         "forge.module.gtfo.map"
       ],
+      "attachmentKinds": [
+        "level",
+        "map-object"
+      ],
       "version": "0.1.0",
       "audience": "player",
       "dependencies": [
@@ -114,6 +121,7 @@
       ],
       "identity": {
         "csprojs": [
+          "ForgeMap/ForgeMap.csproj",
           "ForgeMap/Native/ForgeMap.Native.csproj"
         ],
         "plugin": "ForgeMap/Native/Plugin.cs",
@@ -135,6 +143,9 @@
       "providerIds": [
         "forge.module.gtfo.enemy"
       ],
+      "attachmentKinds": [
+        "enemy-type"
+      ],
       "version": "1.0.0",
       "audience": "player",
       "dependencies": [
@@ -143,6 +154,7 @@
       ],
       "identity": {
         "csprojs": [
+          "ForgeEnemy/ForgeEnemy.csproj",
           "ForgeEnemy/Native/ForgeEnemy.Native.csproj"
         ],
         "plugin": "ForgeEnemy/Native/Plugin.cs",
@@ -161,9 +173,13 @@
       "pluginGuid": "NAinfini.ForgeWeapon",
       "providerId": "forge.module.gtfo.weapon",
       "providerIds": [
-        "forge.module.gtfo.weapon"
+        "forge.module.gtfo.weapon",
+        "forge.module.gtfo.weapon.holder"
       ],
-      "version": "0.1.0",
+      "attachmentKinds": [
+        "gear-block"
+      ],
+      "version": "0.2.0",
       "audience": "player",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.2",
@@ -172,6 +188,7 @@
       ],
       "identity": {
         "csprojs": [
+          "ForgeWeapon/ForgeWeapon.csproj",
           "ForgeWeapon/Native/ForgeWeapon.Native.csproj"
         ],
         "plugin": "ForgeWeapon/Native/Plugin.cs",
@@ -195,6 +212,7 @@
       "audience": "author",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.2",
+        "NAinfini-ForgeMap-0.1.0",
         "NAinfini-ForgeRuntime-1.2.0"
       ],
       "identity": {

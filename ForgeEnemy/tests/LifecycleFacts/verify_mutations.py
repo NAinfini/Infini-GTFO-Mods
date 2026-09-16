@@ -20,6 +20,9 @@ def main() -> int:
     files = list(native.glob('*.cs')) + list((native / 'Observation').glob('*.cs'))
     files += list(Path(__file__).parent.glob('*.cs')) + list((root / 'ForgeEnemy/tests/Shared').glob('*.cs'))
     files += [root / ('ForgeEnemy/tests/NativePlugin/' + name) for name in ['GameDoubles.cs', 'LoaderDoubles.cs']]
+    # Same exclusion as the suite's csproj: the game-load spawn requirement source needs Unity and
+    # GameData references this probe does not carry, and these mutations never touch spawn requirements.
+    files = [p for p in files if p.name != 'EnemySpawnRequirementSource.cs']
     snapshots = {p.name: p.read_bytes() for p in files}
     if len(snapshots) != len(files):
         raise ValueError('Conflicting source names; reconcile the harness before running.')

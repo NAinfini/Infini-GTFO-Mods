@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "verification": "metadata-and-static-native-call-graph-only",
+  "gameExecuted": false,
+  "gameBuild": "20403457",
+  "gameRevision": "34873",
+  "interop": {
+    "used": [
+      { "name": "Modules-ASM.dll", "length": 16777728, "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63",
+        "readWith": "existing local decompilation of the shipped interop assembly (%TEMP%\\covtrigb\\ilspy\\Modules), read-only" }
+    ]
+  },
+  "answer": {
+    "id": "throw-facts",
+    "question": "Where does a thrown item leave the hand, and is there a landing entry that names the Forge item?",
+    "conclusion": [
+      "Gear.ThrowingWeapon declares the release path as a private void body: Throw(float strength), together with CalcThrust(), ResetThrow() and Reset(), and it declares the release state as its own fields m_inThrowCharge, m_inThrowRelease, m_hasThrown, m_throwStrength, m_throwTimer, m_throwChargeTime and m_throwReleaseTime. The type is ItemEquippable, so the thrower is Item.Owner like every other equipment life this package records.",
+      "The throw strength the body receives is a parameter, so the released velocity is not published anywhere by the game: the impulse the weapon is holding is CalcThrust()'s own linear combination of m_throwStrength and the charge timers, and the interop exposes no member that carries the resulting velocity out of the body.",
+      "The thrown object's world side is not one type. GlowstickInstance (Item), GrenadeBase (Item), GlueGrenadeInstance (Item), GlueClusterGrenadeInstance (Item), Decoy (Item) and FlareGunProjectile (Item) are separate item types; GlowstickInstance is the only one of them whose interop declaration carries a landing entry, OnCollisionEnter(Collision col). There is no shared throwable world type and no shared landing body in the image.",
+      "Nothing in the metadata joins a landing body back to the equipment life that released the item: the collision body carries the collision and the thrown object, not the thrower, and the item identity this provider issues is a backpack equipment life, not the thrown object."
+    ],
+    "consequences": [
+      "throw_released is publishable from one private body with the actor read from the item's own Owner; its item port names the equipment life that did the throwing, which is the identity this provider can answer for.",
+      "throw_landed is not publishable: the fact's item port is a required entity port and the only landing entry the image has cannot name a Forge item. The port is declared as the catalog declares it, and no landing fact is published rather than a fact carrying an invented item."
+    ]
+  },
+  "methods": [
+    {
+      "id": "throw-release",
+      "assembly": "Modules-ASM.dll",
+      "type": "Gear.ThrowingWeapon",
+      "typeFull": "Gear.ThrowingWeapon",
+      "name": "Throw",
+      "interopDeclaration": "private void Throw(float strength)",
+      "patchShape": "HarmonyPostfix with __instance and strength",
+      "grounds": [
+        "The interop declares Throw as a private method token on ThrowingWeapon (NativeMethodInfoPtr_Throw_Private_Void_Single_0) and declares m_hasThrown, m_throwStrength, m_inThrowCharge, m_inThrowRelease, m_throwTimer, m_throwChargeTime and m_throwReleaseTime as its own fields.",
+        "ThrowingWeapon : ItemEquippable : Item, and Item declares the Owner property (PlayerAgent), which is the same owner read every other weapon fact in this package already performs."
+      ],
+      "fact": "forge.trigger.equipment.throw_released, published after the body ran, with actor resolved from the item's own owner and the released velocity derived as written below."
+    },
+    {
+      "id": "throw-object-motion",
+      "assembly": "Modules-ASM.dll",
+      "type": "Gear.ThrowingWeapon",
+      "typeFull": "Gear.ThrowingWeapon",
+      "name": "MoveThrowObj",
+      "interopDeclaration": "private void MoveThrowObj(float progressRel, Vector3 moveStart, Vector3 moveTarget, Quaternion rotStart, Quaternion rotTarget)",
+      "patchShape": "not patched",
+      "grounds": ["Declared on the same type; it moves the held throw object between poses and takes no throw state out."],
+      "fact": "recorded only: it shows the release is the transition out of the held poses, which is why the release body is the observation point and the held-object motion is not."
+    },
+    {
+      "id": "throw-landing-glowstick",
+      "assembly": "Modules-ASM.dll",
+      "type": "Gear.GlowstickInstance",
+      "typeFull": "Gear.GlowstickInstance",
+      "name": "OnCollisionEnter",
+      "interopDeclaration": "private void OnCollisionEnter(Collision col)",
+      "patchShape": "not patched",
+      "grounds": [
+        "The interop declares OnCollisionEnter on GlowstickInstance (a class derived from Item) and on GlowStick, Decoy, GrenadeBase, GlueGrenadeInstance, FlareGunProjectile, FogRepellerInstance, GlueClusterPellet and ShellCasing — separate types with no shared throwable base.",
+        "The body would give the collision, i.e. the contact point and the surface collider, which is exactly the position and surface pair the catalog row wants."
+      ],
+      "fact": "unimplemented: the collision names the thrown object, not the equipment life that released it, and no member of the image maps one to the other. The surface port's evidence gap is stated in the row note below."
+    }
+  ],
+  "derivations": [
+    {
+      "id": "throw-velocity",
+      "fact": "throw_released.velocity",
+      "formula": "velocity = the released item's own forward direction times m_throwStrength, read after the body ran.",
+      "why": "the game hands the body a strength parameter and keeps the accumulated charge in m_throwStrength; the direction the held object is aimed along is the item transform's forward. This is a derivation and not a native velocity, which is why it is written here rather than assumed silently. A non-finite result leaves the port out (the port is required, so no other port is affected)."
+    }
+  ],
+  "unverified": [
+    { "id": "throw-release-byte-state", "statement": "Whether the release is also observable as a field flip (m_hasThrown / m_inThrowRelease) rather than only as the body running.", "reason": "Both fields exist and are settable, but the interop exposes no body, so the moment they flip relative to the Throw body is not in the metadata.", "whatWouldSettleIt": "A decompilation of the native Throw / Update bodies, or a runtime probe logging both fields at each Update." },
+    { "id": "thrown-world-instance-identity", "statement": "How a thrown object's world instance is created and whether anything in the image links it to the releasing equipment life.", "reason": "The throw bodies hand off to the replication path; no interop member on ThrowingWeapon or on the throwable item types carries a back-reference to the thrower.", "whatWouldSettleIt": "A decompilation of the native Throw body's spawn call, or a runtime trace correlating the releasing weapon with the created instance." },
+    { "id": "throw-surface-material", "statement": "Whether the game exposes a surface material value for a landing, and in what spelling.", "reason": "The catalog declares surface as a nullable resource port named by resourceKind material with schema forge.resource.material; no member in the image returns a material resource, and the module has no material resource kind registered.", "whatWouldSettleIt": "A native body that maps a collider's surface to a datablock id, plus a material resource kind registered in the runtime." }
+  ],
+  "limits": [
+    "No claim about runtime behaviour: nothing here was executed.",
+    "The release velocity is a derived value, not a value the game publishes; it is marked as a derivation so it can be reviewed instead of being read as a native fact.",
+    "The landing entry found on GlowstickInstance is one family's body; other thrown items may land through bodies this read did not enumerate."
+  ]
+}

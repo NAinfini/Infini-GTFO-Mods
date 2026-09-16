@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "purpose": "forge-map-player-health-evidence",
+  "verification": "metadata-and-static-native-body-decode-only",
+  "gameVerified": false,
+  "gameVerifiedNote": "Interop metadata from the Forge-MapEditor-QA profile, dump.cs of the same build and a read-only x64 decode of GameAssembly.dll. No method was invoked, no hook was installed and no game was started, so every claim below is about the compiled body, not about a running session.",
+  "buildId": "20403457",
+  "gameAssemblySha256": "C6A5C3CD8CA5FE2A8C1A71A3D107663E8CBF01404820DBBDA2EA10C4BFD7BF55",
+  "dumpSha256": "BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC",
+  "codeSection": "il2cpp",
+  "assemblies": [
+    { "file": "Modules-ASM.dll", "sha256": "E499B9C0EB1FA4F1C4194B13163CE1932355AD20C04C424FE4661F8EEF736D63", "mvid": "6d066008-28db-4edf-9c0e-df9db732560d" },
+    { "file": "SNet_ASM.dll", "sha256": "6DAD116887A975508B6DB3843C0BECA31874E4F7AFB7C3D6E65D1BE3EDCF9B2C", "mvid": "143acd09-f561-44d0-9455-a78706262fb5" }
+  ],
+  "scope": "The player health receiver ForgeMap commits through: PlayerAgent.Damage, the Dam_PlayerDamageBase hierarchy, the one absolute-health write entry, and what the receive path refuses. The reads the adapter performs are registered in evidence/map-hooks.json (player-agent-damage, player-health, player-health-max, player-health-setup, player-damage-owner, player-agent-alive); this document is the write entry's own evidence and the semantics the action layer stands on.",
+
+  "writeEntries": [
+    { "id": "player-health-write-entry",
+      "member": "System.Void Dam_SyncedDamageBase::SendSetHealth(System.Single)",
+      "declaredBy": "Dam_SyncedDamageBase",
+      "calledThrough": "Dam_PlayerDamageBase",
+      "dumpLine": 546034,
+      "rva": "0x161F790",
+      "inherited": "Dam_PlayerDamageBase (dump.cs 544830) declares no SendSetHealth, SendLocally or SendPacket of its own; the player class carries ReceiveSetHealth, ReceiveAddHealth and OnRevive overrides only, so the one write entry is the base declaration.",
+      "body": {
+        "hostGate": "`mov rax,[SNet]; mov rax,[rax+0B8h]; cmp byte ptr [rax+0B9h],0` at +0x97..+0xA5; a zero master flag branches to the reporting path at RVA 0x161F899, which calls 0x1DDC1F0 and returns without applying anything.",
+        "quantize": "the master path encodes the submitted value against HealthMax (`movss xmm2,[this+1Ch]`, `call 0x181BB5B00`) into a 16-bit field, so the value the receiver stores is a quantization of the submitted one.",
+        "submit": "the encoded value is sent through 0x181633510 and then handed to the receiver's own virtual receive through the class method pair at +0x3C0 (slot 41, `ReceiveSetHealth`) on the same machine.",
+        "meaning": "one entry both replicates and applies: the host quantizes, broadcasts the packet and applies locally; a client that reached it would only take the reporting branch."
+      } },
+    { "id": "player-add-health-entry",
+      "member": "System.Void Dam_PlayerDamageBase::ReceiveAddHealth(pAddHealthData)",
+      "declaredBy": "Dam_PlayerDamageBase",
+      "dumpLine": 544971,
+      "rva": "0x16172F0",
+      "slot": 44,
+      "body": "host-gated the same way; decodes the packet's delta against HealthMax (`call 0x181BB5AE0`), adds the receiver's current health, clamps the sum against HealthMax (`call 0x180F01680`), stores it and then calls Dam_SyncedDamageBase::SendSetHealth with the absolute result.",
+      "meaning": "the game's own heal path is a delta wrapper that ends in the same absolute write entry, which is why the action layer declares no second entry: submitting the absolute value through SendSetHealth is what the game does after its own clamp."
+    }
+  ],
+
+  "receiveSemantics": {
+    "playerReceiveSetHealth": {
+      "member": "System.Void Dam_PlayerDamageBase::ReceiveSetHealth(pSetHealthData)",
+      "declaredBy": "Dam_PlayerDamageBase",
+      "dumpLine": 544974,
+      "rva": "0x1617CD0",
+      "slot": 41,
+      "body": "reads the receiver's Owner (field +0xF0); a null owner returns without storing. Otherwise it calls the owner's virtual slot 11 (`PlayerAgent::get_Alive`, RVA 0xCAD190, a byte read at +0xD0 of the agent) and a false answer returns without storing. Only then does it decode the 16-bit value against HealthMax (`call 0x181BB5AE0`) and store it at +0x20, followed by its own state notifications.",
+      "meaning": "a dead player cannot be written to, and a receiver without an owner cannot either. The player domain's `not-alive` refusal is this same condition checked before anything is submitted, and no health write can revive: reviving is the separate OnRevive flow (RVA 0x1617230, slot 66), which this adapter never calls."
+    },
+    "setup": {
+      "member": "System.Void Dam_PlayerDamageBase::Setup(PlayerAgent)",
+      "dumpLine": 544884,
+      "rva": "0x1618690",
+      "body": "writes Health = HealthMax, sets IsSetup (+0x24) to 1, stores the agent in Owner (+0xF0) and writes m_onlyToMaster (+0x25) as (DamageBaseOwner == 1); it then reads HealthMax from the agent's own data.",
+      "meaning": "an un-set-up receiver holds no meaningful health state, which is why the adapter refuses one instead of reading it."
+    }
+  },
+
+  "fieldOffsets": {
+    "damageBase": [
+      { "field": "HealthMax", "offset": "0x1C", "declaredBy": "Dam_SyncedDamageBase" },
+      { "field": "Health", "offset": "0x20", "declaredBy": "Dam_SyncedDamageBase" },
+      { "field": "IsSetup", "offset": "0x24", "declaredBy": "Dam_SyncedDamageBase" },
+      { "field": "m_onlyToMaster", "offset": "0x25", "declaredBy": "Dam_SyncedDamageBase" },
+      { "field": "m_setHealthPacket", "offset": "0x40", "declaredBy": "Dam_SyncedDamageBase" },
+      { "field": "Owner", "offset": "0xF0", "declaredBy": "Dam_PlayerDamageBase" }
+    ]
+  },
+
+  "facts": [
+    { "id": "single-write-entry", "claim": "A player's absolute health has exactly one write entry, Dam_SyncedDamageBase.SendSetHealth, shared with the game's own heal path.", "basis": "Dam_PlayerDamageBase declares no writer; ReceiveAddHealth clamps and calls that entry" },
+    { "id": "host-only", "claim": "The entry applies nothing on a client.", "basis": "the master-flag branch in its own body; the branch target only reports" },
+    { "id": "dead-cannot-be-healed", "claim": "A dead player's health is never stored by the receive path.", "basis": "the Owner.Alive guard in the player's ReceiveSetHealth override" },
+    { "id": "downed-is-alive", "claim": "A downed player is a legal recipient in this model.", "basis": "PlayerAgent.Alive stays true while PlayerLocomotion reports Downed (evidence/player-observation.json); the receive path consults Alive alone" },
+    { "id": "readback-decides", "claim": "The committed amount is the receiver's readback, never the requested amount.", "basis": "the entry quantizes against HealthMax and applies through the receiver's own virtual call, so the stored value can differ from the submitted one" },
+    { "id": "no-revive", "claim": "Committing health does not revive anyone.", "basis": "the write path stores a value and notifies; reviving is Dam_PlayerDamageBase.OnRevive, a different flow this adapter never calls" }
+  ],
+
+  "unverified": [
+    { "id": "runtime-order", "question": "Whether the quantized value actually lands and how a live session's readback settles after the packet round-trip.", "why": "no game execution and no host/client pair; the adapter therefore reports only what its own readback shows and never the requested amount" },
+    { "id": "late-join-replay", "question": "How the set-health channel behaves for a client that joins after the write.", "why": "the packet is the game's own; no session was observed" },
+    { "id": "downed-machine", "question": "Whether a health write to a downed player also moves the locomotion machine.", "why": "the receive path stores health and runs its own notifications; whether the downed state reacts to the value is not established, and the action layer does not claim it" },
+    { "id": "healer-tools", "question": "Which native healer tools call ReceiveAddHealth versus another path.", "why": "only the two entries' bodies were decoded; the callers of ReceiveAddHealth were not enumerated" }
+  ],
+
+  "gameVerificationPlan": [
+    "In an installed profile, heal a player at low health and confirm the result row's amount matches the health delta shown by the game.",
+    "Heal a dead player and confirm the command is rejected with `not-alive` and no health changes.",
+    "Heal a downed player and confirm health changes while the downed state itself is untouched.",
+    "Heal from a client and confirm the command is rejected with `authority-or-phase` and nothing is applied."
+  ],
+
+  "limits": [
+    "No native invocation, no game execution, no multiplayer and no host/client pair was exercised",
+    "The decode proves instruction shapes at the frozen RVAs of this build; the RVA-to-method binding comes from dump.cs of the same build",
+    "The action layer's result rows and refusal codes are covered by the managed tests, not by this document"
+  ]
+}

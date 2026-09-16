@@ -38,6 +38,7 @@ internal sealed class RecordFixture
             limits ?? new RuntimeLimits(), Sink, runtimeLevel);
         // A kernel without a sink keeps no level table, so a module level is whatever the fixture was asked to run at.
         var moduleLevel = runtimeLevel == RuntimeLogLevel.Off ? RuntimeLogLevel.Off : RuntimeLogLevel.Info;
+        Kernel.RegisterModule(LevelMount(), RuntimeLogLevel.Off);
         Trigger = Kernel.RegisterModule(TriggerModule(), moduleLevel);
         Action = Kernel.RegisterModule(ActionModule(), moduleLevel);
         SecondAction = Kernel.RegisterModule(SecondActionModule(), moduleLevel);
@@ -59,6 +60,24 @@ internal sealed class RecordFixture
 
     internal readonly record struct ActionDefinition(string CapabilityId, string Kind, string Execution, string Wiring);
 
+    /// <summary>Every fixture plan mounts the whole level, and no mount kind belongs to the kernel any more: the
+    /// provider that owns the kind has to be registered before the plan loads. This double owns it and answers the
+    /// one reference the fixture plans carry, so the record points stay observable without a domain provider.</summary>
+    private static RuntimeModule LevelMount() => new(RuntimeKernel.ApiVersion,
+        RuntimeJson.From(new
+        {
+            providers = new[] { new { id = "test.records.level", kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
+            capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()
+        }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>())
+    {
+        AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>
+        {
+            ["level"] = AttachmentMatcherRegistration.ByScope((category, reference) => category == null && reference == LevelReference)
+        }
+    };
+    private const string LevelReference = "test.records.level";
+    private static readonly object[] Attachments = { new { kind = "level", reference = LevelReference } };
+
     /// <summary>One plan: a trigger entry whose entity output feeds a parameterless action, and a second entry behind its
     /// own trigger whose first action a test can fail while a successor step owned by another provider is still unexecuted.
     /// The two entries use different trigger bindings, so a test publishes to exactly one of them.</summary>
@@ -76,11 +95,11 @@ internal sealed class RecordFixture
         object[] ActionInputs() => new object[] { new { slot = 1, fromEventSlot = 1 }, new { slot = 2, value = 3 } };
         return RuntimeJson.From(new
         {
-            schemaVersion = 3, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
+            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
             runtime = Kernel.Identity, domain = "logic", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = Array.Empty<string>(), dependencies = Array.Empty<string>(),
             limits = new { maxEventsPerTick, maxCommandsPerTick, maxQueuedEvents, maxCausalDepth = 4 },
-            bindings = pins,
+            bindings = pins, attachments = Attachments,
             entrypoints = new object[]
             {
                 new { nodeId = "A", binding = Index(pins, TriggerBinding), layout = triggerLayout, start = 0, steps = new object[]
@@ -103,7 +122,7 @@ internal sealed class RecordFixture
 
     internal RuntimeEvent Event(string eventId, string binding = TriggerBinding, long tick = 1)
         => new(eventId, binding, Kernel.WorldEpoch, tick, "test.records.scope",
-            RuntimeJson.From(new { target = Target(Kernel.WorldEpoch) }), Target(Kernel.WorldEpoch));
+            RuntimeJson.From(new { target = Target(Kernel.WorldEpoch) }));
 
     /// <summary>Starts the runtime with the one plan loaded, then advances once so the kernel is ready to dispatch.</summary>
     internal void Start(string planId = "test.records.plan", int maxEventsPerTick = 8, int maxCommandsPerTick = 8, int maxQueuedEvents = 8)
@@ -120,11 +139,15 @@ internal sealed class RecordFixture
 
     internal RuntimeLogRecord[] AdvanceAndCollect(string eventId, string binding = TriggerBinding, long tick = 1)
     {
-        var dispatch = Trigger.Publish(Event(eventId, binding, Math.Max(0, Kernel.CurrentTick)));
+        // The kernel only accepts an event from the provider that owns the binding, and the second entry's trigger
+        // belongs to the second package.
+        var dispatch = Owner(binding).Publish(Event(eventId, binding, Math.Max(0, Kernel.CurrentTick)));
         if (dispatch.Status != "queued") throw new Exception("publish refused: " + dispatch.Code);
         Kernel.Advance(tick, true);
         return Sink.Records.ToArray();
     }
+
+    private RuntimeModuleHandle Owner(string binding) => binding == SecondTriggerBinding ? SecondAction : Trigger;
 
     private object Pin(string bindingId)
     {
@@ -158,6 +181,19 @@ internal sealed class RecordFixture
     private static object Slots(JsonElement resolved, string side)
         => LayoutOf.Invoke(null, new object[] { resolved, side })!;
 
+    /// <summary>The fixture result schema's row: the four shared columns in their fixed order, then the amount the
+    /// action applied and the number of targets it reached. Nothing writes a row here — the declared shape is what
+    /// makes the capability registrable, and the same shape covers all three action capabilities.</summary>
+    private static readonly object[] ResultFields =
+    {
+        new { id = "target", type = "entity" },
+        new { id = "status", type = "enum", schema = "execution_outcome" },
+        new { id = "committed", type = "enum", schema = "commit_state" },
+        new { id = "code", type = "string" },
+        new { id = "amount", type = "number", unit = "hp" },
+        new { id = "target_count", type = "integer" }
+    };
+
     private static object Graph(string kind, string executionPort)
     {
         if (kind != "action")
@@ -174,7 +210,8 @@ internal sealed class RecordFixture
             ["domains"] = new[] { "logic" }, ["execution"] = "host",
             ["inputs"] = new object[] { new { id = "in", type = "execution" }, new { id = "target", type = "entity" },
                 new { id = "amount", type = "number" } },
-            ["outputs"] = new object[] { new { id = executionPort, type = "execution" }, new { id = "outcome", type = "result", schema = "test.result" } },
+            ["outputs"] = new object[] { new { id = executionPort, type = "execution" },
+                new { id = "outcome", type = "result", schema = "test.result", fields = ResultFields } },
             ["parameters"] = Array.Empty<object>(),
             ["recipients"] = new { input = "target", target = "entity", cardinality = "one", requires = Array.Empty<string>(), result = "outcome" }
         };
@@ -212,6 +249,9 @@ internal sealed class RecordFixture
             capabilities, bindings
         }).GetRawText(), handlers, bindings.Select(b => new BindingSupport(b.id, "implementation-only", Array.Empty<string>())).ToArray())
         {
+            // Both doubles answer the whole command without reading a port, so their shapes declare none.
+            Shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
+            { ["test.action"] = new HandlerShape(), ["test.fail"] = new HandlerShape() },
             // The plan wires an entity from the trigger event into the action, so the kernel resolves it through the
             // entity reference contract: this namespace is what makes such an input valid.
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
@@ -243,7 +283,6 @@ internal sealed class RecordFixture
         new[] { new BindingSupport(SecondActionBinding, "implementation-only", Array.Empty<string>()),
             new BindingSupport(SecondTriggerBinding, "implementation-only", Array.Empty<string>()) })
     {
-        EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
-        { ["test.entity"] = reference => reference.Id == Target(reference.WorldEpoch).Id }
+        Shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal) { ["test.second"] = new HandlerShape() }
     };
 }

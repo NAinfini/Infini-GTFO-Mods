@@ -53,9 +53,6 @@ public static class ReferenceCollections
         SelectionCount(count); var snapshot = Snapshot(candidates);
         return Slice(Permuted(snapshot, seed), snapshot.Length, count);
     }
-    /// <summary>Website count: the distinct candidate count compared with an integer value, without tolerance.</summary>
-    public static bool CountMatches(IReadOnlyList<EntityReference> candidates, ScalarComparison operation, long value)
-        => PureConditions.Compare(Unique(Snapshot(candidates)).Count, value, operation, 0d);
     /// <summary>The website selector's structural empty policy. Fail rejects an empty result; skip only tells a
     /// downstream scheduler to skip work, so the selected value itself stays empty.</summary>
     public static IReadOnlyList<EntityReference> ApplyEmptyPolicy(IReadOnlyList<EntityReference> selected, EmptySelectionPolicy policy)

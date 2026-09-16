@@ -52,7 +52,7 @@ internal static class CommitCases
             SFloat16.Preview = (v, _) => { s.Actor.Damage.Health = 90; return v; }; var r = s.Heal();
             Audit.Require(r.CommitState == CommitStates.None && s.Actor.Damage.Sends == 0, AuditScene.Describe(r, s.Actor.Damage.Sends)); });
 
-        // r11: a full-health target commits with actual==0 and produces no fact; combined with a rejected target,
+        // A full-health target commits with actual==0 and produces no fact; combined with a rejected target,
         // at least one row still committed, so the handler reports Partial/Confirmed with possibly-empty facts,
         // not Rejected/None (the deleted heal-no-state-change code no longer exists).
         Audit.Case("heal.multi-full-and-rejected-is-partial-confirmed", () =>
@@ -64,7 +64,7 @@ internal static class CommitCases
             Audit.Require(r.Status == "partial" && r.CommitState == CommitStates.Confirmed
                 && r.Facts.Count == 0 && AuditScene.Rows(r).Length == 2, AuditScene.Describe(r, s.Actor.Damage.Sends));
         });
-        // r11: a full-health target contributes no fact; combined with a target whose commit becomes unknown, at
+        // A full-health target contributes no fact; combined with a target whose commit becomes unknown, at
         // least one row still committed, so the handler reports Partial/Unknown rather than Failed/Unknown.
         Audit.Case("heal.multi-full-and-unknown-is-partial-unknown", () =>
         {

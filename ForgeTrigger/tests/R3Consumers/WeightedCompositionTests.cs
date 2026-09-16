@@ -3,7 +3,9 @@ using ForgeRuntime.Framework;
 using ForgeTrigger.Pure;
 using ForgeTrigger.Targeting;
 
-// A real public-SDK composition using synthetic observations, never a gameplay commit.
+// A real public-SDK composition using synthetic observations, never a gameplay commit: the relation filter narrows
+// an explicit candidate set, the weighted sampler draws from what survived, and the receiver check is the explicit
+// action-side question. Each stage is the existing algorithm; nothing here is a second implementation.
 internal static class WeightedCompositionTests
 {
     internal static void Run(Action<bool,string> check)
@@ -12,37 +14,42 @@ internal static class WeightedCompositionTests
         RuntimeEntitySnapshot Snapshot(string id, string kind, string faction, long life = 1, bool health = true)
             => new(new EntityReference(id,1,life), kind, faction, "alive", Array.Empty<string>(),
                 health ? receivers : Array.Empty<string>(), new[] {0d,0d,0d});
-        var owner = Snapshot("test.luck:owner", "enemy", "blue");
-        var source = Snapshot("test.luck:source", "player", "red");
+        var self = Snapshot("test.luck:self", "deployable", "blue");
         var ally = Snapshot("test.luck:ally", "enemy", "blue");
         var hostile = Snapshot("test.luck:hostile", "player", "red");
         var decoy = Snapshot("test.luck:decoy", "enemy", "red", health:false);
-        using var world = new ObservationWorld(new[] {owner,source,ally,hostile,decoy});
+        using var world = new ObservationWorld(new[] {self,ally,hostile,decoy});
         var kernel = world.Kernel;
-        var actors = new RuntimeActorContext(new Dictionary<string,EntityReference>
-            { ["owner"]=owner.Ref, ["source"]=source.Ref });
         var relations = new RuntimeFactionRelations(new RuntimeFactionRelation[]
-            { new("blue","blue","ally"), new("blue","red","hostile"), new("red","blue","ally") });
-        JsonElement Policy(string relation) => RuntimeJson.From(new {schemaVersion=1,anchor="owner",kinds="any",
-            relations=new[] {relation},lifeStates=new[] {"alive"},requireTags=Array.Empty<string>(),
-            excludeTags=Array.Empty<string>(),sort="stable-id",maxTargets=16});
+            { new("blue","blue","ally"), new("blue","red","hostile") });
         var candidates = new[] {decoy.Ref,hostile.Ref,ally.Ref,hostile.Ref};
-        foreach (var receiver in receivers)
-        foreach (var relation in new[] {"ally","hostile"})
+        var session = world.Session();
+        // The decoy is the same faction as the hostile and carries only the damage receiver. The relation filter
+        // keeps it — the row declares no receiver requirement at all — and the receiver question is asked later, by
+        // the action that consumes the references, which is exactly the separation this composition is here to show.
+        foreach (var (relation, names) in new (string, string[])[]
+            { ("ally", new[]{"ally"}), ("hostile", new[]{"decoy","hostile"}) })
         {
-            var expected = relation=="ally" ? ally.Ref : hostile.Ref;
-            var filtered = ObservedRecipientFilter.Select(kernel,candidates,actors,relations,Policy(relation),new[] {receiver});
-            check(filtered.Selected.SequenceEqual(new[] {expected}), "weighted composition explicit relation/receiver "+relation+" "+receiver);
+            var expected = names.Select(name => name == "ally" ? ally.Ref : name == "decoy" ? decoy.Ref : hostile.Ref).ToArray();
+            var filtered = ObservedRecipientFilter.Select(session,candidates,self.Ref,relations,
+                RecipientFilterRequest.Read(relation));
+            check(filtered.Selected.SequenceEqual(expected), "filtered relation names exactly the "+relation+" targets");
+            check(ObservedSpaceNodes.Filter(session,candidates,self.Ref,relations,RecipientFilterRequest.Read("self")).Count==0,
+                "the composition's own instance is not answered as an ally or a hostile of itself");
             var observations = world.Observations;
             var weights = filtered.Selected.Select(target=>new WeightedCandidate(target,3)).ToArray();
             var selected = WeightedSampling.Sample(weights,5,42,WeightedSamplingMode.WithoutReplacement);
-            check(selected.Selected.SequenceEqual(new[] {expected}) && selected.UnfilledCount==4,
+            check(selected.Selected.SequenceEqual(expected) && selected.UnfilledCount==5-expected.Length,
                 "filtered weighted shortfall is not a five-target commit");
             check(world.Observations==observations, "pure weighting does not invent extra world queries");
-            var current = ObservedEntityNodes.RequireReceivers(kernel,selected.Selected,receiver);
-            check(current.Count==1 && current[0].Ref==expected, "selected occurrence passes explicit fresh receiver check");
+            // The receiver requirement is the action's own question, asked on the references the plan actually
+            // carries, and it is asked separately from the filter: the filter row declares no such parameter.
+            check(ObservedEntityNodes.RequireReceivers(kernel,selected.Selected.Where(row=>row!=decoy.Ref).ToArray(),
+                    receivers[0]).Count>0,
+                "the references that carry the receiver pass the action's own check");
+            Reject("receiver-unsupported",()=>ObservedEntityNodes.RequireReceivers(kernel,new[] {decoy.Ref},receivers[0]));
             var repeated = WeightedSampling.Sample(weights,5,42,WeightedSamplingMode.WithReplacement);
-            check(repeated.SelectedCount==5 && repeated.Selected.Distinct().Count()==1,
+            check(repeated.SelectedCount==5 && repeated.Selected.Distinct().Count()==expected.Length,
                 "with-replacement preserves occurrences rather than inventing five entities");
         }
         void Reject(string code, Action action)
@@ -50,8 +57,6 @@ internal static class WeightedCompositionTests
             try { action(); check(false,"weighted composition accepted "+code); }
             catch (RuntimeContractException error) { check(error.Code==code,"weighted composition rejected "+code); }
         }
-        var sourceOnly = new RuntimeActorContext(new Dictionary<string,EntityReference> { ["source"]=source.Ref });
-        Reject("actor-missing",()=>ObservedRecipientFilter.Select(kernel,candidates,sourceOnly,relations,Policy("hostile"),receivers));
         var chosen = WeightedSampling.Sample(new[] {new WeightedCandidate(hostile.Ref,1)},1,7,WeightedSamplingMode.WithoutReplacement);
         var before = world.Observations;
         Reject("weighted-entropy-budget",()=>WeightedSampling.Sample(new[] {
@@ -62,9 +67,8 @@ internal static class WeightedCompositionTests
         Reject("receiver-unsupported",()=>ObservedEntityNodes.RequireReceivers(kernel,chosen.Selected,receivers[0]));
         check(chosen.Selected[0]==hostile.Ref, "old selection is immutable but not a lasting receiver permission");
         world.Entities[hostile.Ref.Id] = Snapshot(hostile.Ref.Id,"player","blue");
-        var changed = ObservedRecipientFilter.Select(kernel,chosen.Selected,actors,relations,Policy("hostile"),receivers);
-        check(changed.Selected.Count==0 && changed.Excluded.Single().Code=="relation-filter",
-            "current relation is rechecked even without a life change");
+        var changed = ObservedRecipientFilter.Select(session,chosen.Selected,self.Ref,relations,RecipientFilterRequest.Read("hostile"));
+        check(changed.Selected.Count==0, "current relation is rechecked even without a life change");
         var empty = WeightedSampling.Sample(changed.Selected.Select(r=>new WeightedCandidate(r,1)).ToArray(),
             5,42,WeightedSamplingMode.WithReplacement);
         check(empty.SelectedCount==0 && empty.Code=="no-positive-weight", "empty filtered pool cannot fall back to unfiltered targets");
@@ -75,7 +79,8 @@ internal static class WeightedCompositionTests
             "new life requires an explicitly new reference");
         check(kernel.LoadedPlans==0 && kernel.QueuedEvents==0, "selection and revalidation are never gameplay commits");
         kernel.BeginWorld(2); kernel.Advance(0,true);
-        Reject("entity-query-incomplete",()=>ObservedRecipientFilter.Select(kernel,new[] {currentLife},actors,relations,Policy("hostile"),receivers));
+        Reject("entity-query-incomplete",()=>ObservedRecipientFilter.Select(world.Session(),new[] {currentLife},self.Ref,
+            relations,RecipientFilterRequest.Read("hostile")));
         check(kernel.QueuedEvents==0, "world transition cannot turn sampled references into queued effects");
     }
 }
