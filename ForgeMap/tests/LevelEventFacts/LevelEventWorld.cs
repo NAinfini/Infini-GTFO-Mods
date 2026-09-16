@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using ForgeMap;
+using ForgeMap.Tests.Support;
 using ForgeRuntime.Framework;
 
 namespace ForgeMap.Tests.LevelEventFacts;
@@ -39,9 +40,18 @@ internal sealed class LevelEventWorld : IDisposable
     internal static LevelEventWorld Start(long worldEpoch = 1)
     {
         var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        // The control module owns the one step every entrypoint needs, so it registers before the plans below are
+        // mounted; the trigger rows are their own contract's, registered beside this provider the way the host
+        // registers its built-in providers (ruling 148.3).
+        kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         var registration = kernel.RegisterModule(Definition(), RuntimeLogLevel.Off);
         kernel.BeginWorld(worldEpoch);
+        // The observation point these cases assert on is the module's own publication, before the kernel queues
+        // anything, so the module needs a subscriber for every trigger binding it publishes under — its own gate
+        // is what decides whether an event is built at all. `claim` stays false: the events themselves reach no
+        // plan, which is what keeps a case asserting "this reached nobody" honest.
+        SubscriptionGateFixture.Open(kernel, registration);
         kernel.StartRuntime(static () => { });
         kernel.Advance(0, true);
         return new LevelEventWorld(kernel, registration, new LevelEventModule(kernel, registration, _ => { }));

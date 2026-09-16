@@ -238,7 +238,7 @@ try
         ("unknown-root", "{\"format\":\"gtfo-forge-project\",\"projectId\":\"p\",\"notes\":\"x\"}", "an unknown root field rejects the manifest"),
         ("duplicate-root", "{\"format\":\"gtfo-forge-project\",\"projectId\":\"p\",\"projectId\":\"q\"}", "a duplicate root field rejects the manifest"),
         ("missing-root", "{\"format\":\"gtfo-forge-project\",\"projectId\":\"p\"}", "a missing root field rejects the manifest"),
-        ("wrong-format", "{\"format\":\"gtfo-forge-project-v1\",\"projectId\":\"p\"}", "another project format is rejected"),
+        ("wrong-format", "{\"format\":\"gtfo-forge-project-other\",\"projectId\":\"p\"}", "another project format is rejected"),
         ("unknown-experiment", "{\"format\":\"gtfo-forge-project\",\"projectId\":\"p\",\"experiment\":{\"packageVersion\":\"1\",\"authoringSha256\":\"" + new string('a', 64) + "\",\"dependencies\":[],\"channel\":\"beta\"}}", "an unknown experiment field rejects the manifest"),
         ("comments", "{\"format\":\"gtfo-forge-project\",/*note*/\"projectId\":\"p\"}", "JSON comments are rejected"),
         ("trailing-comma", "{\"format\":\"gtfo-forge-project\",\"projectId\":\"p\",}", "trailing commas are rejected"),

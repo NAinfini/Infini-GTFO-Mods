@@ -184,7 +184,7 @@ internal static class Fixture
         GameData.GameDataBlockBase<GameData.SurvivalWavePopulationDataBlock>.Reset();
     }
 
-    /// <summary>One live registration of this slice's own five rows, and the native half attached to it. A handle
+    /// <summary>One live registration of this slice's own three rows, and the native half attached to it. A handle
     /// is a pool slot of a registered provider, so the start rows can only publish one on a world that has this;
     /// the rows and the handler table are the contract's own, which is what makes the rows under test the rows
     /// the runtime would resolve.</summary>
@@ -203,8 +203,6 @@ internal static class Fixture
         var module = new RuntimeModule(RuntimeKernel.ApiVersion, registry.GetRawText(),
             new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
             {
-                [AlarmWaveContract.AlarmStartHandler] = AlarmWaveActions.ExecuteStartAlarm,
-                [AlarmWaveContract.AlarmStopHandler] = AlarmWaveActions.ExecuteStopAlarm,
                 [AlarmWaveContract.ScanStartHandler] = AlarmWaveActions.ExecuteStartScan,
                 [AlarmWaveContract.WaveStartHandler] = AlarmWaveActions.ExecuteStartWave,
                 [AlarmWaveContract.WaveStopHandler] = AlarmWaveActions.ExecuteStopWave

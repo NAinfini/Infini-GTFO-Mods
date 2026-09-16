@@ -37,7 +37,11 @@ internal sealed partial class EnemyModule
     internal Dictionary<string, CommandHandler> ActionFamilyHandlers()
     {
         var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal);
-        foreach (var handler in EnemyControlContract.Handlers(this)) handlers[handler.Key] = handler.Value;
+        // The control family's handler names are its declaration's, in the game-independent assembly; this half
+        // supplies the one body per name it declares.
+        handlers[EnemyControlContract.AwakenHandler] = Awaken;
+        handlers[EnemyControlContract.SleepHandler] = Sleep;
+        handlers[EnemyControlContract.MoveToHandler] = MoveTo;
         handlers[EnemyCombatContract.StaggerHandler] = Stagger;
         handlers[EnemyCombatContract.AttackInterruptHandler] = AttackInterrupt;
         handlers[GlueContract.FoamingHandler] = context => Glue.Foaming(context);

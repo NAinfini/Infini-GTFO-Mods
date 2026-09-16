@@ -36,16 +36,6 @@ namespace ForgeEnemy.Native;
 /// has no timer for, and an `area`/`arrival_tolerance` the navigation contract has no member for.</summary>
 internal sealed partial class EnemyModule
 {
-    internal const string AwakenBinding = ProviderId + ".binding.awaken";
-    internal const string SleepBinding = ProviderId + ".binding.sleep";
-    internal const string MoveToBinding = ProviderId + ".binding.move_to";
-    internal const string AwakenHandler = "gtfo.enemy.awaken";
-    internal const string SleepHandler = "gtfo.enemy.sleep";
-    internal const string MoveToHandler = "gtfo.enemy.move_to";
-    internal const string AwakenCapability = "forge.action.enemy.awaken";
-    internal const string SleepCapability = "forge.action.enemy.sleep";
-    internal const string MoveToCapability = "forge.action.enemy.move_to";
-
     /// <summary>The declared `wake_policy` members. `gradual` has no native parameter: the wake call plays one
     /// wake-up with one delay, so a request for a gradual wake is refused rather than served as an immediate
     /// one.</summary>
@@ -92,15 +82,6 @@ internal sealed partial class EnemyModule
         internal static Outcome Refused(string code) => new(CommandStatuses.Rejected, CommitStates.None, code);
         internal static Outcome Unseen(string code) => new(CommandStatuses.Failed, CommitStates.Unknown, code);
     }
-
-    /// <summary>Each handler's own ports, declared next to the handler and resolved at registration against the
-    /// capability row in `EnemyControlContract`, so neither half can describe a different layout.</summary>
-    internal static readonly HandlerShape AwakenPorts = new HandlerShape()
-        .Inputs("enemies", "source", "alert_amount", "reason").Outputs("result").Parameters("wake_policy");
-    internal static readonly HandlerShape SleepPorts = new HandlerShape()
-        .Inputs("enemies", "duration").Outputs("result").Parameters("sleep_policy", "interrupt_policy");
-    internal static readonly HandlerShape MoveToPorts = new HandlerShape()
-        .Inputs("enemies", "destination", "area", "speed", "arrival_tolerance").Outputs("result");
 
     private static bool IsSleepingState(int state) => state is NativeHibernating or NativeSquidBossHibernating;
 

@@ -218,11 +218,9 @@ internal sealed partial class MapPluginSession : IDisposable
             [PlayerCommandContract.DamageHandlerName] = PlayerCommandActions.Damage,
             [PlayerCommandContract.ReviveHandlerName] = PlayerCommandActions.Revive,
             [PlayerCommandContract.DownHandlerName] = PlayerCommandActions.Down,
-            // The five alarm/scan/wave rows are static facades: each turns its request into the native
+            // The three scan/wave rows are static facades: each turns its request into the native
             // entry point its capability names, and the two start rows mint the handle through the
             // attachment this session took in Start.
-            [AlarmWaveContract.AlarmStartHandler] = AlarmWaveActions.ExecuteStartAlarm,
-            [AlarmWaveContract.AlarmStopHandler] = AlarmWaveActions.ExecuteStopAlarm,
             [AlarmWaveContract.ScanStartHandler] = AlarmWaveActions.ExecuteStartScan,
             [AlarmWaveContract.WaveStartHandler] = AlarmWaveActions.ExecuteStartWave,
             [AlarmWaveContract.WaveStopHandler] = AlarmWaveActions.ExecuteStopWave,

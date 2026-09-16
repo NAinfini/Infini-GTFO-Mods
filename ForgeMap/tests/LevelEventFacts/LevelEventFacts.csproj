@@ -15,6 +15,11 @@
              Exclude="../../../ForgeRuntime/Framework/obj/**/*.cs" />
     <Compile Include="../../../ForgeMap/LevelEventContract.cs;../../../ForgeMap/LevelEventModule.cs" />
     <Compile Include="AssemblyAttributes.cs;ProviderDeclaration.cs;LevelEventWorld.cs;LevelEventFactsTests.cs" />
+    <!-- The world double asserts on the module's own publications, which sit before the kernel is reached, so the
+         module has to be given one subscriber per trigger binding it publishes under: a publisher reads its own
+         gate before it builds an event, and a world with no plan mounted would see nothing at all. The helper is
+         the same one the door-terminal, level-object and trigger-zone worlds open their gates with. -->
+    <Compile Include="../Support/SubscriptionGateFixture.cs" Link="Support/SubscriptionGateFixture.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

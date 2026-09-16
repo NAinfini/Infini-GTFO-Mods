@@ -38,6 +38,6 @@
     <!-- The control family's rows, binding support and shapes are declared in this one file. It is a partial of the
          module and reads the three handler ids and port fields from it, so `EnemyDeclaration` carries the
          declaration-only half of that type; nothing in this process calls the native bodies. -->
-    <Compile Include="../../ForgeEnemy/Native/EnemyControlContract.cs" Link="ForgeEnemy/EnemyControlContract.cs" />
+
   </ItemGroup>
 </Project>

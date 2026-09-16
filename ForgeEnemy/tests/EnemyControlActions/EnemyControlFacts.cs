@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using Enemies;
+using ForgeEnemy;
 using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 using SNetwork;
@@ -61,18 +62,18 @@ internal static class EnemyControlFacts
         Case("awaken.row-is-the-catalog-shape", () =>
         {
             using var world = new EnemyControlWorld();
-            var capability = Capability(world, EnemyModule.AwakenCapability);
+            var capability = Capability(world, EnemyControlContract.AwakenCapability);
             AssertShape(capability, AwakenShape);
             Check(capability.GetProperty("graph").GetProperty("execution").GetString() == "host", "Awaken is not host-tier.");
             Check(capability.GetProperty("graph").GetProperty("recipients").GetProperty("input").GetString() == "enemies",
                 "Awaken's recipient input drifted.");
-            Check(Binding(world, EnemyModule.AwakenCapability).GetProperty("role").GetString() == "execute",
+            Check(Binding(world, EnemyControlContract.AwakenCapability).GetProperty("role").GetString() == "execute",
                 "Awaken's binding is not an execute binding.");
         });
         Case("family.the-three-handle-rows-stay-undeclared", () =>
         {
             using var world = new EnemyControlWorld();
-            var declared = new[] { EnemyModule.AwakenCapability, EnemyModule.SleepCapability, EnemyModule.MoveToCapability };
+            var declared = new[] { EnemyControlContract.AwakenCapability, EnemyControlContract.SleepCapability, EnemyControlContract.MoveToCapability };
             foreach (var id in Unimplemented)
                 Check(!declared.Contains(id), "A handle row was declared without a way to mint its handle: " + id);
             Check(EnemyControlContract.CapabilityIds.SequenceEqual(declared), "The declared row list drifted from the provider's own ids.");
@@ -188,8 +189,8 @@ internal static class EnemyControlFacts
         Case("sleep.row-is-the-catalog-shape", () =>
         {
             using var world = new EnemyControlWorld();
-            AssertShape(Capability(world, EnemyModule.SleepCapability), SleepShape);
-            Check(Capability(world, EnemyModule.SleepCapability).GetProperty("graph").GetProperty("parameters")
+            AssertShape(Capability(world, EnemyControlContract.SleepCapability), SleepShape);
+            Check(Capability(world, EnemyControlContract.SleepCapability).GetProperty("graph").GetProperty("parameters")
                 .EnumerateArray().Count(p => p.GetProperty("required").GetBoolean()) == 2, "Sleep's two policies are not both required.");
         });
         Case("sleep.immediate-commits-through-the-behaviour-machine", () =>
@@ -276,8 +277,8 @@ internal static class EnemyControlFacts
         Case("move_to.row-is-the-catalog-shape", () =>
         {
             using var world = new EnemyControlWorld();
-            AssertShape(Capability(world, EnemyModule.MoveToCapability), MoveToShape);
-            var inputs = Capability(world, EnemyModule.MoveToCapability).GetProperty("graph").GetProperty("inputs").EnumerateArray().ToArray();
+            AssertShape(Capability(world, EnemyControlContract.MoveToCapability), MoveToShape);
+            var inputs = Capability(world, EnemyControlContract.MoveToCapability).GetProperty("graph").GetProperty("inputs").EnumerateArray().ToArray();
             Check(inputs.Single(p => p.GetProperty("id").GetString() == "destination").GetProperty("type").GetString() == "vector3",
                 "move_to's destination is not a vector3.");
             Check(inputs.Single(p => p.GetProperty("id").GetString() == "area").GetProperty("resourceKind").GetString() == "area_field",

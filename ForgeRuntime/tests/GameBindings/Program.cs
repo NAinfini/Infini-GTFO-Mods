@@ -4,6 +4,7 @@ using System.Text.Json;
 using ForgeRuntime;
 using ForgeRuntime.Framework;
 using ForgeRuntime.GameBindings;
+using ForgeEnemy;
 using ForgeEnemy.Native;
 using Plugin = ForgeRuntime.Plugin;
 using SNetwork;
@@ -137,11 +138,11 @@ string LocalPlan(RuntimeKernel k, string planId, string trigger, string action, 
             steps = new[] { new { nodeId = "Step", nodeKind = "action", binding = Array.IndexOf(ids, action), layout = Layout(action), inputs, successors = new int?[] { null } } } } }
     }).GetRawText();
 }
-string DeathRecordPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.death", EnemyDeclaration.DeathStartedBinding, RecordBinding,
+string DeathRecordPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.death", EnemyRegistration.DeathStartedBinding, RecordBinding,
     new[] { ("enemy", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject);
 // damage_applied -> record: the fact the native damage window publishes, wired into a recorder step, so the bridge
 // dispatches a configured plan on the same observation the shipped heal plan is triggered by.
-string DamageRecordPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.damage", EnemyDeclaration.DamageBinding, RecordBinding,
+string DamageRecordPlan(RuntimeKernel k) => LocalPlan(k, "test.bridge.damage", EnemyRegistration.DamageBinding, RecordBinding,
     new[] { ("target", "target") }, Array.Empty<(string, object)>(), RuntimeJson.EmptyObject);
 
 // The failure latch is tested across 100 further ticks, not merely a mode boolean.
@@ -163,10 +164,10 @@ var declaration = EnemyDeclaration.Module(kernel);
 var declarationOwner = kernel.RegisterModule(declaration, RuntimeLogLevel.Off);
 var declaredManifest = RuntimeJson.Parse(kernel.ExportManifest()).GetProperty("registry");
 Check(declaredManifest.GetProperty("providers").EnumerateArray()
-        .Any(row => row.GetProperty("id").GetString() == EnemyDeclaration.ProviderId),
+        .Any(row => row.GetProperty("id").GetString() == EnemyRegistration.ProviderId),
     "the enemy declaration registered no provider");
 var enemyBindings = declaredManifest.GetProperty("bindings").EnumerateArray()
-    .Where(row => row.GetProperty("providerId").GetString() == EnemyDeclaration.ProviderId).ToArray();
+    .Where(row => row.GetProperty("providerId").GetString() == EnemyRegistration.ProviderId).ToArray();
 Check(enemyBindings.Length > 0
         && enemyBindings.All(row => row.GetProperty("status").GetString() == "implemented"),
     "the enemy declaration carries no binding, or one that is not implemented: " + enemyBindings.Length);
@@ -174,9 +175,9 @@ var supported = RuntimeJson.Parse(kernel.ExportManifest()).GetProperty("bindingS
     .Select(row => row.GetProperty("bindingId").GetString()!).ToHashSet(StringComparer.Ordinal);
 Check(enemyBindings.All(row => supported.Contains(row.GetProperty("id").GetString()!)),
     "an enemy binding has no support row");
-Check(enemyBindings.Any(row => row.GetProperty("id").GetString() == EnemyDeclaration.DamageBinding)
-        && enemyBindings.Any(row => row.GetProperty("id").GetString() == EnemyDeclaration.HealBinding)
-        && enemyBindings.Any(row => row.GetProperty("id").GetString() == EnemyDeclaration.DeathStartedBinding),
+Check(enemyBindings.Any(row => row.GetProperty("id").GetString() == EnemyRegistration.DamageBinding)
+        && enemyBindings.Any(row => row.GetProperty("id").GetString() == EnemyRegistration.HealBinding)
+        && enemyBindings.Any(row => row.GetProperty("id").GetString() == EnemyRegistration.DeathStartedBinding),
     "the declaration lost a row the website fixtures pin");
 bool refused = false;
 try { declaration.Handlers.Values.First()(null!); } catch (InvalidOperationException) { refused = true; }
@@ -358,9 +359,9 @@ if (args.Length >= 2 && args[0] == "--bridge")
         var next = new EntityReference("gtfo.enemy:" + id, GameRuntimeBridge.Kernel!.WorldEpoch, ++lifeEpoch);
         Check(next != life, "bridge death attempt reused a life"); life = next; return next;
     }
-    void Die(EntityReference target) => Publish("death", EnemyDeclaration.DeathStartedBinding, target,
+    void Die(EntityReference target) => Publish("death", EnemyRegistration.DeathStartedBinding, target,
         new { enemy = target, source = (EntityReference?)null });
-    void Damage(EntityReference target, double amount) => Publish("damage", EnemyDeclaration.DamageBinding, target,
+    void Damage(EntityReference target, double amount) => Publish("damage", EnemyRegistration.DamageBinding, target,
         new { source = (EntityReference?)null, target, amount, damage_kind = (int?)null, limb = (int?)null });
     void Publish(string name, string binding, EntityReference target, object outputs)
     {
@@ -388,7 +389,7 @@ if (args.Length >= 2 && args[0] == "--bridge")
         var builtins = new[] { CombatContracts.Module(), ControlContracts.Module() }
             .SelectMany(module => RuntimeJson.Rows(RuntimeJson.Parse(module.RegistryJson), "providers").Select(row => RuntimeJson.Text(row, "id"))).ToArray();
         Check(builtins.Length > 0 && builtins.All(id => failedKernel.LogGate(id).Level == RuntimeLogLevel.Error)
-            && failedKernel.LogGate(EnemyDeclaration.ProviderId).Level == RuntimeLogLevel.Off,
+            && failedKernel.LogGate(EnemyRegistration.ProviderId).Level == RuntimeLogLevel.Off,
             "a Runtime built-in provider did not take the Runtime's own log level, or a package provider lost its own");
         var failedOwner = failedKernel.RegisterModule(ProbeModule(), RuntimeLogLevel.Off);
         var failedStates = new List<RuntimeLifecycleEvent>();
@@ -615,7 +616,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
             var target = new EntityReference("gtfo.enemy:7", scripted.WorldEpoch, 1);
             scripted.LoadPlan(mounted);
             scripted.StartRuntime(() => { });
-            var queued = owner.Publish(new RuntimeEvent("fixture.level:" + level, EnemyDeclaration.DamageBinding,
+            var queued = owner.Publish(new RuntimeEvent("fixture.level:" + level, EnemyRegistration.DamageBinding,
                 scripted.WorldEpoch, 0, "fixture.level", RuntimeJson.From(new { source = (EntityReference?)null, target, amount = 10d,
                     damage_kind = (int?)null, limb = (int?)null })));
             Check(dispatched ? queued.Status == "queued" && queued.Code == "accepted"

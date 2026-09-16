@@ -4,22 +4,21 @@ using ForgeRuntime.Framework;
 
 namespace ForgeMap;
 
-/// <summary>The five action rows this slice owns: the alarm, wave and scan actions of the `forge.action.map`
-/// family. The catalog is the authority for every port, parameter and enum these rows carry, so each capability
-/// is declared here field for field and never restated in the native half; this file is the game-independent
-/// side the runtime registry, the manifest and the website compare against.
+/// <summary>The three action rows this slice owns: the scan and wave actions of the `forge.action.map` family.
+/// The catalog is the authority for every port, parameter and enum these rows carry, so each capability is
+/// declared here field for field and never restated in the native half; this file is the game-independent side
+/// the runtime registry, the manifest and the website compare against.
 ///
 /// Every one of them is an `execute` row: the handler writes through a native entry the game itself runs, and the
 /// result row reports whether that write was issued, was already in the state the request asked for, or was
-/// refused by name. The rows are declared here rather than in `ModuleDefinition` because the five share one
-/// subject — the chained puzzle instance that is both the alarm and the scan, and the Mastermind event that is
-/// the wave — and a second declaration of the same ports is how two descriptions of one binding drift apart.
+/// refused by name. The rows are declared here rather than in `ModuleDefinition` because they share their
+/// subjects — the chained puzzle instance the scan row activates, and the Mastermind event that is the wave — and
+/// a second declaration of the same ports is how two descriptions of one binding drift apart.
 ///
-/// The wave rows are declared by this assembly even though their catalog owner is the map package: `rows.tsv`
-/// records that `wave_start`/`wave_stop` were assigned to ForgeEnemy when the wave facts moved there, while this
-/// slice's specification names them here. The declaration is therefore written so the wave half can be lifted into
-/// the enemy package without moving a single native hook: nothing in it reads a ForgeMap type — the native write
-/// path is `Mastermind.TriggerSurvivalWave`, which is the enemy package's own subject.</summary>
+/// The alarm is that same chained puzzle: the game has one instance kind, the catalog expresses starting it with
+/// `scan_start`, and the puzzle's own data block (`TriggerAlarmOnActivate`) is what makes the activation raise an
+/// alarm. The two alarm rows the rulings deleted are therefore not declared here, and nothing takes their place —
+/// a level's alarm is started by the scan row that names the same instance.</summary>
 public static class AlarmWaveContract
 {
     /// <summary>The provider every row of this family belongs to, written out rather than read from
@@ -29,14 +28,11 @@ public static class AlarmWaveContract
     public const string ProviderId = "forge.module.gtfo.map";
 
     /// <summary>The port the wave start row publishes its handle on, and the lifetime every handle this family
-    /// mints carries: a wave lives for the encounter, and the instance the alarm names does too.</summary>
+    /// mints carries: a wave lives for the encounter, and the instance the scan activates does too.</summary>
     public const string WaveHandlePort = "wave_handle";
-    public const string AlarmHandlePort = "alarm_handle";
     public const string ScanHandlePort = "scan_handle";
     public const string HandleLifetime = "encounter";
 
-    public const string AlarmStartCapability = "forge.action.map.alarm_start";
-    public const string AlarmStopCapability = "forge.action.map.alarm_stop";
     public const string ScanStartCapability = "forge.action.map.scan_start";
     public const string WaveStartCapability = "forge.action.map.wave_start";
     public const string WaveStopCapability = "forge.action.map.wave_stop";
@@ -44,16 +40,13 @@ public static class AlarmWaveContract
     /// <summary>The handler names the native half supplies, one per row. They are this provider's own vocabulary:
     /// a binding names the handler the registration must carry, and the runtime refuses an implemented binding
     /// whose handler is missing rather than dispatching into nothing.</summary>
-    public const string AlarmStartHandler = "gtfo.map.alarm_start";
-    public const string AlarmStopHandler = "gtfo.map.alarm_stop";
     public const string ScanStartHandler = "gtfo.map.scan_start";
     public const string WaveStartHandler = "gtfo.map.wave_start";
     public const string WaveStopHandler = "gtfo.map.wave_stop";
 
-    /// <summary>The permission a plan needs to drive alarms or scans, and the one it needs to drive waves. Both
-    /// are the resources' own control permission, spelled the way the catalog's `recipients.requires` spells it,
-    /// so a plan that pins one of these bindings declares exactly what the row says it must.</summary>
-    public const string AlarmControlPermission = "alarm.control";
+    /// <summary>The permission a plan needs to drive a scan, and the one it needs to drive waves. Both are the
+    /// resources' own control permission, spelled the way the catalog's `recipients.requires` spells it, so a plan
+    /// that pins one of these bindings declares exactly what the row says it must.</summary>
     public const string ScanControlPermission = "scan.control";
     public const string WaveControlPermission = "wave.control";
 
@@ -61,10 +54,6 @@ public static class AlarmWaveContract
     /// lists are the catalog's, in the catalog's order: an execute binding ends in `result`, and the two start
     /// rows additionally declare the handle output their row publishes — the handle a later stop row reads
     /// back.</summary>
-    public static readonly HandlerShape AlarmStartShape = new HandlerShape()
-        .Inputs("alarm", "source", "participants").Outputs("result", "alarm_handle");
-    public static readonly HandlerShape AlarmStopShape = new HandlerShape()
-        .Inputs("alarms", "reason").Outputs("result").Parameters("existing_enemies_policy");
     public static readonly HandlerShape ScanStartShape = new HandlerShape()
         .Inputs("scan", "anchor", "participants", "quorum").Outputs("result", "scan_handle");
     public static readonly HandlerShape WaveStartShape = new HandlerShape()
@@ -76,14 +65,12 @@ public static class AlarmWaveContract
     /// registration's shape table beside the player selector's and the heal handler's.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> Shapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
-        [AlarmStartHandler] = AlarmStartShape,
-        [AlarmStopHandler] = AlarmStopShape,
         [ScanStartHandler] = ScanStartShape,
         [WaveStartHandler] = WaveStartShape,
         [WaveStopHandler] = WaveStopShape
     };
 
-    /// <summary>The five binding rows: this provider's own id under its own namespace, the canonical capability
+    /// <summary>The three binding rows: this provider's own id under its own namespace, the canonical capability
     /// each implements and the handler the native half supplies. The rows are `execute` bindings, so the runtime
     /// resolves their shapes against these capabilities and refuses a registration that supplies no handler for
     /// one of them. `requires` is empty on every row: it names other bindings a row's closure needs, not the
@@ -91,21 +78,17 @@ public static class AlarmWaveContract
     /// them.</summary>
     public static object[] Bindings() => new object[]
     {
-        Row(AlarmStartCapability, AlarmStartHandler),
-        Row(AlarmStopCapability, AlarmStopHandler),
         Row(ScanStartCapability, ScanStartHandler),
         Row(WaveStartCapability, WaveStartHandler),
         Row(WaveStopCapability, WaveStopHandler)
     };
 
-    /// <summary>The five registration rows, in the same order as <see cref="Bindings"/>: one per binding, each
+    /// <summary>The three registration rows, in the same order as <see cref="Bindings"/>: one per binding, each
     /// naming the permission that binding's recipients require. `implementation-only` is the verification the
-    /// provider can stand behind for all five — a native write path exists for each, and its own evidence file
+    /// provider can stand behind for all three — a native write path exists for each, and its own evidence file
     /// names the entry point and the denial.</summary>
     public static BindingSupport[] Support() => new[]
     {
-        new BindingSupport(Binding(AlarmStartCapability), "implementation-only", new[] { AlarmControlPermission }),
-        new BindingSupport(Binding(AlarmStopCapability), "implementation-only", new[] { AlarmControlPermission }),
         new BindingSupport(Binding(ScanStartCapability), "implementation-only", new[] { ScanControlPermission }),
         new BindingSupport(Binding(WaveStartCapability), "implementation-only", new[] { WaveControlPermission }),
         new BindingSupport(Binding(WaveStopCapability), "implementation-only", new[] { WaveControlPermission })
@@ -128,87 +111,19 @@ public static class AlarmWaveContract
         requires = Array.Empty<string>()
     };
 
-    /// <summary>The five catalog rows, verbatim: the ports, resource kinds, handle kinds, lifetimes, structural
+    /// <summary>The three catalog rows, verbatim: the ports, resource kinds, handle kinds, lifetimes, structural
     /// parameters and recipient declarations the website publishes for these ids. They are declared here rather
     /// than copied into `ModuleDefinition` because the registry resolves each binding's shape against the
     /// capability it names, and a capability that describes a different port set than the website's own row would
     /// make the same plan compile on one side and be refused on the other.
     ///
-    /// `graph.execution` is `host` for all five: each one writes through a host-side entry point the game
+    /// `graph.execution` is `host` for all three: each one writes through a host-side entry point the game
     /// replicates (the puzzle's own state replicator, the Mastermind's event list), so the row is never a
     /// local-only presentation.
     ///
     /// Each row is its own constant so the registration can take them one at a time — the Map declaration's
     /// capability array is a shared file and one insertion per batch is how the integration adds them — and
-    /// <see cref="CapabilitiesJson"/> is the same five in catalog order for a reader that wants the whole set.</summary>
-    public const string AlarmStartCapabilityJson = """
-    {
-      "id": "forge.action.map.alarm_start",
-      "owner": "forge.module.gtfo.map",
-      "kind": "action",
-      "label": "开始警报",
-      "version": "1.0.0",
-      "parameters": { "description": "开始一场具名警报。" },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "alarm", "type": "resource", "resourceKind": "chained-puzzle", "schema": "forge.resource.chained-puzzle" },
-          { "id": "source", "type": "entity" },
-          { "id": "participants", "type": "entity", "cardinality": "many" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.map.alarm_start",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" }
-            ] },
-          { "id": "alarm_handle", "type": "handle", "handleKind": "effect", "lifetime": "encounter" }
-        ],
-        "parameters": []
-        ,"recipients": { "input": "alarm", "target": "resource", "cardinality": "one", "requires": [ "alarm.control" ], "result": "result", "handle": "alarm_handle" }
-      }
-    }
-    """;
-
-    public const string AlarmStopCapabilityJson = """
-    {
-      "id": "forge.action.map.alarm_stop",
-      "owner": "forge.module.gtfo.map",
-      "kind": "action",
-      "label": "停止警报",
-      "version": "1.0.0",
-      "parameters": { "description": "停掉警报，并决定已刷的敌人怎么办。" },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "alarms", "type": "handle", "handleKind": "effect", "lifetime": "encounter" },
-          { "id": "reason", "type": "string" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.map.alarm_stop",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" }
-            ] }
-        ],
-        "parameters": [
-          { "id": "existing_enemies_policy", "type": "enum", "role": "structural", "required": true, "values": [ "keep", "clear" ] }
-        ]
-        ,"recipients": { "input": "alarms", "target": "handle", "cardinality": "one", "requires": [ "alarm.control" ], "result": "result" }
-      }
-    }
-    """;
-
+    /// <see cref="CapabilitiesJson"/> is the same three in catalog order for a reader that wants the whole set.</summary>
     public const string ScanStartCapabilityJson = """
     {
       "id": "forge.action.map.scan_start",
@@ -316,14 +231,14 @@ public static class AlarmWaveContract
     }
     """;
 
-    /// <summary>The five rows in catalog order, as the array a registry's capability section carries. The order is
-    /// the catalog's own, so a diff of this array against the website's rows is positional.</summary>
-    public static readonly string CapabilitiesJson = "[\n" + AlarmStartCapabilityJson + ",\n" + AlarmStopCapabilityJson
-        + ",\n" + ScanStartCapabilityJson + ",\n" + WaveStartCapabilityJson + ",\n" + WaveStopCapabilityJson + "\n]";
+    /// <summary>The three rows in catalog order, as the array a registry's capability section carries. The order
+    /// is the catalog's own, so a diff of this array against the website's rows is positional.</summary>
+    public static readonly string CapabilitiesJson = "[\n" + ScanStartCapabilityJson
+        + ",\n" + WaveStartCapabilityJson + ",\n" + WaveStopCapabilityJson + "\n]";
 
     /// <summary>The chained-puzzle resource kind's own name in the shared resource-kind table. A chained puzzle
-    /// is both the alarm and the scan: the game has one instance kind and distinguishes the two by the puzzle
-    /// data block's own alarm flag, which is why one provider owns both rows' resource kind.</summary>
+    /// is both the alarm and the scan: the game has one instance kind, its data block's `TriggerAlarmOnActivate`
+    /// is what makes an activation an alarm, and the one scan row is therefore how a level's alarm is started.</summary>
     public const string ChainedPuzzleKind = "chained-puzzle";
     /// <summary>The wave resource kind's own name. A wave resource is the author's pair of data blocks — the
     /// settings block and the population block — not a running wave; the running wave is the Mastermind event the

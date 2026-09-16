@@ -291,7 +291,7 @@ using var sdkStream = File.OpenRead(typeof(RuntimeKernel).Assembly.Location);
 using var sdkHash = System.Security.Cryptography.SHA256.Create();
 var report = new
 {
-    scenarioRevision = "selector-query-native-v1", schemaVersion = 1,
+    scenarioRevision = "selector-query-native", schemaVersion = 1,
     verification = "production-source-and-explicit-compiled-sdk-with-test-doubles", gameExecuted = false,
     note = "Every selector row the kernel serves is the production module's own — capability, binding, handler "
         + "shape, evaluator and candidate source — and the plan's trigger and recording action are this suite's "

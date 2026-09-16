@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Enemies;
+using ForgeEnemy;
 using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 using SNetwork;
@@ -40,7 +41,14 @@ internal sealed class EnemyControlWorld : IDisposable
         Kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
         Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         Module = new EnemyModule(Kernel, () => Allowed);
-        Handlers = EnemyControlContract.Handlers(Module);
+        // One body per handler name the contract declares, the way `EnemyActionFamilies` wires the same three
+        // into the provider's own registration.
+        Handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
+        {
+            [EnemyControlContract.AwakenHandler] = Module.Awaken,
+            [EnemyControlContract.SleepHandler] = Module.Sleep,
+            [EnemyControlContract.MoveToHandler] = Module.MoveTo
+        };
         Registration = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, Registry(),
             Handlers, EnemyControlContract.Support()) { Shapes = EnemyControlContract.Shapes() }, RuntimeLogLevel.Off);
 
@@ -92,16 +100,16 @@ internal sealed class EnemyControlWorld : IDisposable
     /// <summary>The three declared optional inputs arrive as present zeros and nulls, in the two shapes a plan can
     /// produce: a literal the compiler wrote into the frame, and a port the plan left unwired.</summary>
     internal CommandResult Awaken(EntityReference[] targets, string policy = "immediate", double alertAmount = 0)
-        => Dispatch(EnemyModule.AwakenHandler, new { enemies = targets, alert_amount = alertAmount, reason = "test" }, new { wake_policy = policy });
+        => Dispatch(EnemyControlContract.AwakenHandler, new { enemies = targets, alert_amount = alertAmount, reason = "test" }, new { wake_policy = policy });
 
     internal CommandResult AwakenUnwired(EntityReference[] targets)
-        => Dispatch(EnemyModule.AwakenHandler, new { enemies = targets, alert_amount = (double?)null, reason = "test" }, new { wake_policy = "immediate" });
+        => Dispatch(EnemyControlContract.AwakenHandler, new { enemies = targets, alert_amount = (double?)null, reason = "test" }, new { wake_policy = "immediate" });
 
     internal CommandResult Sleep(EntityReference[] targets, string policy = "immediate", string interrupt = "any", int duration = 0)
-        => Dispatch(EnemyModule.SleepHandler, new { enemies = targets, duration }, new { sleep_policy = policy, interrupt_policy = interrupt });
+        => Dispatch(EnemyControlContract.SleepHandler, new { enemies = targets, duration }, new { sleep_policy = policy, interrupt_policy = interrupt });
 
     internal CommandResult MoveTo(EntityReference[] targets, double[] destination, double? speed = null)
-        => Dispatch(EnemyModule.MoveToHandler, new { enemies = targets, destination, speed }, null);
+        => Dispatch(EnemyControlContract.MoveToHandler, new { enemies = targets, destination, speed }, null);
 
     /// <summary>One dispatch through the handler the contract hands to a registration under this name, with a
     /// frame shaped the way the capability declares it: `enemies` is an entity set, an optional value arrives as a
@@ -109,7 +117,7 @@ internal sealed class EnemyControlWorld : IDisposable
     /// context is built by the Framework's own internal constructor.</summary>
     private CommandResult Dispatch(string handler, object inputs, object? parameters)
     {
-        var origin = new RuntimeEvent("test.control:" + Kernel.WorldEpoch, EnemyModule.AwakenBinding,
+        var origin = new RuntimeEvent("test.control:" + Kernel.WorldEpoch, EnemyControlContract.AwakenBinding,
             Kernel.WorldEpoch, Math.Max(0, Kernel.CurrentTick), "gtfo.world:" + Kernel.WorldEpoch, RuntimeJson.EmptyObject);
         var context = (CommandContext)ContextConstructor.Invoke(new object?[]
         {

@@ -359,7 +359,7 @@ class CompareRunsTests(unittest.TestCase):
 
     def test_wrong_format_is_rejected(self):
         after = report("after")
-        after["format"] = "gtfo-forge-diagnostics-report-v2"
+        after["format"] = "gtfo-forge-diagnostics-report-other"
         result = self.run_compare(report("before"), after)
         self.assertEqual(2, result.returncode)
         self.assertIn("gtfo-forge-diagnostics-report", result.stderr)

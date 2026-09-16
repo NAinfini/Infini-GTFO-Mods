@@ -10,31 +10,33 @@ using SNetwork;
 namespace ForgeMap.Native;
 
 /// <summary>
-/// The native half of the five alarm, wave and scan actions: one method per row, each taking the native objects
+/// The native half of the three scan and wave actions: one method per row, each taking the native objects
 /// the row resolved and answering with the one decision it made. Nothing here is a plan, a result frame or a
 /// native write of its own — the handlers below are the binding side, and the action methods are what they call
 /// in.
 ///
 /// Every write goes through a native entry the game itself runs, so the game replicates it:
 /// <list type="bullet">
-/// <item><description>An alarm or a scan is a `ChainedPuzzleInstance`, and its own
+/// <item><description>A scan is a `ChainedPuzzleInstance`, and its own
 /// `AttemptInteract(eChainedPuzzleInteraction.Activate|Deactivate)` is the entry the game's own door, terminal
 /// and objective callbacks use. That entry hands the interaction to the instance's own state replicator, and the
 /// replicator's callback is what runs the master side (`OnStateChange` calls `MasterActivate`/`MasterDeactivate`).
 /// Writing the instance's fields or calling the private master methods directly would change one machine's state
-/// without the replicator, which is exactly the write this layer must not make.</description></item>
+/// without the replicator, which is exactly the write this layer must not make. An alarm is that same instance
+/// kind — the puzzle's own data block says whether activating it raises one — so this activation is also how a
+/// level's alarm is started; the two alarm rows the rulings deleted had no write of their own.</description></item>
 /// <item><description>A wave is a Mastermind event, and `Mastermind.TriggerSurvivalWave` is the host entry that
 /// creates it, answers with the event id it registered and replicates through `SurvivalWave.OnSpawn`. The stop
 /// side is the same event back again — `Mastermind.TryGetEvent(eventId, out event)` followed by the event's own
 /// `StopEvent()` — which is why the start row mints the handle that names it.</description></item>
 /// </list>
 ///
-/// <b>The handle.</b> A wave or an alarm instance is named by an effect handle the provider mints through the
-/// kernel's own pool, and the native object the handle stands for is registered beside it. That is the whole
-/// mechanism the node list's "start a wave and store it in 警报A, stop that wave later" template needs: the start
-/// row publishes the handle, the plan's own named-object row stores it, and the stop row reads the same handle
-/// back and resolves it to the event it named. A handle the kernel no longer holds live resolves to nothing, so a
-/// value that outlived its wave is refused as `wave-not-live` instead of stopping a stranger.
+/// <b>The handle.</b> A wave or the puzzle instance a scan activated is named by an effect handle the provider
+/// mints through the kernel's own pool, and the native object the handle stands for is registered beside it. That
+/// is the whole mechanism the node list's "start a wave and store it in 警报A, stop that wave later" template
+/// needs: the start row publishes the handle, the plan's own named-object row stores it, and the stop row reads
+/// the same handle back and resolves it to the event it named. A handle the kernel no longer holds live resolves
+/// to nothing, so a value that outlived its wave is refused as `wave-not-live` instead of stopping a stranger.
 ///
 /// The handle can only be cast on a registration this half is attached to; <see cref="Attach"/> is the one line
 /// the session calls with its own kernel and registration, and a detached half refuses the two start rows with
@@ -83,13 +85,10 @@ internal sealed class AlarmWaveActions
 
     // ---- result vocabulary ---------------------------------------------------------------------------
     /// <summary>The codes the result rows carry, in two groups: the decisions that end in a write
-    /// (`alarm-started`, `scan-started`, `wave-started`, `alarm-stopped`, `wave-stopped` and the
-    /// already-in-state readings), and the refusals, one per check that can refuse a request. A row names
-    /// exactly one of them, so a plan and a log line read the same decision.</summary>
-    internal const string AlarmStartedCode = "alarm-started";
+    /// (`scan-started`, `wave-started`, `wave-stopped` and the already-in-state reading), and the refusals, one
+    /// per check that can refuse a request. A row names exactly one of them, so a plan and a log line read the
+    /// same decision.</summary>
     internal const string AlarmAlreadyActiveCode = "alarm-already-active";
-    internal const string AlarmStoppedCode = "alarm-stopped";
-    internal const string AlarmNotActiveCode = "alarm-not-active";
     internal const string ScanStartedCode = "scan-started";
     internal const string WaveStartedCode = "wave-started";
     internal const string WaveStoppedCode = "wave-stopped";
@@ -98,7 +97,6 @@ internal sealed class AlarmWaveActions
     /// `graph.execution = host`, and the native entries behind them decide and replicate on the master only, so a
     /// command that reaches a client is refused rather than run against a world it does not own.</summary>
     internal const string AuthorityCode = "authority-or-phase";
-    internal const string NoAlarmResourceCode = "alarm-resource-missing";
     internal const string NoScanResourceCode = "scan-resource-missing";
     internal const string NoWaveResourceCode = "wave-resource-missing";
     internal const string ResourceNotChainedPuzzleCode = "alarm-resource-not-chained-puzzle";
@@ -117,17 +115,11 @@ internal sealed class AlarmWaveActions
     internal const string WaveKnobUnsupportedCode = "wave-knob-unsupported";
     internal const string WaveHandleMissingCode = "wave-handle-missing";
     internal const string WavePendingFinishUnsupportedCode = "wave-pending-finish-unsupported";
-    internal const string AlarmHandleMissingCode = "alarm-handle-missing";
-    internal const string AlarmClearUnsupportedCode = "alarm-clear-unsupported";
     internal const string PolicyUnknownCode = "policy-unknown";
     /// <summary>The handle resolved to no native object of this world: it was never minted by this provider, it
     /// belongs to an ended world, or the wave it named is gone. All three are one answer — there is nothing to
     /// stop — and no branch guesses which of them it was.</summary>
     internal const string HandleNotLiveCode = "handle-not-live";
-    /// <summary>The handle is live but names no event of a kind this half can stop. A handle whose object cannot
-    /// be stopped is refused rather than cancelled, because cancelling releases the handle without stopping
-    /// anything.</summary>
-    internal const string HandleNotStoppableCode = "handle-not-stoppable";
     /// <summary>This half was never attached to a registration, so it cannot mint the handle either start row
     /// declares. The refusal is by name: a start row that wrote the world and then could not name what it wrote
     /// would be worse than one that refused first.</summary>
@@ -210,7 +202,7 @@ internal sealed class AlarmWaveActions
         return CommandResult.Create(status, committed, outcome.Code, "", Outputs(Envelope(row), handle));
     }
 
-    /// <summary>The stop rows carry the canonical four columns, so they use the result row without the extra
+    /// <summary>The stop row carries the canonical four columns, so it uses the result row without the extra
     /// column the two start rows declare. Every stop branch is written through here, which is why a refusal and
     /// an issued stop cannot describe different columns.</summary>
     private static CommandResult PlainRow(CommandContext context, string code, string detail = "")
@@ -227,30 +219,24 @@ internal sealed class AlarmWaveActions
 
     // ---- handlers ------------------------------------------------------------------------------------
 
-    /// <summary>The `forge.action.map.alarm_start` handler. The alarm is an author-named chained puzzle the level
-    /// already built, which is what the row's `chained-puzzle` resource names.</summary>
-    internal static CommandResult ExecuteStartAlarm(CommandContext context)
-        => StartNamedPuzzle(context, alarm: true);
-
-    /// <summary>The `forge.action.map.scan_start` handler. The scan is the same instance kind as the alarm — the
-    /// game has one chained puzzle type and the data block's own alarm flag says which reading it has — so the
-    /// same write is used, and the row's `quorum` is echoed back rather than applied: the required number of
-    /// players in the scan belongs to the puzzle's own data block, and no native entry takes it per request.</summary>
+    /// <summary>The `forge.action.map.scan_start` handler. The scan is a chained puzzle the level already built,
+    /// which is what the row's `chained-puzzle` resource names; the same instance kind is what an alarm is, and the
+    /// puzzle's own data block decides which reading the activation has. The row's `quorum` is echoed back rather
+    /// than applied: the required number of players in the scan belongs to the puzzle's own data block, and no
+    /// native entry takes it per request.</summary>
     internal static CommandResult ExecuteStartScan(CommandContext context)
-        => StartNamedPuzzle(context, alarm: false);
+        => StartScan(context);
 
-    private static CommandResult StartNamedPuzzle(CommandContext context, bool alarm)
+    private static CommandResult StartScan(CommandContext context)
     {
         // The row's `quorum` is read before any refusal so every row of this shape carries the column, whatever
         // the decision was: a plan reading a refused row sees the same port set as a committed one.
         int quorum = 0;
-        if (!alarm && context.Inputs.TryGetProperty("quorum", out var quorumValue)
+        if (context.Inputs.TryGetProperty("quorum", out var quorumValue)
             && quorumValue.ValueKind == JsonValueKind.Number) quorum = quorumValue.GetInt32();
         if (!IsHost(context)) return AlarmRow(context, MapActionOutcome.Refused(AuthorityCode), quorum);
-        // The two rows name their subject port differently — `alarm` for the alarm row, `scan` for the scan row
-        // — and both are the same resource kind, which is why one reading serves both.
-        if (Resource(context, alarm ? "alarm" : "scan") is not { } resource)
-            return AlarmRow(context, MapActionOutcome.Refused(alarm ? NoAlarmResourceCode : NoScanResourceCode), quorum);
+        if (Resource(context, "scan") is not { } resource)
+            return AlarmRow(context, MapActionOutcome.Refused(NoScanResourceCode), quorum);
         if (resource.Kind != AlarmWaveContract.ChainedPuzzleKind)
             return AlarmRow(context, MapActionOutcome.Refused(ResourceNotChainedPuzzleCode), quorum);
         if (string.IsNullOrEmpty(resource.Id)) return AlarmRow(context, MapActionOutcome.Refused(ResourceIdEmptyCode), quorum);
@@ -269,10 +255,8 @@ internal sealed class AlarmWaveActions
         // for the encounter and its handle dies with it.
         if (_current is not { } self || !self.TryMintHandle(() => instance, out var handle))
             return AlarmRow(context, MapActionOutcome.Refused(HandleUnavailableCode), quorum);
-        // `alarm_handle` is the alarm row's port; the scan row's is `scan_handle`, and the two rows are the same
-        // instance kind, so the port travels with the row that asked.
-        var minted = new MintedHandle(alarm ? AlarmWaveContract.AlarmHandlePort : AlarmWaveContract.ScanHandlePort, handle);
-        return AlarmRow(context, StartPuzzle(alarm, instance), quorum, minted);
+        var minted = new MintedHandle(AlarmWaveContract.ScanHandlePort, handle);
+        return AlarmRow(context, StartPuzzle(instance), quorum, minted);
     }
 
     /// <summary>The `forge.action.map.wave_start` handler: one Mastermind survival wave, started through the
@@ -301,29 +285,6 @@ internal sealed class AlarmWaveActions
         if (_current is not { } self || !self.TryMintHandle(() => registered, out var handle))
             return WaveRow(context, MapActionOutcome.Refused(HandleUnavailableCode), budget);
         return WaveRow(context, outcome, budget, new MintedHandle(AlarmWaveContract.WaveHandlePort, handle));
-    }
-
-    /// <summary>The `forge.action.map.alarm_stop` handler. Its input is the effect handle the start row
-    /// published, and the handle resolves to the puzzle instance it named; the one policy the native stop
-    /// entries cannot express refuses before them.</summary>
-    internal static CommandResult ExecuteStopAlarm(CommandContext context)
-    {
-        if (!IsHost(context)) return PlainRow(context, AuthorityCode);
-        if (Policy(context, "existing_enemies_policy") is not { } policy || !KnownAlarmPolicy(policy))
-            return PlainRow(context, PolicyUnknownCode);
-        // Native stop paths: the puzzle's own `AttemptInteract(Deactivate)` ends it (and, through the puzzle's
-        // own state change, the wave it started), WardenObjectiveManager.StopAllWardenObjectiveEnemyWaves and
-        // ElevatorShaftLanding.StopAmbientAlarm end the level-wide alarms. Nothing native takes a policy about the
-        // enemies already out; the puzzle's own data block decides that (DisableSurvivalWaveOnComplete), and a
-        // request that asks Forge to clear them would be a second, Forge-owned enemy deletion path.
-        if (policy == "clear") return PlainRow(context, AlarmClearUnsupportedCode);
-        if (!context.Inputs.TryGetProperty("alarms", out var handle) || handle.ValueKind != JsonValueKind.Object)
-            return PlainRow(context, AlarmHandleMissingCode);
-        if (!TryHandle(handle, out var native)) return PlainRow(context, HandleNotLiveCode);
-        if (native is not ChainedPuzzleInstance instance) return PlainRow(context, HandleNotStoppableCode);
-        if (!instance.IsActive) return PlainRow(context, AlarmNotActiveCode);
-        instance.AttemptInteract(eChainedPuzzleInteraction.Deactivate);
-        return StoppedRow(context, AlarmStoppedCode);
     }
 
     /// <summary>The `forge.action.map.wave_stop` handler: the same handle mechanism on the wave side. The native
@@ -368,9 +329,8 @@ internal sealed class AlarmWaveActions
 
     /// <summary>The native object one live handle of this provider names, or false when the handle is not live:
     /// a handle this provider never cast, one whose world has ended, and one whose native object is gone are the
-    /// same answer to the only question both stop rows ask — there is nothing to stop — and no branch guesses
-    /// which of them it was. A live handle whose object is of another kind is a separate answer: the caller says
-    /// so with `handle-not-stoppable` instead of releasing a handle it cannot use.</summary>
+    /// same answer to the only question the stop row asks — there is nothing to stop — and no branch guesses
+    /// which of them it was.</summary>
     private static bool TryHandle(JsonElement handle, out object? native)
     {
         native = null;
@@ -396,12 +356,12 @@ internal sealed class AlarmWaveActions
     /// <summary>Starts one named chained puzzle through its own interaction entry. The caller has already walked
     /// the ladder that decides whether the instance can be started at all, so this is the one write: the
     /// interaction entry is the native sync path, and it hands the interaction to the instance's own state
-    /// replicator, whose callback runs MasterActivate on the master. The wave the alarm starts is the puzzle's
-    /// own (`TriggerEnemyWave` from the state change); no separate wave is started here.</summary>
-    private static MapActionOutcome StartPuzzle(bool alarm, ChainedPuzzleInstance instance)
+    /// replicator, whose callback runs MasterActivate on the master. The wave such an activation starts is the
+    /// puzzle's own (`TriggerEnemyWave` from the state change); no separate wave is started here.</summary>
+    private static MapActionOutcome StartPuzzle(ChainedPuzzleInstance instance)
     {
         instance.AttemptInteract(eChainedPuzzleInteraction.Activate);
-        return MapActionOutcome.Issued(alarm ? AlarmStartedCode : ScanStartedCode);
+        return MapActionOutcome.Issued(ScanStartedCode);
     }
 
     /// <summary>Starts one survival wave on the host. The master's own entry answers whether it accepted the
@@ -588,10 +548,6 @@ internal sealed class AlarmWaveActions
     private static string? Policy(CommandContext context, string parameter)
         => context.Parameters.TryGetProperty(parameter, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString() : null;
-
-    /// <summary>The two members the alarm stop row's `existing_enemies_policy` declares in the catalog. A value
-    /// outside the set is refused rather than folded into the neighbouring member.</summary>
-    private static bool KnownAlarmPolicy(string policy) => policy is "keep" or "clear";
 
     /// <summary>The two members the wave stop row's `pending_spawns_policy` declares in the catalog.</summary>
     private static bool KnownWavePolicy(string policy) => policy is "cancel" or "finish";

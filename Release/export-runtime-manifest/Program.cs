@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using ForgeEnemy;
 using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 using ForgeTrigger;
@@ -88,7 +89,7 @@ static int Export(string releasePath, string outputPath)
                     clipSet: ExportOnlyHandler(ForgeWeapon.WeaponHolderActionsContract.ClipSetHandler)),
                     RuntimeLogLevel.Off);
                 break;
-            case EnemyDeclaration.ProviderId:
+            case EnemyRegistration.ProviderId:
                 // The provider's rows are registered from their own declaration, never from the game-bound module:
                 // every body travels as the stand-in `EnemyDeclaration` hands out, and no row is invented here.
                 kernel.RegisterModule(EnemyDeclaration.Module(kernel), RuntimeLogLevel.Off); break;

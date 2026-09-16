@@ -21,14 +21,14 @@ internal sealed record RuntimeLogLimits(int PlayerLinesPerTick, int PlayerQueue,
     internal static readonly RuntimeLogLimits Default = new(256, 8192, 4096, 65536, 64L * 1024 * 1024, 10);
 }
 
-/// <summary>forge.log.v1 JSONL writer. BepInEx logging never happens on the background thread: <see cref="Write"/> and
+/// <summary>forge.log JSONL writer. BepInEx logging never happens on the background thread: <see cref="Write"/> and
 /// <see cref="Dispose"/> run on the kernel thread and mirror the console, while the one background thread created by the
 /// first record only opens the file, serializes, writes and prunes. What that thread could not write is reported once by
 /// <see cref="Dispose"/>, because a session's loss is only final once the writer has drained its queue and closed its
 /// file.</summary>
 internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
 {
-    internal const string Schema = "forge.log.v1";
+    internal const string Schema = "forge.log";
     internal const string DirectoryName = "forge-logs";
     // Stop runs from Unity quit/destroy on the main thread: a longer wait visibly hangs shutdown, while a working disk
     // drains even a full elevated queue far sooner. The thread is a background thread, so a stuck disk cannot keep the process alive.

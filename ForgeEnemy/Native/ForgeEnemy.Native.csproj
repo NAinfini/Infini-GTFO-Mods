@@ -14,7 +14,7 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;EnemyPluginSession.cs;EnemySpawnRequirementSource.cs;EnemyHookInstall.cs;Enemy*Hooks.cs;EnemyModule*.cs;EnemyActionFamilies.cs;EnemyControlContract.cs;EnemyControlActions.cs;EnemyCombatActions.cs;GlueActions.cs;GlueFacts.cs;EnemyBehaviorNative.cs;EnemyBehaviorLedger.cs;EnemyBehaviorActions.cs;EnemyWaveModule.cs;EnemyNodeEffectActions.cs;EnemyNodeFacts.cs;EnemyNodeRegistration.cs;EnemyNodeValueReads.cs;EnemySelector.cs;EnemyAttackInstanceFacts.cs;EnemyWaveFacts.cs;EnemyProfileContract.cs;EnemyProfileActions.cs;Observation/*.cs" />
+    <Compile Include="Plugin.cs;EnemyPluginSession.cs;EnemySpawnRequirementSource.cs;EnemyHookInstall.cs;Enemy*Hooks.cs;EnemyModule*.cs;EnemyActionFamilies.cs;EnemyControlActions.cs;EnemyCombatActions.cs;GlueActions.cs;GlueFacts.cs;EnemyBehaviorNative.cs;EnemyBehaviorLedger.cs;EnemyBehaviorActions.cs;EnemyWaveModule.cs;EnemyNodeEffectActions.cs;EnemyNodeFacts.cs;EnemyNodeRegistration.cs;EnemyNodeValueReads.cs;EnemySelector.cs;EnemyAttackInstanceFacts.cs;EnemyWaveFacts.cs;EnemyProfileContract.cs;EnemyProfileActions.cs;Observation/*.cs" />
     <!-- The spawn requirement derivation is game-independent, but the runtime data source in this assembly
          feeds it, so the one source is compiled here instead of loading the managed helper assembly. -->
     <Compile Include="../Spawn/EnemySpawnRequirements.cs" Link="Spawn/EnemySpawnRequirements.cs" />
@@ -28,6 +28,7 @@
     <Compile Include="../EnemySelectorContract.cs" Link="EnemySelectorContract.cs" />
     <Compile Include="../AttackInstanceContract.cs" Link="AttackInstanceContract.cs" />
     <Compile Include="../ModuleDefinition.cs" Link="ModuleDefinition.cs" />
+    <Compile Include="../EnemyControlContract.cs;../EnemyRegistration.cs" Link="%(Filename)%(Extension)" />
     <!-- One domain-owned receiver split across partials; no duplicate runtime provider. -->
     <Reference Include="ForgeRuntime" HintPath="$(ForgeRuntimeAssembly)" Private="false" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeFrameworkAssembly)" Private="false" />

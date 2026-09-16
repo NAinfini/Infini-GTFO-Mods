@@ -17,7 +17,7 @@
          module and its partials are absent on purpose; compiling them would drag the whole game surface into a
          harness whose doubles cover the host, not the game. -->
     <Compile Include="../../../ForgeEnemy/*.cs" Link="ForgeEnemy/%(Filename)%(Extension)" />
-    <Compile Include="../../../ForgeEnemy/Native/EnemyControlContract.cs" Link="EnemyControlContract.cs" />
+
     <!-- One declaration, two registrations: the release export and this harness register the same rows, so the file
          lives with the export tool and is linked here rather than copied into a second table. -->
     <Compile Include="../../../Release/export-runtime-manifest/EnemyDeclaration.cs" Link="EnemyDeclaration.cs" />

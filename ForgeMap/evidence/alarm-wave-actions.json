@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "purpose": "Native evidence for the five alarm/wave/scan action rows: forge.action.map.{alarm_start,alarm_stop,scan_start,wave_start,wave_stop}. Every hook signature, RVA and field layout below is read from the QA-profile interop assembly and the build 20403457 dump; every call edge is read out of GameAssembly.dll's own code section and is marked as a static scan, not as a game-verified observation.",
+  "purpose": "Native evidence for the three scan/wave action rows: forge.action.map.{scan_start,wave_start,wave_stop}. The two alarm rows the rulings deleted had no native write of their own: an alarm is the same ChainedPuzzleInstance a scan activates, and the puzzle's own data block decides whether that activation raises one. Every hook signature, RVA and field layout below is read from the QA-profile interop assembly and the build 20403457 dump; every call edge is read out of GameAssembly.dll's own code section and is marked as a static scan, not as a game-verified observation.",
   "verification": "implementation",
   "gameVerified": false,
   "gameVerifiedNote": "No claim in this file was observed in a running game. The call edges were recovered by scanning the native code section for direct relative calls into the named method bodies; a call whose target lands on a jump stub, a virtual dispatch or an indirect call is not visible to that scan and is not claimed. Each such gap is stated per entry.",
@@ -61,7 +61,7 @@
       "offset": "0x1731880",
       "dumpLine": 610176,
       "interopVisibility": "public wrapper for a public native method",
-      "role": "The write path this slice uses for alarm_start/scan_start (Activate) and as the native stop entry for a single alarm (Deactivate).",
+      "role": "The write path this slice uses for scan_start (Activate); `Deactivate` is the single-instance stop no row of this slice issues.",
       "reads": "the interaction enum only",
       "sync": "the entry hands the interaction to the instance's own SNet_StateReplicator<pChainedPuzzleState,pChainedPuzzleInteraction> through InteractWithState (direct call recovered at file offset 0x17319C0 inside this body, target 0x1817331982). The replicator's provider callback is OnStateChange, which is where the master side runs.",
       "harmony": "not a hook target for this slice; it is the call target",
@@ -131,7 +131,7 @@
       "reads": "the instance's own fields; the body contains Debug logging and string building",
       "callers": ["0x1733853 inside ChainedPuzzleInstance.OnStateChange (byte scan)"],
       "callerCount": 0,
-      "sync": "not proven. Whether the deactivation publishes a new pChainedPuzzleState was not established, so alarm_stop does not claim it (see unimplementedRows).",
+      "sync": "not proven. Whether the deactivation publishes a new pChainedPuzzleState was not established, and no Forge row of this slice issues a deactivation.",
       "verified": false
     },
     {
@@ -338,7 +338,7 @@
       "type": "ChainedPuzzles.ChainedPuzzleInstance",
       "isStatic": false,
       "signature": "System.Boolean ChainedPuzzles.ChainedPuzzleInstance::get_IsActive()",
-      "note": "Read by alarm_start/scan_start to answer 'the state the request asked for already holds' without writing."
+      "note": "Read by scan_start to answer 'the state the request asked for already holds' without writing."
     },
     {
       "id": "puzzle-solved",
@@ -421,7 +421,7 @@
       "type": "ChainedPuzzles.ChainedPuzzleInstance",
       "isStatic": false,
       "signature": "System.Void ChainedPuzzles.ChainedPuzzleInstance::AttemptInteract(ChainedPuzzles.eChainedPuzzleInteraction)",
-      "role": "the puzzle's own interaction entry and the only member a Forge alarm/scan request writes through. It hands the interaction to the instance's own state replicator (InteractWithState), whose provider callback is OnStateChange, so the master side of an activation runs where the game already runs it. `Activate` is alarm_start and scan_start; `Deactivate` is the single-instance stop an alarm_stop would issue once its handle resolves."
+      "role": "the puzzle's own interaction entry and the only member a Forge scan request writes through. It hands the interaction to the instance's own state replicator (InteractWithState), whose provider callback is OnStateChange, so the master side of an activation runs where the game already runs it. `Activate` is scan_start; whether that activation is an alarm is the puzzle's own data block (TriggerAlarmOnActivate), not a second row. `Deactivate` is the single-instance stop no row of this slice issues."
     },
     {
       "id": "mastermind-survival-wave-entry",
@@ -434,7 +434,7 @@
   ],
   "readbacksAlarmWave": "the rows above are the reads of this slice; the two writes are in `writes`",
   "unproven": [
-    "Whether MasterDeactivate publishes a new pChainedPuzzleState (and therefore replicates) was not established; the body contains no call into the state replicator that this scan found, and the class's push into the replicator was only found inside AttemptInteract. alarm_stop does not rely on it and is unimplemented for that reason.",
+    "Whether MasterDeactivate publishes a new pChainedPuzzleState (and therefore replicates) was not established; the body contains no call into the state replicator that this scan found, and the class's push into the replicator was only found inside AttemptInteract. No row of this slice deactivates an instance, so nothing here relies on it.",
     "The bodies of MasterActivate and MasterDeactivate were scanned for direct calls only; an indirect call, a virtual dispatch or a call through a function pointer inside them is invisible to that method.",
     "The frequency of ChainedPuzzleManager.CreatePuzzleInstance was not measured, so no provider polls its list; both the resource enumeration and every action read it on demand.",
     "PublicAlarmName uniqueness inside a level is not established.",
@@ -443,20 +443,11 @@
   "catalogMismatches": [
     "forge.action.map.wave_start declares budget/count/seed/interval inputs, but the only interop-visible native start entry takes neither a budget, a count, a seed nor an interval: the population budget and the group cadence are fields of the author's SurvivalWaveSettingsDataBlock, and the seed is the level's own. A request that carries one of the four is refused with `wave-knob-unsupported` rather than run without it.",
     "forge.action.map.scan_start declares an `anchor` (vector3) and a `quorum` (integer). No native entry takes either: a puzzle is created at a position (ChainedPuzzleManager.CreatePuzzleInstance), an existing puzzle cannot be moved per request, and the number of players a scan requires is a field of its own data block (read by CP_Bioscan_Core). The anchor is therefore not applied and the quorum is echoed back in the result row, never written.",
-    "forge.action.map.alarm_stop declares `existing_enemies_policy` with `keep` and `clear`. Nothing native takes that decision: whether the wave started by the puzzle survives the puzzle's end is the data block's own DisableSurvivalWaveOnComplete, and clearing already-spawned enemies would be a second, Forge-owned enemy deletion path. `clear` is refused with `alarm-clear-unsupported`.",
     "forge.action.map.wave_stop declares `pending_spawns_policy` with `cancel` and `finish`. The native stop removes the event, which is `cancel`; no entry lets a wave spend its remaining budget first, so `finish` is refused with `wave-pending-finish-unsupported`.",
     "forge.action.map.wave_start and wave_stop are recorded in rows.tsv as belonging to ForgeEnemy (ruling 83: wave facts and wave control are the enemy package's), while this slice's specification names ForgeMap files. The declaration is written so the wave half can be moved without touching a native hook; the integration batch has to decide which package registers it.",
-    "The catalog's alarm_start/scan_start declare a `handle` output (alarm_handle/scan_handle) and the two stop rows declare a handle input. This runtime has no entry point that mints a provider handle and no table that turns one back into a native object, so the start rows publish their result only and the stop rows refuse with `handle-native-unavailable`."
+    "The catalog's two start rows declare a `handle` output (scan_handle/wave_handle) and the stop row declares a handle input. The runtime mints a provider handle through RuntimeModuleHandle.CreateEffectHandle/RegisterNative and resolves it back with TryNative, which is what the start rows publish from; a handle that names no live object of this world is refused with `handle-not-live` rather than stopping a stranger."
   ],
   "unimplementedRows": [
-    {
-      "row": "forge.action.map.alarm_stop",
-      "state": "未实现",
-      "missing": "provider 铸句柄 + 句柄↔原生对象表 (R-ABI 批 C)",
-      "detail": "The row's only subject input is an effect handle. Resolving it to the ChainedPuzzleInstance it named needs the handle-to-native table, and minting that handle in alarm_start needs the provider-side handle factory. Both are batch C of %TEMP%\\rabi-audit\\implementation-plan.md.",
-      "integrationPoint": "RuntimeModuleHandle.CreateEffectHandle(kind, lifetime) + RegisterNative(handle, object) / TryNative(handle, out object), then Mastermind.TryGetEvent(eventId) + MastermindEvent.StopEvent() for a wave and ChainedPuzzleInstance.MasterDeactivate for a puzzle",
-      "refusalCode": "handle-native-unavailable"
-    },
     {
       "row": "forge.action.map.wave_stop",
       "state": "未实现",
@@ -466,22 +457,15 @@
       "refusalCode": "handle-native-unavailable"
     },
     {
-      "row": "forge.action.map.alarm_start (alarm_handle output)",
-      "state": "部分实现",
-      "missing": "provider 铸句柄 (R-ABI 批 C)",
-      "detail": "The action itself runs: the named puzzle is activated through its own interaction entry. Only the row's declared `alarm_handle` output cannot be produced, so a plan that consumes that port gets nothing and the handle-dependent stop row cannot be driven.",
-      "integrationPoint": "RuntimeModuleHandle.CreateEffectHandle(\"effect\", \"encounter\") after the interaction is issued"
-    },
-    {
       "row": "forge.action.map.scan_start (scan_handle output)",
       "state": "部分实现",
       "missing": "provider 铸句柄 (R-ABI 批 C)",
-      "detail": "Same as alarm_start's handle: the activation runs, the handle output has no producer."
+      "detail": "The activation runs through the puzzle's own interaction entry, which is the write the row claims; this file was written before the handle factory landed."
     }
   ],
   "integrationNotes": [
     "The integration batch must add `ResourceProviders` for the two kinds this slice declares (`chained-puzzle`, `wave`). Without a registered owner of a kind, a plan that carries a compiled resource reference of that kind is refused at load with `stale-resource` (RuntimePlan.ResolveResourceLiteral reads the registry's static declaration), so the two start rows cannot be driven end-to-end until the provider is registered.",
-    "The chained-puzzle provider belongs to whichever package owns the puzzle instance table; this slice publishes it from ForgeMap because the alarm and scan rows are declared there.",
+    "The chained-puzzle provider belongs to whichever package owns the puzzle instance table; this slice publishes it from ForgeMap because the scan row is declared there.",
     "The plan ABI reads a resource port's value as {\"resourceKind\",\"resourceId\"} and the kernel validates the kind against the port's own declaration, so the handler never has to guess a kind."
   ]
 }

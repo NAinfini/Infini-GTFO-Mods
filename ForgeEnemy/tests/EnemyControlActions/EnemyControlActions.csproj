@@ -28,7 +28,7 @@
          compiling their half-finished partials. Everything the actions themselves do is the production source,
          unchanged. The native hook classes, the plugin lifetime and the sibling families are not part of this
          suite's statement: it dispatches the handlers, it does not install Harmony patches. -->
-    <Compile Include="../../Native/EnemyControlActions.cs;../../Native/EnemyControlContract.cs" />
+    <Compile Include="../../Native/EnemyControlActions.cs;../../ModuleDefinition.cs;../../EnemyControlContract.cs" />
     <Compile Include="GameDoubles.cs;EnemyModuleShim.cs;Probe.cs;EnemyControlWorld.cs;EnemyControlFacts.cs;Program.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />

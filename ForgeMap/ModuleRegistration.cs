@@ -40,9 +40,8 @@ public static class ModuleRegistration
         RuntimeJson.Parse(EnvironmentContract.EnvironmentStateCapabilityJson),
         RuntimeJson.Parse(EnvironmentContract.ZoneLightsCapabilityJson),
         RuntimeJson.Parse(HudContract.ValueCapabilityJson),
-        // The five alarm/scan/wave execute rows and their resource kinds (ruling 129.4).
-        RuntimeJson.Parse(AlarmWaveContract.AlarmStartCapabilityJson),
-        RuntimeJson.Parse(AlarmWaveContract.AlarmStopCapabilityJson),
+        // The three scan/wave execute rows and their resource kinds (ruling 129.4; the two alarm rows were
+        // deleted by a later ruling — an alarm is the chained puzzle `scan_start` activates).
         RuntimeJson.Parse(AlarmWaveContract.ScanStartCapabilityJson),
         RuntimeJson.Parse(AlarmWaveContract.WaveStartCapabilityJson),
         RuntimeJson.Parse(AlarmWaveContract.WaveStopCapabilityJson),

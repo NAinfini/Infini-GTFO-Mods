@@ -278,7 +278,7 @@ python ForgeMap/tools/run_identity_checks.py --out ForgeMap/evidence/identity-ch
 - 计划文件不是合法 JSON 或读不到时记 `assembly.schema`（`$`）：合同的 34 码里没有"文件读不到"这一条，取形状阶段的码。文档能解析但没有 `planId`、或文件名不等于 `planId + ".assembly.json"` 时记 `assembly.plan-file`（与两个检查器的宽松 planId 提取一致）。
 - 每个计划文件单独出结果，一份被拒不影响同包其他计划（沿用 I-PACK"每个文件单独出结果"的口径）；文件身份两条码（`assembly.plan-file`、`assembly.duplicate-level-layout`）在描述符与计划文档校验之前判定，`assembly.duplicate-level-layout` 记在 ordinal 靠后的那个文件上，`assembly.package-layout` 是包级拒绝且不再出计划行。同一份计划被拒时它的 `levelLayoutId` 仍占用登记，后续同 id 文件照样报重复。
 - 合同没有为 `forge/maps/` 写 I-PACK 里的链接/越界检查（`plan-path`）与单文件/合计上限（`json-size`、`plan-budget`），本次**没有实现**，等裁决方决定是否按 I-PACK 逐条补齐。
-- 诊断日志暂用 BepInEx 日志的 `map.plan-accepted` / `map.plan-rejected` / `map.package-rejected` 三行（行内 `path` 为 BepInEx 相对路径），**不是** `forge.log.v1` 记录：`plan.loaded` / `plan.rejected` 归 Runtime sink。Map 的 cfg `Logging.Level` 已在 `Native/Plugin.cs` 绑定并随 `MapPluginSession.Start` 注册，但这三行诊断仍未改走 Runtime sink。这三个码需要按 §2.5 补进 §3.2 I-DIAG 的包内诊断码表。
+- 诊断日志暂用 BepInEx 日志的 `map.plan-accepted` / `map.plan-rejected` / `map.package-rejected` 三行（行内 `path` 为 BepInEx 相对路径），**不是** `forge.log` 记录：`plan.loaded` / `plan.rejected` 归 Runtime sink。Map 的 cfg `Logging.Level` 已在 `Native/Plugin.cs` 绑定并随 `MapPluginSession.Start` 注册，但这三行诊断仍未改走 Runtime sink。这三个码需要按 §2.5 补进 §3.2 I-DIAG 的包内诊断码表。
 
 **边界**：发现流程只读夹具目录并跑已有静态检查；18 项与 44 项都是合成数据与替身，不能替代实机、主客机、导航或生成验证。没有真实 Geo 包、没有网站夹具（`Tests/Forge/fixtures/map-assembly/` 仍缺 `MANIFEST.json` 与 `cases.json`），也没有 G7 生成。
 

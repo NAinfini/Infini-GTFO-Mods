@@ -81,7 +81,7 @@ internal sealed class RecNullContext : IRecSessionContext
 /// </summary>
 internal static class RecSession
 {
-    internal const string SchemaVersion = "forge.rec.v1";
+    internal const string SchemaVersion = "forge.rec";
     internal const int DefaultRecordBudget = 64 * 1024;
     internal const int DefaultSegmentBytes = 8 * 1024 * 1024;
 

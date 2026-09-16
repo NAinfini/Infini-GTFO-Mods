@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using ForgeRuntime.Framework;
 
-namespace ForgeEnemy.Native;
+namespace ForgeEnemy;
 
 /// <summary>The enemy control rows this provider implements, spelled as the authoring catalog rows
 /// `forge.action.enemy.awaken`, `forge.action.enemy.sleep` and `forge.action.enemy.move_to`: the same ports, the
-/// same structural enums in the same order, and the same result row fields. The rows live beside the handlers
-/// because this package's registry is assembled from the native module's own strings, so a row and the member it
-/// is submitted through cannot drift apart without failing the registration.
+/// same structural enums in the same order, and the same result row fields. The declaration half lives in the
+/// game-independent package assembly, so the registration the game-side module builds and the one the release
+/// export builds read the same rows instead of two copies of them; the native handlers that answer the rows are
+/// the game-bound assembly's own.
 ///
 /// Three rows of the same family stay undeclared here, because declaring a capability this provider cannot
 /// answer would advertise a node that can never run: `forge.action.enemy.target_set` declares a `lease` handle
@@ -18,12 +19,24 @@ namespace ForgeEnemy.Native;
 /// They are reported in `ForgeEnemy/evidence/enemy-control-actions.json` rather than half-implemented.</summary>
 internal static class EnemyControlContract
 {
+    /// <summary>The three binding ids, handler names and capability ids, named rather than spelled at each call
+    /// site: the rows below declare them, `Support` carries them and the native handlers answer them.</summary>
+    internal const string AwakenBinding = ModuleDefinition.ProviderId + ".binding.awaken";
+    internal const string SleepBinding = ModuleDefinition.ProviderId + ".binding.sleep";
+    internal const string MoveToBinding = ModuleDefinition.ProviderId + ".binding.move_to";
+    internal const string AwakenHandler = "gtfo.enemy.awaken";
+    internal const string SleepHandler = "gtfo.enemy.sleep";
+    internal const string MoveToHandler = "gtfo.enemy.move_to";
+    internal const string AwakenCapability = "forge.action.enemy.awaken";
+    internal const string SleepCapability = "forge.action.enemy.sleep";
+    internal const string MoveToCapability = "forge.action.enemy.move_to";
+
     /// <summary>The rows this provider answers, in catalog order. `CapabilityRows` is the declaration half and
     /// `BindingRows` the registration half; both are the same three actions in the same order, so a reader can
     /// match them by index.</summary>
     internal static readonly string[] CapabilityIds =
     {
-        EnemyModule.AwakenCapability, EnemyModule.SleepCapability, EnemyModule.MoveToCapability
+        AwakenCapability, SleepCapability, MoveToCapability
     };
 
     /// <summary>The three capability rows, one JSON object each, in the order `CapabilityIds` names. They are
@@ -411,8 +424,18 @@ internal static class EnemyControlContract
     /// registration, and a handler name that drifts from its row is a binding nobody can answer.</summary>
     internal static readonly string[] HandlerNames =
     {
-        EnemyModule.AwakenHandler, EnemyModule.SleepHandler, EnemyModule.MoveToHandler
+        AwakenHandler, SleepHandler, MoveToHandler
     };
+
+    /// <summary>Each handler's own ports, declared once for both halves that register the rows and resolved at
+    /// registration against the capability row the binding implements, so neither half can describe a different
+    /// layout.</summary>
+    internal static readonly HandlerShape AwakenPorts = new HandlerShape()
+        .Inputs("enemies", "source", "alert_amount", "reason").Outputs("result").Parameters("wake_policy");
+    internal static readonly HandlerShape SleepPorts = new HandlerShape()
+        .Inputs("enemies", "duration").Outputs("result").Parameters("sleep_policy", "interrupt_policy");
+    internal static readonly HandlerShape MoveToPorts = new HandlerShape()
+        .Inputs("enemies", "destination", "area", "speed", "arrival_tolerance").Outputs("result");
 
     /// <summary>The capability rows above, in index order — the shape a registration site needs for the two
     /// insertion points that take one row at a time. A registration site appends all three, in this order, after
@@ -423,29 +446,20 @@ internal static class EnemyControlContract
     /// binding `i` names capability `i`.</summary>
     internal static IReadOnlyList<string> BindingRowText() => BindingRows;
 
-    /// <summary>The three command handlers this contract's binding rows name, handed to the registration as one
-    /// table so the binding, the handler and its shape are declared in one place.</summary>
-    internal static Dictionary<string, CommandHandler> Handlers(EnemyModule module) => new(StringComparer.Ordinal)
-    {
-        [EnemyModule.AwakenHandler] = module.Awaken,
-        [EnemyModule.SleepHandler] = module.Sleep,
-        [EnemyModule.MoveToHandler] = module.MoveTo
-    };
-
-    /// <summary>The three handlers' own port sets, resolved once at registration against the rows above.</summary>
+    /// <summary>The three handlers' own port sets, keyed by the handler names the rows above spell.</summary>
     internal static Dictionary<string, HandlerShape> Shapes() => new(StringComparer.Ordinal)
     {
-        [EnemyModule.AwakenHandler] = EnemyModule.AwakenPorts,
-        [EnemyModule.SleepHandler] = EnemyModule.SleepPorts,
-        [EnemyModule.MoveToHandler] = EnemyModule.MoveToPorts
+        [AwakenHandler] = AwakenPorts,
+        [SleepHandler] = SleepPorts,
+        [MoveToHandler] = MoveToPorts
     };
 
     /// <summary>One binding's registration support. Writing an enemy's own state machine reads and writes only
     /// state this module already tracks, so each binding carries the one permission its write path needs.</summary>
     internal static BindingSupport[] Support() => new[]
     {
-        new BindingSupport(EnemyModule.AwakenBinding, "implementation-only", new[] { "gtfo.enemy.behavior.write" }),
-        new BindingSupport(EnemyModule.SleepBinding, "implementation-only", new[] { "gtfo.enemy.behavior.write" }),
-        new BindingSupport(EnemyModule.MoveToBinding, "implementation-only", new[] { "gtfo.enemy.navigation.write" })
+        new BindingSupport(AwakenBinding, "implementation-only", new[] { "gtfo.enemy.behavior.write" }),
+        new BindingSupport(SleepBinding, "implementation-only", new[] { "gtfo.enemy.behavior.write" }),
+        new BindingSupport(MoveToBinding, "implementation-only", new[] { "gtfo.enemy.navigation.write" })
     };
 }

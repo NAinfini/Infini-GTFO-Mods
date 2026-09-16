@@ -78,7 +78,7 @@ ExperimentPanelKey = F5
 
 每个会话目录里是若干 `rec-<session>-<序号>.jsonl` 分段（开 gzip 时是 `.jsonl.gz`）、截图目录 `shots/` 和一份 `index.json`。`index.json` 记录通道计数、分段列表、丢弃数、是否触到总量上限以及装了哪些补丁；`patches` 字段就是跟踪器的启动报告，所以一个会话能自己说明它当时在跟踪什么。
 
-每条记录是一行 JSON，固定字段是 `v`（`forge.rec.v1`）、`seq`、`session`、`channel`、`kind`、`t`（进程毫秒）、`frame`、`snetTime`（玩家同步时间，取到才有）、`role`、`slot`、`level`（远征 key）、`worldEpoch`、`tick`，业务内容在 `body` 里。通道含义见下表。
+每条记录是一行 JSON，固定字段是 `v`（`forge.rec`）、`seq`、`session`、`channel`、`kind`、`t`（进程毫秒）、`frame`、`snetTime`（玩家同步时间，取到才有）、`role`、`slot`、`level`（远征 key）、`worldEpoch`、`tick`，业务内容在 `body` 里。通道含义见下表。
 
 | 通道 | 内容 |
 | --- | --- |

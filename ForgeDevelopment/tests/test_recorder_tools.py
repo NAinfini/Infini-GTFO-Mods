@@ -24,7 +24,7 @@ sys.modules["rec_query"] = query
 
 
 def record(seq, channel, kind, body, snet=None, role="host", stamp=None, frame=None):
-    value = {"v": "forge.rec.v1", "seq": seq, "session": "rec-test", "channel": channel, "kind": kind,
+    value = {"v": "forge.rec", "seq": seq, "session": "rec-test", "channel": channel, "kind": kind,
              "t": seq * 10 if stamp is None else stamp, "role": role, "slot": "0", "level": "Rundown/Test"}
     if snet is not None:
         value["snetTime"] = snet
@@ -45,7 +45,7 @@ def write_session(directory: Path, rows, gzip_segments=False):
         path = directory / "rec-test-000.jsonl"
         path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     (directory / "index.json").write_text(json.dumps({
-        "v": "forge.rec.v1", "session": "rec-test", "role": rows[0]["role"] if rows else "host",
+        "v": "forge.rec", "session": "rec-test", "role": rows[0]["role"] if rows else "host",
         "dropped": 0, "budgetReached": False, "segments": [{"file": path.name, "bytes": 1, "records": len(rows)}],
     }), encoding="utf-8")
     return directory

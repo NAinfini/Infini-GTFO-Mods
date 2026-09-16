@@ -38,7 +38,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 ### 执行日志
 
-**内核记录点已接入。** 按 `forge.log.v1` 事件码表，Runtime 归属与内核可见的记录点全部在内核里写出：`registration.rejected`、`binding.registered`、`plan.loaded`、`plan.rejected`、`world.began`、`trigger.fired`、`event.rejected`、`budget.exceeded`、`event.deferred`、`event.cancelled`、`step.started`、`step.finished`、`entry.stopped`、`observer.failed`、`runtime.suspended`，加上 writer 自己的 `log.level`/`log.dropped`。`adapter.*` 等适配器事件码定稿后再做，领域包内部的原生诊断码也不在本节范围。SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别)。
+**内核记录点已接入。** 按 `forge.log` 事件码表，Runtime 归属与内核可见的记录点全部在内核里写出：`registration.rejected`、`binding.registered`、`plan.loaded`、`plan.rejected`、`world.began`、`trigger.fired`、`event.rejected`、`budget.exceeded`、`event.deferred`、`event.cancelled`、`step.started`、`step.finished`、`entry.stopped`、`observer.failed`、`runtime.suspended`，加上 writer 自己的 `log.level`/`log.dropped`。`adapter.*` 等适配器事件码定稿后再做，领域包内部的原生诊断码也不在本节范围。SDK 合同见 [Framework README](Framework/README.md#执行日志-sink-与级别)。
 
 归属按合同的归属规则：`step.started`/`step.finished` 与 `trigger.fired` 归该 binding 所属的 provider，`binding.registered` 归被注册 binding 的 provider，`observer.failed` 归该观察者的 provider，`event.cancelled` 与其余 `event.*`、`plan.*`、`entry.stopped`、`budget.exceeded`、`world.began`、`runtime.suspended`、`registration.*` 归 Runtime。级别由码本身决定，只有 `step.finished` 按结果分级：`failed` 或 commit 为 `unknown` 记 error，其余记 info。`registration.rejected` 的 `subjectProvider` 是被拒绝的 provider，`runtime.suspended` 一条对应一次暂停（启动失败、主机迁移、检查点恢复、宿主回调异常、停止各一条）。
 
@@ -50,7 +50,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 `[Logging] Level` 接受 `off`、`error`、`info`（大小写与首尾空白不敏感），默认 `error`，按原始文本解析，其他值（包括 `trace`）在原生初始化之前失败。改动需要重启。`Runtime.Mode = Off` 时宿主不初始化，也就没有 writer。
 
-宿主的 `Logging/RuntimeLogWriter.cs` 实现 sink，写 `forge.log.v1` JSONL：
+宿主的 `Logging/RuntimeLogWriter.cs` 实现 sink，写 `forge.log` JSONL：
 
 - 惰性启动：第一条被接受的记录才创建后台线程、目录和文件。没有记录就没有线程、目录、文件和控制台输出。
 - 文件是 `BepInEx/forge-logs/<yyyyMMddTHHmmssZ>-<4 位十六进制随机>.jsonl`，UTF-8 无 BOM，`\n` 换行，`CreateNew` 不覆盖。新文件建好后按修改时间只保留最新 10 个，只删该目录顶层的 `*.jsonl`。

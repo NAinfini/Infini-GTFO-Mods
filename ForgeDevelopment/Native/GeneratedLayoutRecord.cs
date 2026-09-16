@@ -9,7 +9,7 @@ using HostPlugin = ForgeRuntime.Plugin;
 namespace ForgeDevelopment.Native;
 
 /// <summary>
-/// The actual layout of a generated level, recorded into `forge.log.v1` (contract §3.2, `map.layout-generated`).
+/// The actual layout of a generated level, recorded into `forge.log` (contract §3.2, `map.layout-generated`).
 ///
 /// The report files already say which build jobs ran; they never said what the level became. This reads the
 /// built level — every zone the generator created, the geomorph prefabs inside it and the gate through which the
