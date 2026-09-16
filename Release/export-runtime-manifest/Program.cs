@@ -2,7 +2,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ForgeEnemy.Native;
-using ForgeMap;
 using ForgeRuntime.Framework;
 using ForgeTrigger;
 using ForgeWeapon;
@@ -107,75 +106,16 @@ static int Export(string releasePath, string outputPath)
     return 0;
 }
 
-/// <summary>The one Map declaration this tool registers: the same rows the game-side session declares, so the
-/// manifest is the running registry's own and not a second description of it. The rows, the capability rows and
-/// the registration support are the game-independent contracts'; every handler body belongs to the game-bound
-/// assembly, so each one is replaced by the refusing stand-in below and every shape is the contract's own. The
-/// shape table is the definition's, composed with the native handlers' shapes rather than replaced — dropping it
-/// would leave the player selector's row unresolvable.</summary>
-static RuntimeModule MapModule()
-{
-    var bindings = new object[] { PlayerHealthContract.Row() }
-        .Concat(TerminalObjectContract.Bindings())
-        .Concat(ObjectiveActionContract.Bindings()).ToArray();
-    var capabilities = TerminalObjectContract.Rows().Cast<object>()
-        .Concat(ObjectiveActionContract.CapabilityRows()).ToArray();
-    var support = new[] { PlayerHealthContract.Support() }
-        .Concat(TerminalObjectContract.Supports())
-        .Concat(ObjectiveActionContract.Supports()).ToArray();
-    var definition = ForgeMap.ModuleDefinition.Create(bindings, capabilities, support);
-    // The declaration carries the on-demand rows whose reading belongs to the game-bound half: the level's own
-    // zone table, the scan and container state, and the generator rows. A registration that declares them must
-    // resolve an evaluator for each, so every one gets the same refusing stand-in a game-bound body gets — the
-    // row, its shape and its handler name are the declaration's, and only the reading is absent here. The set is
-    // read from the declaration itself rather than restated: a row a later batch adds is exported, not dropped.
-    var evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal);
-    var shapes = new Dictionary<string, HandlerShape>(definition.Shapes, StringComparer.Ordinal)
-    {
-        [PlayerHealthContract.HandlerName] = PlayerHealthContract.Shape,
-        [TerminalObjectContract.CommandHandlerName] = TerminalObjectContract.CommandShape,
-        [TerminalObjectContract.VisibilityHandlerName] = TerminalObjectContract.VisibilityShape,
-        [TerminalObjectContract.OutputHandlerName] = TerminalObjectContract.OutputShape,
-        [ObjectiveActionContract.StateHandlerName] = ObjectiveActionContract.StateShape,
-        [ObjectiveActionContract.PhaseHandlerName] = ObjectiveActionContract.PhaseShape,
-        [ObjectiveActionContract.ExtractionHandlerName] = ObjectiveActionContract.ExtractionShape
-    };
-    using (var declared = JsonDocument.Parse(definition.RegistryJson))
-    {
-        var owned = declared.RootElement.GetProperty("capabilities").EnumerateArray()
-            .Where(row => row.GetProperty("owner").GetString() == ForgeMap.ModuleDefinition.ProviderId)
-            .ToDictionary(row => row.GetProperty("id").GetString()!, row => row.GetProperty("kind").GetString()!, StringComparer.Ordinal);
-        foreach (var row in declared.RootElement.GetProperty("bindings").EnumerateArray())
-        {
-            if (row.GetProperty("status").GetString() != "implemented") continue;
-            var role = row.GetProperty("role").GetString();
-            if (role != "observe" && role != "evaluate") continue;
-            // A row whose capability another provider owns resolves that provider's evaluator, and a trigger row
-            // is published rather than evaluated; only this provider's own on-demand rows are answered here.
-            if (!owned.TryGetValue(row.GetProperty("capabilityId").GetString()!, out var kind)) continue;
-            if (kind is not ("selector" or "condition" or "state")) continue;
-            var handler = row.GetProperty("handler").GetString()!;
-            evaluators[handler] = ExportOnlyEvaluator(handler);
-            if (shapes.ContainsKey(handler)) continue;
-            if (LevelObjectContract.Shapes().TryGetValue(handler, out var level)) shapes[handler] = level;
-            else if (GeneratorContract.Shapes().TryGetValue(handler, out var generator)) shapes[handler] = generator;
-            else if (PlayerStateContract.ValueShapes().TryGetValue(handler, out var value)) shapes[handler] = value;
-        }
-    }
-    return definition with
-    {
-        Handlers = new[]
-            {
-                PlayerHealthContract.HandlerName, TerminalObjectContract.CommandHandlerName, TerminalObjectContract.VisibilityHandlerName,
-                TerminalObjectContract.OutputHandlerName, ObjectiveActionContract.StateHandlerName,
-                ObjectiveActionContract.PhaseHandlerName, ObjectiveActionContract.ExtractionHandlerName
-            }
-            .Select(handler => (Handler: handler, Body: ExportOnlyHandler(handler)))
-            .ToDictionary(row => row.Handler, row => row.Body, StringComparer.Ordinal),
-        Shapes = shapes,
-        Evaluators = evaluators
-    };
-}
+/// <summary>The one Map declaration this tool registers: the game-independent registration the game-side session
+/// builds as well, so the manifest is the running registry's own and not a second description of it. Every body
+/// belongs to the game-bound assembly and no row is invented here: the rows, the capability rows, the support
+/// lines, the shape table and the names that need a body are the shared declaration's own, and each body is
+/// replaced by the refusing stand-in below.</summary>
+static RuntimeModule MapModule() => ForgeMap.ModuleRegistration.Create(
+    ForgeMap.ModuleRegistration.CommandHandlers
+        .ToDictionary(handler => handler, ExportOnlyHandler, StringComparer.Ordinal),
+    ForgeMap.ModuleRegistration.EvaluatorHandlers
+        .ToDictionary(handler => handler, ExportOnlyEvaluator, StringComparer.Ordinal));
 
 /// <summary>The stand-in an evaluator whose reading belongs to a game-bound assembly is registered with: the row
 /// is exported, and this process answers no query at all, so the only honest body is one that refuses.</summary>

@@ -173,18 +173,17 @@ internal sealed partial class MapPluginSession : IDisposable
         if (PlayerValueReads.Installed is { } reads) Cleanup(() => PlayerValueReads.Detach(reads), errors);
     }
 
-    /// <summary>The one Map provider definition: the capability and binding rows the game-independent Map
-    /// assembly declares, extended with the implemented rows and the runtime surface of every half. This session
-    /// composes it because it is the only place that knows the player identity, the map objects, the environment
-    /// and the level together, and because the runtime accepts exactly one provider of one identity namespace.
-    /// Each entry reads the half that is current when the kernel asks, so the definition can be built before the
-    /// player half attaches to the registration it is declared on; nothing is dispatched before the host starts
-    /// the runtime.
+    /// <summary>The one Map provider definition: the rows, the support lines and the shape table
+    /// <see cref="ModuleRegistration"/> declares — the same registration the release export builds — completed
+    /// with the bodies and the runtime surface of every half. This session supplies the bodies because it is the
+    /// only place that knows the player identity, the map objects, the environment and the level together, and
+    /// because the runtime accepts exactly one provider of one identity namespace. Each entry reads the half that
+    /// is current when the kernel asks, so the definition can be built before the player half attaches to the
+    /// registration it is declared on; nothing is dispatched before the host starts the runtime.
     ///
     /// Every row's declaration — its capability, its binding, its registration row and its port shape — is the
-    /// game-independent contract's, and only the handlers are native, so the declaration and the implementation
-    /// cannot drift into two descriptions of one binding. The shapes they add are composed with the declaration's
-    /// own here, because a definition carries one shape table for all of them.</summary>
+    /// game-independent contract's, and only the handler bodies are native, so the declaration and the
+    /// implementation cannot drift into two descriptions of one binding.</summary>
     private RuntimeModule Definition()
     {
         var actions = new TerminalObjectActions(_kernel, () => !_faulted, TerminalFor, _report);
@@ -193,128 +192,74 @@ internal sealed partial class MapPluginSession : IDisposable
         var environment = EnvironmentActions.For(() => !_faulted, _report);
         var presented = EnvironmentPresentation.For(_report);
         var hud = new HudActions(_report);
-        var capabilities = new List<object>
+        var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
         {
-            RuntimeJson.Parse(EnvironmentContract.LightingCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.LightColorCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.FogCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.FogCycleCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.AudioCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.AudioStopCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.IntelCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.DialogueCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.NavMarkerCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.AnimationCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.PlayerVoiceCapabilityJson),
-            // The two environment value rows: their bindings in `EnvironmentContract.Bindings` are `evaluate`
-            // ones, so each row is declared here exactly as the ten action rows' are.
-            RuntimeJson.Parse(EnvironmentContract.EnvironmentStateCapabilityJson),
-            RuntimeJson.Parse(EnvironmentContract.ZoneLightsCapabilityJson),
-            RuntimeJson.Parse(HudContract.ValueCapabilityJson),
-            // The five alarm/scan/wave execute rows and their resource kinds (ruling 129.4).
-            RuntimeJson.Parse(AlarmWaveContract.AlarmStartCapabilityJson),
-            RuntimeJson.Parse(AlarmWaveContract.AlarmStopCapabilityJson),
-            RuntimeJson.Parse(AlarmWaveContract.ScanStartCapabilityJson),
-            RuntimeJson.Parse(AlarmWaveContract.WaveStartCapabilityJson),
-            RuntimeJson.Parse(AlarmWaveContract.WaveStopCapabilityJson),
-            // The `v-obj` value row, and the level-event family's own rows: its eight trigger bindings name
-            // canonical capability rows the runtime trigger contract declares (registered as a host built-in),
-            // the three action rows are this contract's own spelling of the catalog's graph, and the two spatial
-            // triggers are their own contract's.
-            RuntimeJson.Parse(LevelObjectiveValueContract.CapabilityRowJson),
-            // The door value row: its binding is an `evaluate` one too, and a row nothing declares is refused.
-            RuntimeJson.Parse(DoorQueryContract.CapabilityRowJson)
+            [PlayerHealthContract.HandlerName] = PlayerHealthAction.Execute,
+            [TerminalObjectContract.CommandHandlerName] = actions.HandleCommand,
+            [TerminalObjectContract.VisibilityHandlerName] = actions.HandleVisibility,
+            [TerminalObjectContract.OutputHandlerName] = actions.HandleOutput,
+            [ObjectiveActionContract.StateHandlerName] = objectives.HandleState,
+            [ObjectiveActionContract.PhaseHandlerName] = objectives.HandlePhase,
+            [ObjectiveActionContract.ExtractionHandlerName] = objectives.HandleExtraction,
+            [DoorTerminalActionContract.LockHandlerName] = doors.HandleLock,
+            [DoorTerminalActionContract.UnlockHandlerName] = doors.HandleUnlock,
+            [EnvironmentContract.LightingHandler] = environment.HandleLighting,
+            [EnvironmentContract.LightColorHandler] = environment.HandleLightColor,
+            [EnvironmentContract.FogHandler] = environment.HandleFog,
+            [EnvironmentContract.FogCycleHandler] = environment.HandleFogCycle,
+            [EnvironmentContract.NavMarkerHandler] = environment.HandleNavMarker,
+            [EnvironmentContract.AnimationHandler] = environment.HandleAnimation,
+            [EnvironmentContract.AudioHandler] = presented.HandleAudio,
+            [EnvironmentContract.AudioStopHandler] = presented.HandleAudioStop,
+            [EnvironmentContract.IntelHandler] = presented.HandleIntel,
+            [EnvironmentContract.DialogueHandler] = presented.HandleDialogue,
+            [EnvironmentContract.PlayerVoiceHandler] = presented.HandlePlayerVoice,
+            [HudContract.ValueHandler] = hud.HandleValue,
+            [PlayerCommandContract.DamageHandlerName] = PlayerCommandActions.Damage,
+            [PlayerCommandContract.ReviveHandlerName] = PlayerCommandActions.Revive,
+            [PlayerCommandContract.DownHandlerName] = PlayerCommandActions.Down,
+            // The five alarm/scan/wave rows are static facades: each turns its request into the native
+            // entry point its capability names, and the two start rows mint the handle through the
+            // attachment this session took in Start.
+            [AlarmWaveContract.AlarmStartHandler] = AlarmWaveActions.ExecuteStartAlarm,
+            [AlarmWaveContract.AlarmStopHandler] = AlarmWaveActions.ExecuteStopAlarm,
+            [AlarmWaveContract.ScanStartHandler] = AlarmWaveActions.ExecuteStartScan,
+            [AlarmWaveContract.WaveStartHandler] = AlarmWaveActions.ExecuteStartWave,
+            [AlarmWaveContract.WaveStopHandler] = AlarmWaveActions.ExecuteStopWave,
+            // The three level-event actions, through the same static facade: each builds the
+            // `WardenObjectiveEventData` the engine's own event manager executes.
+            [LevelEventContract.ObjectiveTimerHandlerName] = LevelEventActions.Timer,
+            [LevelEventContract.DimensionHandlerName] = LevelEventActions.Dimension,
+            [LevelEventContract.ExpeditionEndHandlerName] = LevelEventActions.ExpeditionEnd
+        };
+        var evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
+        {
+            [PlayerSelectorContract.HandlerName] = PlayerSelector.Evaluate,
+            // The zone row's evaluator is the game-independent contract's, built from the one read only this
+            // half can make: the zone the anchor's own course node belongs to.
+            [ZoneSelectorContract.HandlerName] =
+                ZoneSelectorContract.Evaluators(new ZoneSelectorContract.ZoneReaders(ZoneOfPlayer))[ZoneSelectorContract.HandlerName],
+            [DoorQueryContract.HandlerName] =
+                DoorQueryContract.Evaluator(new DoorQueryContract.DoorReaders(DoorStateSample)),
+            [EnvironmentContract.EnvironmentStateHandler] = EnvironmentQuery.Evaluate,
+            // The `v-zone-lights` row: the same level the other environment reads stand in, resolving the
+            // named zone through the one zone table and reading its own light list.
+            [EnvironmentContract.ZoneLightsHandler] = EnvironmentQuery.ZoneLights,
+            // The value rows answer through the module that holds the tables the facts fill, so a read of a
+            // scan or a generator is a read of the same instance the fact named and not a second lookup of
+            // it. Each half is read late, for the same reason every other entry here is.
+            [LevelObjectContract.ScanStateHandler] = context => LevelObjects().ReadScanState(context),
+            [GeneratorContract.GeneratorStateHandler] = context => MapObjectHalf().ReadGeneratorState(context),
+            // The `v-obj` row: one objective layer's live state, read through the game-bound reader.
+            [LevelObjectiveValueContract.HandlerName] = LevelObjectiveValueContract.Evaluator(
+                new LevelObjectiveValueContract.LayerReader(LevelObjectiveValueReader.Read))
         }
-            .Concat(LevelEventContract.CapabilityRows())
-            .Concat(TriggerZoneContract.CapabilityRows())
-            .ToList();
-
-        var bindings = new object[] { PlayerHealthContract.Row() }
-            .Concat(TerminalObjectContract.Bindings())
-            .Concat(ObjectiveActionContract.Bindings())
-            .Concat(DoorTerminalEventContract.Bindings())
-            .Concat(DoorTerminalActionContract.Bindings())
-            .Concat(new object[] { RuntimeJson.Parse(DoorQueryContract.BindingRowJson) })
-            .Concat(EnvironmentContract.Bindings())
-            .Concat(new object[] { HudContract.BindingRow() })
-            .Concat(PlayerStateContract.Rows())
-            .Concat(PlayerEventContract.Rows())
-            .Concat(PlayerLifeContract.Rows())
-            .Concat(PlayerStateContract.ValueBindings())
-            .Concat(PlayerCommandContract.Rows())
-            .Concat(AlarmWaveContract.Bindings())
-            .Concat(LevelEventContract.BindingRows())
-            .Concat(TriggerZoneContract.BindingRows())
-            .Concat(new object[] { RuntimeJson.Parse(LevelObjectiveValueContract.BindingRowJson) });
-
-        var support = new[] { PlayerHealthContract.Support() }
-            .Concat(TerminalObjectContract.Supports())
-            .Concat(ObjectiveActionContract.Supports())
-            .Concat(DoorTerminalEventContract.Supports())
-            .Concat(DoorTerminalActionContract.Supports())
-            .Concat(new[] { new BindingSupport(DoorQueryContract.BindingId, "implementation-only", new[] { MapObjectContract.MapObjectReadPermission }) })
-            .Concat(EnvironmentContract.Supports())
-            .Concat(new[] { HudContract.Support() })
-            .Concat(PlayerStateContract.Support())
-            .Concat(PlayerEventContract.Support())
-            .Concat(PlayerLifeContract.Support())
-            .Concat(PlayerStateContract.ValueSupport())
-            .Concat(PlayerCommandContract.Support())
-            .Concat(AlarmWaveContract.Support())
-            .Concat(LevelEventContract.Supports())
-            .Concat(TriggerZoneContract.Supports())
-            .Concat(new[] { LevelObjectiveValueContract.Support() });
-
-        return ModuleDefinition.Create(
-            bindings.ToArray(),
-            TerminalObjectContract.Rows()
-                .Concat(ObjectiveActionContract.CapabilityRows())
-                .Concat(DoorTerminalActionContract.Rows())
-                .Concat(capabilities)
-                .Concat(PlayerStateContract.ValueRows())
-                .Concat(new object[] { PlayerCommandContract.DownRow() }).ToArray(),
-            support.ToArray()) with
+            .Concat(PlayerValueReads.Evaluators())
+            .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
+        // The rows, the support lines and the shape table are the one game-independent registration both this
+        // session and the release export build; only the bodies above and the native tables below are this half's.
+        return ModuleRegistration.Create(handlers, evaluators) with
         {
-            Handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
-            {
-                [PlayerHealthContract.HandlerName] = PlayerHealthAction.Execute,
-                [TerminalObjectContract.CommandHandlerName] = actions.HandleCommand,
-                [TerminalObjectContract.VisibilityHandlerName] = actions.HandleVisibility,
-                [TerminalObjectContract.OutputHandlerName] = actions.HandleOutput,
-                [ObjectiveActionContract.StateHandlerName] = objectives.HandleState,
-                [ObjectiveActionContract.PhaseHandlerName] = objectives.HandlePhase,
-                [ObjectiveActionContract.ExtractionHandlerName] = objectives.HandleExtraction,
-                [DoorTerminalActionContract.LockHandlerName] = doors.HandleLock,
-                [DoorTerminalActionContract.UnlockHandlerName] = doors.HandleUnlock,
-                [EnvironmentContract.LightingHandler] = environment.HandleLighting,
-                [EnvironmentContract.LightColorHandler] = environment.HandleLightColor,
-                [EnvironmentContract.FogHandler] = environment.HandleFog,
-                [EnvironmentContract.FogCycleHandler] = environment.HandleFogCycle,
-                [EnvironmentContract.NavMarkerHandler] = environment.HandleNavMarker,
-                [EnvironmentContract.AnimationHandler] = environment.HandleAnimation,
-                [EnvironmentContract.AudioHandler] = presented.HandleAudio,
-                [EnvironmentContract.AudioStopHandler] = presented.HandleAudioStop,
-                [EnvironmentContract.IntelHandler] = presented.HandleIntel,
-                [EnvironmentContract.DialogueHandler] = presented.HandleDialogue,
-                [EnvironmentContract.PlayerVoiceHandler] = presented.HandlePlayerVoice,
-                [HudContract.ValueHandler] = hud.HandleValue,
-                [PlayerCommandContract.DamageHandlerName] = PlayerCommandActions.Damage,
-                [PlayerCommandContract.ReviveHandlerName] = PlayerCommandActions.Revive,
-                [PlayerCommandContract.DownHandlerName] = PlayerCommandActions.Down,
-                // The five alarm/scan/wave rows are static facades: each turns its request into the native
-                // entry point its capability names, and the two start rows mint the handle through the
-                // attachment this session took in Start.
-                [AlarmWaveContract.AlarmStartHandler] = AlarmWaveActions.ExecuteStartAlarm,
-                [AlarmWaveContract.AlarmStopHandler] = AlarmWaveActions.ExecuteStopAlarm,
-                [AlarmWaveContract.ScanStartHandler] = AlarmWaveActions.ExecuteStartScan,
-                [AlarmWaveContract.WaveStartHandler] = AlarmWaveActions.ExecuteStartWave,
-                [AlarmWaveContract.WaveStopHandler] = AlarmWaveActions.ExecuteStopWave,
-                // The three level-event actions, through the same static facade: each builds the
-                // `WardenObjectiveEventData` the engine's own event manager executes.
-                [LevelEventContract.ObjectiveTimerHandlerName] = LevelEventActions.Timer,
-                [LevelEventContract.DimensionHandlerName] = LevelEventActions.Dimension,
-                [LevelEventContract.ExpeditionEndHandlerName] = LevelEventActions.ExpeditionEnd
-            },
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
             {
                 [PlayerIdentityModule.EntityKind] = reference => PlayerIdentityModule.Current is { } half && half.IsCurrent(reference),
@@ -370,68 +315,8 @@ internal sealed partial class MapPluginSession : IDisposable
             PresentationSessions = new Dictionary<string, Func<IReadOnlyList<EntityReference>?, IReadOnlyList<string>?>>(StringComparer.Ordinal)
             {
                 [ModuleDefinition.ProviderId] = PlayerSessions.SessionsOf
-            },
-            // The declaration's own shape table is composed with the native handlers' shapes here, because a
-            // definition carries one shape table for the selectors, the actions and the evaluators together.
-            // Replacing it would drop the declaration's own entries and make their rows unresolvable.
-            Shapes = ComposeShapes(environment, presented, objectives, hud),
-            Evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
-            {
-                [PlayerSelectorContract.HandlerName] = PlayerSelector.Evaluate,
-                // The zone row's evaluator is the game-independent contract's, built from the one read only this
-                // half can make: the zone the anchor's own course node belongs to.
-                [ZoneSelectorContract.HandlerName] =
-                    ZoneSelectorContract.Evaluators(new ZoneSelectorContract.ZoneReaders(ZoneOfPlayer))[ZoneSelectorContract.HandlerName],
-                [DoorQueryContract.HandlerName] =
-                    DoorQueryContract.Evaluator(new DoorQueryContract.DoorReaders(DoorStateSample)),
-                [EnvironmentContract.EnvironmentStateHandler] = EnvironmentQuery.Evaluate,
-                // The `v-zone-lights` row: the same level the other environment reads stand in, resolving the
-                // named zone through the one zone table and reading its own light list.
-                [EnvironmentContract.ZoneLightsHandler] = EnvironmentQuery.ZoneLights,
-                // The value rows answer through the module that holds the tables the facts fill, so a read of a
-                // scan or a generator is a read of the same instance the fact named and not a second lookup of
-                // it. Each half is read late, for the same reason every other entry here is.
-                [LevelObjectContract.ScanStateHandler] = context => LevelObjects().ReadScanState(context),
-                [GeneratorContract.GeneratorStateHandler] = context => MapObjectHalf().ReadGeneratorState(context),
-                // The `v-obj` row: one objective layer's live state, read through the game-bound reader.
-                [LevelObjectiveValueContract.HandlerName] = LevelObjectiveValueContract.Evaluator(
-                    new LevelObjectiveValueContract.LayerReader(LevelObjectiveValueReader.Read))
             }
-                .Concat(PlayerValueReads.Evaluators())
-                .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal)
         };
-    }
-
-    /// <summary>The one shape table a registration carries: the declaration's own entries — the two selectors and
-    /// the map-object rows — plus every native handler's shape, each contract's own. Composing them here rather
-    /// than restating a port is what keeps one layout per handler.</summary>
-    private static Dictionary<string, HandlerShape> ComposeShapes(EnvironmentActions environment,
-        EnvironmentPresentation presented, ObjectiveActionHandler objectives, HudActions hud)
-    {
-        var shapes = new Dictionary<string, HandlerShape>(ModuleDefinition.FormShapes, StringComparer.Ordinal)
-        {
-            [PlayerHealthContract.HandlerName] = PlayerHealthContract.Shape,
-            [TerminalObjectContract.CommandHandlerName] = TerminalObjectContract.CommandShape,
-            [TerminalObjectContract.VisibilityHandlerName] = TerminalObjectContract.VisibilityShape,
-            [TerminalObjectContract.OutputHandlerName] = TerminalObjectContract.OutputShape,
-            [ObjectiveActionContract.StateHandlerName] = ObjectiveActionContract.StateShape,
-            [ObjectiveActionContract.PhaseHandlerName] = ObjectiveActionContract.PhaseShape,
-            [ObjectiveActionContract.ExtractionHandlerName] = ObjectiveActionContract.ExtractionShape,
-            [DoorTerminalActionContract.LockHandlerName] = DoorTerminalActionContract.LockShape,
-            [DoorTerminalActionContract.UnlockHandlerName] = DoorTerminalActionContract.UnlockShape,
-            [DoorQueryContract.HandlerName] = DoorQueryContract.Shape,
-            [EnvironmentContract.EnvironmentStateHandler] = EnvironmentContract.EnvironmentStateShape,
-            [LevelObjectContract.ScanStateHandler] = LevelObjectContract.ScanStateShape,
-            [GeneratorContract.GeneratorStateHandler] = GeneratorContract.GeneratorStateShape
-        };
-        foreach (var (name, shape) in EnvironmentContract.Shapes()) shapes[name] = shape;
-        foreach (var (name, shape) in HudContract.Shapes()) shapes[name] = shape;
-        foreach (var (name, shape) in PlayerCommandContract.Shapes()) shapes[name] = shape;
-        foreach (var (name, shape) in PlayerStateContract.ValueShapes()) shapes[name] = shape;
-        foreach (var (name, shape) in AlarmWaveContract.Shapes()) shapes[name] = shape;
-        foreach (var (name, shape) in LevelEventContract.Shapes()) shapes[name] = shape;
-        foreach (var (name, shape) in LevelObjectiveValueContract.Shapes()) shapes[name] = shape;
-        return shapes;
     }
 
     /// <summary>The level-object half, refused by name when it was never created. Every entry of the definition
