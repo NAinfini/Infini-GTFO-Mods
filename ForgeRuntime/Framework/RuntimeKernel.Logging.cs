@@ -183,6 +183,19 @@ public sealed partial class RuntimeKernel
             Result = new RuntimeLogResult { Status = CommandStatuses.Cancelled, Reason = code } });
     }
 
+    /// <summary>One entry point a dispatch reached whose own trigger options refused it. Written per refusal rather
+    /// than per event, because the three numbers a card's options are debugged with — which entry, which check, how
+    /// far it had got — belong to the entry and not to the event that happened to arrive.</summary>
+    private void LogGateRefused(TriggerGateReceipt refusal, string bindingId, string eventId)
+    {
+        if (logSink == null || !LogGate(Identity.Id).IsEnabled(RuntimeLogLevel.Trace)) return;
+        WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Trace, Code = RuntimeLogCodes.EventRejected, Provider = Identity.Id,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, EventId = eventId, Binding = bindingId, Entry = refusal.NodeId,
+            Plan = new RuntimeLogPlan { PlanId = refusal.PlanId, ResourceId = "", ResourceRevision = "" },
+            Result = new RuntimeLogResult { Status = CommandStatuses.Rejected, Reason = refusal.Code },
+            Detail = "accumulated=" + refusal.Accumulated + " fired=" + refusal.Fired });
+    }
+
     private void LogStepStarted(in StepOrigin origin, string provider, string step, string bindingId, string commandId)
     {
         if (logSink == null || !LogGate(provider).IsEnabled(RuntimeLogLevel.Trace)) return;

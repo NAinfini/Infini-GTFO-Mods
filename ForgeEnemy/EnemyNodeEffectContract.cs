@@ -5,14 +5,20 @@ using ForgeRuntime.Framework;
 
 namespace ForgeEnemy;
 
-/// <summary>The three enemy actions this package's own native write paths carry and whose catalog rows have no
-/// other owner: `forge.action.enemy.kill`, `forge.action.enemy.mark` and `forge.action.enemy.target`.
+/// <summary>The four enemy actions this package's own native write paths carry and whose catalog rows have no
+/// other owner: `forge.action.enemy.kill`, `forge.action.enemy.remove`, `forge.action.enemy.mark` and
+/// `forge.action.enemy.target`.
 ///
 /// Each row names one native submission and nothing else:
 /// <list type="bullet">
 /// <item>`kill` ends one enemy's life through `Dam_EnemyDamageBase.InstantDead(bool force)` — the game's own
 /// unconditional end-of-life entry, which is what "clear this room" means, in contrast with
 /// `forge.action.combat.execute`, which asks for an execution the target's own immunity rules may refuse.</item>
+/// <item>`remove` takes one enemy out of the world through the game's own replication despawn
+/// (`EnemyAgent.Sync.Replicator.Despawn()`), which is the other half of the same choice: no life ends, no death
+/// settlement runs and no corpse is left — the enemy is gone the way a despawned enemy always goes. `kill` and
+/// `remove` share one port shape because they are one author choice with two outcomes, and the catalog keeps
+/// them as two rows so a plan says which outcome it wants rather than passing a mode.</item>
 /// <item>`mark` builds Forge's own NavMarker on the enemy's model object through `GuiManager.NavMarkerLayer`,
 /// because the game's own tag accepts neither a colour nor a caller-set duration (ruling 86/89; the evidence is
 /// `%TEMP%\nativeinv\ni-markcolor.md`). It replaces the `ToolSyncManager.WantToTagEnemy` adapter this package
@@ -29,7 +35,14 @@ namespace ForgeEnemy;
 /// object, and the tier refuses a result that claims a world write.
 ///
 /// The rows are declared here rather than copied out of the website catalog: the shape a plan is resolved against
-/// is the shape this provider implements.</summary>
+/// is the shape this provider implements.
+///
+/// Both rows' `recipients.requires` names the same permission string the binding's own support row registers
+/// (`gtfo.enemy.life.write` / `gtfo.enemy.removal.write`). Those two spellings used to differ — the row asked for
+/// `life.end` / `life.remove` while the support row demanded a `gtfo.`-prefixed permission — and the kernel reads
+/// exactly one of them: `RuntimePlan`'s permission lock compares the plan's own `permissions` with the union of
+/// every binding's `BindingSupport.RequiredPermissions`, and `recipients.requires` is only checked for being a
+/// list of identifiers (`RuntimeGraphContracts`). One string, one place it is read from.</summary>
 public static class EnemyNodeEffectContract
 {
     /// <summary>The provider every row here belongs to; the same string `ModuleDefinition.ProviderId` carries.</summary>
@@ -40,6 +53,12 @@ public static class EnemyNodeEffectContract
     public const string KillCapability = "forge.action.enemy.kill";
     public const string KillBinding = ProviderId + ".binding.kill";
     public const string KillHandler = "gtfo.enemy.kill";
+
+    /// <summary>`forge.action.enemy.remove`: take the target enemies out of the world through the game's own
+    /// replication despawn, with no death settlement and no corpse.</summary>
+    public const string RemoveCapability = "forge.action.enemy.remove";
+    public const string RemoveBinding = ProviderId + ".binding.remove";
+    public const string RemoveHandler = "gtfo.enemy.remove";
 
     /// <summary>`forge.action.enemy.mark`: build a Forge-owned navigation marker on each target.</summary>
     public const string MarkCapability = "forge.action.enemy.mark";
@@ -52,25 +71,26 @@ public static class EnemyNodeEffectContract
     public const string TargetHandler = "gtfo.enemy.target";
 
     /// <summary>Every capability id this contract names, in the same order as <see cref="CapabilityRows"/>.</summary>
-    public static readonly string[] CapabilityIds = { KillCapability, MarkCapability, TargetCapability };
+    public static readonly string[] CapabilityIds = { KillCapability, RemoveCapability, MarkCapability, TargetCapability };
 
     /// <summary>Every binding id this contract declares, in registration order.</summary>
-    public static readonly string[] BindingIds = { KillBinding, MarkBinding, TargetBinding };
+    public static readonly string[] BindingIds = { KillBinding, RemoveBinding, MarkBinding, TargetBinding };
 
     /// <summary>Every handler name this contract declares, in the same order as <see cref="BindingIds"/>.</summary>
-    public static readonly string[] HandlerNames = { KillHandler, MarkHandler, TargetHandler };
+    public static readonly string[] HandlerNames = { KillHandler, RemoveHandler, MarkHandler, TargetHandler };
 
-    /// <summary>The permission each binding writes the world through: a life ended, a marker built, an enemy's
-    /// own target written.</summary>
+    /// <summary>The permission each binding writes the world through: a life ended, an enemy removed from the
+    /// world, a marker built, an enemy's own target written.</summary>
     public const string KillPermission = "gtfo.enemy.life.write";
+    public const string RemovePermission = "gtfo.enemy.removal.write";
     public const string MarkPermission = "gtfo.enemy.marker.write";
     public const string TargetPermission = "gtfo.enemy.targeting.write";
 
-    /// <summary>The three capability rows, each a complete catalog entry in the website's own row shape, in the
+    /// <summary>The four capability rows, each a complete catalog entry in the website's own row shape, in the
     /// same order as <see cref="CapabilityIds"/>.</summary>
-    public static readonly string[] CapabilityRows = { KillRow, MarkRow, TargetRow };
+    public static readonly string[] CapabilityRows = { KillRow, RemoveRow, MarkRow, TargetRow };
 
-    /// <summary>The three rows as one JSON array body, for a registration that appends them to its own
+    /// <summary>The four rows as one JSON array body, for a registration that appends them to its own
     /// `capabilities` array.</summary>
     public static string CapabilityRowsJson => string.Join(",\n", CapabilityRows);
 
@@ -104,14 +124,10 @@ public static class EnemyNodeEffectContract
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.enemy"],
             "id": "targets",
             "type": "entity",
             "cardinality": "many"
-          },
-          {
-            "entityKinds": ["gtfo.player", "gtfo.enemy", "gtfo.equipment"],
-            "id": "source",
-            "type": "entity"
           }
         ],
         "outputs": [
@@ -155,7 +171,92 @@ public static class EnemyNodeEffectContract
           "target": "entity",
           "cardinality": "many",
           "requires": [
-            "life.end"
+            "gtfo.enemy.life.write"
+          ],
+          "result": "result"
+        }
+      }
+    }
+    """;
+
+    private const string RemoveRow = """
+    {
+      "id": "forge.action.enemy.remove",
+      "owner": "forge.module.gtfo.enemy",
+      "kind": "action",
+      "label": "移除敌人",
+      "version": "1.0.0",
+      "parameters": {
+        "description": "把目标敌人从世界里移除，不留尸体。",
+        "summary": "让这些敌人直接消失，走游戏自己的回收（despawn）通道：不算死亡、不掉尸体、不触发死亡结算。",
+        "summaryEn": "Takes the target enemies out of the world through the game's own despawn path: no death, no corpse, no death settlement.",
+        "labelEn": "Remove enemy",
+        "support": "implementation-only"
+      },
+      "graph": {
+        "domains": [
+          "map",
+          "room",
+          "enemy",
+          "tool",
+          "consumable",
+          "player"
+        ],
+        "execution": "host",
+        "inputs": [
+          {
+            "id": "in",
+            "type": "execution"
+          },
+          {
+            "entityKinds": ["gtfo.enemy"],
+            "id": "targets",
+            "type": "entity",
+            "cardinality": "many"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "next",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "type": "result",
+            "schema": "forge.result.enemy.remove",
+            "fields": [
+              {
+                "id": "target",
+                "type": "entity"
+              },
+              {
+                "id": "status",
+                "type": "enum",
+                "schema": "execution_outcome"
+              },
+              {
+                "id": "committed",
+                "type": "enum",
+                "schema": "commit_state"
+              },
+              {
+                "id": "code",
+                "type": "string"
+              },
+              {
+                "id": "target_count",
+                "type": "integer"
+              }
+            ]
+          }
+        ],
+        "parameters": [],
+        "recipients": {
+          "input": "targets",
+          "target": "entity",
+          "cardinality": "many",
+          "requires": [
+            "gtfo.enemy.removal.write"
           ],
           "result": "result"
         }
@@ -385,6 +486,7 @@ public static class EnemyNodeEffectContract
     public static string CapabilityIdFor(string bindingId) => bindingId switch
     {
         KillBinding => KillCapability,
+        RemoveBinding => RemoveCapability,
         MarkBinding => MarkCapability,
         _ => TargetCapability
     };
@@ -393,6 +495,7 @@ public static class EnemyNodeEffectContract
     public static string HandlerFor(string bindingId) => bindingId switch
     {
         KillBinding => KillHandler,
+        RemoveBinding => RemoveHandler,
         MarkBinding => MarkHandler,
         _ => TargetHandler
     };
@@ -401,6 +504,7 @@ public static class EnemyNodeEffectContract
     public static string PermissionFor(string bindingId) => bindingId switch
     {
         KillBinding => KillPermission,
+        RemoveBinding => RemovePermission,
         MarkBinding => MarkPermission,
         _ => TargetPermission
     };
@@ -423,15 +527,23 @@ public static class EnemyNodeEffectContract
     /// appends them to its own `bindings` array.</summary>
     public static string BindingRowsJson => string.Join(",\n", BindingIds.Select(BindingRowJson));
 
-    /// <summary>The three support rows a registration appends to its `BindingSupport` table.</summary>
+    /// <summary>The four support rows a registration appends to its `BindingSupport` table.</summary>
     public static BindingSupport[] Support() => BindingIds
         .Select(binding => new BindingSupport(binding, "implementation-only", new[] { PermissionFor(binding) }))
         .ToArray();
 
-    /// <summary>The kill handler's ports: `targets` is the recipient collection and `source` the only other role.
-    /// The row carries no structural parameter, so the shape declares none either.</summary>
-    public static HandlerShape KillShape() => new HandlerShape()
-        .Inputs("targets", "source").Outputs("result");
+    /// <summary>The kill handler's ports: `targets` is the recipient collection. The row carries no source role:
+    /// neither the native instant-death entry nor this handler reads one, and a port nothing reads is an option
+    /// the author would see and the game would ignore.</summary>
+    public static HandlerShape KillShape() => LifeOutcomeShape();
+
+    /// <summary>The remove handler's ports. It is the same shape as `kill`'s because the two rows are the same
+    /// author choice with two outcomes: one recipient collection, one result row per target.</summary>
+    public static HandlerShape RemoveShape() => LifeOutcomeShape();
+
+    /// <summary>The one port shape `kill` and `remove` share.</summary>
+    private static HandlerShape LifeOutcomeShape() => new HandlerShape()
+        .Inputs("targets").Outputs("result");
 
     /// <summary>The mark handler's ports: `targets`, then the three things only Forge can carry — the colour, its
     /// opacity and the caller-set duration — with the audience as the row's one structural parameter. The colour is
@@ -448,6 +560,7 @@ public static class EnemyNodeEffectContract
     public static Dictionary<string, HandlerShape> Shapes() => new(StringComparer.Ordinal)
     {
         [KillHandler] = KillShape(),
+        [RemoveHandler] = RemoveShape(),
         [MarkHandler] = MarkShape(),
         [TargetHandler] = TargetShape()
     };

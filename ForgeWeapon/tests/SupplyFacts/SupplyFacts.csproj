@@ -31,6 +31,10 @@
     <Compile Include="../../InventoryActionContract.cs" />
     <Compile Include="../../WeaponOverrideContract.cs" />
     <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../WeaponStateTriggerContract.cs;../../CombatPrimitiveContract.cs" />
+    <!-- The reload and inventory-query rows the seed appends as well; the query contract's evaluators are the
+         reads file, so it compiles with them. -->
+    <Compile Include="../../ReloadInventoryContract.cs;../../InventoryQueryContract.cs;../../InventoryQueryReads.cs" />
     <Compile Include="../../Native/WeaponSupplyActions.cs" />
     <Compile Include="../../Native/WeaponSupplyItems.cs" />
     <Compile Include="../../Native/WeaponMeleeRemoteLedger.cs" />

@@ -47,6 +47,10 @@ internal sealed partial class MapPluginSession : IDisposable
     /// <summary>The door and terminal observation half. The two door execute rows and the door value row answer
     /// from the tables it fills, which is why the session owns it and not the hook list.</summary>
     private DoorTerminalFacts? _doorTerminal;
+    /// <summary>The world-event half: the two trigger components a world event object carries publish through it,
+    /// and the condition action's one native call is answered by its static body. It holds its own Harmony
+    /// instance, so it is released with the other halves rather than left patched.</summary>
+    private WorldEventFacts? _worldEvents;
     /// <summary>The attribute-modifier half: the one adapter the two sourced-modifier rows write through. It holds
     /// a lifecycle subscription on the registration, so the session owns it and releases it with the other
     /// halves.</summary>
@@ -116,6 +120,11 @@ internal sealed partial class MapPluginSession : IDisposable
                 report, TerminalObservation.BySyncId, TerminalObservation.Address, DoorTerminalFacts.DoorOwner,
                 session.WeakDoorPlacement, player => PlayerIdentityModule.Current?.ReferenceOf(player));
             DoorTerminalFacts.Current = session._doorTerminal;
+            // The world-event half, attached after the registration exists because it patches against the
+            // registration's own gates: its four patches reach it through `WorldEventFacts.Current`, and the one
+            // condition action is a static body that reads nothing but the request.
+            session._worldEvents = WorldEventFacts.Attach(kernel, session.MapObjects.Registration,
+                () => SNet.IsMaster, report);
             // The zones are handed to the map-object module before any tick judges them, and the tick patch
             // reaches this one session: the registration exists by now, which is what the judging module publishes
             // through. The room resolver is the one that reads the level the game generated — it names an authored
@@ -177,6 +186,9 @@ internal sealed partial class MapPluginSession : IDisposable
         var doorTerminal = _doorTerminal;
         _doorTerminal = null;
         if (doorTerminal != null) Cleanup(() => DoorTerminalFacts.Current = null, errors);
+        // The world-event half unpatches itself, so it goes before the registration it published on is disposed.
+        var worldEvents = _worldEvents; _worldEvents = null;
+        if (worldEvents != null) Cleanup(() => WorldEventFacts.Detach(worldEvents), errors);
         var state = State; State = null;
         if (state != null) Cleanup(() => PlayerStateFacts.Detach(state), errors);
         var events = Events; Events = null;
@@ -216,10 +228,19 @@ internal sealed partial class MapPluginSession : IDisposable
     {
         var actions = new TerminalObjectActions(_kernel, () => !_faulted, TerminalFor, _report);
         var objectives = ObjectiveActionHandler.For(() => !_faulted, _report);
+        // The objective-event half: the two rows that write the objective machine through the level-event
+        // executor. It holds no state a world owns, so the session only hands it the readiness gate and the log.
+        var objectiveEvents = ObjectiveEventActions.For(() => !_faulted, _report);
         var doors = new DoorTerminalActions(_kernel, () => !_faulted, DoorFor, _report);
         // The three door execute rows' own half: it resolves a recipient through the same address grammar the
         // observation half records doors by, so a door a plan names is the door that was observed.
         var doorActions = new DoorActionCommands(_kernel, () => !_faulted, DoorActionCommands.ResolveByAddress, _report);
+        // The one map-object state row: the interaction switch writes a terminal's own state.
+        var mapState = new MapStateActions(_kernel, () => !_faulted, TerminalObjectActions.ResolveByAddress, _report);
+        // The interaction-prompt half owns the per-object presentation rules the two interaction-prompt patches
+        // read; the terminal-content half writes a terminal's own command table and log files.
+        var interactionText = new InteractionTextActions(_kernel, () => !_faulted, _report);
+        var terminalContent = new TerminalContentActions(_kernel, () => !_faulted, _report);
         var environment = EnvironmentActions.For(() => !_faulted, _report);
         var presented = EnvironmentPresentation.For(_report);
         var hud = new HudActions(_report);
@@ -232,13 +253,17 @@ internal sealed partial class MapPluginSession : IDisposable
             [ObjectiveActionContract.StateHandlerName] = objectives.HandleState,
             [ObjectiveActionContract.PhaseHandlerName] = objectives.HandlePhase,
             [ObjectiveActionContract.ExtractionHandlerName] = objectives.HandleExtraction,
+            // The two objective-event rows: the sub-objective text and the progression step, both through the
+            // game's own level-event executor.
+            [ObjectiveEventContract.DisplayHandlerName] = objectiveEvents.HandleDisplay,
+            [ObjectiveEventContract.ProgressHandlerName] = objectiveEvents.HandleProgress,
             [DoorTerminalActionContract.LockHandlerName] = doors.HandleLock,
             [DoorTerminalActionContract.UnlockHandlerName] = doors.HandleUnlock,
-            // The three door rows and the two player rows: the contract's own handler names, so the declaration
-            // and its body are one fact.
+            // The two door rows and the map-object state row: the contract's own handler names, so the
+            // declaration and its body are one fact.
             [DoorActionContract.OpenHandlerName] = doorActions.HandleOpen,
             [DoorActionContract.CloseHandlerName] = doorActions.HandleClose,
-            [DoorActionContract.AlarmHandlerName] = doorActions.HandleAlarm,
+            [MapStateContract.InteractionHandlerName] = mapState.HandleInteraction,
             [PlayerActionContract.TeleportHandlerName] = PlayerActions.Teleport,
             [PlayerActionContract.InfectionHandlerName] = PlayerActions.Infection,
             // The movement preset writes the one native modification table through the one adapter this session
@@ -266,14 +291,25 @@ internal sealed partial class MapPluginSession : IDisposable
             // The three scan/wave rows are static facades: each turns its request into the native
             // entry point its capability names, and the two start rows mint the handle through the
             // attachment this session took in Start.
-            [AlarmWaveContract.ScanStartHandler] = AlarmWaveActions.ExecuteStartScan,
+            [AlarmWaveContract.ScanStateHandler] = AlarmWaveActions.ExecuteScanState,
             [AlarmWaveContract.WaveStartHandler] = AlarmWaveActions.ExecuteStartWave,
             [AlarmWaveContract.WaveStopHandler] = AlarmWaveActions.ExecuteStopWave,
             // The three level-event actions, through the same static facade: each builds the
             // `WardenObjectiveEventData` the engine's own event manager executes.
             [LevelEventContract.ObjectiveTimerHandlerName] = LevelEventActions.Timer,
             [LevelEventContract.DimensionHandlerName] = LevelEventActions.Dimension,
-            [LevelEventContract.ExpeditionEndHandlerName] = LevelEventActions.ExpeditionEnd
+            [LevelEventContract.ExpeditionEndHandlerName] = LevelEventActions.ExpeditionEnd,
+            // The world-event condition action, through the same kind of static facade.
+            [WorldEventContract.WorldEventConditionHandlerName] = WorldEventFacts.Condition,
+            // The two folded EOS rows: the interaction prompt that replaces a door's text, and the terminal's own
+            // content. Both are this package's body, keyed by the contract name.
+            [InteractionTextContract.HandlerName] = interactionText.Handle,
+            [TerminalContentContract.HandlerName] = terminalContent.Handle,
+            // generic-player: the batch's four execute bodies, keyed by the names their contracts declare.
+            [CombatImpulseContract.HandlerName] = GenericPlayerActions.Impulse,
+            [PlayerStaminaContract.HandlerName] = GenericPlayerActions.StaminaChange,
+            [PresentationActionContract.CameraShakeHandlerName] = GenericPlayerActions.CameraShake,
+            [PresentationActionContract.ScreenLiquidHandlerName] = GenericPlayerActions.ScreenLiquid
         };
         var evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
         {
@@ -298,11 +334,20 @@ internal sealed partial class MapPluginSession : IDisposable
                 new LevelObjectiveValueContract.LayerReader(LevelObjectiveValueReader.Read))
         }
             .Concat(PlayerValueReads.Evaluators())
+            // generic-player: the movement-state read, built from this package's own player table.
+            .Concat(GenericPlayerActions.Evaluators())
             .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
         // The rows, the support lines and the shape table are the one game-independent registration both this
         // session and the release export build; only the bodies above and the native tables below are this half's.
         return ModuleRegistration.Create(handlers, evaluators) with
         {
+            // The sourced-modifier row's duration is the plan's own `effect` block, so its restoration is the
+            // kernel's to call: this is the callback it ends one through. The movement preset keeps its own
+            // `duration` port and handle and is therefore not in this table.
+            EffectRestores = new Dictionary<string, EffectRestoreHandler>(StringComparer.Ordinal)
+            {
+                [AgentModifierContract.ApplyHandlerName] = AgentModifierAdapter.RestoreApply
+            },
             EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
             {
                 [PlayerIdentityModule.EntityKind] = reference => PlayerIdentityModule.Current is { } half && half.IsCurrent(reference),
@@ -410,17 +455,29 @@ internal sealed partial class MapPluginSession : IDisposable
     }
 
     /// <summary>One door read for the `forge.query.map.door_state` value row: the entrance door the reference
-    /// names, its own last status, whether a lock holds it and the key it wants. A reference no door of this
-    /// world answers for yields no sample, which the row refuses by name rather than answering with a status the
-    /// door never had.</summary>
+    /// names, its own last status, whether a lock holds it, the key it wants and the chained puzzle its lock
+    /// holds. A reference no door of this world answers for yields no sample, which the row refuses by name
+    /// rather than answering with a status the door never had.
+    ///
+    /// The puzzle id is the instance's own `m_puzzleUID` — the same id the scan row's chained-puzzle resource
+    /// provider publishes — so a plan can wire this output straight into `forge.action.map.scan_state`. A door
+    /// whose lock holds no puzzle, or a door with no lock component, leaves the reading absent.</summary>
     private static DoorQueryContract.DoorSample? DoorStateSample(EntityReference reference)
     {
         if (MapObjectDoorAddress.TryParse(Id(reference)) is not { } address) return null;
         if (MapObjectDoorAddress.ParseWeakSerial(address.Key) is not null) return null;
         if (DoorObservation.ByAddress(address) is not { } door) return null;
         if (!DoorObservation.IsCurrentAddress(door, address)) return null;
-        return DoorObservation.Read(door)?.Door is { } reading
-            ? new DoorQueryContract.DoorSample(reading.Status, reading.Locked, reading.Key) : null;
+        if (DoorObservation.Read(door)?.Door is not { } reading) return null;
+        string? puzzle = null;
+        var locks = door.m_locks?.TryCast<LG_SecurityDoor_Locks>();
+        if (locks != null && !locks.WasCollected)
+        {
+            var instance = locks.ChainedPuzzleToSolve;
+            if (instance != null && !instance.WasCollected && !string.IsNullOrEmpty(instance.m_puzzleUID))
+                puzzle = instance.m_puzzleUID;
+        }
+        return new DoorQueryContract.DoorSample(reading.Status, reading.Locked, reading.Key, puzzle);
     }
 
     /// <summary>The zone one weak door stands in: the level's own coordinates for it and the entity reference the
@@ -672,6 +729,30 @@ internal sealed partial class MapPluginSession : IDisposable
     /// expedition-start row publishes the same string, so a plan mounted on a level and a plan waiting for that
     /// level's own start agree about which level they are in.</summary>
     internal string? LevelReference() => LevelIdentity.Read(_report)?.ToString();
+
+    /// <summary>The level's authored wave tuning, applied once for each world the session sees. It is a field the
+    /// level loads with and not a step a plan runs, so it has no handler and no registration: the level's own
+    /// field in its map data document is read when the level is there (the first player to spawn is what tells
+    /// this session that it is) and the numbers land on the two components the game keeps them on. Only the host
+    /// applies them — the draw and the spawn it decides are the host's — and a level build where the managers are
+    /// still absent reports why and leaves the next level load to try again.</summary>
+    internal void ApplyLevelTuning()
+    {
+        var epoch = _kernel.WorldEpoch;
+        if (_tuningEpoch == epoch) return;
+        _tuningEpoch = epoch;
+        if (_faulted || _kernel.Lifecycle.IsHost != true) return;
+        int applied;
+        try { applied = LevelWaveTuning.Apply(_report, LevelReference()); }
+        catch (Exception error)
+        {
+            try { _report("map.wave-tuning-failed: " + error.GetType().Name); } catch (Exception) { /* reported best-effort */ }
+            return;
+        }
+        if (applied > 0) try { _report("map.wave-tuning-applied: " + applied); } catch (Exception) { /* reported best-effort */ }
+    }
+
+    private long _tuningEpoch = -1;
 
     internal void Guard(Action<PlayerIdentityModule> callback)
     {

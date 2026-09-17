@@ -22,7 +22,7 @@ internal static class ActionCases
             using var s = new Scene();
             var enemy = Scene.NewEnemy();
             var reference = s.Track(enemy);
-            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference }, source = reference });
+            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference } });
             Check(result.Status == CommandStatuses.Succeeded, $"Expected succeeded, got {result.Status}/{result.Code}.");
             Check(result.CommitState == CommitStates.Confirmed, "A kill that landed was not confirmed.");
             Check(enemy.Damage!.InstantDeaths == 1, "The instant-death entry did not run exactly once.");
@@ -43,7 +43,7 @@ internal static class ActionCases
             var staleRef = s.Track(stale);
             s.Retire(staleRef);
             var result = s.Dispatch(EnemyNodeEffectContract.KillCapability,
-                new { targets = new[] { deadRef, staleRef }, source = liveRef });
+                new { targets = new[] { deadRef, staleRef } });
             Check(result.Status == CommandStatuses.Rejected, $"Expected a rejection, got {result.Status}.");
             Check(Code(result, 0) == "not-alive", "A dead target was not refused by name: " + Code(result, 0));
             Check(Code(result, 1) == "stale-or-unsupported-recipient", "A retired life was not refused by name: " + Code(result, 1));
@@ -59,7 +59,7 @@ internal static class ActionCases
             var throwingRef = s.Track(throwing);
             var laterRef = s.Track(later);
             var result = s.Dispatch(EnemyNodeEffectContract.KillCapability,
-                new { targets = new[] { throwingRef, laterRef }, source = throwingRef });
+                new { targets = new[] { throwingRef, laterRef } });
             Check(Status(result, 0) == CommandStatuses.Failed && Committed(result, 0) == CommitStates.Unknown,
                 "A native failure was not reported as an unknown commit.");
             Check(Code(result, 1) == "not-attempted-after-unknown-commit", "The run did not stop after an unknown commit.");
@@ -74,7 +74,7 @@ internal static class ActionCases
             // native call whose effect cannot be observed looks like from here.
             survivor.Damage!.Kills = false;
             var reference = s.Track(survivor);
-            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference }, source = reference });
+            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference } });
             Check(Committed(result, 0) == CommitStates.Unknown && Code(result, 0) == "death-unseen",
                 $"A kill that did not land was not reported as unknown: {Code(result, 0)}.");
             Check(survivor.Damage.InstantDeaths == 1 && survivor.Alive, "The case did not model an unseen death.");
@@ -86,7 +86,7 @@ internal static class ActionCases
             var enemy = Scene.NewEnemy();
             var reference = s.Track(enemy);
             SNetwork.SNet.IsMaster = false;
-            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference }, source = reference });
+            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference } });
             Check(result.Status == CommandStatuses.Rejected && result.Code == "authority-or-phase",
                 $"A non-host was not refused by authority: {result.Status}/{result.Code}.");
             Check(enemy.Damage!.InstantDeaths == 0, "A non-host wrote the world.");
@@ -98,7 +98,7 @@ internal static class ActionCases
             var enemy = Scene.NewEnemy();
             var reference = s.Track(enemy);
             s.Allowed = false;
-            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference }, source = reference });
+            var result = s.Dispatch(EnemyNodeEffectContract.KillCapability, new { targets = new[] { reference } });
             Check(result.Code == "authority-or-phase", "A closed session gate was not refused.");
             Check(enemy.Damage!.InstantDeaths == 0, "The gate was bypassed.");
         });

@@ -32,6 +32,21 @@ internal sealed class ModifierWorld : IDisposable
             typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool)
         }, null) ?? throw new InvalidOperationException("CommandContext's own constructor was not found.");
 
+    /// <summary>The kernel's own effect handle is what a plan's step carries into its handler, and its setter is
+    /// the kernel's: the fixture writes the same property the dispatch does.</summary>
+    private static readonly PropertyInfo EffectHandleProperty = typeof(CommandContext)
+        .GetProperty("EffectHandle", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("CommandContext's effect handle was not found.");
+
+    /// <summary>The context the kernel's restore call carries is built by the kernel, so the fixture builds the
+    /// same object through the same constructor.</summary>
+    private static readonly ConstructorInfo EffectContextConstructor = typeof(RuntimeEffectContext)
+        .GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, new[]
+        {
+            typeof(JsonElement), typeof(string), typeof(int), typeof(long), typeof(long), typeof(string),
+            typeof(string), typeof(string), typeof(string), typeof(string), typeof(IReadOnlyList<EntityReference>)
+        }, null) ?? throw new InvalidOperationException("RuntimeEffectContext's own constructor was not found.");
+
     private static long _world;
     private readonly RuntimeModuleHandle _contract;
     private readonly RuntimeModuleHandle _registration;
@@ -80,6 +95,12 @@ internal sealed class ModifierWorld : IDisposable
             {
                 [PlayerIdentityModule.EntityKind] = () => PlayerIdentityModule.Current is { } half && half.IsRegistered
                     ? half.CurrentPlayers() : throw new RuntimeContractException("player-module-unavailable", "no identity")
+            },
+            // The session's own restore wiring, in the fixture: the sourced-modifier row's duration belongs to the
+            // kernel's effect lifecycle, so this is the callback it ends one through.
+            EffectRestores = new Dictionary<string, EffectRestoreHandler>(StringComparer.Ordinal)
+            {
+                [AgentModifierContract.ApplyHandlerName] = AgentModifierAdapter.RestoreApply
             }
         }, RuntimeLogLevel.Off);
         Identity = new PlayerIdentityModule(_registration, Kernel, () => CanObserve, Reports.Add, Reports.Add);
@@ -117,10 +138,42 @@ internal sealed class ModifierWorld : IDisposable
         })!;
     }
 
-    /// <summary>One apply request: the operation is the row's own structural parameter and the attribute is the
-    /// member name the kernel resolves the enum port to.</summary>
+    /// <summary>One apply request: the operation is the row's own structural parameter, the attribute is the
+    /// member name the kernel resolves the enum port to, and the effect handle is the one the kernel cast for the
+    /// step — a plan walks the handler with it, and a fixture has no plan, so it mints the same handle the kernel
+    /// would and hands it over. <see cref="NamesEffect"/> turns that off for the case of a card with no `effect`
+    /// block at all.</summary>
     internal CommandResult Apply(string operation, object? inputs)
-        => Adapter.Apply(Context(AgentModifierContract.ApplyCapabilityId, inputs, new { operation }));
+    {
+        var context = Context(AgentModifierContract.ApplyCapabilityId, inputs, new { operation });
+        LastHandle = null;
+        if (NamesEffect)
+        {
+            LastHandle = MintHandle();
+            EffectHandleProperty.SetValue(context, LastHandle.Value);
+        }
+        return Adapter.Apply(context);
+    }
+
+    /// <summary>Whether the apply requests this world builds carry the kernel's own effect handle.</summary>
+    internal bool NamesEffect { get; set; } = true;
+
+    /// <summary>The handle the last apply was filed under, as a plan's step would have published it.</summary>
+    internal JsonElement? LastHandle { get; private set; }
+
+    /// <summary>One effect ending, driven through the production restore callback with a context the kernel builds:
+    /// the constructor is internal, so the fixture builds the same object through it. Only the handle and the
+    /// reason are read back by the callback under test.</summary>
+    internal void EndEffect(JsonElement handle, string reason)
+        => AgentModifierAdapter.RestoreApply((RuntimeEffectContext)EffectContextConstructor.Invoke(new object?[]
+        {
+            handle, reason, 1, Kernel.CurrentTick, Kernel.WorldEpoch, "test.plan", "A_action",
+            AgentModifierContract.Binding(AgentModifierContract.ApplyCapabilityId),
+            AgentModifierContract.ApplyCapabilityId, "test.command", Array.Empty<EntityReference>()
+        })!);
+    /// <summary>A handle minted the way the kernel's own effect handle is: through the registration the plan's
+    /// provider registered under, so its provider index is the one the ledger files against.</summary>
+    internal JsonElement MintHandle() => _registration.CreateEffectHandle("entity_life");
 
     /// <summary>One remove request over the handles a case collected.</summary>
     internal CommandResult Remove(object? inputs)

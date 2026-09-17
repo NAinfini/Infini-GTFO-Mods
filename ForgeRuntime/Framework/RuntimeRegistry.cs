@@ -16,6 +16,10 @@ internal sealed class RuntimeRegistry
     internal readonly Dictionary<string, string[]> CapabilityReads = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, JsonElement> Bindings = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, CommandHandler> Handlers = new(StringComparer.Ordinal);
+    /// <summary>The restore callback of each binding whose module registered one, keyed by binding id and owned by
+    /// the provider that registered it. A binding without one cannot carry an `effect` block in a plan, which is
+    /// how the kernel knows a duration it hands out will be undone.</summary>
+    internal readonly Dictionary<string, (string Owner, EffectRestoreHandler Restore)> EffectRestores = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, EvaluatorHandler> Evaluators = new(StringComparer.Ordinal);
     /// <summary>Each binding's resolved handler shape, by binding id: the registration-time answer to "which port
     /// is this handler's amount", kept for the dispatch path so it never asks again.</summary>
@@ -25,6 +29,10 @@ internal sealed class RuntimeRegistry
     internal readonly Dictionary<string, string> CapabilityRegistrants = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, (string Owner, Func<EntityReference, RuntimeEntitySnapshot?> Observe)> EntityObservers = new(StringComparer.Ordinal);
     internal readonly Dictionary<string, (string Owner, Func<object, EntityReference?> Resolve)> EntityInstanceResolvers = new(StringComparer.Ordinal);
+    /// <summary>What each kind's own provider answers for a live reference of it: the native object the reference
+    /// names, or null. Registered beside the kind's resolver and owned by the same provider, so a step that has to
+    /// touch another module's entity asks the kernel instead of that module's table.</summary>
+    internal readonly Dictionary<string, (string Owner, Func<EntityReference, object?> Instance)> EntityInstances = new(StringComparer.Ordinal);
     /// <summary>One candidate source per entity kind, owned by the provider that owns that kind's resolver: it is
     /// the provider's own answer to "which entities of my kind exist right now", never a kernel-side scan.</summary>
     internal readonly Dictionary<string, (string Owner, Func<IReadOnlyList<EntityReference>> Candidates)> EntityCandidates = new(StringComparer.Ordinal);
@@ -62,12 +70,14 @@ internal sealed class RuntimeRegistry
         foreach (var x in source.CapabilityReads) CapabilityReads.Add(x.Key, x.Value);
         foreach (var x in source.Bindings) Bindings.Add(x.Key, x.Value);
         foreach (var x in source.Handlers) Handlers.Add(x.Key, x.Value);
+        foreach (var x in source.EffectRestores) EffectRestores.Add(x.Key, x.Value);
         foreach (var x in source.Evaluators) Evaluators.Add(x.Key, x.Value);
         foreach (var x in source.Shapes) Shapes.Add(x.Key, x.Value);
         foreach (var x in source.Support) Support.Add(x.Key, x.Value);
         foreach (var x in source.Resolvers) Resolvers.Add(x.Key, x.Value);
         foreach (var x in source.EntityObservers) EntityObservers.Add(x.Key, x.Value);
         foreach (var x in source.EntityInstanceResolvers) EntityInstanceResolvers.Add(x.Key, x.Value);
+        foreach (var x in source.EntityInstances) EntityInstances.Add(x.Key, x.Value);
         foreach (var x in source.EntityCandidates) EntityCandidates.Add(x.Key, x.Value);
         foreach (var x in source.EntityZones) EntityZones.Add(x.Key, x.Value);
         foreach (var x in source.AttachmentMatchers) AttachmentMatchers.Add(x.Key, x.Value);
@@ -128,6 +138,23 @@ internal sealed class RuntimeRegistry
             next.Shapes.Add(id, ShapeFor(suppliedShapes, handlerName, capability, id, usedShapes));
         }
         RuntimeJson.ExactSet(suppliedHandlers.Keys, usedHandlers, "unused-handler");
+        // A restore callback travels with the handler it belongs to and is resolved per binding for the same
+        // reason a shape is: the plan's `effect` block is checked against the binding that would apply it, so a
+        // callback wired to a binding nobody implements would be a promise about a step that never runs.
+        var suppliedRestores = module.EffectRestores == null
+            ? new Dictionary<string, EffectRestoreHandler>(StringComparer.Ordinal)
+            : new Dictionary<string, EffectRestoreHandler>(module.EffectRestores, StringComparer.Ordinal);
+        var usedRestores = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var binding in bindings)
+        {
+            var id = RuntimeJson.Text(binding, "id");
+            if (RuntimeJson.Text(binding, "status") != "implemented" || RuntimeJson.Text(binding, "role") != "execute") continue;
+            if (!next.Capabilities.TryGetValue(RuntimeJson.Text(binding, "capabilityId"), out var capability)
+                || RuntimeJson.Text(capability, "kind") != "action") continue;
+            if (!suppliedRestores.TryGetValue(RuntimeJson.Text(binding, "handler"), out var restore) || restore == null) continue;
+            next.EffectRestores.Add(id, (providerId, restore)); usedRestores.Add(RuntimeJson.Text(binding, "handler"));
+        }
+        RuntimeJson.ExactSet(suppliedRestores.Keys, usedRestores, "unused-effect-restore");
         var suppliedEvaluators = new Dictionary<string, EvaluatorHandler>(module.Evaluators, StringComparer.Ordinal);
         var usedEvaluators = new HashSet<string>(StringComparer.Ordinal);
         foreach (var binding in bindings)
@@ -196,6 +223,18 @@ internal sealed class RuntimeRegistry
                     "entity-instance-resolver-owner", "An instance resolver requires this provider's resolver.");
                 RuntimeJson.Require(next.EntityInstanceResolvers.TryAdd(item.Key, (providerId, item.Value!)),
                     "entity-instance-resolver-conflict", item.Key);
+            }
+        }
+        if (module.EntityInstances != null)
+        {
+            foreach (var item in module.EntityInstances)
+            {
+                RuntimeJson.Require(RuntimeJson.IsId(item.Key) && item.Value != null,
+                    "entity-instance", "Invalid entity instance lookup.");
+                RuntimeJson.Require(next.Resolvers.TryGetValue(item.Key, out var resolver) && resolver.Owner == providerId,
+                    "entity-instance-owner", "An instance lookup requires this provider's resolver.");
+                RuntimeJson.Require(next.EntityInstances.TryAdd(item.Key, (providerId, item.Value!)),
+                    "entity-instance-conflict", item.Key);
             }
         }
         if (module.EntityCandidates != null)
@@ -300,7 +339,12 @@ internal sealed class RuntimeRegistry
     {
         RuntimeJson.Require(supplied.TryGetValue(handlerName, out var shape) && shape != null, "missing-shape", bindingId);
         RuntimeJson.Require(capability.TryGetProperty("graph", out var graph), "shape-port", bindingId + " has no graph to resolve against.");
-        shape!.Resolve(graph);
+        try { shape!.Resolve(graph); }
+        catch (RuntimeContractException error)
+        {
+            var capabilityId = RuntimeJson.Id(capability, "id");
+            throw new RuntimeContractException(error.Code, bindingId + " -> " + capabilityId + ": " + error.Message);
+        }
         used.Add(handlerName);
         return shape;
     }
@@ -321,7 +365,15 @@ internal sealed class RuntimeRegistry
         }
         foreach (var c in Capabilities.Values)
         {
-            RuntimeJson.Shape(c, "id owner kind label version parameters", "graph");
+            // The row's own id travels with the refusal: `Shape` reports the offending member by name, and a member
+            // name alone does not say which row carried it.
+            try { RuntimeJson.Shape(c, "id owner kind label version parameters", "graph"); }
+            catch (RuntimeContractException error)
+            {
+                var at = c.TryGetProperty("id", out var declared) && declared.ValueKind == JsonValueKind.String
+                    ? declared.GetString() : "?";
+                throw new RuntimeContractException(error.Code, at + ": " + error.Message);
+            }
             var id = RuntimeJson.Id(c, "id"); var owner = RuntimeJson.Text(c, "owner");
             RuntimeJson.Require(Providers.TryGetValue(owner, out var provider), "capability-owner", id);
             RuntimeJson.Require(id.StartsWith("forge.", StringComparison.Ordinal)

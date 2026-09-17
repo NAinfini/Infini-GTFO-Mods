@@ -735,7 +735,8 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
         return _kernel.ResolveEntityInstance(MapObjectKind, collider);
     }
 
-    // A destroyed Unity object reads as null through its own overloaded equality, and its transform then throws;
+    /// <summary>
+    /// A destroyed Unity object reads as null through its own overloaded equality, and its transform then throws;
     // a non-finite coordinate is refused rather than published as a position. The one reader answers both the
     // observer snapshots and the deployment fact, so a position can never have a second spelling in this package.
     private static double[]? Position(Item instance)

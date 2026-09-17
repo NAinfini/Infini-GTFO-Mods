@@ -34,10 +34,14 @@
     <Compile Include="../../WeaponMeleeHitContract.cs" />
     <Compile Include="../../WeaponPlacementContract.cs" />
     <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../WeaponStateTriggerContract.cs;../../CombatPrimitiveContract.cs" />
     <!-- `ModuleDefinition.Create` composes the action families' rows too, so their contracts compile with it. -->
     <Compile Include="../../WeaponSupplyContract.cs" />
     <Compile Include="../../WeaponOverrideContract.cs" />
     <Compile Include="../../InventoryActionContract.cs" />
+    <!-- The reload and inventory-query rows the seed appends as well; the query contract's evaluators are the
+         reads file, so it compiles with them. -->
+    <Compile Include="../../ReloadInventoryContract.cs;../../InventoryQueryContract.cs;../../InventoryQueryReads.cs" />
     <Compile Include="../../ModuleDefinition.cs" />
     <Compile Include="HolderWorld.cs;HolderRowsTests.cs;DeployableRowsTests.cs;HolderChannelTests.cs;MeleeHitRowsTests.cs;MeleeDedupeTests.cs;GameDoubles.cs" />
     <!-- The melee dedupe rule is game-independent by design, so the ledger the two native sources share is

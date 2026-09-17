@@ -21,6 +21,10 @@
          ForgeTrigger keep every game-independent source file at their package root, so each declaration set is
          that whole set; naming individual files would silently drop a declaration the next refactor adds. -->
     <Compile Include="../../ForgeMap/*.cs" Link="Modules/ForgeMap/%(Filename)%(Extension)" />
+    <!-- A Map feature keeps its game-independent half in its own `Features/<feature>/` directory beside its
+         registration, so the declaration set is the root glob above plus every feature directory. Without this the
+         tool would compile a `ModuleRegistration` that names registrations it cannot see. -->
+    <Compile Include="../../ForgeMap/Features/**/*.cs" Link="Modules/ForgeMap/Features/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../../ForgeWeapon/*.cs" Link="Modules/ForgeWeapon/%(Filename)%(Extension)" />
     <Compile Include="../../ForgeTrigger/*.cs" Link="Modules/ForgeTrigger/%(Filename)%(Extension)" />
     <Compile Include="../../ForgeTrigger/Pure/*.cs" Link="Modules/Pure/%(Filename)%(Extension)" />

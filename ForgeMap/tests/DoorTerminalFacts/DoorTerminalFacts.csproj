@@ -30,6 +30,9 @@
     <Compile Include="../../DoorTerminalEventContract.cs" />
     <Compile Include="../../DoorTerminalActionContract.cs" />
     <Compile Include="../../DoorQueryContract.cs" />
+    <!-- The door row's new `puzzle` output names the chained-puzzle resource kind the scan row publishes, so
+         that contract file is compiled here too: one spelling of the kind, asserted by the cases below. -->
+    <Compile Include="../../AlarmWaveContract.cs" />
     <Compile Include="../../TerminalObjectContract.cs" />
     <Compile Include="../../MapObjectObservation.cs" />
     <!-- `MapObjectObservation` carries the zone section the trigger-zone package declares, so the contract that

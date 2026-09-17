@@ -774,7 +774,8 @@ public static class TriggerZoneContract
 
     /// <summary>One capability row: the catalog's own label and description, this build's `host` execution, the
     /// three ports the fact really publishes and no authoring parameter at all. `zone` is the zone entity itself,
-    /// exactly as `target` is the entity that walked in or out.</summary>
+    /// exactly as `target` is the entity that walked in or out, and the zone is published before the body that
+    /// walked: the catalog's own output order is `[next, zone, target]`.</summary>
     public static object Row(string capability, string label, string description)
         => new
         {
@@ -786,8 +787,8 @@ public static class TriggerZoneContract
                 outputs = new object[]
                 {
                     new { id = "next", type = "execution" },
-                    new { id = "target", type = "entity" },
-                    new { id = "zone", type = "entity", entityKinds = new[] { "gtfo.zone" } }
+                    new { id = "zone", type = "entity", entityKinds = new[] { "gtfo.zone" } },
+                    new { id = "target", type = "entity" }
                 },
                 parameters = Array.Empty<object>()
             }

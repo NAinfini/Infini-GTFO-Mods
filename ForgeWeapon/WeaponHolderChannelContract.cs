@@ -62,12 +62,16 @@ public static class WeaponHolderChannelContract
     /// <summary>The refusal for a reload this machine cannot start: the equipment is not the holder's wielded
     /// item, or the game's own reload entry point declined it (nothing to load, already reloading).</summary>
     public const string ReloadRefusedCode = "reload-refused";
+    /// <summary>The refusal for a fire this machine cannot make: the equipment is not the holder's wielded item,
+    /// it is not a bullet weapon, or the state the request named is not the one the weapon is in.</summary>
+    public const string FireRefusedCode = "fire-refused";
 
-    /// <summary>The two capability ids this provider answers for, in declaration order. The resolver table is
+    /// <summary>The three capability ids this provider answers for, in declaration order. The resolver table is
     /// keyed by them, so a registration and its resolvers cannot drift apart.</summary>
     public static IReadOnlyList<string> Capabilities { get; } = new[]
     {
         WeaponHolderActionsContract.ReloadCapability,
-        WeaponHolderActionsContract.ClipSetCapability
+        WeaponHolderActionsContract.ClipSetCapability,
+        WeaponHolderActionsContract.AutoFireCapability
     };
 }

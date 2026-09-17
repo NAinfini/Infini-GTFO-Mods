@@ -250,32 +250,69 @@ internal sealed class WeaponOverrideApplier : IWeaponOverrideSink
         switch (field.Name)
         {
             case "fire_rate":
-                block.ShotDelay = (float)field.Value;
+                block.ShotDelay = (float)WeaponActionRuntime.ShotDelayFromRate(Value(applied, field));
                 break;
             case "spread_cone":
                 // The cone is an integer count of degrees; the shipped read is a 32-bit load (`cmp r15d` family),
                 // so the value is rounded here rather than written as a fraction nothing reads back.
-                block.ShotgunConeSize = (int)Math.Round(field.Value, MidpointRounding.AwayFromZero);
+                block.ShotgunConeSize = (int)Math.Round(Value(applied, field), MidpointRounding.AwayFromZero);
                 break;
             case "spread_movement_scale":
-                block.HipFireSpread = (float)field.Value;
+                block.HipFireSpread = (float)Value(applied, field);
                 break;
             case "spread_aim_scale":
-                block.AimSpread = (float)field.Value;
+                block.AimSpread = (float)Value(applied, field);
                 break;
             case "recoil_horizontal":
-                if (recoil != null) recoil.horizontalScale!.Min = (float)field.Value;
+                if (recoil != null) recoil.horizontalScale!.Min = (float)Value(applied, field);
                 break;
             case "recoil_vertical":
-                if (recoil != null) recoil.verticalScale!.Min = (float)field.Value;
+                if (recoil != null) recoil.verticalScale!.Min = (float)Value(applied, field);
                 break;
             case "recoil_recovery":
-                if (recoil != null) recoil.spring = (float)field.Value;
+                if (recoil != null) recoil.spring = (float)Value(applied, field);
                 break;
             case "recoil_camera_kick":
-                if (recoil != null) recoil.power!.Min = (float)field.Value;
+                if (recoil != null) recoil.power!.Min = (float)Value(applied, field);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The number one field writes, after its operation has been resolved. `set` is the request's own value;
+    /// `add` and `subtract` are resolved against the instance's original block, which is the only reason this
+    /// package keeps one. Resolution lives in the native half and not in the ledger because the vocabulary's own
+    /// unit is not always the block member's unit — `fire_rate` names a frequency and the block stores its
+    /// reciprocal — and only this half knows which member a name is.
+    /// </summary>
+    private static double Value(Applied applied, WeaponOverrideField field) => field.Operation switch
+    {
+        WeaponOverrideOperation.Add => Original(applied, field.Name) + field.Value,
+        WeaponOverrideOperation.Subtract => Original(applied, field.Name) - field.Value,
+        _ => field.Value
+    };
+
+    /// <summary>What the instance's own block held for one name, before this package cloned it, expressed in the
+    /// unit the name itself uses. Called only from the write arms above, so the two lookups are already guarded:
+    /// a recoil name only arrives after the original recoil block was found, and a weapon that never fires has a
+    /// `ShotDelay` of zero, which resolves to a rate of zero rather than a division.</summary>
+    private static double Original(Applied applied, string name)
+    {
+        var block = applied.OriginalBlock;
+        return name switch
+        {
+            "fire_rate" => WeaponActionRuntime.RateFromShotDelay(block.ShotDelay),
+            "burst_count" => block.BurstShotCount,
+            "spread_cone" => block.ShotgunConeSize,
+            "spread_movement_scale" => block.HipFireSpread,
+            "spread_aim_scale" => block.AimSpread,
+            "recoil_horizontal" => applied.OriginalRecoil!.horizontalScale!.Min,
+            "recoil_vertical" => applied.OriginalRecoil!.verticalScale!.Min,
+            "recoil_recovery" => applied.OriginalRecoil!.spring,
+            "recoil_camera_kick" => applied.OriginalRecoil!.power!.Min,
+            _ => throw new ArgumentOutOfRangeException(nameof(name), name,
+                "an add or a subtract was resolved for a field with no original read")
+        };
     }
 
     /// <summary>

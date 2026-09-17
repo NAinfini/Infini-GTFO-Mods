@@ -27,6 +27,12 @@ public sealed partial class RuntimeKernel
         internal int Rounds;
         internal bool Loop;
         internal bool ForEach;
+        /// <summary>Whether this loop's list is a table of points rather than a candidate set, which is what makes
+        /// its rounds publish an orientation beside the point and what makes a short table repeatable.</summary>
+        internal bool Positions;
+        /// <summary>What a position walk does when the table runs out before the budget does: `repeat` starts the
+        /// table over from its first point, and `stop` — the default — ends the walk there.</summary>
+        internal bool Repeat;
         internal int[] Successors;
         internal JsonElement Items;
     }
@@ -149,17 +155,22 @@ public sealed partial class RuntimeKernel
             case "forge.control.flow.for_each":
             case "forge.control.flow.for_each_position":
             {
-                // One loop, three sources: a count, the candidates a selector picked, or the positions an upstream
+                // One loop, three sources: a count, the candidates a selector picked, or the points an upstream
                 // step published. `for_each_position` is `for_each`'s own frame — item and index are published for
-                // the round the same way — over the `positions` port instead of `candidates`.
+                // the round the same way — over the `positions` port instead of `candidates`, with the orientation
+                // that belongs to each point beside it.
                 var forEach = step.Control != "forge.control.flow.repeat";
-                var source = step.Control == "forge.control.flow.for_each_position" ? "positions" : "candidates";
-                var rounds = forEach ? CandidateCount(inputs, step, source) : Count(inputs, "count", step);
+                var positions = step.Control == "forge.control.flow.for_each_position";
+                var source = positions ? "positions" : "candidates";
+                var repeat = positions && parameters.TryGetProperty("shortfall", out var shortfall)
+                    && shortfall.ValueKind == JsonValueKind.String && shortfall.GetString() == "repeat";
+                var rounds = forEach ? CandidateCount(inputs, step, source, positions, repeat) : Count(inputs, "count", step);
                 if (rounds == 0) { cursor = Successor(step, 0); return null; }
                 var frame = new ControlFrame
                 {
                     Descriptor = step, Step = stepIndex, Output = 1, Round = 0, Rounds = rounds, Loop = true, ForEach = forEach,
-                    Successors = successors, Items = forEach ? inputs.GetProperty(source) : default
+                    Positions = positions, Repeat = repeat, Successors = successors,
+                    Items = forEach ? inputs.GetProperty(source) : default
                 };
                 controlWalk.Add(frame);
                 WriteLoopFrame(frame);
@@ -273,23 +284,53 @@ public sealed partial class RuntimeKernel
     }
 
     /// <summary>Writes a loop control step's value outputs for the round it is about to run: `index` counts rounds
-    /// and `item` is the candidate the round is about.</summary>
+    /// and `item` is the candidate — or the point — the round is about. A position round also publishes the
+    /// orientation that belongs to its point, and a `repeat` walk whose round is past the end of the table uses the
+    /// table from the top, so a team larger than its authored point list is placed on the list again instead of
+    /// walking fewer rounds than the plan asked for.</summary>
     private void WriteLoopFrame(in ControlFrame frame)
     {
-        if (frame.ForEach) stepFrames[frame.Step] = RuntimeJson.From(new { item = frame.Items[frame.Round], index = frame.Round });
-        else stepFrames[frame.Step] = RuntimeJson.From(new { index = frame.Round });
+        if (!frame.ForEach) { stepFrames[frame.Step] = RuntimeJson.From(new { index = frame.Round }); return; }
+        var at = frame.Round % frame.Items.GetArrayLength();
+        stepFrames[frame.Step] = frame.Positions
+            ? RuntimeJson.From(new { item = frame.Items[at], rotation = Heading(frame, at), index = frame.Round })
+            : RuntimeJson.From(new { item = frame.Items[at], index = frame.Round });
     }
 
-    /// <summary>The rounds a `for_each`/`for_each_position` may run: the count of its own list input — candidates
-    /// or positions — bounded by the input's own budget and by the per-control iteration ceiling. A list larger
-    /// than the budget is refused rather than truncated: the plan asked for all of them.</summary>
-    private int CandidateCount(JsonElement inputs, ResolvedStep step, string port)
+    /// <summary>The facing that belongs to one point of a position table, as the Euler degrees a placement reads:
+    /// the direction the walk travels from this point to the point after it, which is the one orientation a list of
+    /// bare points can answer. The last point of a table that repeats faces back at its first point; the last point
+    /// of a table that stops keeps the heading it was reached with, which is the segment that brought the walk
+    /// there. A table of one point has no segment at all and answers no rotation.</summary>
+    private static JsonElement Heading(in ControlFrame frame, int at)
     {
-        var candidates = inputs.TryGetProperty(port, out var value) && value.ValueKind == JsonValueKind.Array ? value.GetArrayLength() : 0;
-        var budget = inputs.TryGetProperty("budget", out var limit) ? (int)RuntimeJson.Integer(limit, 0) : candidates;
+        var length = frame.Items.GetArrayLength();
+        if (length < 2) return RuntimeJson.From(new[] { 0d, 0d, 0d });
+        var next = at + 1 < length ? at + 1 : frame.Repeat ? 0 : at;
+        var from = next == at ? at - 1 : at;
+        var across = frame.Items[next][0].GetDouble() - frame.Items[from][0].GetDouble();
+        var forward = frame.Items[next][2].GetDouble() - frame.Items[from][2].GetDouble();
+        var yaw = across == 0d && forward == 0d ? 0d : Math.Atan2(across, forward) * 180d / Math.PI;
+        return RuntimeJson.From(new[] { 0d, yaw, 0d });
+    }
+
+    /// <summary>The rounds a `for_each`/`for_each_position` may run. A candidate list runs one round per candidate,
+    /// bounded by the input's own budget: a list larger than the budget is refused rather than truncated, because
+    /// the plan asked for all of them. A point table is what a walk is placed from, so its budget bounds the rounds
+    /// and `shortfall` says what happens when the table runs out first: `repeat` fills the budget from the top of
+    /// the table, `stop` ends the walk at its last point. A table longer than the budget is walked no further than
+    /// the budget, which is what bounding the rounds means.</summary>
+    private int CandidateCount(JsonElement inputs, ResolvedStep step, string port, bool cycled, bool repeat)
+    {
+        var listed = inputs.TryGetProperty(port, out var value) && value.ValueKind == JsonValueKind.Array ? value.GetArrayLength() : 0;
+        var budget = inputs.TryGetProperty("budget", out var limit) ? (int)RuntimeJson.Integer(limit, 0) : listed;
         RuntimeJson.Require(budget <= Limits.MaxControlIterations, RuntimeAbiCodes.IterationBudget, step.NodeId);
-        RuntimeJson.Require(candidates <= budget, RuntimeAbiCodes.IterationBudget, step.NodeId);
-        return candidates;
+        if (!cycled)
+        {
+            RuntimeJson.Require(listed <= budget, RuntimeAbiCodes.IterationBudget, step.NodeId);
+            return listed;
+        }
+        return repeat && listed > 0 ? budget : Math.Min(listed, budget);
     }
 
     private int Count(JsonElement inputs, string port, ResolvedStep step)
@@ -410,7 +451,7 @@ public sealed partial class RuntimeKernel
             var actors = ActorContext(pending.Event, item);
             foreach (var role in RequiredActors(step.BindingId))
                 RuntimeJson.Require(actors.Get(role) != null, "actor-missing", role);
-            var result = evaluator(new EvaluationContext(step.NodeId, parameters, RuntimeJson.From(inputs), session, actors, relations));
+            var result = evaluator(new EvaluationContext(step.NodeId, parameters, RuntimeJson.From(inputs), session, actors, relations, CurrentTick, EntityInstance));
             // A refused read is a rejected step, never a frame that silently holds fewer candidates.
             RuntimeJson.Require(queryRefusal == null, step.NodeKind == "query" ? queryRefusal! : RuntimeAbiCodes.PureWorldPort, step.NodeId);
             var outputs = RuntimeJson.Rows(step.Contract, "outputs");

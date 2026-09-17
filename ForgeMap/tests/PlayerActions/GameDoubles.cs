@@ -14,6 +14,34 @@ namespace UnityEngine
     {
         public float x, y, z;
         public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        public static Vector3 zero => new(0f, 0f, 0f);
+        public static Vector3 operator +(Vector3 left, Vector3 right) => new(left.x + right.x, left.y + right.y, left.z + right.z);
+        public static Vector3 operator -(Vector3 left, Vector3 right) => new(left.x - right.x, left.y - right.y, left.z - right.z);
+        public static Vector3 operator *(Vector3 value, float scale) => new(value.x * scale, value.y * scale, value.z * scale);
+        public float sqrMagnitude => x * x + y * y + z * z;
+        public float magnitude => MathF.Sqrt(sqrMagnitude);
+        public Vector3 normalized => magnitude <= 0f ? zero : new Vector3(x / magnitude, y / magnitude, z / magnitude);
+        public static float Distance(Vector3 left, Vector3 right) => (left - right).magnitude;
+    }
+
+    /// <summary>Unity's clock, as the movement-state read uses it: the seconds the game has been running. A case
+    /// sets it, because the state-entry time the native machine carries is on this same clock.</summary>
+    public static class Time
+    {
+        public static float time { get; set; }
+    }
+}
+
+/// <summary>The game's own collection type. The production warp gate reads `Il2CppSystem`'s `HashSet` — the
+/// interop's own type and not the BCL one — so the fixture declares that type instead of aliasing it.</summary>
+namespace Il2CppSystem.Collections.Generic
+{
+    public sealed class HashSet<T>
+    {
+        private readonly List<T> _items = new();
+        public bool Contains(T item) => _items.Contains(item);
+        public void Add(T item) => _items.Add(item);
+        public int Count => _items.Count;
     }
 }
 
@@ -94,9 +122,12 @@ namespace Agents
     public class Agent : UnityObjectDouble
     {
         public Vector3 Position { get; set; }
+        public Vector3 Forward;
         // A spawned agent is alive in the game; a double that defaulted to dead would hide the dead branch.
         public virtual bool Alive { get; set; } = true;
         public virtual int PlayerSlotIndex { get; set; }
+        public virtual Vector3 EyePosition => Position;
+        public virtual bool IsLocallyOwned { get; set; } = true;
     }
 }
 
@@ -110,6 +141,17 @@ namespace Player
             GrabbedByTrap, GrabbedByTank, Testing, InElevator, GrabbedByPouncer, StandStill
         }
         public PLOC_State m_currentStateEnum;
+        /// <summary>The game clock reading at which the machine entered the state it is in, which is what the
+        /// movement-state row turns into the seconds the state has been held.</summary>
+        public float m_changeStateTime;
+        /// <summary>Every force this machine's own push channel was handed, in submission order, and the channel's
+        /// accumulated value. The real member accumulates the same way, which is why a row confirms a write by
+        /// reading back at least what it wrote.</summary>
+        public List<Vector3> Pushes { get; } = new();
+        private Vector3 _externalPushForce;
+        public void AddExternalPushForce(Vector3 force) { Pushes.Add(force); _externalPushForce += force; }
+        public Vector3 GetExternalPushForce() => _externalPushForce;
+        public void ResetExternalPushForce() { Pushes.Clear(); _externalPushForce = Vector3.zero; }
         /// <summary>The state object the interop's own `TryCast` would answer with. A case that needs the downed
         /// state object sets it; null is a locomotion machine with no state object to hand out.</summary>
         public object? CurrentState;
@@ -135,6 +177,9 @@ namespace Player
     public struct pPlayerLocationData
     {
         public Vector3 position;
+        /// <summary>The slot the identity half's own position read uses. The game's struct carries both, and the
+        /// production read names this one.</summary>
+        public Vector3 goodPosition;
     }
 
     /// <summary>The synced damage base a player's health and infection state live on, with the members the player
@@ -169,6 +214,10 @@ namespace Player
 
     public sealed class PlayerAgent : Agents.Agent
     {
+        /// <summary>The two components the generic-player batch writes through: the agent's own stamina value and
+        /// the camera this machine draws for it.</summary>
+        public PlayerStamina? Stamina { get; set; }
+        public FPSCamera? FPSCamera { get; set; }
         /// <summary>The game's own warp flags, at the enum's own values.</summary>
         [Flags]
         public enum WarpOptions : byte
@@ -189,7 +238,7 @@ namespace Player
         public Interact_Revive? ReviveInteraction;
         /// <summary>The states this agent accepts a warp in. The default mirrors the game's own set for a player on
         /// the ground; a case that needs the refusal clears or replaces it.</summary>
-        public HashSet<PlayerLocomotion.PLOC_State>? m_warpableStates = new()
+        public Il2CppSystem.Collections.Generic.HashSet<PlayerLocomotion.PLOC_State>? m_warpableStates = new()
         {
             PlayerLocomotion.PLOC_State.Stand, PlayerLocomotion.PLOC_State.Crouch, PlayerLocomotion.PLOC_State.Run,
             PlayerLocomotion.PLOC_State.Jump, PlayerLocomotion.PLOC_State.Fall, PlayerLocomotion.PLOC_State.Land,
@@ -230,4 +279,52 @@ namespace Player
         public void OnPlayerDespawned() { }
         public static void Reset() { Agents.Clear(); ThrowOnRead = false; }
     }
+}
+
+/// <summary>PlayerStamina's own value, as the stamina row writes and reads it back. The real member is a `0..1`
+/// float behind a private setter; the double keeps the same range contract and records every write.</summary>
+public sealed class PlayerStamina : UnityObjectDouble
+{
+    public List<float> Writes { get; } = new();
+    private float _stamina;
+    public float Stamina
+    {
+        get => _stamina;
+        set { _stamina = value; Writes.Add(value); }
+    }
+}
+
+/// <summary>The camera a shake is submitted to. Every call is recorded, so a case can prove the amplitude that
+/// reached the camera after the distance falloff and that nothing else was called.</summary>
+public sealed class FPSCamera : UnityObjectDouble
+{
+    public readonly record struct ShakeCall(float Duration, float Amplitude, float Frequency, Vector3 Direction);
+    public List<ShakeCall> Shakes { get; } = new();
+    public void Shake(float duration, float amplitude, float frequency, Vector3 worldDirection)
+        => Shakes.Add(new ShakeCall(duration, amplitude, frequency, worldDirection));
+}
+
+/// <summary>The native liquid preset vocabulary, in the enum's own order: the contract's preset names are aligned
+/// with these indices and the native call takes the index.</summary>
+public enum ScreenLiquidSettingName
+{
+    enemyBlood_BigBloodBomb = 0, enemyBlood_SmallRandomStreak = 1, enemyBlood_Squirt = 2, shooterGoo = 3,
+    spitterJizz = 4, elevatorRain = 5, waterDrizzle = 6, waterDrip = 7, playerBlood = 8,
+    disinfectionPack_Apply = 9, disinfectionStation_Apply = 10, infectionSweat = 11,
+    playerBlood_SmallDamage = 12, playerBlood_BigDamage = 13, playerBlood_Downed = 14, anemoneGoo = 15
+}
+
+/// <summary>The game's own screen-liquid entry: it queues one job for the local viewport and answers whether it
+/// took it. A case reads the calls back and can make the entry refuse.</summary>
+public static class ScreenLiquidManager
+{
+    public readonly record struct ApplyCall(ScreenLiquidSettingName Setting, Vector3 Position, Vector3 Direction);
+    public static List<ApplyCall> Calls { get; } = new();
+    public static bool Result { get; set; } = true;
+    public static bool Apply(ScreenLiquidSettingName setting, Vector3 position, Vector3 direction)
+    {
+        Calls.Add(new ApplyCall(setting, position, direction));
+        return Result;
+    }
+    public static void Reset() { Calls.Clear(); Result = true; }
 }

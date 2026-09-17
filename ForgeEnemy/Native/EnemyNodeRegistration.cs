@@ -56,11 +56,12 @@ internal sealed partial class EnemyModule
         return table.GetAgent((int)globalId, out dynamic? agent) ? agent : null;
     }
 
-    /// <summary>The three node actions and the six value rows, each paired with the capability its shape was
+    /// <summary>The four node actions and the six value rows, each paired with the capability its shape was
     /// resolved against.</summary>
     internal Dictionary<string, CommandHandler> NodeActionHandlers() => new(StringComparer.Ordinal)
     {
         [KillHandler] = Kill,
+        [RemoveHandler] = Remove,
         [MarkHandler] = Mark,
         [TargetHandler] = Target
     };
@@ -68,11 +69,12 @@ internal sealed partial class EnemyModule
     /// <summary>The value rows' evaluators, one per query handler name.</summary>
     internal static IReadOnlyDictionary<string, EvaluatorHandler> NodeEvaluators() => EnemyNodeValueReads.Evaluators();
 
-    /// <summary>The handler shapes the three node actions answer, keyed by the same names as
+    /// <summary>The handler shapes the four node actions answer, keyed by the same names as
     /// <see cref="NodeActionHandlers"/>.</summary>
     internal static Dictionary<string, HandlerShape> NodeActionShapes() => new(StringComparer.Ordinal)
     {
         [KillHandler] = KillPorts,
+        [RemoveHandler] = RemovePorts,
         [MarkHandler] = MarkPorts,
         [TargetHandler] = TargetPorts
     };
@@ -101,17 +103,22 @@ internal sealed partial class EnemyModule
         yield return new BindingSupport(NodeSpawnBinding, "implementation-only", Array.Empty<string>());
         foreach (var row in EnemyNodeValueContract.ValueSupport()) yield return row;
         foreach (var row in EnemyNodeTriggerContract.Support()) yield return row;
+        yield return new BindingSupport(EnemyAbilityUsedContract.BindingId, "implementation-only",
+            new[] { EnemyAbilityUsedContract.ReadPermission });
         yield return new BindingSupport(KillBinding, "implementation-only", new[] { EnemyNodeEffectContract.KillPermission });
+        yield return new BindingSupport(RemoveBinding, "implementation-only", new[] { EnemyNodeEffectContract.RemovePermission });
         yield return new BindingSupport(MarkBinding, "implementation-only", new[] { EnemyNodeEffectContract.MarkPermission });
         yield return new BindingSupport(TargetBinding, "implementation-only", new[] { EnemyNodeEffectContract.TargetPermission });
     }
 
-    /// <summary>The capability rows this module's registration appends, in registry order: the value rows and the
-    /// three action rows. The trigger rows of this family are `forge.trigger.*` rows and are declared by the
-    /// runtime's trigger contract, so no registration here carries them.</summary>
+    /// <summary>The capability rows this module's registration appends, in registry order: the value rows, the
+    /// four action rows, and the one trigger row this package declares itself. The rest of this family's trigger
+    /// rows are `forge.trigger.*` rows declared by the runtime's trigger contract, so no registration here carries
+    /// them.</summary>
     internal static string NodeCapabilityRowsJson
         => string.Join(",\n", System.Linq.Enumerable.Select(EnemyNodeValueContract.ValueRows(), RuntimeJson.From))
-           + ",\n" + EnemyNodeEffectContract.CapabilityRowsJson;
+           + ",\n" + EnemyNodeEffectContract.CapabilityRowsJson
+           + ",\n" + EnemyAbilityUsedContract.CapabilityRow;
 
     /// <summary>The binding rows this module's registration appends, in the same order as the capabilities
     /// above, with the generic spawn row's own binding: that row's capability is the trigger contract's, and
@@ -120,7 +127,8 @@ internal sealed partial class EnemyModule
         => string.Join(",\n", System.Linq.Enumerable.Select(EnemyNodeValueContract.ValueBindings(), RuntimeJson.From))
            + ",\n" + EnemyNodeEffectContract.BindingRowsJson
            + ",\n" + EnemyNodeTriggerContract.SpawnedBindingRowJson
-           + ",\n" + EnemyNodeTriggerContract.BindingRowsJson;
+           + ",\n" + EnemyNodeTriggerContract.BindingRowsJson
+           + ",\n" + EnemyAbilityUsedContract.BindingRowJson;
 
     /// <summary>Attaches the value source for this module's lifetime and registers the marker pump. Called once,
     /// where the module is built; a second call would install a second resolver for the same rows. The agent

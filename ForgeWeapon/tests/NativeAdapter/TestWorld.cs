@@ -150,13 +150,38 @@ namespace ForgeWeapon.Tests.NativeAdapter;
         {
             var session = WeaponNativeSession.Start(Kernel, RuntimeLogLevel.Off, () => CanExecute, Reports.Add, Infos.Add,
                 install ?? (() => { Installs++; DuringInstall?.Invoke(); }), remove ?? (() => Removes++),
-                gearPartsRoot ?? GearPartsRoot);
+                gearPartsRoot ?? GearPartsRoot, gate => Launch(gate));
             Started = session;
             return session;
         }
 
-        internal void StartRuntime(string? document = null)
+        /// <summary>
+        /// The launch row's body for this fixture: it answers with the row's own result shape and spawns nothing.
+        /// The real body reaches a native prefab, which is why the session takes one as a factory rather than
+        /// building it — this fixture stands in for it so the row is declared and its registration is exercised,
+        /// and the native build is where the real body is checked against the game's own signatures.
+        /// </summary>
+        internal CommandHandler Launch(Func<bool> gate)
         {
+            LaunchGates.Add(gate);
+            return context => CommandResult.Succeeded(RuntimeJson.From(new
+            {
+                rows = new[]
+                {
+                    new
+                    {
+                        target = (EntityReference?)null, status = CommandStatuses.Succeeded,
+                        committed = CommitStates.Confirmed, code = "", target_count = 1
+                    }
+                }
+            }));
+        }
+
+        /// <summary>The gates the launch factory was handed, so a case can prove the body really was built for
+        /// this session's own readiness rather than for a static one.</summary>
+        internal List<Func<bool>> LaunchGates { get; } = new();
+
+        internal void StartRuntime(string? document = null)        {
             var plan = document ?? Plan();
             Kernel.StartRuntime(() => { Kernel.LoadPlan(plan); MountPublishers(); });
             Kernel.Advance(0, true);

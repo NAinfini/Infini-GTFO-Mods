@@ -88,6 +88,7 @@ internal static class PlayerActions
     internal const string AreaCode = "area-field-unavailable";
     internal const string DestinationCode = "destination-unavailable";
     internal const string DestinationInvalidCode = "destination-invalid";
+    internal const string DimensionCode = "dimension-out-of-range";
     internal const string RotationCode = "rotation-missing";
     internal const string WarpStateCode = "warp-state-refused";
     internal const string WarpUnknownCode = "warp-not-observed";
@@ -159,15 +160,17 @@ internal static class PlayerActions
         var look = LookDirection(rotationX, rotationY, rotationZ);
 
         var outcomes = new List<PlayerActionOutcome>(targets.Length);
-        foreach (var target in targets) outcomes.Add(WarpOne(players, target, landing, look));
+        foreach (var target in targets) outcomes.Add(WarpOne(players, target, WarpDimension, landing, look));
         var outputs = RuntimeJson.From(new { results = TeleportRows(outcomes) });
         return Aggregate(outcomes, outputs, "teleport");
     }
 
     /// <summary>One recipient's warp. Every step before the native call is a read the caller could re-check, and
     /// the agent is resolved again after the call: a life replaced in between leaves the effect of the write
-    /// unknown rather than attributed to whoever holds the reference now.</summary>
-    private static PlayerActionOutcome WarpOne(PlayerIdentityModule players, EntityReference target, Vector3 landing, Vector3 look)
+    /// unknown rather than attributed to whoever holds the reference now. The dimension is the caller's, because
+    /// the authored teleport and the dimension warp differ in exactly that: where the landing is read back.</summary>
+    private static PlayerActionOutcome WarpOne(PlayerIdentityModule players, EntityReference target,
+        eDimensionIndex dimension, Vector3 landing, Vector3 look)
     {
         if (!IsKind(target, PlayerIdentityModule.EntityKind)) return Refuse(target, KindCode);
         if (!players.CanCommit) return Refuse(target, AuthorityCode);
@@ -191,7 +194,7 @@ internal static class PlayerActions
         if (accepted == null || !accepted.Contains(state)) return Refuse(target, WarpStateCode);
         if (players.CurrentAgent(target)?.Pointer != pointer) return Refuse(target, StaleCode);
 
-        try { agent.RequestWarpToSync(WarpDimension, landing, look, WarpEffects); }
+        try { agent.RequestWarpToSync(dimension, landing, look, WarpEffects); }
         catch (Exception) { return Unknown(target, CommitExceptionCode); }
 
         var after = players.CurrentAgent(target);
@@ -207,6 +210,66 @@ internal static class PlayerActions
         if (!Finite(position)) return Unknown(target, ReadbackExceptionCode);
         if (Distance(position, landing) > WarpTolerance) return Unknown(target, WarpUnknownCode);
         return Committed(target, 0);
+    }
+
+    // ---- forge.action.player.dimension (the authored-table shape) ------------------------------------------
+
+    /// <summary>The `forge.action.player.dimension` command's per-recipient body: the EOS family's dimension warp,
+    /// which is the authored teleport above with two differences — the destination dimension is the request's own
+    /// instead of the level's reality, and every recipient gets its own landing from the request's two destination
+    /// collections, in order and with the table reused from the top once it runs out. The row is one capability in
+    /// two shapes: this body answers the shape that carries the table, and the level-event half answers the
+    /// team-event shape. The table was a row of its own (`forge.action.player.dimension_warp`) until the merge.
+    ///
+    /// The table is the row's `positions` and `look_dirs` collections, zipped by index, so it is checked once for
+    /// the whole command: a table this layer cannot pair exactly refuses the command instead of moving the
+    /// recipients it happened to parse. Each landing is then solved by the game's own sampler for the destination
+    /// dimension, which is the same gate the teleport row passes, and the readback is the one the teleport row
+    /// uses — a warp the game declined leaves the agent where it was, and that is an unknown commit rather than a
+    /// success.</summary>
+    internal static CommandResult DimensionWarp(CommandContext context) => DimensionWarp(context.Inputs);
+
+    /// <inheritdoc cref="Teleport(JsonElement, JsonElement)"/>
+    internal static CommandResult DimensionWarp(JsonElement inputs)
+    {
+        if (PlayerIdentityModule.Current is not { } players || !players.CanCommit)
+            return CommandResult.Rejected(AuthorityCode);
+        if (!inputs.TryGetProperty("dimension", out var dimensionElement)
+            || dimensionElement.ValueKind != JsonValueKind.Number
+            || !dimensionElement.TryGetInt32(out int dimension)
+            || dimension < 0 || dimension >= (int)eDimensionIndex.MAX_COUNT)
+            return CommandResult.Rejected(DimensionCode);
+        if (!inputs.TryGetProperty("positions", out var positions)
+            || !inputs.TryGetProperty("look_dirs", out var lookDirs))
+            return CommandResult.Rejected(DimensionDestinations.InvalidCode);
+        if (!DimensionDestinations.TryRead(positions, lookDirs, out var destinations, out var locationsCode))
+            return CommandResult.Rejected(locationsCode);
+        var targets = Targets(inputs, "players");
+        if (targets.Length == 0) return CommandResult.Rejected(NoTargetsCode);
+        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TooManyTargetsCode);
+
+        var destinationDimension = (eDimensionIndex)dimension;
+        var outcomes = new List<PlayerActionOutcome>(targets.Length);
+        for (var index = 0; index < targets.Length; index++)
+        {
+            var destination = DimensionDestinations.At(destinations, index);
+            var position = new Vector3(destination.Position[0], destination.Position[1], destination.Position[2]);
+            Vector3 landing;
+            try
+            {
+                if (!PlayerAgent.SampleWarpPosition(destinationDimension, position, out landing))
+                {
+                    outcomes.Add(Refuse(targets[index], DestinationCode));
+                    continue;
+                }
+            }
+            catch (Exception) { outcomes.Add(Refuse(targets[index], DestinationCode)); continue; }
+            if (!Finite(landing)) { outcomes.Add(Refuse(targets[index], DestinationCode)); continue; }
+            var look = new Vector3(destination.LookDirection[0], destination.LookDirection[1], destination.LookDirection[2]);
+            outcomes.Add(WarpOne(players, targets[index], destinationDimension, landing, look));
+        }
+        var outputs = RuntimeJson.From(new { results = TeleportRows(outcomes) });
+        return Aggregate(outcomes, outputs, "dimension-warp");
     }
 
     // ---- forge.action.player.infection_change ------------------------------------------------------------

@@ -22,6 +22,9 @@ internal sealed class WeaponNativeSession : IDisposable
     internal EquipmentNativeAdapter Adapter { get; private set; } = null!;
     internal EquipmentIdentitySession Identity { get; private set; } = null!;
     internal WeaponCombatObserver Combat { get; private set; } = null!;
+    /// <summary>The weapon-state facts and the impact records behind the hit-context read: one charge row, one
+    /// aim row, the shot-resolution row, and the store the query is answered from.</summary>
+    internal CombatFactsObserver CombatFacts { get; private set; } = null!;
     /// <summary>The attack-instance rows: the game's own empty-clip paths and the two ends of a burst sequence,
     /// each naming the same equipment life the shot observer counts and never counting a shot itself.</summary>
     internal AttackInstanceModule Attack { get; private set; } = null!;
@@ -63,8 +66,15 @@ internal sealed class WeaponNativeSession : IDisposable
     private WeaponNativeSession(RuntimeKernel kernel, Action<string> report, Action removeHooks)
     { _kernel = kernel; _report = report; _removeHooks = removeHooks; }
 
+    /// <summary>
+    /// Starts the package's native half. <paramref name="projectileLaunch"/> is the one body this file does not
+    /// build for itself: the launch row's spawn call reaches a native prefab, so it is handed in as a factory and
+    /// the row is declared only because a body was really supplied for it. A caller that supplies none is a
+    /// process with no launch row, which the registration answers by not declaring the binding at all.
+    /// </summary>
     internal static WeaponNativeSession Start(RuntimeKernel kernel, RuntimeLogLevel logLevel, Func<bool> canExecute,
-        Action<string> report, Action<string> info, Action installHooks, Action removeHooks, string gearPartsRoot)
+        Action<string> report, Action<string> info, Action installHooks, Action removeHooks, string gearPartsRoot,
+        Func<Func<bool>, CommandHandler>? projectileLaunch = null)
     {
         ArgumentNullException.ThrowIfNull(kernel); ArgumentNullException.ThrowIfNull(canExecute);
         ArgumentNullException.ThrowIfNull(report); ArgumentNullException.ThrowIfNull(info);
@@ -81,7 +91,7 @@ internal sealed class WeaponNativeSession : IDisposable
         {
             session.Adapter = new EquipmentNativeAdapter(kernel, () => !session._faulted && canExecute(), report, info);
             // The bodies this provider executes itself, built before the registration because the registration
-            // carries them: the ammunition pair, the three instance-override rows and the inventory pair. Each
+            // carries them: the ammunition pair, the four instance-override rows and the inventory pair. Each
             // reads the player behind a `gtfo.player` reference through the adapter's own lookup, which confirms
             // every candidate against the owning domain and never derives a player here.
             session.Supply = new WeaponSupplyAdapter(kernel, () => !session._faulted && canExecute(),
@@ -99,8 +109,16 @@ internal sealed class WeaponNativeSession : IDisposable
                 module: ModuleDefinition.Create(
                     ammoAdd: session.Supply.HandleAdd, ammoConsume: session.Supply.HandleConsume,
                     overrides: WeaponOverrideContract.Handlers(session.OverrideActions.FireRate,
-                        session.OverrideActions.Spread, session.OverrideActions.Recoil),
-                    inventoryGive: session.Inventory.HandleGive, inventoryConsume: session.Inventory.HandleConsume),
+                        session.OverrideActions.Spread, session.OverrideActions.Recoil,
+                        session.OverrideActions.Property),
+                    inventoryGive: session.Inventory.HandleGive, inventoryConsume: session.Inventory.HandleConsume,
+                    // The `property` row's effects are the kernel's to time; this is the callback it ends them
+                    // through. The named rows keep their own duration port and so are not in this table.
+                    overrideRestores: new Dictionary<string, EffectRestoreHandler>(StringComparer.Ordinal)
+                    {
+                        [WeaponOverrideContract.PropertyHandler] = WeaponActionAdapter.RestoreProperty
+                    },
+                    projectileLaunch: projectileLaunch?.Invoke(() => !session._faulted && canExecute())),
                 observe: value => ObserveOverrides(session.Overrides.Ledger, value));
             session.Adapter.Attach(session.Identity);
             // The read rows' source goes on with the identity table they read through: a life is only nameable
@@ -108,6 +126,11 @@ internal sealed class WeaponNativeSession : IDisposable
             // slot this session no longer follows.
             session.Reads = InventoryQueryReads.Attach(new InventoryQuerySource(session.Adapter));
             session.Combat = new WeaponCombatObserver(session.Adapter, () => kernel, report, info);
+            // The weapon-state and shot-resolution facts. The shot observer is handed in rather than duplicated:
+            // the shot's own tally is what both the resolution and the hit candidate describe, so there is one
+            // place that counts what a shot reached.
+            session.CombatFacts = CombatFactsObserver.Attach(session.Adapter, session.Combat, () => kernel,
+                session.Adapter.EntityOf, session.Adapter.OwnerOf, report, info);
             // The attack-instance rows name the shot observer's own equipment life for their actor and equipment
             // ports; the module keeps no tally of shots and no ledger of hits of its own.
             session.Attack = new AttackInstanceModule(session.Adapter, () => kernel, report, info);
@@ -165,6 +188,9 @@ internal sealed class WeaponNativeSession : IDisposable
             Cleanup(ReloadInventoryHooks.Clear, errors);
             if (session.Melee != null) Cleanup(session.Melee.Dispose, errors);
             if (session.Facts != null) Cleanup(session.Facts.Dispose, errors);
+            // The combat facts go with the session for the same reason the other observers do: a start that
+            // failed after they were built must not leave a store behind that no session answers for.
+            if (session.CombatFacts != null) Cleanup(session.CombatFacts.Dispose, errors);
             if (session.Holder != null) Cleanup(session.Holder.Dispose, errors);
             if (session.Identity != null) Cleanup(session.Identity.Dispose, errors);
             if (session.Reads is { } reads) Cleanup(() => InventoryQueryReads.Detach(reads), errors);
@@ -252,6 +278,7 @@ internal sealed class WeaponNativeSession : IDisposable
         // The read rows' source is detached with the observers and before the adapter is cleared, so a plan
         // evaluating after this point refuses by code instead of reading a half-disposed adapter.
         if (Reads is { } reads) InventoryQueryReads.Detach(reads);
+        CombatFacts.Dispose();
         Melee.Dispose();
         Facts.Dispose();
         // The narrowed gear pool is the game's own state, so it is put back before the hooks that could narrow it

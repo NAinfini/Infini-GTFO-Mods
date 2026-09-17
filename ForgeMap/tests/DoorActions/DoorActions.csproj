@@ -8,9 +8,10 @@
     <NoWarn>$(NoWarn);CS0436</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The two slice sources are compiled in as production sources; the game-independent contract assembly comes
-         from its own project so the rows under test are the ones the runtime registry would read. -->
-    <Compile Include="../../Native/DoorActionCommands.cs;../../Native/DoorActions.cs;../../Native/MapActionOutcome.cs" />
+    <!-- The slice sources are compiled in as production sources; the game-independent contract assembly comes
+         from its own project so the rows under test are the ones the runtime registry would read. `MapStateActions`
+         is the merged alarm row's own half, and it forwards to the door body compiled here. -->
+    <Compile Include="../../Native/DoorActionCommands.cs;../../Native/DoorActions.cs;../../Native/MapActionOutcome.cs;../../Native/MapStateActions.cs" />
     <Compile Include="AssemblyAttributes.cs;GameDoubles.cs;DoorActionWorld.cs;DoorActionTests.cs" />
     <ProjectReference Include="../../ForgeMap.csproj" />
   </ItemGroup>

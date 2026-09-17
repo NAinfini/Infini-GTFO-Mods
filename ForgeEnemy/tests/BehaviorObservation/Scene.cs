@@ -61,7 +61,7 @@ internal sealed class Scene : IDisposable
         actor.AI.m_detection = new() { m_ai = actor.AI, Pointer = new(pointer + 3) };
         actor.AI.m_locomotion = new() { m_agent = actor, CurrentStateEnum = ES_StateEnum.PathMove };
         actor.Locomotion = actor.AI.m_locomotion;
-        actor.Abilities = new() { m_agent = actor, ActiveAbility = AgentAbility.Primary, CanTriggerAbilities = true };
+        actor.Abilities = new() { m_agent = actor, ActiveAbility = AgentAbility.Melee, CanTriggerAbilities = true };
         actor.m_hasValidTarget = true;
         return actor;
     }

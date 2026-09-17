@@ -250,6 +250,16 @@ public static class MapObjectDoorStatus
     /// locked whatever component put it there.</summary>
     public static bool IsLocked(int status) => status is 3 or 4 or 5 or 6 or 7 or 15;
 
+    /// <summary>Whether the door's own status is the glue state it is held in
+    /// (`eDoorStatus.GluedMax`, dump.cs:688678). Glue is an obstruction the door itself reports, not a lock: a
+    /// plan that wants to know whether the way is blocked reads this rather than inferring it from `closed`.</summary>
+    public static bool IsGlued(int status) => status == 12;
+
+    /// <summary>Whether the door's own status is one of the two states where an attempt to open it stuck — in
+    /// glue (`TryOpenStuckInGlue`) or against something broken (`TryOpenStuckBroken`), dump.cs:688679-688680. Both
+    /// are the door failing to move rather than a state it settled in.</summary>
+    public static bool IsStuck(int status) => status is 13 or 14;
+
     public static string Name(int status) => status switch
     {
         0 => "none",

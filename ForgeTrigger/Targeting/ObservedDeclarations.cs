@@ -106,6 +106,17 @@ internal static class ObservedDeclaration
             ModuleDefinition.ProviderId + ".binding." + name, "trigger." + rowKind + "." + name, shape, evaluate);
     }
 
+    /// <summary>Register a reviewed semantic graph, with no duplicate port declarations.</summary>
+    internal static ObservedNode Primitive(string id, string label, string description, HandlerShape shape, EvaluatorHandler evaluate)
+    {
+        var graph = PrimitiveGraphSource.Get(id);
+        var kind = id.Split('.')[1]; var name = id.Split('.')[^1];
+        var execution = graph.GetProperty("execution").GetString()!;
+        return new ObservedNode(id, kind, execution, execution == "query" ? "observe" : "evaluate",
+            label, description, graph, ModuleDefinition.ProviderId + ".binding." + name,
+            "trigger." + kind + "." + name, shape, evaluate);
+    }
+
     // Every piece below is built as a JsonElement rather than as an `object`, so a collection keeps its JSON type
     // instead of being written by an object-typed slot; the catalog row is compared field for field.
     internal static JsonElement[] Inputs(params JsonElement[] ports) => ports;
@@ -119,6 +130,18 @@ internal static class ObservedDeclaration
     {
         ["id"] = RuntimeJson.From(id), ["type"] = RuntimeJson.From("enum"), ["role"] = RuntimeJson.From("structural"),
         ["required"] = RuntimeJson.From(true), ["set"] = RuntimeJson.From(set)
+    });
+
+    /// <summary>A structural number or flag the plan may leave out, the way the catalog declares the filter's own
+    /// `dimension` and its two switches: what an unwritten one means is the row's rule, not a default this table
+    /// invents.</summary>
+    internal static JsonElement OptionalInteger(string id) => Optional("integer", id);
+    internal static JsonElement OptionalBoolean(string id) => Optional("boolean", id);
+
+    private static JsonElement Optional(string type, string id) => RuntimeJson.From(new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+    {
+        ["id"] = RuntimeJson.From(id), ["type"] = RuntimeJson.From(type), ["role"] = RuntimeJson.From("structural"),
+        ["required"] = RuntimeJson.From(false)
     });
 
     /// <summary>A structural enum whose members are the row's own inline list, the way the catalog declares the
@@ -214,6 +237,38 @@ internal static class ObservedEvaluation
         => context.Parameters.TryGetProperty(parameter, out var value) && value.ValueKind != JsonValueKind.Null
             ? value.GetString()!
             : throw new RuntimeContractException("missing-field", parameter);
+
+    /// <summary>One optional structural parameter of the resolved frame, spelled as its member name, or null when
+    /// the plan left it out. The row's own rule reads an unwritten member as the first member of its list, which is
+    /// the row's business and not this reader's.</summary>
+    internal static string? OptionalParameterText(EvaluationContext context, string parameter)
+        => context.Parameters.TryGetProperty(parameter, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() : null;
+
+    /// <summary>One optional structural number of the resolved frame, or null when the plan left it out.</summary>
+    internal static int? OptionalParameterInteger(EvaluationContext context, string parameter)
+        => context.Parameters.TryGetProperty(parameter, out var value) && value.ValueKind == JsonValueKind.Number
+            ? (int)value.GetDouble() : null;
+
+    /// <summary>One optional structural flag, or <paramref name="whenAbsent"/> when the plan left it out: a
+    /// parameter the compiler wrote is the author's answer, and one it did not write is nobody's.</summary>
+    internal static bool OptionalParameterFlag(EvaluationContext context, string parameter, bool whenAbsent)
+        => context.Parameters.TryGetProperty(parameter, out var value)
+            && value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : whenAbsent;
+
+    /// <summary>The seed a step draws with: the number the author wrote on its own `seed` port under `fixed`, or
+    /// the run's own number under `session`. The run's number is the world epoch — the identity every peer of one
+    /// world shares — mixed with the step's own node, so a session-seeded step picks different targets in a
+    /// different run and the same targets on every peer of this one.</summary>
+    internal static long Seed(EvaluationContext context, string port, string mode)
+        => mode == "session" ? RunSeed(context) : context.Inputs.GetProperty(port).GetInt64();
+
+    private static long RunSeed(EvaluationContext context)
+    {
+        var hash = 14695981039346656037UL;
+        foreach (var character in context.NodeId) hash = unchecked((hash ^ character) * 1099511628211UL);
+        return unchecked((long)(hash ^ (ulong)context.Query.WorldEpoch));
+    }
 
     /// <summary>The references one collection port carries. A port the plan left empty is an empty set; a port that
     /// is not there at all is refused, so an absent candidate collection never reads as an observed empty world.</summary>

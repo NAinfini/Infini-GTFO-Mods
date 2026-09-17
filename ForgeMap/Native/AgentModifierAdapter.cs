@@ -23,9 +23,10 @@ namespace ForgeMap.Native;
 /// modification was registered, which is a refusal by name — never a retried or invented id.
 ///
 /// The id, not the handle, is what the native clear takes, so the ledger is the provider's own: modification id →
-/// the life it was written on, the attribute member, the submission and the tick it expires at. A command's
-/// handle is the provider's own effect handle, minted once for the command and kept beside the ids it covers, so
-/// `attribute_remove` can be asked for exactly what an `attribute_apply` handed out.
+/// the life it was written on, the attribute member, the submission and the tick it expires at. The handle a
+/// command's modifications are filed under is the kernel's own effect handle — the step's `effect` block is what
+/// gave it a duration and a cancellation — so `attribute_remove` can be asked for exactly what an
+/// `attribute_apply` handed out, and the kernel calls `RestoreApply` back when that effect ends.
 ///
 /// Three properties of the native path are recorded rather than assumed, and all three are the game-internal
 /// confirmation items `ForgeMap/evidence/agent-modifier-hooks.json` lists: which side of `AddSyncedModifierValue`
@@ -34,11 +35,11 @@ namespace ForgeMap.Native;
 /// a refusal) and does not fall back to a Forge-side imitation of any of them.
 ///
 /// Cleanup is driven by the kernel's own lifecycle because nothing else tells a provider that a life ended or a
-/// world did: `WorldChanged` clears the ledger and the ids it still holds, `TickAdvanced` expires what came due
-/// and drops what belongs to a life the player identity no longer resolves, and the handle's own cancel hook
-/// revokes a single command's effect. A lifecycle callback may not mutate the kernel, so the sweep asks the
-/// player identity whether a life is current instead of the kernel's entity check: both answer about the same
-/// table, and the identity is this package's own half of it.</summary>
+/// world did: `WorldChanged` clears the ledger and the ids it still holds, `TickAdvanced` drops what belongs to a
+/// life the player identity no longer resolves, and the kernel's restore callback revokes a single effect's
+/// modifications. A lifecycle callback may not mutate the kernel, so the sweep asks the player identity whether a
+/// life is current instead of the kernel's entity check: both answer about the same table, and the identity is
+/// this package's own half of it.</summary>
 internal sealed class AgentModifierAdapter : IDisposable
 {
     /// <summary>The design's own ceiling on native modification writes per host tick, shared by every command
@@ -61,6 +62,8 @@ internal sealed class AgentModifierAdapter : IDisposable
     /// so a request that carries it cannot be served as asked and is refused by name rather than served without
     /// it.</summary>
     internal const string GravityCode = "jump-gravity-unsupported";
+    /// <summary>The movement preset's own `duration` port: the preset is not a rule an `effect` block times, so it
+    /// keeps the port and the tick pass that releases what came due.</summary>
     internal const string DurationCode = "duration-out-of-range";
     internal const string TargetsCode = "too-many-targets";
     internal const string WriteBudgetCode = "modifier-budget";
@@ -89,8 +92,8 @@ internal sealed class AgentModifierAdapter : IDisposable
 
     /// <summary>The attribute a movement preset's group answers with. A preset is two native modifiers, so a
     /// `remove` narrowed to one `agent_modifier` member never covers it — the name is deliberately outside the
-    /// table those requests are validated against, and the whole preset is released by an unnarrowed remove, its
-    /// own cancel or its expiry.</summary>
+    /// table those requests are validated against, and the whole preset is released by an unnarrowed remove, by
+    /// the tick its own `duration` port expires at, or by the world's end.</summary>
     private const string ProfileAttribute = "movement-profile";
 
     /// <summary>One row of the apply result, in the canonical row's own columns: the four fixed columns first,
@@ -116,13 +119,18 @@ internal sealed class AgentModifierAdapter : IDisposable
         [property: JsonPropertyName("target_count")] int TargetCount);
 
     /// <summary>The kernel's own identity of a handle value: the world, the generation, the pool slot and the
-    /// creating provider. It is read so a request handle can be matched against the one this provider minted,
-    /// which is the only key a provider has: the kernel's handle table is private and `TryNative` answers only
-    /// for a handle that carries a native object, while a handle registered here would be dropped by the
-    /// kernel's own lifetime sweep — no provider in this package registers the native object resolver that
-    /// sweep asks, so a `PlayerAgent` would answer "no current life" and release a live handle.</summary>
+    /// creating provider. It is read so a request handle can be matched against the one the kernel cast, which is
+    /// the only key a provider has: the kernel's handle table is private and `TryNative` answers only for a handle
+    /// that carries a native object, while a handle registered here would be dropped by the kernel's own lifetime
+    /// sweep — no provider in this package registers the native object resolver that sweep asks, so a `PlayerAgent`
+    /// would answer "no current life" and release a live handle.
+    ///
+    /// The default value is the "no handle" marker, because the epoch a real handle carries starts at one: the
+    /// first world the kernel begins is world one, and the first handle it casts is cast in it.</summary>
     private readonly record struct HandleKey(long WorldEpoch, long LifeEpoch, int Local, int Provider)
     {
+        internal bool IsHandle => WorldEpoch != 0;
+
         internal static bool TryRead(JsonElement value, out HandleKey key)
         {
             key = default;
@@ -138,11 +146,13 @@ internal sealed class AgentModifierAdapter : IDisposable
     }
 
     /// <summary>One live modification: what the native entry returned, the life it was written on, when it
-    /// expires, and the handle the command it belongs to minted.</summary>
+    /// expires, and the effect handle the command's own card filed it under.</summary>
     private sealed class Applied
     {
         internal uint Id;
         internal EntityReference Target = new("", 0, 0);
+        /// <summary>The provider's own expiry, which only the movement preset sets: the sourced-modifier row's
+        /// duration belongs to the kernel's effect lifecycle, so its entries carry none.</summary>
         internal long ExpiryTick = -1;
         internal HandleKey Handle;
         /// <summary>Whether a native clear failure for this id was already reported, so a failing clear is one
@@ -150,9 +160,9 @@ internal sealed class AgentModifierAdapter : IDisposable
         internal bool Reported;
     }
 
-    /// <summary>The modifications one command wrote, under the effect handle that command returned. A single
-    /// attribute row groups one member; a movement preset groups the two members it wrote, under the name no
-    /// single-attribute request can name.</summary>
+    /// <summary>The modifications one command wrote, under the effect handle the kernel cast for that step. A
+    /// single attribute row groups one member; a movement preset groups the two members it wrote, under the name
+    /// no single-attribute request can name.</summary>
     private sealed class Group
     {
         internal HandleKey Key;
@@ -197,6 +207,17 @@ internal sealed class AgentModifierAdapter : IDisposable
     internal static CommandResult ProfileHandler(CommandContext context)
         => Current is { } adapter ? adapter.Profile(context) : CommandResult.Rejected(AuthorityCode);
 
+    /// <summary>The `attribute_apply` row's own restore callback, which the kernel calls when the effect its card
+    /// asked for ends — by its duration, by a cancellation, by a released plan or by the world. What ends is every
+    /// modification that command filed under that handle, and a handle the module has already released through its
+    /// own removal action is the no-op it has to be: the kernel keeps the instance until its duration runs out, and
+    /// a restore that found nothing to undo is not a failure.</summary>
+    internal static void RestoreApply(RuntimeEffectContext context)
+    {
+        if (Current is not { } adapter || !HandleKey.TryRead(context.Handle, out var key)) return;
+        adapter.ReleaseGroup(key, "effect-ended");
+    }
+
     /// <summary>The adapter subscribes on the registration it is handed, because a lifecycle observer is the one
     /// per-tick and per-world notification a provider gets without the kernel calling into it. The subscription
     /// needs a registration that exists, so the adapter is created after `RegisterModule` returned — the kernel
@@ -219,8 +240,13 @@ internal sealed class AgentModifierAdapter : IDisposable
 
     /// <summary>The `forge.action.combat.attribute_apply` handler. The whole request check runs before the first
     /// recipient, because a command that cannot be carried out as asked must not half-apply: an attribute outside
-    /// the table, a no-op member, an unbounded or zero amount, a negative lifetime and an over-wide recipient set
-    /// are all refused by name, and a command that cannot mint the handle naming its own effect writes nothing.</summary>
+    /// the table, a no-op member, an unbounded or zero amount and an over-wide recipient set are all refused by
+    /// name, and a command whose effect handle cannot be read writes nothing.
+    ///
+    /// The effect's handle is the kernel's, not this provider's: the plan's own `effect` block is what gave the
+    /// step a duration, a layer count and a cancellation, and the same handle is what the kernel hands back in the
+    /// restore callback below. A step with no `effect` block has no handle at all, and a modification nothing can
+    /// name lasts until it is removed, its life ends or the world does.</summary>
     internal CommandResult Apply(CommandContext context)
     {
         CheckThread();
@@ -246,30 +272,18 @@ internal sealed class AgentModifierAdapter : IDisposable
             && amountValue.ValueKind == JsonValueKind.Number ? amountValue.GetDouble() : double.NaN;
         if (!double.IsFinite(amount) || amount == 0 || Math.Abs(amount) > MaximumAmount)
             return CommandResult.Rejected(AmountCode);
-        long? expiry = null;
-        if (context.Inputs.TryGetProperty("duration", out var durationValue) && durationValue.ValueKind != JsonValueKind.Null)
-        {
-            if (durationValue.ValueKind != JsonValueKind.Number || !durationValue.TryGetInt64(out var ticks)
-                || ticks < 0 || context.SimulationTick > long.MaxValue - ticks)
-                return CommandResult.Rejected(DurationCode);
-            // Zero is no duration, the way the other actions read the same port: a modification with no
-            // caller-set lifetime lasts until it is removed, its life ends or the world does.
-            if (ticks > 0) expiry = context.SimulationTick + ticks;
-        }
         var targets = context.Inputs.GetProperty("targets").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
         // One row is written per recipient; the result budget is the row budget.
         if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
         // `subtract` is the same contribution with the sign the native modifier table reads as its opposite.
         double submitted = operation == "subtract" ? -amount : amount;
 
-        // The effect handle is minted before the first write so a command that cannot name its effect does not
-        // create one: the handle is what a later remove or cancel holds, and an unnamed modification would only
-        // be reachable by expiry.
-        JsonElement handle;
-        try { handle = _registration.CreateEffectHandle("entity_life"); }
-        catch (RuntimeContractException) { return CommandResult.Rejected(HandleBudgetCode); }
-        if (!HandleKey.TryRead(handle, out var key)) return CommandResult.Rejected(HandleBudgetCode);
-        _registration.RegisterCancel(handle, () => CancelGroup(key));
+        // The kernel's handle is what this command's modifications are filed under, because it is what the kernel
+        // calls back with when the effect ends. A value the kernel did not cast for this step — a card that asked
+        // for no effect has none — leaves the group unnamed; the modifications are still in the ledger and the
+        // sweep, the removal that names them and the world's own end all release them.
+        HandleKey key = default;
+        var named = context.EffectHandle is { } effectHandle && HandleKey.TryRead(effectHandle, out key) && key.IsHandle;
 
         var rows = new List<ApplyRow>(targets.Length);
         var written = new List<Applied>(targets.Length);
@@ -309,7 +323,9 @@ internal sealed class AgentModifierAdapter : IDisposable
             {
                 Id = id,
                 Target = target,
-                ExpiryTick = expiry ?? -1,
+                // The instance's clock is the kernel's: this ledger keeps no expiry for a row whose duration the
+                // plan's `effect` block owns, and the module is called back when that clock runs out.
+                ExpiryTick = -1,
                 Handle = key
             };
             _entries.Add(id, entry);
@@ -318,12 +334,10 @@ internal sealed class AgentModifierAdapter : IDisposable
             committed++;
         }
 
-        // Only a command that wrote something has an effect to name: the handle of a fully refused command is
-        // left out of the frame instead of naming an empty group.
-        JsonElement outputs = written.Count == 0
-            ? RuntimeJson.From(new { results = rows })
-            : RuntimeJson.From(new { results = rows, modifier = handle });
-        if (written.Count != 0)
+        // The handle is not this row's output: the kernel publishes the effect handle its card asked for into
+        // this capability's own `modifier` port, so a module that returned one would be a second writer of it.
+        JsonElement outputs = RuntimeJson.From(new { results = rows });
+        if (named && written.Count != 0)
         {
             var group = new Group { Key = key, Attribute = attribute! };
             foreach (var entry in written) group.Ids.Add(entry.Id);
@@ -367,14 +381,14 @@ internal sealed class AgentModifierAdapter : IDisposable
         var targets = context.Inputs.GetProperty("targets").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
         if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
 
-        // The effect handle is minted before the first write so a command that cannot name its effect writes
-        // nothing: the handle is what a later remove or cancel holds, and an unnamed preset would only be
-        // reachable by expiry.
+        // The preset's own effect handle is minted before the first write so a command that cannot name its effect
+        // writes nothing: the handle is what a later remove, cancel or expiry holds, and an unnamed preset would
+        // only be reachable by its life's end or the world's.
         JsonElement handle;
         try { handle = _registration.CreateEffectHandle("entity_life"); }
         catch (RuntimeContractException) { return CommandResult.Rejected(HandleBudgetCode); }
         if (!HandleKey.TryRead(handle, out var key)) return CommandResult.Rejected(HandleBudgetCode);
-        _registration.RegisterCancel(handle, () => CancelGroup(key));
+        _registration.RegisterCancel(handle, () => ReleaseGroup(key, "handle-cancelled"));
 
         var rows = new List<ProfileRow>(targets.Length);
         var written = new List<Applied>(targets.Length * 2);
@@ -458,11 +472,16 @@ internal sealed class AgentModifierAdapter : IDisposable
         return Aggregate(committed, rejected, unknown, rows.Select(row => row.Code).ToArray(), outputs);
     }
 
-    /// <summary>The `forge.action.combat.attribute_remove` handler. The request names what an apply handed out —
+    /// <summary>The `forge.action.combat.attribute_remove` handler: the immediate removal, which ends what an
+    /// apply handed out right here instead of waiting for the effect's own clock. The request names the handles —
     /// the effect handle collection, optionally narrowed to one attribute — and every modification the handles
-    /// cover is released through the same native clear the expiry path uses. A request that names a handle this
-    /// provider no longer holds, or an attribute one of them was not written under, is refused as a whole before
-    /// anything is cleared.</summary>
+    /// cover is released through the same native clear the restore and the expiry paths use. A request that names
+    /// a handle this provider no longer holds, or an attribute one of them was not written under, is refused as a
+    /// whole before anything is cleared.
+    ///
+    /// The kernel's effect instance is not ended here: it belongs to the plan's own card and its `cancel` handle,
+    /// and it stays until its duration runs out or its handle is cancelled. By then the group is gone, so the
+    /// restore callback this adapter answers is the no-op an already-undone effect has to be.</summary>
     internal CommandResult Remove(CommandContext context)
     {
         CheckThread();
@@ -600,15 +619,22 @@ internal sealed class AgentModifierAdapter : IDisposable
         if (ReferenceEquals(Current, this)) Current = null;
     }
 
-    /// <summary>The effect handle's own cancel: a plan that cancels the handle an apply returned revokes exactly
-    /// the modifications that command wrote, and nothing else.</summary>
-    private void CancelGroup(HandleKey key)
+    /// <summary>The end of one effect: every modification filed under the handle is released through the same
+    /// native clear the removal and the expiry paths use, and nothing else is. A handle no group answers for is
+    /// the no-op of an effect the module already undid — which is also what the movement preset's own cancel hook
+    /// needs, since a plan may cancel the handle that preset returned.</summary>
+    private void ReleaseGroup(HandleKey key, string reason)
     {
         if (!_groups.TryGetValue(key, out var group)) return;
         _due.Clear();
         _due.AddRange(group.Ids);
-        Clear(_due, "handle-cancelled");
+        Clear(_due, reason);
     }
+
+    /// <summary>Whether this adapter holds modifications under one handle — the question a caller asks to tell a
+    /// command whose effect is still live from one it never filed.</summary>
+    internal bool HoldsGroup(JsonElement handle)
+        => HandleKey.TryRead(handle, out var key) && _groups.ContainsKey(key);
 
     /// <summary>Releases the named ids through the native synced clear and forgets the ones that were released.
     /// An id whose clear threw stays in the ledger — with one diagnostic, not one per tick — so the world-end

@@ -376,16 +376,17 @@ internal static class PlanAbiTests
                 "a candidate set above its budget is refused");
             Check(h.Applied.Count == 0, "no round runs off a partially read candidate set");
         }
-        // for_each_position: one round per position, in list order, with `index` published for the body.
+        // for_each_position: one round per point, in list order, with `index` published for the body. The budget
+        // bounds the rounds, so a table exactly that long is walked once.
         {
             var h = new Harness();
             h.Load(h.Plan("for-each-position", new[]
             {
                 h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
                     new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
-                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, Array.Empty<object>(),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, new object[] { 0 },
                     new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
-                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 4 } }, new int?[] { 2, 3 }),
+                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 2 } }, new int?[] { 2, 3 }),
                 h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
                 h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 },
                     h.ActionInput(FromStep(h.Port(h.ActionContract, "inputs", "steps"), 1, h.Port(h.ForEachPositionContract, "outputs", "index"))), new int?[] { null })
@@ -395,23 +396,104 @@ internal static class PlanAbiTests
             Check(h.Applied.SequenceEqual(new[] { "S3_body:" + Entity(1) + ":0", "S3_body:" + Entity(1) + ":1", "S2_next:" + Entity(1) + ":-" }),
                 "for_each_position runs one body per position and then enters next [" + string.Join("|", h.Applied) + "]");
         }
-        // for_each_position: a position list larger than the declared budget is refused, never truncated.
+        // for_each_position: `shortfall=repeat` fills the budget from the top of the table, and every round publishes
+        // the point it walks to and the index that counts the rounds.
         {
             var h = new Harness();
-            h.Load(h.Plan("for-each-position-budget", new[]
+            h.Load(h.Plan("for-each-position-repeat", new[]
             {
                 h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
                     new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
-                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, Array.Empty<object>(),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, new object[] { 1 },
+                    new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
+                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 4 } }, new int?[] { 2, 3 }),
+                h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 },
+                    new object[] { FromEvent(h.Port(h.ActionContract, "inputs", "target"), h.TriggerPort("outputs", "target")),
+                                   FromStep(h.Port(h.ActionContract, "inputs", "steps"), 1, h.Port(h.ForEachPositionContract, "outputs", "index")),
+                                   FromStep(h.Port(h.ActionContract, "inputs", "mark"), 1, h.Port(h.ForEachPositionContract, "outputs", "item")) },
+                    new int?[] { null })
+            }, start: 1));
+            h.Publish("for-each-position-repeat", targets: new[] { Entity(1), Entity(2) });
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[]
+                {
+                    "S3_body:" + Entity(1) + ":0:1/2/3", "S3_body:" + Entity(1) + ":1:4/5/6",
+                    "S3_body:" + Entity(1) + ":2:1/2/3", "S3_body:" + Entity(1) + ":3:4/5/6",
+                    "S2_next:" + Entity(1) + ":-"
+                }),
+                "a repeat walk fills its budget from the top of the table [" + string.Join("|", h.Applied) + "]");
+        }
+        // for_each_position: an unwritten `shortfall` ends the walk at the table's last point instead of walking on.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("for-each-position-stop", new[]
+            {
+                h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
+                    new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, new object[] { 0 },
+                    new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
+                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 4 } }, new int?[] { 2, 3 }),
+                h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 },
+                    new object[] { FromEvent(h.Port(h.ActionContract, "inputs", "target"), h.TriggerPort("outputs", "target")),
+                                   FromStep(h.Port(h.ActionContract, "inputs", "steps"), 1, h.Port(h.ForEachPositionContract, "outputs", "index")),
+                                   FromStep(h.Port(h.ActionContract, "inputs", "mark"), 1, h.Port(h.ForEachPositionContract, "outputs", "item")) },
+                    new int?[] { null })
+            }, start: 1));
+            h.Publish("for-each-position-stop", targets: new[] { Entity(1), Entity(2) });
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[]
+                {
+                    "S3_body:" + Entity(1) + ":0:1/2/3", "S3_body:" + Entity(1) + ":1:4/5/6",
+                    "S2_next:" + Entity(1) + ":-"
+                }),
+                "a walk whose table runs out ends at its last point [" + string.Join("|", h.Applied) + "]");
+        }
+        // for_each_position: the budget bounds the rounds even when the table holds more points than it.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("for-each-position-short", new[]
+            {
+                h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
+                    new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, new object[] { 1 },
                     new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
                                    new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 1 } }, new int?[] { 2, 3 }),
                 h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
-                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null })
+                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 },
+                    h.ActionInput(FromStep(h.Port(h.ActionContract, "inputs", "steps"), 1, h.Port(h.ForEachPositionContract, "outputs", "index"))), new int?[] { null })
             }, start: 1));
-            h.Publish("for-each-position-budget", targets: new[] { Entity(1), Entity(2) });
-            var tick = h.Kernel.Advance(1, true);
-            Check(tick.Events.Any(e => e.Status == "rejected" && e.Code == RuntimeAbiCodes.IterationBudget) && h.Applied.Count == 0,
-                "a position list above its budget is refused whole, not truncated");
+            h.Publish("for-each-position-short", targets: new[] { Entity(1), Entity(2) });
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[] { "S3_body:" + Entity(1) + ":0", "S2_next:" + Entity(1) + ":-" }),
+                "the budget bounds a table that holds more points than it [" + string.Join("|", h.Applied) + "]");
+        }
+        // for_each_position: every round publishes the facing that belongs to its own point — the direction the walk
+        // travels from it, which for the last point of a repeating walk is back at the first.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("for-each-position-facing", new[]
+            {
+                h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
+                    new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, new object[] { 1 },
+                    new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
+                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 2 } }, new int?[] { 2, 3 }),
+                h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 },
+                    new object[] { FromEvent(h.Port(h.ActionContract, "inputs", "target"), h.TriggerPort("outputs", "target")),
+                                   FromStep(h.Port(h.ActionContract, "inputs", "turn"), 1, h.Port(h.ForEachPositionContract, "outputs", "rotation")) },
+                    new int?[] { null })
+            }, start: 1));
+            h.Publish("for-each-position-facing", targets: new[] { Entity(1), Entity(2) });
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[]
+                {
+                    "S3_body:" + Entity(1) + ":-:0/45/0", "S3_body:" + Entity(1) + ":-:0/-135/0",
+                    "S2_next:" + Entity(1) + ":-"
+                }),
+                "each round carries the facing of its own point [" + string.Join("|", h.Applied) + "]");
         }
         // enum_switch: the member the set lists at index i is the exit `case_(i+1)`, and only that exit runs.
         {
@@ -797,7 +879,14 @@ internal static class PlanAbiTests
                 // published into `steps` — that is how a case asserts the frame a loop or a cancel wrote.
                 var target = context.Inputs.TryGetProperty("target", out var entity) ? RuntimeJson.Entity(entity).Id : "-";
                 var steps = context.Inputs.TryGetProperty("steps", out var value) && value.ValueKind == JsonValueKind.Number ? ((long)value.GetDouble()).ToString() : "-";
-                Applied.Add($"{context.NodeId}:{target}:{steps}");
+                // A vector a preceding control step published — a position table's own position and direction — is
+                // logged only when the plan wired the optional port, so every assertion written before it existed
+                // still reads the same string.
+                var mark = context.Inputs.TryGetProperty("mark", out var point) && point.ValueKind == JsonValueKind.Array
+                    ? ":" + string.Join("/", point.EnumerateArray().Select(component => component.GetDouble())) : "";
+                var turn = context.Inputs.TryGetProperty("turn", out var facing) && facing.ValueKind == JsonValueKind.Array
+                    ? ":" + string.Join("/", facing.EnumerateArray().Select(component => component.GetDouble())) : "";
+                Applied.Add($"{context.NodeId}:{target}:{steps}{mark}{turn}");
                 // `count` is the movable output the action-publishes-a-value cases read: a declared column of this
                 // capability's own result row, read back by a later step through `fromStepSlot`.
                 return CommandResult.Succeeded(RuntimeJson.From(new { actual = 1, count = 7 }));
@@ -827,14 +916,18 @@ internal static class PlanAbiTests
             // count a case asserts (`cancel`'s cancelled, a loop's index), and the action records it as the number
             // its own log line carries.
             seed["capabilities"]!.AsArray()[1]!["graph"]!["inputs"] = JsonNode.Parse(
-                "[{\"id\":\"in\",\"type\":\"execution\"},{\"id\":\"target\",\"type\":\"entity\"},{\"id\":\"steps\",\"type\":\"integer\",\"optional\":true}]");
+                "[{\"id\":\"in\",\"type\":\"execution\"},{\"id\":\"target\",\"type\":\"entity\"},{\"id\":\"steps\",\"type\":\"integer\",\"optional\":true},"
+                + "{\"id\":\"mark\",\"type\":\"vector3\",\"unit\":\"m\",\"optional\":true,\"nullable\":true},"
+                + "{\"id\":\"turn\",\"type\":\"vector3\",\"unit\":\"deg\",\"optional\":true,\"nullable\":true}]");
             seed["capabilities"]!.AsArray().Add(JsonNode.Parse(RuntimeJson.From(new
             {
                 id = Id + ".observe", owner = Id, kind = "selector", label = "Observed entities", version = "1.0.0", parameters = new { },
                 graph = new { domains = new[] { "enemy" }, execution = "query",
                     inputs = new object[] { new { id = "targets", type = "entity", cardinality = "many" } },
                     outputs = new object[] { new { id = "seen", type = "entity" }, new { id = "seen_many", type = "entity", cardinality = "many" }, new { id = "hits", type = "integer" },
-                        new { id = "points", type = "vector3", cardinality = "many" } },
+                        new { id = "points", type = "vector3", cardinality = "many" },
+                        new { id = "look_dirs", type = "vector3", cardinality = "many" },
+                        new { id = "points_extra", type = "vector3", cardinality = "many" } },
                     parameters = Array.Empty<object>() }
             }).GetRawText())!);
             seed["bindings"]!.AsArray().Add(JsonNode.Parse(RuntimeJson.From(new
@@ -846,8 +939,8 @@ internal static class PlanAbiTests
             {
                 RegistryJson = seed.ToJsonString(),
                 Evaluators = new Dictionary<string, EvaluatorHandler> { [Id + ".handler.observe"] = Observe },
-                Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(Id)] = Fixture.Shape(Id, new[] { "target", "steps" }),
-                    [Id + ".handler.observe"] = new HandlerShape().Inputs("targets").Outputs("seen", "seen_many", "hits", "points") },
+                Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(Id)] = Fixture.Shape(Id, new[] { "target", "steps", "mark", "turn" }),
+                    [Id + ".handler.observe"] = new HandlerShape().Inputs("targets").Outputs("seen", "seen_many", "hits", "points", "look_dirs", "points_extra") },
                 BindingSupport = new[] { Fixture.Support(Id)[0], Fixture.Support(Id)[1],
                     new BindingSupport(WorldTriggerBinding, "implementation-only", NoPermissions),
                     new BindingSupport(ObserveBinding, "implementation-only", NoPermissions) },
@@ -911,8 +1004,12 @@ internal static class PlanAbiTests
             {
                 seen = seen[0], seen_many = seen.ToArray(), hits = seen.Count,
                 // The fixture's one position list: `for_each_position` walks what a step published, so the list a
-                // case checks is produced by a query step exactly the way the candidate set is.
-                points = new[] { new[] { 1d, 2d, 3d }, new[] { 4d, 5d, 6d } }
+                // case checks is produced by a query step exactly the way the candidate set is. The directions are
+                // the table's second half, one per position.
+                points = new[] { new[] { 1d, 2d, 3d }, new[] { 4d, 5d, 6d } },
+                look_dirs = new[] { new[] { 7d, 8d, 9d }, new[] { 10d, 11d, 12d } },
+                // A second table of the same kind and a different length, so a case can wire halves that disagree.
+                points_extra = new[] { new[] { 1d, 1d, 1d }, new[] { 2d, 2d, 2d }, new[] { 3d, 3d, 3d } }
             });
         }
 

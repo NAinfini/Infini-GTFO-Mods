@@ -21,6 +21,9 @@
          adapter because the handler names and the binding rows have to agree, and a renamed row fails here. -->
     <Compile Include="../../Native/InventoryActions.cs" />
     <Compile Include="../../InventoryActionContract.cs" />
+    <!-- The reload and inventory-query rows the seed appends as well; the query contract's evaluators are the
+         reads file, so it compiles with them. -->
+    <Compile Include="../../ReloadInventoryContract.cs;../../InventoryQueryContract.cs;../../InventoryQueryReads.cs" />
     <!-- `ModuleDefinition.Create` composes this package's own row sets, so every contract it names has to be
          compiled here; a missing one is that declaration failing to build, not a row the registry dropped. -->
     <Compile Include="../../WeaponSupplyContract.cs" />
@@ -28,6 +31,7 @@
     <Compile Include="../../WeaponDeployableFactsContract.cs" />
     <Compile Include="../../WeaponMeleeHitContract.cs" />
     <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../WeaponStateTriggerContract.cs;../../CombatPrimitiveContract.cs" />
     <Compile Include="../../ModuleDefinition.cs" />
     <Compile Include="InventoryActionsWorld.cs;InventoryActionsTests.cs;GameDoubles.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />

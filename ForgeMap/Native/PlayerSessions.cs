@@ -93,6 +93,13 @@ internal static class PlayerSessions
     internal static IReadOnlyList<string>? SessionsOf(IReadOnlyList<EntityReference>? recipients)
     {
         if (recipients == null || recipients.Count == 0) return null;
+        // A map object is not a player, and the one presentation row of this provider that names one — the
+        // interaction-prompt row — draws on every machine that might look at that object: the prompt belongs to
+        // whichever player is aiming at it, and this layer cannot know which one that will be. So a step whose
+        // recipients are all map objects is addressed to every player in the level, which is the only conversion
+        // that puts the rule on the machine that will draw the prompt. A step that mixes a map object with a
+        // player is still converted one reference at a time below, and refuses as before.
+        if (AllMapObjects(recipients)) return EverySession();
         var sessions = new List<string>(recipients.Count);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var reference in recipients)
@@ -102,5 +109,38 @@ internal static class PlayerSessions
         }
         sessions.Sort(StringComparer.Ordinal);
         return sessions;
+    }
+
+    /// <summary>Whether every reference names a map object of this provider. The kind is the one prefix every
+    /// map-object reference carries, read here rather than through a category parser: routing asks which entity
+    /// namespace a step addresses, not which category inside it.</summary>
+    private static bool AllMapObjects(IReadOnlyList<EntityReference> recipients)
+    {
+        foreach (var reference in recipients)
+            if (reference?.Id == null
+                || !reference.Id.StartsWith(MapObjectModule.EntityKind + ":", StringComparison.Ordinal)) return false;
+        return true;
+    }
+
+    /// <summary>Every session this machine can name in the level, or null when it can name none. This is the
+    /// address list a presentation step about a map object is routed with: the game's own player list, read the
+    /// way the identity half reads it, so a player who is in the level is addressed and one who is not is not.</summary>
+    internal static IReadOnlyList<string>? EverySession()
+    {
+        var agents = PlayerManager.PlayerAgentsInLevel;
+        int count = agents == null ? 0 : agents.Count;
+        var sessions = new SortedSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < count; index++)
+        {
+            var agent = agents![index];
+            if (agent == null) continue;
+            var player = agent.Owner;
+            if (player == null || player.Pointer == IntPtr.Zero) continue;
+            int slot;
+            try { slot = player.PlayerSlotIndex(); }
+            catch (Exception) { continue; }
+            if (slot >= 0) sessions.Add(slot.ToString(CultureInfo.InvariantCulture));
+        }
+        return sessions.Count == 0 ? null : new List<string>(sessions);
     }
 }

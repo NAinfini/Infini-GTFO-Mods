@@ -53,8 +53,10 @@ public sealed partial class RuntimeModuleHandle
 public sealed partial class RuntimeKernel
 {
     /// <summary>One live handle. Its kind and lifetime are what a consuming port must agree with; the schedule
-    /// identity is what `cancel` resolves, so a handle never carries a schedule string of its own. The native
-    /// object and the cancel callback belong to the provider that cast the handle, and neither outlives the slot.</summary>
+    /// identity is what `cancel` resolves, so a handle never carries a schedule string of its own; the effect
+    /// identity is what a kernel-managed effect resolves, so cancelling the handle ends the effect instead of
+    /// releasing a slot the effect still names. The native object and the cancel callback belong to the provider
+    /// that cast the handle, and neither outlives the slot.</summary>
     private sealed class HandleSlot
     {
         internal string Kind = "";
@@ -63,6 +65,7 @@ public sealed partial class RuntimeKernel
         internal int Generation;
         internal bool Active;
         internal string? ScheduleId;
+        internal int EffectId = -1;
         internal object? Native;
         internal Action? Cancel;
     }
@@ -87,7 +90,8 @@ public sealed partial class RuntimeKernel
     /// <summary>Allocates one handle and returns its wire value: the identity triple in a <see cref="FrameHandle"/>
     /// plus the creating provider's index. A slot is reused only when free, and every allocation takes a new
     /// generation, so a value read after its slot was recycled fails `stale-handle` instead of naming a stranger.</summary>
-    private JsonElement CreateHandle(string provider, string kind, string lifetime, out int slot, string? scheduleId = null)
+    private JsonElement CreateHandle(string provider, string kind, string lifetime, out int slot, string? scheduleId = null,
+        int effectId = -1)
     {
         var free = handleSlots.FindIndex(entry => entry is not { Active: true });
         if (free < 0)
@@ -97,7 +101,7 @@ public sealed partial class RuntimeKernel
         }
         var generation = ++handleGeneration;
         RuntimeJson.Require(generation > 0 && generation < int.MaxValue, RuntimeAbiCodes.HandleBudget, "Handle generation exhausted.");
-        var entrySlot = new HandleSlot { Kind = kind, Lifetime = lifetime, ProviderId = provider, Generation = generation, Active = true, ScheduleId = scheduleId };
+        var entrySlot = new HandleSlot { Kind = kind, Lifetime = lifetime, ProviderId = provider, Generation = generation, Active = true, ScheduleId = scheduleId, EffectId = effectId };
         handleSlots[free] = entrySlot;
         slot = free;
         return HandleValue(WorldEpoch, generation, free, ProviderIndex(provider));
@@ -224,6 +228,9 @@ public sealed partial class RuntimeKernel
             try { kind = ResolveEntityObject(native); }
             catch (RuntimeContractException) { kind = ""; }
             if (kind != "" && IsEntityCurrentKind(kind, native)) continue;
+            // An effect handle is not released on its own: the module that applied the effect is called back first,
+            // which is the same ending its own tick pass would write.
+            if (handle.EffectId >= 0 && effects.TryGetValue(handle.EffectId, out var effect)) { EndEffect(effect, EffectEndReasons.Reclaimed, CurrentTick); continue; }
             ReleaseHandle(slot);
         }
     }
@@ -268,11 +275,12 @@ public sealed partial class RuntimeKernel
     private static string? Optional(JsonElement value, string key)
         => value.TryGetProperty(key, out var field) && field.ValueKind == JsonValueKind.String ? field.GetString() : null;
 
-    /// <summary>Cancels the schedule one timer handle holds, or runs the cancel hook the provider registered for a
-    /// handle of its own. The count is the contract's own answer — 0 when the handle names a schedule that already
-    /// ended, or a provider handle that had nothing left to stop — and a handle that is no longer live is refused
-    /// by name. Either way the handle is spent here: a value that names a cancelled handle is `stale-handle` from
-    /// then on, so nothing can keep using what its owner has already stopped.</summary>
+    /// <summary>Cancels the schedule one timer handle holds, ends the effect one effect handle names, or runs the
+    /// cancel hook the provider registered for a handle of its own. The count is the contract's own answer — 0 when
+    /// the handle names a schedule that already ended, or a provider handle that had nothing left to stop — and a
+    /// handle that is no longer live is refused by name. Either way the handle is spent here: a value that names a
+    /// cancelled handle is `stale-handle` from then on, so nothing can keep using what its owner has already
+    /// stopped.</summary>
     private int CancelHandle(JsonElement value, JsonElement port, string detail)
     {
         var slot = CheckHandle(value, port, detail, out var address);
@@ -282,6 +290,13 @@ public sealed partial class RuntimeKernel
             EndSchedule(job, "cancelled", "explicit-cancel");
             PruneSchedules();
             cancelled = 1;
+        }
+        // An effect handle is the kernel's own to end: the module that applied the effect is called back with the
+        // cancellation, so the module never registers a second cancel hook for the same state.
+        if (slot.EffectId >= 0 && effects.TryGetValue(slot.EffectId, out var effect))
+        {
+            EndEffect(effect, EffectEndReasons.Cancelled, CurrentTick);
+            return 1;
         }
         if (slot.Cancel is { } hook)
         {

@@ -93,7 +93,8 @@ public static class PlayerActionContract
             inputs = new object[]
             {
                 new { id = "in", type = "execution" },
-                new { id = "players", type = "entity", cardinality = "many" },
+                new { id = "players", type = "entity", cardinality = "many",
+                    entityKinds = new[] { PlayerStateContract.EntityKind } },
                 new { id = "destination", type = "vector3", unit = "m" },
                 new { id = "rotation", type = "vector3", unit = "deg" },
                 new { id = "area", type = "resource", resourceKind = "area_field", schema = "forge.resource.area_field" }
@@ -148,7 +149,8 @@ public static class PlayerActionContract
             {
                 new { id = "in", type = "execution" },
                 new { id = "targets", type = "entity", cardinality = "many" },
-                new { id = "source", type = "entity" },
+                new { id = "source", type = "entity",
+                    entityKinds = new[] { PlayerStateContract.EntityKind } },
                 new { id = "amount", type = "number" },
                 new { id = "resistance", type = "number" },
                 new { id = "cap", type = "number" }

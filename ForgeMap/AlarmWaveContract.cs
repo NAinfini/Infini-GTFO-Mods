@@ -28,19 +28,27 @@ public static class AlarmWaveContract
     public const string ProviderId = "forge.module.gtfo.map";
 
     /// <summary>The port the wave start row publishes its handle on, and the lifetime every handle this family
-    /// mints carries: a wave lives for the encounter, and the instance the scan activates does too.</summary>
+    /// mints carries: a wave lives for the encounter. The scan row publishes no handle — nothing read one, so the
+    /// rulings had it deleted rather than kept as a port no plan can use.</summary>
     public const string WaveHandlePort = "wave_handle";
-    public const string ScanHandlePort = "scan_handle";
     public const string HandleLifetime = "encounter";
 
-    public const string ScanStartCapability = "forge.action.map.scan_start";
+    public const string ScanStateCapability = "forge.action.map.scan_state";
     public const string WaveStartCapability = "forge.action.map.wave_start";
     public const string WaveStopCapability = "forge.action.map.wave_stop";
+
+    /// <summary>The three things the scan row can do to the one instance kind a scan and an alarm share. `start`
+    /// is the activation a plan ran before the merge, `complete` is the interaction that solves the puzzle for the
+    /// players in it, and `reset` is the deactivation that puts the instance back to the state it had before it
+    /// was activated — the game has no separate reset member, and that is the one it has.
+    ///
+    /// The old `forge.action.map.scan_start` id is gone: one instance, one row.</summary>
+    public static readonly string[] ScanOperations = { "start", "complete", "reset" };
 
     /// <summary>The handler names the native half supplies, one per row. They are this provider's own vocabulary:
     /// a binding names the handler the registration must carry, and the runtime refuses an implemented binding
     /// whose handler is missing rather than dispatching into nothing.</summary>
-    public const string ScanStartHandler = "gtfo.map.scan_start";
+    public const string ScanStateHandler = "gtfo.map.scan_state";
     public const string WaveStartHandler = "gtfo.map.wave_start";
     public const string WaveStopHandler = "gtfo.map.wave_stop";
 
@@ -51,11 +59,17 @@ public static class AlarmWaveContract
     public const string WaveControlPermission = "wave.control";
 
     /// <summary>One handler's own port set, resolved at registration against the canonical capability. The port
-    /// lists are the catalog's, in the catalog's order: an execute binding ends in `result`, and the two start
-    /// rows additionally declare the handle output their row publishes — the handle a later stop row reads
-    /// back.</summary>
-    public static readonly HandlerShape ScanStartShape = new HandlerShape()
-        .Inputs("scan", "anchor", "participants", "quorum").Outputs("result", "scan_handle");
+    /// lists are the catalog's, in the catalog's order: an execute binding ends in `result`, and the wave start
+    /// row additionally declares the handle output its row publishes — the handle a later stop row reads
+    /// back.
+    ///
+    /// The scan row carries exactly the resource it writes and the setting that says how: `anchor`,
+    /// `participants` and `quorum` were declared but never read — the required number of players in a scan
+    /// belongs to the puzzle's own data block and no native entry takes it per request — and a parameter or port
+    /// the game ignores is a choice an author would keep making, so the rulings had them deleted.</summary>
+    public static readonly HandlerShape ScanStateShape = new HandlerShape()
+        .Inputs("scan").Outputs("result")
+        .Parameters("operation");
     public static readonly HandlerShape WaveStartShape = new HandlerShape()
         .Inputs("wave", "budget", "count", "seed", "interval").Outputs("result", "wave_handle");
     public static readonly HandlerShape WaveStopShape = new HandlerShape()
@@ -65,7 +79,7 @@ public static class AlarmWaveContract
     /// registration's shape table beside the player selector's and the heal handler's.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> Shapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
-        [ScanStartHandler] = ScanStartShape,
+        [ScanStateHandler] = ScanStateShape,
         [WaveStartHandler] = WaveStartShape,
         [WaveStopHandler] = WaveStopShape
     };
@@ -78,7 +92,7 @@ public static class AlarmWaveContract
     /// them.</summary>
     public static object[] Bindings() => new object[]
     {
-        Row(ScanStartCapability, ScanStartHandler),
+        Row(ScanStateCapability, ScanStateHandler),
         Row(WaveStartCapability, WaveStartHandler),
         Row(WaveStopCapability, WaveStopHandler)
     };
@@ -89,7 +103,7 @@ public static class AlarmWaveContract
     /// names the entry point and the denial.</summary>
     public static BindingSupport[] Support() => new[]
     {
-        new BindingSupport(Binding(ScanStartCapability), "implementation-only", new[] { ScanControlPermission }),
+        new BindingSupport(Binding(ScanStateCapability), "implementation-only", new[] { ScanControlPermission }),
         new BindingSupport(Binding(WaveStartCapability), "implementation-only", new[] { WaveControlPermission }),
         new BindingSupport(Binding(WaveStopCapability), "implementation-only", new[] { WaveControlPermission })
     };
@@ -124,38 +138,35 @@ public static class AlarmWaveContract
     /// Each row is its own constant so the registration can take them one at a time — the Map declaration's
     /// capability array is a shared file and one insertion per batch is how the integration adds them — and
     /// <see cref="CapabilitiesJson"/> is the same three in catalog order for a reader that wants the whole set.</summary>
-    public const string ScanStartCapabilityJson = """
+    public const string ScanStateCapabilityJson = """
     {
-      "id": "forge.action.map.scan_start",
+      "id": "forge.action.map.scan_state",
       "owner": "forge.module.gtfo.map",
       "kind": "action",
-      "label": "启动已绑定扫描",
+      "label": "启动、强制完成或重置扫描",
       "version": "1.0.0",
-      "parameters": { "description": "启动一个已绑定的扫描。" },
+      "parameters": { "description": "对已绑定的扫描执行启动、强制完成或重置；扫描与警报共用同一种链式谜题实例。" },
       "graph": {
         "domains": [ "map", "room", "logic" ],
         "execution": "host",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "scan", "type": "resource", "resourceKind": "chained-puzzle", "schema": "forge.resource.chained-puzzle" },
-          { "id": "anchor", "type": "vector3", "unit": "m" },
-          { "entityKinds": ["gtfo.player"], "id": "participants", "type": "entity", "cardinality": "many" },
-          { "id": "quorum", "type": "integer" }
+          { "id": "scan", "type": "resource", "resourceKind": "chained-puzzle", "schema": "forge.resource.chained-puzzle" }
         ],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.map.scan_start",
+          { "id": "result", "type": "result", "schema": "forge.result.map.scan_state",
             "fields": [
               { "id": "target", "type": "entity" },
               { "id": "status", "type": "enum", "schema": "execution_outcome" },
               { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" },
-              { "id": "quorum", "type": "integer" }
-            ] },
-          { "id": "scan_handle", "type": "handle", "handleKind": "effect", "lifetime": "encounter" }
+              { "id": "code", "type": "string" }
+            ] }
         ],
-        "parameters": []
-        ,"recipients": { "input": "scan", "target": "resource", "cardinality": "one", "requires": [ "scan.control" ], "result": "result", "handle": "scan_handle" }
+        "parameters": [
+          { "id": "operation", "type": "enum", "role": "structural", "required": true, "values": [ "start", "complete", "reset" ] }
+        ]
+        ,"recipients": { "input": "scan", "target": "resource", "cardinality": "one", "requires": [ "scan.control" ], "result": "result" }
       }
     }
     """;
@@ -233,7 +244,7 @@ public static class AlarmWaveContract
 
     /// <summary>The three rows in catalog order, as the array a registry's capability section carries. The order
     /// is the catalog's own, so a diff of this array against the website's rows is positional.</summary>
-    public static readonly string CapabilitiesJson = "[\n" + ScanStartCapabilityJson
+    public static readonly string CapabilitiesJson = "[\n" + ScanStateCapabilityJson
         + ",\n" + WaveStartCapabilityJson + ",\n" + WaveStopCapabilityJson + "\n]";
 
     /// <summary>The chained-puzzle resource kind's own name in the shared resource-kind table. A chained puzzle

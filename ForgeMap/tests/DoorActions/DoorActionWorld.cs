@@ -12,11 +12,12 @@ namespace ForgeMap.Tests.DoorActions;
 
 /// <summary>One case's world: a kernel with the one `gtfo.map_object` namespace registered the way the Map
 /// provider registers it — a namespace resolver plus the instance resolver that maps a live native instance back
-/// to its reference — and the three door action rows declared from `DoorActionContract`, with the native
-/// handler object over the same table. There is no loader, no session and no hook: the handler is a plain
-/// object, so a case builds one and disposes the kernel it was built over before returning.
+/// to its reference — and the Map provider's action rows declared from their contracts: the two door rows of
+/// `DoorActionContract` and the one map-object state row of `MapStateContract`, with the native handler objects
+/// over the same table. There is no loader, no session and no hook: the handlers are plain objects, so a case
+/// builds them and disposes the kernel they were built over before returning.
 ///
-/// The declaration is the contract's own rows, bindings and shapes, so registering it proves the rows resolve
+/// The declaration is the contracts' own rows, bindings and shapes, so registering it proves the rows resolve
 /// against the real registry: a capability whose recipient contract, ports or parameters do not satisfy the
 /// framework is refused here, not in a comment.</summary>
 internal sealed class DoorActionWorld : IDisposable
@@ -32,6 +33,8 @@ internal sealed class DoorActionWorld : IDisposable
     internal RuntimeKernel Kernel { get; }
     /// <summary>Every door instance this world resolves, by the reference the provider assigned it.</summary>
     internal readonly Dictionary<EntityReference, LG_SecurityDoor> Doors = new();
+    /// <summary>Every terminal instance this world resolves, by the reference the provider assigned it.</summary>
+    internal readonly Dictionary<EntityReference, LG_ComputerTerminal> Terminals = new();
     /// <summary>The references this world's own namespace resolver still answers for.</summary>
     internal readonly HashSet<EntityReference> Live = new();
     internal readonly List<EntityReference> LookedUp = new();
@@ -57,6 +60,8 @@ internal sealed class DoorActionWorld : IDisposable
         Kernel.BeginWorld(WorldEpoch);
         var commands = new DoorActionCommands(Kernel, () => Ready, Resolve, Reports.Add);
         Commands = commands;
+        // The state row's own half, over the same kernel and the same terminal table.
+        MapState = new MapStateActions(Kernel, () => Ready, ResolveTerminal, Reports.Add);
         _map = Kernel.RegisterModule(Declaration(commands), RuntimeLogLevel.Off);
         var other = OtherKind;
         _other = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, Registry("fixture.players"),
@@ -67,6 +72,8 @@ internal sealed class DoorActionWorld : IDisposable
 
     /// <summary>The handler object under test, built over this world's own table.</summary>
     internal DoorActionCommands Commands { get; }
+    /// <summary>The map-object state row's own handler object, over the same kernel and terminal table.</summary>
+    internal MapStateActions MapState { get; }
     internal readonly HashSet<EntityReference> OtherLive = new();
 
     /// <summary>The Map provider's own declaration, from the contract's rows, bindings, supports, shapes and
@@ -76,16 +83,16 @@ internal sealed class DoorActionWorld : IDisposable
         RuntimeJson.From(new
         {
             providers = new[] { new { id = ModuleDefinition.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
-            capabilities = DoorActionContract.Rows(),
-            bindings = DoorActionContract.Bindings()
+            capabilities = DoorActionContract.Rows().Concat(MapStateContract.CapabilityRows()).ToArray(),
+            bindings = DoorActionContract.Bindings().Concat(MapStateContract.BindingRows()).ToArray()
         }).GetRawText(),
         new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
         {
             [DoorActionContract.OpenHandlerName] = commands.HandleOpen,
             [DoorActionContract.CloseHandlerName] = commands.HandleClose,
-            [DoorActionContract.AlarmHandlerName] = commands.HandleAlarm
+            [MapStateContract.InteractionHandlerName] = MapState.HandleInteraction
         },
-        DoorActionContract.Supports())
+        DoorActionContract.Supports().Concat(MapStateContract.Supports()).ToArray())
     {
         EntityResolvers = new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
         {
@@ -97,7 +104,8 @@ internal sealed class DoorActionWorld : IDisposable
                 ? Doors.FirstOrDefault(pair => ReferenceEquals(pair.Value, door)).Key
                 : null
         },
-        Shapes = DoorActionContract.Shapes()
+        Shapes = DoorActionContract.Shapes().Concat(MapStateContract.Shapes())
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
     };
 
     private static string Registry(string provider) => RuntimeJson.From(new
@@ -146,6 +154,28 @@ internal sealed class DoorActionWorld : IDisposable
     internal EntityReference ReferenceOf(LG_SecurityDoor door)
         => Doors.First(pair => ReferenceEquals(pair.Value, door)).Key;
 
+    /// <summary>A terminal this world's own namespace registered, with the address it reads as, so the
+    /// interaction row's reference, its own instance table and the category check all agree exactly as they do in
+    /// the game.</summary>
+    internal LG_ComputerTerminal Terminal(int zone, TERM_State state = TERM_State.Sleeping)
+    {
+        var address = MapObjectTerminalAddress.Create(0, 0, zone, 0)!;
+        var terminal = new LG_ComputerTerminal { CurrentStateName = state };
+        var reference = new EntityReference(Kind + ":" + address, WorldEpoch, 1);
+        Terminals[reference] = terminal;
+        Live.Add(reference);
+        return terminal;
+    }
+
+    /// <summary>The reference one terminal was registered under.</summary>
+    internal EntityReference ReferenceOf(LG_ComputerTerminal terminal)
+        => Terminals.First(pair => ReferenceEquals(pair.Value, terminal)).Key;
+
+    /// <summary>The session's terminal reader as this world hands it over: the world's own table, so a case can
+    /// show the row reaches the terminal its reference names and nothing else.</summary>
+    private LG_ComputerTerminal? ResolveTerminal(EntityReference? reference)
+        => reference != null && Terminals.TryGetValue(reference, out var terminal) ? terminal : null;
+
     /// <summary>The lock component of one door, as the production layer reaches it.</summary>
     internal static LG_SecurityDoor_Locks Locks(LG_SecurityDoor door) => door.m_locks!.Target as LG_SecurityDoor_Locks
         ?? throw new InvalidOperationException("fixture door has no lock component");
@@ -167,11 +197,11 @@ internal sealed class DoorActionWorld : IDisposable
         return reference;
     }
 
-    /// <summary>A reference of the map-object kind but the terminal category: the same namespace, a category
-    /// these rows do not act on.</summary>
-    internal EntityReference Terminal(int zone)
+    /// <summary>A reference of the map-object kind but a category the terminal row does not own: the same
+    /// namespace, a category these rows do not act on, and no terminal behind it.</summary>
+    internal EntityReference OtherCategory(int zone)
     {
-        var reference = new EntityReference(Kind + ":terminal/0/0/" + zone + "/0", WorldEpoch, 1);
+        var reference = new EntityReference(Kind + ":resource_locker/0/0/" + zone + "/0", WorldEpoch, 1);
         Live.Add(reference);
         return reference;
     }

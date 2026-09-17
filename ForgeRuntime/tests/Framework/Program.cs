@@ -681,7 +681,17 @@ void RejectCode(Action action, string code, string name)
         void Register() => kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() }, RuntimeLogLevel.Off);
         if (code == null) Reject(Register, name); else RejectCode(Register, code, name);
     }
-    Bad(g => g.AsObject().Remove("recipients"), "recipient-contract", "every action declares recipients");
+    // An action row may declare no recipients — the level-level writes have nobody to address — and its permission
+    // is then its binding's alone. A row that writes a `requires` of its own is refused by name: permissions live on
+    // the binding, and a second list is the mistake rather than an alternative spelling of the first.
+    Bad(g => g["requires"] = JsonNode.Parse("[\"example.health.write\"]"), "row-shape", "a row declares no permission list");
+    {
+        var module = Fixture.Module("example.contract"); var json = JsonNode.Parse(module.RegistryJson)!;
+        json["capabilities"]![1]!["graph"]!.AsObject().Remove("recipients");
+        var kernel = new RuntimeKernel(Fixture.Identity); kernel.BeginWorld(1);
+        var handle = kernel.RegisterModule(module with { RegistryJson = json.ToJsonString() }, RuntimeLogLevel.Off);
+        Check(handle.IsRegistered, "an action without recipients registers and is judged by its binding alone");
+    }
     Bad(g => g["recipients"]!["result"] = "next", "recipient-result", "recipient result names a result output");
     Bad(g => g["parameters"]![0]!.AsObject().Remove("role"), null, "parameters declare a role");
     Bad(g => g["inputs"]![1]!["type"] = "entity-list", null, "entity-list is retired");
@@ -865,6 +875,10 @@ checks += PlanAbiTests.Run();
 checks += PresentationDispatchTests.Run();
 checks += AttachmentRegistryTests.Run();
 checks += TriggerScopeTests.Run();
+checks += TriggerGateTests.Run();
+checks += GateOptionTests.Run();
+checks += EntityInstanceTests.Run();
+checks += EffectLifecycleTests.Run();
 checks += RuntimeContextTests.Run();
 checks += RuntimeCandidateSourceTests.Run();
 checks += ResourceRegistryTests.Run();
@@ -913,17 +927,46 @@ sealed class Scenario
     public readonly List<string> Applied = new();
     public long World = 1, Life = 1;
     /// <summary>The mount owner is registered first, because a plan's mount kind has to be owned before the plan
-    /// that declares it loads; the scenarios here register one or two behaviour providers on top of it.</summary>
-    public Scenario(RuntimeLimits? limits = null)
+    /// that declares it loads; the scenarios here register one or two behaviour providers on top of it.
+    /// <paramref name="subjectMounts"/> adds the mount kind that accepts an entity, which a per-instance trigger
+    /// option needs before a plan may scope anything to one.</summary>
+    public Scenario(RuntimeLimits? limits = null, bool subjectMounts = false)
     {
         Kernel = new RuntimeKernel(Fixture.Identity, limits); Kernel.BeginWorld(1);
-        Kernel.RegisterModule(Fixture.MountOwner(), RuntimeLogLevel.Off);
+        Kernel.RegisterModule(subjectMounts ? Fixture.MountOwnerWithSubjects() : Fixture.MountOwner(), RuntimeLogLevel.Off);
     }
-    public Dictionary<string, Func<EntityReference, bool>> Resolvers(string id) => new() { [id] = r => r.Id == id + ":1" && r.WorldEpoch == World && r.LifeEpoch == Life };
-    public RuntimeModuleHandle Register(string id, CommandHandler? handler = null) => Kernel.RegisterModule(Fixture.Module(id, handler ?? (ctx => {
+    /// <summary>The kinds this scenario answers for: every entity of the provider's own kind. The index after the
+    /// colon is what tells a per-player option's players apart — that clock is charged against the entity the event's
+    /// own `instigator` port names, and an instigator that does not resolve is refused before any gate sees the
+    /// event — while every other case here names the one entity its provider owns.</summary>
+    public Dictionary<string, Func<EntityReference, bool>> Resolvers(string id)
+    {
+        bool Entity(EntityReference r) => r.WorldEpoch == World && r.LifeEpoch == Life
+            && r.Id.StartsWith(id + ":", StringComparison.Ordinal) && int.TryParse(r.Id[(id.Length + 1)..], out _);
+        return new() { [id] = Entity };
+    }
+    /// <summary>The one player of a scenario's provider kind: the entity a per-player clock is charged against.</summary>
+    public EntityReference Player(string id, int index) => new(id + ":" + index, World, Life);
+    public RuntimeModuleHandle Register(string id, CommandHandler? handler = null, bool amountPort = false, bool instigatorPort = false,
+        bool effectPort = false, EffectRestoreHandler? restore = null, bool endOn = false, bool manyPort = false) => Kernel.RegisterModule(Fixture.Module(id, handler ?? (ctx => {
         Applied.Add(id + ":" + ctx.Parameters.GetProperty("amount").GetDouble()); return CommandResult.Succeeded(RuntimeJson.From(new { actual = ctx.Parameters.GetProperty("amount").GetDouble() }));
-    })) with { EntityResolvers = Resolvers(id) }, RuntimeLogLevel.Off);
-    public void Plan(string plan, string provider, int steps = 1) => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, steps));
+    }), amountPort, instigatorPort, effectPort, restore, endOn, manyPort) with { EntityResolvers = Resolvers(id) }, RuntimeLogLevel.Off);
+    public void Plan(string plan, string provider, int steps = 1, bool amountPort = false, bool instigatorPort = false,
+        bool effectPort = false, string? effect = null)
+        => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, steps, null, null, amountPort, instigatorPort, effectPort, effect));
+    /// <summary>A plan whose entry point declares a trigger option block, written as the JSON a compiler emits.</summary>
+    public void Gated(string plan, string provider, string gate, bool amountPort = false, bool
+instigatorPort = false)
+        => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, 1, null, gate, amountPort, instigatorPort));
+    /// <summary>The same gated entry point mounted on a target that accepts an entity: what a per-instance trigger
+    /// option books its counters against is the entity this mount matched.</summary>
+    public void GatedOnSubject(string plan, string provider, string gate)
+        => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, 1, Fixture.SubjectAttachments, gate));
+    /// <summary>An effect card that names the receiver's own event in `effect.end_on`. The event's trigger is a
+    /// binding of the same module, and the card mounts no entry point on it: an ending is read from the dispatch
+    /// itself, so nothing has to listen on the receiver's trigger for the effect to end.</summary>
+    public void EndOnPlan(string plan, string provider, string effect, bool effectPort = true)
+        => Kernel.LoadPlan(Fixture.Plan(Kernel, plan, provider, 1, null, null, false, false, effectPort, effect));
     public RuntimeEvent Event(string id, string provider, long tick = 1) => new(id, Fixture.Trigger(provider), World, tick, "shared-scope", RuntimeJson.From(new { target = new EntityReference(provider + ":1", World, Life) }));
 }
 static class Fixture
@@ -937,11 +980,25 @@ static class Fixture
     internal static int EnumSetIndex(string schema) => Array.FindIndex(
         ((string Name, string[] Members)[])typeof(RuntimeGraphContracts).GetField("EnumSetTable", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!,
         set => set.Name == schema);
+    /// <summary>One of the shared port tables — handle kinds, handle lifetimes — read by name, so a fixture port that
+    /// declares one writes the same dense index the runtime's own layout does instead of a restatement of the order.</summary>
+    internal static int TableIndex(string table, string name) => Array.IndexOf(
+        (string[])typeof(RuntimeGraphContracts).GetField(table, BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!, name);
     static readonly string[] PortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
     public static string Trigger(string id) => id + ".binding.trigger";
     public static string TriggerCapability(string id) => id + ".trigger";
+    /// <summary>A second entity port on the fixture trigger, so one event can carry two entities a subject-matching
+    /// mount accepts: what a per-instance option has to refuse, because one activation is not one instance.</summary>
+    public static readonly string ManyPort = "targets";
+    /// <summary>The second trigger a card's `effect.end_on` names: the receiver's own event, which is an ability of
+    /// its own row rather than of the entry point that applied the effect.</summary>
+    public static string EndTrigger(string id) => id + ".binding.ended";
+    public static string EndTriggerCapability(string id) => id + ".ended";
     public static string ActionCapability(string id) => id + ".apply";
     public static string Handler(string id) => id + ".handler.apply";
+    /// <summary>The port one effect handle is published through, spelled as the capability declares it: the same
+    /// three facts a module hands the kernel's own cancel entry point when it stops an effect itself.</summary>
+    public static JsonElement EffectPort() => RuntimeJson.Parse("""{"type":"handle","handleKind":"effect","lifetime":"entity_life"}""");
     /// <summary>The fixture action handler's own ports. A test that widens the fixture capability declares the
     /// extra names it made the handler read, so every shape in this file still describes its handler exactly.</summary>
     public static HandlerShape Shape(string id, IReadOnlyList<string>? inputs = null, IReadOnlyList<string>? parameters = null)
@@ -966,34 +1023,93 @@ static class Fixture
     public static readonly string MountReference = "fixture-level";
     /// <summary>Every fixture plan declares one mount target, written in the reference the mount owner answers.</summary>
     public static readonly object[] Attachments = { new { kind = "level", reference = MountReference } };
+    /// <summary>The mount a per-instance trigger option needs: one that accepts an entity, so the plan has an
+    /// instance to count.</summary>
+    public static readonly object[] SubjectAttachments = { new { kind = "map-object", category = "fixture", reference = "any" } };
     /// <summary>The graph fixture's pure compare handler: two numbers in, one boolean out.</summary>
     public static HandlerShape CompareShape() => new HandlerShape().Inputs("left", "right").Outputs("value");
-    public static BindingSupport[] Support(string id, IReadOnlyList<string>? permissions = null) => new[] {
-        new BindingSupport(Trigger(id), "implementation-only", Array.Empty<string>()),
-        new BindingSupport(id + ".binding.apply", "implementation-only", permissions ?? Permissions)
-    };
-    public static RuntimeModule Module(string id, CommandHandler? handler = null)
+    public static BindingSupport[] Support(string id, IReadOnlyList<string>? permissions = null, bool endOn = false)
+    {
+        var support = new List<BindingSupport>
+        {
+            new(Trigger(id), "implementation-only", Array.Empty<string>()),
+            new(id + ".binding.apply", "implementation-only", permissions ?? Permissions)
+        };
+        // The receiver's own event is a binding of this provider too, and a binding is supported or the module
+        // does not register: it is declared only by the tests that give a card an `end_on` ability.
+        if (endOn) support.Add(new BindingSupport(EndTrigger(id), "implementation-only", Array.Empty<string>()));
+        return support.ToArray();
+    }
+    /// <summary>`amountPort` and `instigatorPort` widen the fixture trigger with the optional output ports a test
+    /// needs the matched event to be able to carry: a number a trigger option accumulates, and the player a
+    /// per-player option is charged against. Both are off by default because a declared port is part of the
+    /// trigger's shape — an event may only carry the ports its capability declares — while a test that does not need
+    /// one would otherwise have to carry a value for it in every event it publishes.</summary>
+    public static RuntimeModule Module(string id, CommandHandler? handler = null, bool amountPort = false, bool instigatorPort = false,
+        bool effectPort = false, EffectRestoreHandler? restore = null, bool endOn = false, bool manyPort = false)
     {
         object Port(string name, string type) => new { id = name, type };
+        var domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" };
+        object[] TriggerPorts()
+        {
+            // The synthetic event targets the same player kind as ActionRow and EndTriggerRow.
+            var ports = new List<object> { Port("next", "execution"), new { id = "target", type = "entity", entityKinds = new[] { "gtfo.player" } } };
+            if (instigatorPort) ports.Add(new { id = "instigator", type = "entity", optional = true });
+            if (amountPort) ports.Add(new { id = "amount", type = "number", optional = true });
+            if (manyPort) ports.Add(new { id = ManyPort, type = "entity", cardinality = "many", optional = true });
+            return ports.ToArray();
+        }
+        // The action row's own ports. A test that asks for an effect handle gets the port the kernel publishes
+        // into — and the recipients contract that names it — because a handle with no declared output would be a
+        // duration nothing could ever hold.
+        object[] ActionPorts(bool handle)
+        {
+            var ports = new List<object> { Port("next", "execution"), new { id = "result", type = "result", schema = "example.result.apply", fields = ResultFields } };
+            if (handle) ports.Add(new { id = "effect", type = "handle", handleKind = "effect", lifetime = "entity_life" });
+            return ports.ToArray();
+        }
+        object Recipients(bool handle) => handle
+            ? new { input = "target", target = "entity", cardinality = "one", requires = new[] { "health.current" }, result = "result", handle = "effect" }
+            : (object)new { input = "target", target = "entity", cardinality = "one", requires = new[] { "health.current" }, result = "result" };
         var json = RuntimeJson.From(new {
             providers = new[] { new { id, kind = id.StartsWith("forge.") ? "native" : "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
-            capabilities = new object[] {
-                new { id = TriggerCapability(id), owner = id, kind = "trigger", label = "Observed event", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = Array.Empty<object>(), outputs = new[] { Port("next", "execution"), Port("target", "entity") }, parameters = Array.Empty<object>() } },
-                new { id = ActionCapability(id), owner = id, kind = "action", label = "Effect", version = "1.0.0", parameters = new {}, graph = new { domains = new[] { "enemy", "weapon", "room", "map", "tool", "consumable", "logic" }, execution = "host", inputs = new[] { Port("in", "execution"), Port("target", "entity") }, outputs = new[] { Port("next", "execution"), new { id = "result", type = "result", schema = "example.result.apply", fields = ResultFields } }, parameters = new[] { new { id = "amount", type = "number", role = "value", required = true, minimum = 1, maximum = 100 } }, recipients = new { input = "target", target = "entity", cardinality = "one", requires = new[] { "health.current" }, result = "result" } } }
-            },
-            bindings = new[] {
-                new { id = Trigger(id), capabilityId = TriggerCapability(id), providerId = id, handler = id + ".handler.trigger", role = "observe", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() },
-                new { id = id + ".binding.apply", capabilityId = ActionCapability(id), providerId = id, handler = Handler(id), role = "execute", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() }
-            }
+            capabilities = endOn
+                ? new object[] { TriggerRow(id), EndTriggerRow(id), ActionRow(id, effectPort) }
+                : new object[] { TriggerRow(id), ActionRow(id, effectPort) },
+            bindings = endOn
+                ? new[] { TriggerBinding(id), EndTriggerBinding(id), ActionBinding(id) }
+                : new[] { TriggerBinding(id), ActionBinding(id) }
         });
-        return new RuntimeModule(RuntimeKernel.ApiVersion, json.GetRawText(), new Dictionary<string, CommandHandler> { [Handler(id)] = handler ?? (_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)) }, Support(id))
+        object TriggerRow(string owner) => new { id = TriggerCapability(owner), owner, kind = "trigger", label = "Observed event", version = "1.0.0", parameters = new {}, graph = new { domains = domains, execution = "host", inputs = Array.Empty<object>(), outputs = TriggerPorts(), parameters = Array.Empty<object>() } };
+        // The receiver's own event: one entity, and the kinds it can be about are the ones the covering check reads.
+        object EndTriggerRow(string owner) => new { id = EndTriggerCapability(owner), owner, kind = "trigger", label = "Receiver event", version = "1.0.0", parameters = new {}, graph = new { domains = domains, execution = "host", inputs = Array.Empty<object>(), outputs = new object[] { Port("next", "execution"), new { id = "target", type = "entity", entityKinds = new[] { "gtfo.player" } } }, parameters = Array.Empty<object>() } };
+        object ActionRow(string owner, bool handle) => new { id = ActionCapability(owner), owner, kind = "action", label = "Effect", version = "1.0.0", parameters = new {}, graph = new { domains = domains, execution = "host", inputs = new[] { Port("in", "execution"), new { id = "target", type = "entity", entityKinds = new[] { "gtfo.player" } } }, outputs = ActionPorts(handle), parameters = new[] { new { id = "amount", type = "number", role = "value", required = true, minimum = 1, maximum = 100 } }, recipients = Recipients(handle) } };
+        object TriggerBinding(string owner) => new { id = Trigger(owner), capabilityId = TriggerCapability(owner), providerId = owner, handler = owner + ".handler.trigger", role = "observe", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() };
+        object EndTriggerBinding(string owner) => new { id = EndTrigger(owner), capabilityId = EndTriggerCapability(owner), providerId = owner, handler = owner + ".handler.ended", role = "observe", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() };
+        object ActionBinding(string owner) => new { id = owner + ".binding.apply", capabilityId = ActionCapability(owner), providerId = owner, handler = Handler(owner), role = "execute", status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>() };
+        return new RuntimeModule(RuntimeKernel.ApiVersion, json.GetRawText(), new Dictionary<string, CommandHandler> { [Handler(id)] = handler ?? (_ => CommandResult.Succeeded(RuntimeJson.EmptyObject)) }, Support(id, endOn: endOn))
         {
-            Shapes = new Dictionary<string, HandlerShape> { [Handler(id)] = Shape(id) }
+            Shapes = new Dictionary<string, HandlerShape> { [Handler(id)] = Shape(id) },
+            // One restore callback per handler name, exactly as the handler table is keyed: the fixture's effect
+            // row is only loadable when a test registered the callback that ends it.
+            EffectRestores = restore == null ? null : new Dictionary<string, EffectRestoreHandler> { [Handler(id)] = restore }
         };
     }
     /// <summary>The provider that owns the fixture plans' own mount kind. It declares a scope matcher — no event
     /// subject is needed — and answers only the references it was given.</summary>
     public static RuntimeModule MountOwner() => MountOwner(new[] { MountReference });
+
+    /// <summary>The same owner carrying both mount kinds the fixture's plans use: the scope matcher above, and a
+    /// subject matcher that accepts every entity a trigger payload carries. A per-instance trigger option is booked
+    /// against exactly that accepted entity, so it is the kind a plan scope `instance` has to mount on.</summary>
+    public static RuntimeModule MountOwnerWithSubjects() => MountOwner() with
+    {
+        AttachmentMatchers = new Dictionary<string, AttachmentMatcherRegistration>
+        {
+            ["level"] = AttachmentMatcherRegistration.ByScope((category, reference) => category == null && reference == MountReference),
+            ["map-object"] = AttachmentMatcherRegistration.BySubject((category, reference, subject) => !string.IsNullOrEmpty(subject.Id))
+        }
+    };
 
     /// <summary>The same owner scripted with another set of levels: a fixture that loads plans from a foreign
     /// source names the levels those plans mount on, so the double answers exactly those and nothing else.</summary>
@@ -1010,7 +1126,9 @@ static class Fixture
                 category == null && references.Contains(reference))
         }
     };
-    public static string Plan(RuntimeKernel kernel, string planId, string provider, int stepCount = 1, object[]? attachments = null)
+    /// <summary>The fixture plan's entry point, with the optional trigger options block written as JSON so a test
+    /// spells the wire shape it is testing rather than a C# object that could drift from it.</summary>
+    public static string Plan(RuntimeKernel kernel, string planId, string provider, int stepCount = 1, object[]? attachments = null, string? gate = null, bool amountPort = false, bool instigatorPort = false, bool effectPort = false, string? effect = null)
     {
         var manifest = RuntimeJson.Parse(kernel.ExportManifest()); var registry = manifest.GetProperty("registry");
         var bindings = registry.GetProperty("bindings").EnumerateArray().Where(b => b.GetProperty("providerId").GetString() == provider).OrderBy(b => b.GetProperty("id").GetString(), StringComparer.Ordinal);
@@ -1025,10 +1143,14 @@ static class Fixture
             var capabilityId = registry.GetProperty("bindings").EnumerateArray().Single(b => b.GetProperty("id").GetString() == bindingId).GetProperty("capabilityId").GetString();
             return registry.GetProperty("capabilities").EnumerateArray().Single(c => c.GetProperty("id").GetString() == capabilityId).GetProperty("graph");
         }
-        // Wire frame written independently of the SDK: dense port-type and cardinality indexes; these fixture ports carry no value set or lifetime.
+        // Wire frame written independently of the SDK: dense port-type and cardinality indexes; these fixture ports
+        // carry no value set or lifetime beyond the ones they declare — a handle port's own kind and lifetime are
+        // part of the layout the plan has to re-derive, so a fixture port that names either writes its index.
         object[] Slots(JsonElement ports) => ports.EnumerateArray().Select((p, index) => (object)new {
             index, type = Array.IndexOf(PortTypes, p.GetProperty("type").GetString()),
-            cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0, valueSet = -1, lifetime = -1,
+            cardinality = p.TryGetProperty("cardinality", out var c) && c.GetString() == "many" ? 1 : 0,
+            valueSet = p.TryGetProperty("handleKind", out var k) ? TableIndex("HandleKinds", k.GetString()!) : -1,
+            lifetime = p.TryGetProperty("lifetime", out var l) ? TableIndex("HandleLifetimes", l.GetString()!) : -1,
             optional = p.TryGetProperty("optional", out var o) && o.GetBoolean(), nullable = p.TryGetProperty("nullable", out var n) && n.GetBoolean()
         }).ToArray();
         object Layout(JsonElement graph, object[] constants) => new { inputs = Slots(graph.GetProperty("inputs")), outputs = Slots(graph.GetProperty("outputs")), constants, promoted = Array.Empty<int>() };
@@ -1041,12 +1163,22 @@ static class Fixture
             nodeId = "Action" + i, nodeKind = "action", binding = ids.IndexOf(provider + ".binding.apply"), layout = Layout(action, new object[] { 5 }),
             inputs, successors = new int?[] { i + 1 < stepCount ? i + 1 : null }
         }).ToArray();
-        return RuntimeJson.From(new {
+        // Built as a node rather than one anonymous object so a test's option block is spliced in verbatim: the
+        // fixture carries the wire shape the compiler writes, not a C# restatement of it.
+        var entries = new List<object>();
+        entries.Add(new { nodeId = "Entry", binding = ids.IndexOf(Trigger(provider)), layout = Layout(trigger, Array.Empty<object>()), start = 0, steps });
+        var document = JsonNode.Parse(RuntimeJson.From(new {
             schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth }, bindings = pins,
             attachments = attachments ?? Attachments,
-            entrypoints = new[] { new { nodeId = "Entry", binding = ids.IndexOf(Trigger(provider)), layout = Layout(trigger, Array.Empty<object>()), start = 0, steps } }
-        }).GetRawText();
+            entrypoints = entries.ToArray()
+        }).GetRawText())!;
+        var main = 0;
+        if (gate != null) document["entrypoints"]![main]!["gate"] = JsonNode.Parse(gate);
+        // The duration option block, spliced into the first step the same way: the fixture carries the wire shape
+        // a compiler emits rather than a C# restatement of it.
+        if (effect != null) document["entrypoints"]![main]!["steps"]![0]!["effect"] = JsonNode.Parse(effect);
+        return document.ToJsonString();
     }
 }

@@ -10,6 +10,11 @@ public enum ScalarComparison { Equal, NotEqual, Less, LessOrEqual, Greater, Grea
 public enum ScalarRounding { Floor, Ceiling, Nearest, Truncate }
 /// <summary>The website divide node's structural zero_policy.</summary>
 public enum DivisionZeroPolicy { Reject, Zero, Passthrough }
+/// <summary>What a range row's input value is measured in: the raw quantity itself, an offset already taken from
+/// the window's own minimum, or the position in the window the author computed.</summary>
+public enum RangeInputUnit { Absolute, Relative, Normalized }
+/// <summary>What a range row does with an input outside its window: saturate, extrapolate, or refuse.</summary>
+public enum RangeBounds { Clamp, Allow, Reject }
 
 /// <summary>Stateless, dimensionless arithmetic. Graph units, domains and bindings belong to the public Runtime boundary.</summary>
 public static class ScalarNodes
@@ -50,6 +55,48 @@ public static class ScalarNodes
     {
         PureNumbers.Input(value); PureNumbers.Bounds(minimum, maximum);
         return PureNumbers.Result(Math.Max(minimum, Math.Min(maximum, value)));
+    }
+
+    /// <summary>
+    /// The one range mapping: where the input sits in its own window, curved, optionally flipped, placed in the
+    /// output window. The three input units are the three ways an author can have measured the value: the raw
+    /// quantity, the amount it stands above the window's minimum, or the position in the window itself (0..1).
+    ///
+    /// `clamp` saturates the input to the window, `reject` refuses an input outside it, and `allow` carries the
+    /// part outside the window linearly on top of the curve, so the same row extrapolates where a card asks it to.
+    /// The curve is taken on the part inside the window in every mode: a fractional power of a negative position
+    /// has no real answer, and refusing one would make `allow` unusable rather than permissive.
+    ///
+    /// The two thresholds are what the author counts as "nothing yet" and "already full": a value below the floor
+    /// and a value at the ceiling both read as the threshold they passed, so a window wider than the part that
+    /// matters still maps the part that matters across the whole output. A pair that is not a window — a floor at
+    /// or above its ceiling — saturates nothing.
+    /// </summary>
+    public static double MapRange(double value, double inputMinimum, double inputMaximum, double inputFloor,
+        double inputCeiling, double outputMinimum, double outputMaximum, RangeInputUnit unit, double exponent,
+        bool flip, RangeBounds bounds)
+    {
+        PureNumbers.Input(value); PureNumbers.Input(exponent); PureNumbers.Bounds(inputMinimum, inputMaximum);
+        PureNumbers.Bounds(outputMinimum, outputMaximum);
+        PureNumbers.Input(inputFloor); PureNumbers.Input(inputCeiling);
+        if (inputCeiling > inputFloor) value = Math.Max(inputFloor, Math.Min(inputCeiling, value));
+        var span = inputMaximum - inputMinimum;
+        if (span <= 0d)
+            throw new RuntimeContractException("pure-reversed-range", "A range mapping needs a window wider than nothing.");
+        var position = unit switch
+        {
+            RangeInputUnit.Absolute => (value - inputMinimum) / span,
+            RangeInputUnit.Relative => value / span,
+            RangeInputUnit.Normalized => value,
+            _ => throw new RuntimeContractException("pure-operation", "Unknown range input unit.")
+        };
+        if (bounds == RangeBounds.Reject && (position < 0d || position > 1d))
+            throw new RuntimeContractException("pure-range", "The input is outside the window this row maps.");
+        var inside = Math.Max(0d, Math.Min(1d, position));
+        var curve = exponent == 1d ? inside : Math.Pow(inside, exponent);
+        var weight = curve + (bounds == RangeBounds.Allow ? position - inside : 0d);
+        if (flip) weight = 1d - weight;
+        return PureNumbers.Result(outputMinimum + (outputMaximum - outputMinimum) * weight);
     }
 
     public static double Absolute(double value) => PureNumbers.Result(Math.Abs(PureNumbers.Input(value)));

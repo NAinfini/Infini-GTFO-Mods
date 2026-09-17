@@ -4,6 +4,12 @@ namespace BepInEx
     public sealed class BepInPlugin : Attribute { public BepInPlugin(string id, string name, string version) { } }
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class BepInDependency : Attribute { public BepInDependency(string id, string version) { } }
+    /// <summary>The one loader path the production entry point reads: where the instance's plugins live. A case
+    /// points it at a fixture root, which is how the profile discovery is exercised without a game install.</summary>
+    public static class Paths
+    {
+        public static string BepInExRootPath = "BepInEx";
+    }
 }
 namespace BepInEx.Configuration
 {

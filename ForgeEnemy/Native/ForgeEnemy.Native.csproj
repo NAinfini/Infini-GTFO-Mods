@@ -14,17 +14,20 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;EnemyPluginSession.cs;EnemySpawnRequirementSource.cs;EnemyHookInstall.cs;Enemy*Hooks.cs;EnemyModule*.cs;EnemyActionFamilies.cs;EnemyControlActions.cs;EnemyCombatActions.cs;GlueActions.cs;GlueFacts.cs;EnemyBehaviorNative.cs;EnemyBehaviorLedger.cs;EnemyBehaviorActions.cs;EnemyWaveModule.cs;EnemyNodeEffectActions.cs;EnemyNodeFacts.cs;EnemyNodeRegistration.cs;EnemyNodeValueReads.cs;EnemySelector.cs;EnemyAttackInstanceFacts.cs;EnemyWaveFacts.cs;EnemyProfileActions.cs;Observation/*.cs" />
+    <Compile Include="Plugin.cs;EnemyPluginSession.cs;EnemySpawnRequirementSource.cs;EnemyHookInstall.cs;Enemy*Hooks.cs;EnemyModule*.cs;EnemyActionFamilies.cs;EnemyControlActions.cs;EnemyCombatActions.cs;GlueActions.cs;GlueFacts.cs;EnemyBehaviorNative.cs;EnemyBehaviorLedger.cs;EnemyBehaviorActions.cs;EnemyWaveModule.cs;EnemyNodeEffectActions.cs;EnemyNodeFacts.cs;EnemyNodeRegistration.cs;EnemyNodeValueReads.cs;EnemySelector.cs;EnemyAttackInstanceFacts.cs;EnemyWaveFacts.cs;EnemyProfileActions.cs;EnemyAbilityUsedFacts.cs;EnemyVolumeActions.cs;Observation/*.cs" />
     <!-- The spawn requirement derivation is game-independent, but the runtime data source in this assembly
-         feeds it, so the one source is compiled here instead of loading the managed helper assembly. -->
+         feeds it, so the one source is compiled here instead of loading the managed helper assembly. The enemy
+         profile reader is compiled for the same reason: the plugin reads the documents and the tests read the
+         same reader, so the accepted shape has exactly one definition. -->
     <Compile Include="../Spawn/EnemySpawnRequirements.cs" Link="Spawn/EnemySpawnRequirements.cs" />
+    <Compile Include="../Profile/*.cs" Link="Profile/%(Filename)%(Extension)" />
     <!-- The node-list family's contracts: the query rows, the three action rows and the two trigger rows this
          provider declares, plus the rows of the action families the same registration carries (enemy control,
          combat, foam, behaviour, the profile's `phase_set`) and the wave trigger rows. Compiled here for the same
          reason the selector declaration is — this assembly references exactly the host and the SDK, so the rows it
          registers cannot drift from a second copy. -->
     <Compile Include="../EnemyNode*Contract.cs" Link="%(Filename)%(Extension)" />
-    <Compile Include="../EnemyCombatContract.cs;../GlueContract.cs;../EnemyBehaviorContract.cs;../EnemyWaveContract.cs;../EnemyProfileContract.cs;../EnemyStaggerContract.cs;../EnemyAbilityInterruptedContract.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../EnemyCombatContract.cs;../GlueContract.cs;../EnemyBehaviorContract.cs;../EnemyWaveContract.cs;../EnemyProfileContract.cs;../EnemyStaggerContract.cs;../EnemyAbilityInterruptedContract.cs;../EnemyAbilityUsedContract.cs;../EnemyVolumeContract.cs" Link="%(Filename)%(Extension)" />
     <Compile Include="../EnemySelectorContract.cs" Link="EnemySelectorContract.cs" />
     <Compile Include="../AttackInstanceContract.cs" Link="AttackInstanceContract.cs" />
     <Compile Include="../ModuleDefinition.cs" Link="ModuleDefinition.cs" />

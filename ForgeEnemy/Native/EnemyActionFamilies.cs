@@ -45,6 +45,8 @@ internal sealed partial class EnemyModule
         handlers[EnemyCombatContract.StaggerHandler] = Stagger;
         handlers[EnemyCombatContract.AttackInterruptHandler] = AttackInterrupt;
         handlers[GlueContract.FoamingHandler] = context => Glue.Foaming(context);
+        // The volume family's one execute handler: the native effect volume and the fog sphere that draws it.
+        handlers[VolumeHandler] = EffectVolume;
         foreach (var handler in BehaviorHandlers(this)) handlers[handler.Key] = handler.Value;
         // The profile family is one execute handler; its row and binding are declared in the root contract the
         // registration composes, so the two halves cannot drift.
@@ -61,6 +63,7 @@ internal sealed partial class EnemyModule
         foreach (var shape in GlueContract.Shapes()) shapes[shape.Key] = shape.Value;
         foreach (var shape in EnemyBehaviorContract.Shapes()) shapes[shape.Key] = shape.Value;
         foreach (var shape in EnemyProfileContract.Shapes()) shapes[shape.Key] = shape.Value;
+        shapes[VolumeHandler] = VolumePorts;
         return shapes;
     }
 
@@ -100,11 +103,13 @@ internal sealed partial class EnemyModule
         catch (Exception) { return null; }
     }
 
-    /// <summary>Drops the foam family's state with the module that owns it: the ledger's timers and the effects it
-    /// still holds are released here, so a package that unloads mid-level leaves no foam record behind.</summary>
+    /// <summary>Drops the action families' state with the module that owns it: the foam ledger's timers and the
+    /// effects it still holds are released here, and every effect volume this package registered is unregistered
+    /// from the game's own manager, so a package that unloads mid-level leaves neither behind.</summary>
     internal void DisposeActionFamilies()
     {
         _glue?.Dispose();
         _glue = null;
+        ReleaseVolumes();
     }
 }

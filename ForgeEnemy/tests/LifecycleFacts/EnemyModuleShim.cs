@@ -95,6 +95,11 @@ internal sealed partial class EnemyModule : IDisposable
     /// with it belongs to a family this suite does not compile.</summary>
     internal void ClearWorld() { CheckThread(); _entities.Clear(); }
 
+    /// <summary>The store the entry point hands the provider at Load. This family publishes lifecycle facts and
+    /// reads no profile, so the member exists to keep the entry point compiling against the harness's store
+    /// double; applying a profile is the EnemyProfile suite's statement.</summary>
+    internal void LoadProfiles(EnemyProfileStore profiles) => ArgumentNullException.ThrowIfNull(profiles);
+
     /// <summary>The provider's declaration with exactly this family's rows in it: the provider itself and the two
     /// observation bindings the lifecycle facts publish through. The ids and the handler names are the module's
     /// own constants, so a row this suite registers cannot name a binding the provider does not; the capabilities

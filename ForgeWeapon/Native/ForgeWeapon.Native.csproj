@@ -18,7 +18,7 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;WeaponNativeSession.cs;WeaponNativeHooks.cs;EquipmentNativeAdapter.cs;WeaponCombatObserver.cs;AttackInstanceHooks.cs;AttackInstanceModule.cs;GearPartTransformData.cs;GearPartTransformApplier.cs;LoadoutPolicyData.cs;LoadoutPolicyWiring.cs;GearLoadoutFilter.cs;GearLoadoutSession.cs;Il2CppGearPool.cs" />
+    <Compile Include="Plugin.cs;WeaponNativeSession.cs;WeaponNativeHooks.cs;EquipmentNativeAdapter.cs;WeaponCombatObserver.cs;CombatFactsObserver.cs;WeaponProjectileActions.cs;UnityValueBridge.cs;AttackInstanceHooks.cs;AttackInstanceModule.cs;GearPartTransformData.cs;GearPartTransformApplier.cs;LoadoutPolicyData.cs;LoadoutPolicyWiring.cs;GearLoadoutFilter.cs;GearLoadoutSession.cs;Il2CppGearPool.cs" />
     <!-- The device facts and the holder tier: their observers, the fact router they publish through and the
          channel the holder's own machine writes through. `WeaponMeleeHitFacts` carries the two melee hooks and
          reads the remote half's ledger, which the receiver hooks claim through. -->

@@ -48,6 +48,10 @@ public static class PureModule
     /// inline `values`), so each array below is declared in the order of the C# enum it maps onto.</summary>
     internal static readonly string[] RoundingModes = { "floor", "ceil", "nearest", "truncate" };
     internal static readonly string[] ZeroPolicies = { "reject", "zero", "passthrough" };
+    /// <summary>The range row's own two inline sets: what its input value is measured in, and what it does with an
+    /// input outside the window.</summary>
+    internal static readonly string[] RangeInputUnits = { "absolute", "relative", "normalized" };
+    internal static readonly string[] RangeBounds = { "clamp", "allow", "reject" };
 
     /// <summary>One family per table, in catalog order: the value-only rows a `pure` step evaluates. Public
     /// because the contract tests iterate the same tables the module registers instead of restating them.</summary>
@@ -55,6 +59,7 @@ public static class PureModule
         .Concat(VariadicDeclarations.Nodes)
         .Concat(TextDeclarations.Nodes)
         .Concat(VectorDeclarations.Nodes)
+        .Concat(ListDeclarations.Nodes)
         .Concat(ConditionDeclarations.Nodes)
         .ToArray();
 
@@ -124,6 +129,14 @@ public static class PureModule
     internal static JsonElement Text(string id) => Typed(id, "string");
     internal static JsonElement Enum(string id, string schema) => Port(id, "enum", schema);
     internal static JsonElement Typed(string id, string type) => Port(id, type);
+
+    /// <summary>A port that carries a list of one value type: the catalog's own `cardinality: many`, declared on
+    /// the type it repeats. One slot holds the whole list, exactly as an entity list port does, so a row that
+    /// reads one item out of it reads the list it was handed rather than a world it would have to walk.</summary>
+    internal static JsonElement Many(string id, string type) => RuntimeJson.From(new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+    {
+        ["id"] = RuntimeJson.From(id), ["type"] = RuntimeJson.From(type), ["cardinality"] = RuntimeJson.From("many")
+    });
 
     /// <summary>A port that carries the catalog's own unit. The unit is part of the port, so a value measured in
     /// something else is refused at the boundary instead of being read as if it were this one.</summary>
@@ -241,6 +254,18 @@ public static class PureModule
             (ScalarRounding)Member(RoundingModes, EnumParameter(context, "mode"), "mode")));
     internal static JsonElement RandomRange(EvaluationContext context)
         => Value(SeededNodes.Uniform(Input(context, "minimum"), Input(context, "maximum"), Whole(context, "seed")));
+    /// <summary>The one range row: where the input sits in its own window, curved and optionally flipped, placed in
+    /// the output window. Every number it reads is an input — the two windows, the two thresholds the author counts
+    /// the value against and the curve's exponent — because each of them is a value an upstream step may compute;
+    /// only the two vocabularies are structural. `flip` is an input like the rest, so a plan that leaves it out is
+    /// refused at the port rather than read as "not flipped".</summary>
+    internal static JsonElement MapRange(EvaluationContext context)
+        => Value(ScalarNodes.MapRange(Input(context, "value"), Input(context, "input_min"), Input(context, "input_max"),
+            Input(context, "input_floor"), Input(context, "input_ceiling"), Input(context, "output_min"),
+            Input(context, "output_max"),
+            (RangeInputUnit)Member(RangeInputUnits, EnumParameter(context, "input_unit"), "input_unit"),
+            Input(context, "exponent"), Flag(context, "flip"),
+            (RangeBounds)Member(RangeBounds, EnumParameter(context, "bounds"), "bounds")));
     /// <summary>The one text row: the template with its format item filled from the value.</summary>
     internal static JsonElement Text(EvaluationContext context)
         => Value(TextNodes.Compose(PortText(context, "template"), Input(context, "value")));
@@ -288,6 +313,10 @@ public static class PureModule
     private static double[] Position(EvaluationContext context, string port)
         => context.Inputs.GetProperty(port).EnumerateArray().Select(component => component.GetDouble()).ToArray();
     private static double Parameter(EvaluationContext context, string name) => context.Parameters.GetProperty(name).GetDouble();
+    /// <summary>A parameter the plan may leave out. An unwritten one is absent rather than false, so the row reads
+    /// the absence as the choice it is instead of answering for a flag nobody wrote.</summary>
+    private static bool ParameterFlag(EvaluationContext context, string name)
+        => context.Parameters.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
     private static string EnumParameter(EvaluationContext context, string name) => context.Parameters.GetProperty(name).GetString()!;
 
     /// <summary>Resolves a member name the kernel already mapped back from its compiled index. The C# enums are

@@ -54,7 +54,7 @@ Case("contract.binding-row-and-shape", () =>
     var parameterIds = EnemySelectorContract.Shape.ParameterIds;
     var expected = $"id={EnemySelectorContract.BindingId}, capabilityId={EnemySelectorContract.CapabilityId}, "
         + $"providerId={ModuleDefinition.ProviderId}, handler={EnemySelectorContract.HandlerName}, role=observe, status=implemented, "
-        + "shape=targets{{relation,empty}}";
+        + "shape=targets{}";
     var observed = $"id={binding.GetProperty("id").GetString()}, capabilityId={binding.GetProperty("capabilityId").GetString()}, "
         + $"providerId={binding.GetProperty("providerId").GetString()}, handler={binding.GetProperty("handler").GetString()}, "
         + $"role={binding.GetProperty("role").GetString()}, status={binding.GetProperty("status").GetString()}, "
@@ -69,7 +69,7 @@ Case("contract.binding-row-and-shape", () =>
         && binding.GetProperty("role").GetString() == "observe"
         && binding.GetProperty("status").GetString() == "implemented"
         && outputIds.SequenceEqual(new[] { "targets" })
-        && parameterIds.SequenceEqual(new[] { "relation", "empty" })
+        && parameterIds.Count == 0
         && graphOutputs.SequenceEqual(outputIds)
         && graphParameters.SequenceEqual(parameterIds);
     return (passes, expected, observed);
@@ -172,7 +172,7 @@ Case("selector.registered-rows", () =>
         observed);
 });
 
-Case("selector.hostile-set", () =>
+Case("selector.complete-roster", () =>
 {
     using var scene = new SelectorScene();
     scene.Dispatch("select.hostile");
@@ -182,45 +182,18 @@ Case("selector.hostile-set", () =>
         $"the module's own candidate set, answer={string.Join("|", scene.CandidateIds())}", $"status={scene.LastStep?.Result.Status}; targets={string.Join("|", targets)}");
 });
 
-Case("selector.relation-refused", () =>
+Case("selector.no-implicit-faction-options", () =>
 {
     using var scene = new SelectorScene();
-    var observed = new List<string>();
-    var refused = true;
-    // Every other member of `recipient_relation`, in declaration order: self, ally, neutral, unknown.
-    foreach (var relation in new[] { 0, 1, 3, 4 })
-    {
-        scene.Load(new object[] { relation, 0 });
-        scene.Dispatch("select.relation." + relation);
-        observed.Add($"{relation}:{scene.LastStep?.Result.Status}/{scene.LastStep?.Result.Code}");
-        refused &= scene.LastStep is { Result.Status: "rejected", Result.Code: "relation-unsupported" };
-    }
-    return (refused && scene.Recorded.Count == 0,
-        "A relation this anchorless selector cannot evaluate is refused, and no answer reaches the consumer.",
-        string.Join(" ", observed) + $"; recorded={scene.Recorded.Count}");
+    var refused = new[] { 0, 1, 2, 3, 4 }.All(relation => !scene.TryLoad(new object[] { relation, 0 }).Loaded);
+    return (refused, "A roster has no implicit relation or empty-policy constants; legacy constants must be rejected.", $"refused={refused}");
 });
-
-Case("selector.missing-parameter", () =>
+Case("selector.parameterless-reload", () =>
 {
     using var scene = new SelectorScene();
-    var outcome = scene.TryLoad(new object[] { 2 });
-    return (!outcome.Loaded && outcome.Code != null,
-        "A plan that does not compile the required `empty` constant is refused at load, with no dispatch at all.",
-        $"loaded={outcome.Loaded}; code={outcome.Code}");
-});
-
-Case("selector.empty-policy-read", () =>
-{
-    using var scene = new SelectorScene();
-    scene.Load(new object[] { 2, 1 }); // skip
-    scene.Dispatch("select.empty.skip");
-    var skip = scene.Targets();
-    scene.Load(new object[] { 2, 2 }); // fail
-    scene.Dispatch("select.empty.fail");
-    var fail = scene.Targets();
-    return (skip.SequenceEqual(scene.CandidateIds()) && fail.SequenceEqual(scene.CandidateIds()),
-        "Both caller-side empty policies answer the same complete set: the binding reads the policy and leaves it to the consumer.",
-        $"skip=[{string.Join("|", skip)}]; fail=[{string.Join("|", fail)}]");
+    scene.Load(Array.Empty<object>());
+    scene.Dispatch("select.parameterless");
+    return (scene.Targets().SequenceEqual(scene.CandidateIds()), "Parameter-free roster yields exactly its current candidate set.", string.Join("|", scene.Targets()));
 });
 
 Case("selector.source-refused", () =>

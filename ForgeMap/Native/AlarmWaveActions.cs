@@ -90,6 +90,9 @@ internal sealed class AlarmWaveActions
     /// same decision.</summary>
     internal const string AlarmAlreadyActiveCode = "alarm-already-active";
     internal const string ScanStartedCode = "scan-started";
+    internal const string ScanCompletedCode = "scan-completed";
+    internal const string ScanResetCode = "scan-reset";
+    internal const string OperationCode = "scan-operation-unknown";
     internal const string WaveStartedCode = "wave-started";
     internal const string WaveStoppedCode = "wave-stopped";
 
@@ -139,10 +142,6 @@ internal sealed class AlarmWaveActions
     /// and the code names the one check that decided it.</summary>
     private sealed record ResultRow(string? Target, string Status, string Committed, string Code);
 
-    /// <summary>One row of the alarm start result, in the catalog's own column order plus the one column its
-    /// sibling `scan_start` declares: `target`, `status`, `committed`, `code`, `quorum`.</summary>
-    private sealed record QuorumResultRow(string? Target, string Status, string Committed, string Code, int Quorum);
-
     /// <summary>One row of the wave start result: the canonical columns plus `budget`. The budget column carries
     /// the population points the wave has really spent at the moment the row is written, which is what the native
     /// side can answer; the planned total the request may name is not a value this build's start entry returns,
@@ -150,7 +149,6 @@ internal sealed class AlarmWaveActions
     private sealed record WaveResultRow(string? Target, string Status, string Committed, string Code, double Budget);
 
     private static JsonElement Envelope(ResultRow row) => RuntimeJson.From(new { results = new[] { row } });
-    private static JsonElement Envelope(QuorumResultRow row) => RuntimeJson.From(new { results = new[] { row } });
     private static JsonElement Envelope(WaveResultRow row) => RuntimeJson.From(new { results = new[] { row } });
 
     private static string? Target(CommandContext context)
@@ -186,12 +184,11 @@ internal sealed class AlarmWaveActions
         });
     }
 
-    private static CommandResult AlarmRow(CommandContext context, MapActionOutcome outcome, int quorum,
-        MintedHandle? handle = null)
+    private static CommandResult AlarmRow(CommandContext context, MapActionOutcome outcome)
     {
         var (status, committed) = Reading(outcome);
-        var row = new QuorumResultRow(Target(context), status, committed, outcome.Code, quorum);
-        return CommandResult.Create(status, committed, outcome.Code, "", Outputs(Envelope(row), handle));
+        var row = new ResultRow(Target(context), status, committed, outcome.Code);
+        return CommandResult.Create(status, committed, outcome.Code, "", Envelope(row));
     }
 
     private static CommandResult WaveRow(CommandContext context, MapActionOutcome outcome, double budget,
@@ -219,44 +216,59 @@ internal sealed class AlarmWaveActions
 
     // ---- handlers ------------------------------------------------------------------------------------
 
-    /// <summary>The `forge.action.map.scan_start` handler. The scan is a chained puzzle the level already built,
-    /// which is what the row's `chained-puzzle` resource names; the same instance kind is what an alarm is, and the
-    /// puzzle's own data block decides which reading the activation has. The row's `quorum` is echoed back rather
-    /// than applied: the required number of players in the scan belongs to the puzzle's own data block, and no
-    /// native entry takes it per request.</summary>
-    internal static CommandResult ExecuteStartScan(CommandContext context)
-        => StartScan(context);
+    /// <summary>The `forge.action.map.scan_state` handler. The scan is a chained puzzle the level already built,
+    /// which is what the row's `chained-puzzle` resource names. The row's `operation` selects which of the
+    /// instance's own three interactions is submitted: `start` activates it, `complete` solves it for the players
+    /// in it, and `reset` deactivates it — the game has no separate reset member, and the deactivation puts the
+    /// instance back to the status it had before it was activated. The row declares no other port: the required
+    /// number of players in the scan belongs to the puzzle's own data block, so `quorum` was never a value this
+    /// handler could apply and the rulings had it deleted rather than echoed.</summary>
+    internal static CommandResult ExecuteScanState(CommandContext context) => ScanState(context);
 
-    private static CommandResult StartScan(CommandContext context)
+    private static CommandResult ScanState(CommandContext context)
     {
-        // The row's `quorum` is read before any refusal so every row of this shape carries the column, whatever
-        // the decision was: a plan reading a refused row sees the same port set as a committed one.
-        int quorum = 0;
-        if (context.Inputs.TryGetProperty("quorum", out var quorumValue)
-            && quorumValue.ValueKind == JsonValueKind.Number) quorum = quorumValue.GetInt32();
-        if (!IsHost(context)) return AlarmRow(context, MapActionOutcome.Refused(AuthorityCode), quorum);
+        if (!IsHost(context)) return AlarmRow(context, MapActionOutcome.Refused(AuthorityCode));
+        if (Operation(context) is not { } operation)
+            return AlarmRow(context, MapActionOutcome.Refused(OperationCode));
         if (Resource(context, "scan") is not { } resource)
-            return AlarmRow(context, MapActionOutcome.Refused(NoScanResourceCode), quorum);
+            return AlarmRow(context, MapActionOutcome.Refused(NoScanResourceCode));
         if (resource.Kind != AlarmWaveContract.ChainedPuzzleKind)
-            return AlarmRow(context, MapActionOutcome.Refused(ResourceNotChainedPuzzleCode), quorum);
-        if (string.IsNullOrEmpty(resource.Id)) return AlarmRow(context, MapActionOutcome.Refused(ResourceIdEmptyCode), quorum);
-        // The ladder is walked before any handle is minted, so a request the level cannot satisfy is refused with
-        // the check that refused it rather than with the handle gap behind the write.
+            return AlarmRow(context, MapActionOutcome.Refused(ResourceNotChainedPuzzleCode));
+        if (string.IsNullOrEmpty(resource.Id)) return AlarmRow(context, MapActionOutcome.Refused(ResourceIdEmptyCode));
         var manager = ChainedPuzzleManager.Current;
-        if (manager == null || manager.WasCollected) return AlarmRow(context, MapActionOutcome.Refused(ManagerUnavailableCode), quorum);
+        if (manager == null || manager.WasCollected) return AlarmRow(context, MapActionOutcome.Refused(ManagerUnavailableCode));
         var instance = FindPuzzle(manager, resource.Id);
-        if (instance == null) return AlarmRow(context, MapActionOutcome.Refused(AlarmNotFoundCode), quorum);
-        if (instance.WasCollected || instance.Data == null) return AlarmRow(context, MapActionOutcome.Refused(AlarmUnavailableCode), quorum);
-        if (instance.IsActive) return AlarmRow(context, MapActionOutcome.AlreadyInState(AlarmAlreadyActiveCode), quorum);
-        if (instance.IsSolved) return AlarmRow(context, MapActionOutcome.Refused(AlarmAlreadySolvedCode), quorum);
-        if (instance.NRofPuzzles() <= 0) return AlarmRow(context, MapActionOutcome.Refused(AlarmNoCoresCode), quorum);
-        // The handle is minted before the write, so a start that cannot name what it started refuses instead of
-        // leaving an active puzzle no stop row can address. Its lifetime is the encounter's: the instance lives
-        // for the encounter and its handle dies with it.
-        if (_current is not { } self || !self.TryMintHandle(() => instance, out var handle))
-            return AlarmRow(context, MapActionOutcome.Refused(HandleUnavailableCode), quorum);
-        var minted = new MintedHandle(AlarmWaveContract.ScanHandlePort, handle);
-        return AlarmRow(context, StartPuzzle(instance), quorum, minted);
+        if (instance == null) return AlarmRow(context, MapActionOutcome.Refused(AlarmNotFoundCode));
+        if (instance.WasCollected || instance.Data == null) return AlarmRow(context, MapActionOutcome.Refused(AlarmUnavailableCode));
+        // All three operations address an instance that is already there, so none mints a handle: the scan row
+        // publishes no handle port, and a stop row addresses a wave rather than a puzzle.
+        if (operation != "start") return AlarmRow(context, Interact(instance, operation));
+        if (instance.IsActive) return AlarmRow(context, MapActionOutcome.AlreadyInState(AlarmAlreadyActiveCode));
+        if (instance.IsSolved) return AlarmRow(context, MapActionOutcome.Refused(AlarmAlreadySolvedCode));
+        if (instance.NRofPuzzles() <= 0) return AlarmRow(context, MapActionOutcome.Refused(AlarmNoCoresCode));
+        return AlarmRow(context, StartPuzzle(instance));
+    }
+
+    /// <summary>The row's `operation`, or null when the request named one this row does not carry. The parameter is
+    /// structural, so it is read from the plan's own parameters rather than from a wired port.</summary>
+    private static string? Operation(CommandContext context)
+    {
+        if (context.Parameters.ValueKind != JsonValueKind.Object
+            || !context.Parameters.TryGetProperty("operation", out var member)
+            || member.ValueKind != JsonValueKind.String) return null;
+        var operation = member.GetString();
+        return operation != null && Array.IndexOf(AlarmWaveContract.ScanOperations, operation) >= 0 ? operation : null;
+    }
+
+    /// <summary>The two interactions that act on an instance already in the world. `complete` solves it — the same
+    /// entry the game's own scanner uses when the players finish it — and `reset` deactivates it, which is the one
+    /// member that puts a chained puzzle back to its pre-activation status.</summary>
+    private static MapActionOutcome Interact(ChainedPuzzleInstance instance, string operation)
+    {
+        instance.AttemptInteract(operation == "complete"
+            ? eChainedPuzzleInteraction.Solve
+            : eChainedPuzzleInteraction.Deactivate);
+        return MapActionOutcome.Issued(operation == "complete" ? ScanCompletedCode : ScanResetCode);
     }
 
     /// <summary>The `forge.action.map.wave_start` handler: one Mastermind survival wave, started through the

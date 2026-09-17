@@ -34,6 +34,11 @@ public sealed class LevelEventModule : IDisposable
     internal const string ModeUnknownCode = "dimension-mode-unknown";
     internal const string DimensionInvalidCode = "dimension-index-invalid";
     internal const string EndingUnknownCode = "expedition-ending-unknown";
+    /// <summary>A plan named recipients for a move that carries no destination table. The three native team events
+    /// move the whole team and take no subset, so a plan's own player set is not a target this row can honor; the
+    /// ruling names this case `dimension-players-need-locations` and makes it an author error, which the plan
+    /// loader refuses once the runtime can express a parameter-combination rule (see the report).</summary>
+    internal const string PlayersNeedLocationsCode = "dimension-players-need-locations";
     /// <summary>A documented recipient port a plan supplied that the native event cannot address: the three rows
     /// of this family act on the whole session, so a plan's own objective, player or participant set is refused
     /// by name rather than served as the session-wide call it is not.</summary>
@@ -196,25 +201,42 @@ public sealed class LevelEventModule : IDisposable
         return Issued("objective-timer-issued");
     }
 
-    /// <summary>The dimension command: `flash` and `warp` send the whole team, `clear` empties a dimension. The
-    /// dimension index is the game's own `eDimensionIndex` value; `clear` says whether the destination is emptied
-    /// before the move, which is the field the vanilla `DimensionWarpTeam` events use.</summary>
-    internal CommandResult ExecuteDimension(CommandContext context, Action<string, int, bool> move)
+    /// <summary>The dimension command, in its two shapes. With an authored destination table — the row's
+    /// `positions` and `look_dirs` collections — the request is the EOS dimension-warp half: every named player
+    /// lands on its own authored entry, and `moveEach` is the native body that submits one warp per recipient.
+    /// Without one it is the team event: `flash` and `warp` send the whole team and `clear` empties a dimension,
+    /// through `move`. The mode is the whole decision the native event needs beyond the index: `clear` names
+    /// `eWardenObjectiveEventType.ClearDimension` itself, so the request carries no clear flag.
+    ///
+    /// The follow policy the deleted `policy` parameter used to carry is not replaced: the deployed sentries a
+    /// warp takes along are an `IWarpableObject` the game's own notify already moves, and the items it does not
+    /// move have no carry this row could promise, so the ruling deleted the parameter rather than keeping a choice
+    /// the game cannot honor.</summary>
+    internal CommandResult ExecuteDimension(CommandContext context, Action<string, int> move,
+        Func<CommandResult> moveEach)
     {
         if (!context.IsHost) return Refused(AuthorityCode);
         ArgumentNullException.ThrowIfNull(move);
-        if (Present(context.Inputs, "players")) return Refused(PlayersTargetCode);
+        var carriesTable = HasDestinations(context);
         string mode = Text(context.Parameters, "mode");
         if (Array.IndexOf(LevelEventContract.DimensionModes, mode) < 0) return Refused(ModeUnknownCode);
-        if (!context.Parameters.TryGetProperty("clear", out var clear) || clear.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
-            return Refused(ModeUnknownCode);
+        if (carriesTable)
+        {
+            if (mode != "warp") return Refused(ModeUnknownCode);
+            ArgumentNullException.ThrowIfNull(moveEach);
+            return moveEach();
+        }
+        if (Present(context.Inputs, "players")) return Refused(PlayersNeedLocationsCode);
         double? dimension = Number(context.Inputs, "dimension");
+        // `flash` and `warp` need a destination dimension and `clear` names none: a request that leaves the index
+        // out of a moving mode is an author error the plan loader refuses once the runtime can express a
+        // parameter-combination rule (see the report), and the handler refuses it by the same code until then.
         if (mode != "clear" && (dimension == null || dimension.Value < 0 || dimension.Value > int.MaxValue))
             return Refused(DimensionInvalidCode);
         int index = dimension == null ? 0 : (int)dimension.Value;
         try
         {
-            move(mode, index, clear.GetBoolean());
+            move(mode, index);
         }
         catch (Exception error)
         {
@@ -223,6 +245,12 @@ public sealed class LevelEventModule : IDisposable
         }
         return Issued("dimension-" + mode + "-issued");
     }
+
+    /// <summary>Whether the request carries an authored destination table, which is what selects the
+    /// per-recipient shape of the dimension row: either collection the table travels in is enough to say so, and
+    /// the table's own reader refuses a request that carries only one of them.</summary>
+    internal static bool HasDestinations(CommandContext context)
+        => Present(context.Inputs, "positions") || Present(context.Inputs, "look_dirs");
 
     /// <summary>The expedition-end command: `instant_win` ends the expedition now, `win_on_death` makes the next
     /// wipe the win the objective's own completion check looks for. Both are the game's own members

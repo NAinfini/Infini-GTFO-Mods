@@ -56,17 +56,20 @@ public static class ObservedSpaceDeclarations
         ObservedDeclaration.Node("forge.selector.target.filter", "query", "某区域里的玩家 / 敌人", "用一套目标规则筛掉不要的。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Entity("anchor"), ObservedDeclaration.Many("candidates")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")),
-            ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnum("relation", "recipient_relation"), ObservedDeclaration.EmptyPolicyParameter()),
-            new HandlerShape().Inputs("anchor", "candidates").Outputs("targets").Parameters("relation", "empty"), FilterHandler),
+            ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnum("relation", "recipient_relation"),
+                ObservedDeclaration.StructuralEnumValues("state", RecipientFilterRequest.States, required: false),
+                ObservedDeclaration.OptionalInteger("dimension"),
+                ObservedDeclaration.OptionalBoolean("damageable_doors"),
+                ObservedDeclaration.OptionalBoolean("include_self"),
+                ObservedDeclaration.EmptyPolicyParameter()),
+            new HandlerShape().Inputs("anchor", "candidates").Outputs("targets")
+                .Parameters("relation", "state", "dimension", "damageable_doors", "include_self", "empty"), FilterHandler),
         ObservedDeclaration.Node("forge.selector.target.partition", "query", "按队伍、部位或标签分组", "按一个键把目标分成两堆。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Text("key")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("matched"), ObservedDeclaration.Many("rest")),
             ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnumValues("field", PartitionFields), ObservedDeclaration.EmptyPolicyParameter()),
             new HandlerShape().Inputs("candidates", "key").Outputs("matched", "rest").Parameters("field", "empty"), PartitionHandler),
-        ObservedDeclaration.Node("forge.selector.target.zone_members", "query", "某区域里的实体", "从候选里挑出位于指定区域内的实体。",
-            ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"),
-                ObservedDeclaration.Resource("zone", RuntimeZones.ResourceKind, "forge.resource.zone")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
+        ObservedDeclaration.Primitive("forge.selector.target.zone_members", "某区域里的实体", "从候选里挑出位于指定区域内的实体。",
             new HandlerShape().Inputs("candidates", "zone").Outputs("targets").Parameters("empty"), ZoneMembersHandler));
 
     /// <summary>The zone filter keeps the candidates whose own zone is the one the plan named, and it reads that
@@ -165,11 +168,17 @@ public static class ObservedSpaceDeclarations
             ObservedEvaluation.Required(context, "radius").GetDouble()));
 
     /// <summary>The relation is measured against the row's explicit `anchor` input, which is what a deployable
-    /// wires its `owner` into; nothing here reads a role from the event.</summary>
+    /// wires its `owner` into; nothing here reads a role from the event. The row's three optional members are read
+    /// from the same parameter bag and default to the member that filters nothing, so a plan written before they
+    /// existed compiles and means what it always meant.</summary>
     private static JsonElement FilterHandler(EvaluationContext context)
         => ObservedEvaluation.Targets(context, ObservedSpaceNodes.Filter(context.Query,
             ObservedEvaluation.Candidates(context, "candidates"), ObservedEvaluation.Entity(context, "anchor"),
-            context.Relations, RecipientFilterRequest.Read(ObservedEvaluation.ParameterText(context, "relation"))));
+            context.Relations, RecipientFilterRequest.Read(ObservedEvaluation.ParameterText(context, "relation"),
+                ObservedEvaluation.OptionalParameterText(context, "state"),
+                ObservedEvaluation.OptionalParameterInteger(context, "dimension"),
+                ObservedEvaluation.OptionalParameterFlag(context, "damageable_doors", true),
+                ObservedEvaluation.OptionalParameterFlag(context, "include_self", true))));
 
     /// <summary>This row has two outputs, so `empty` is applied to the pair once: `fail` refuses when either side
     /// would be empty, and `skip` answers both sides unchanged.</summary>

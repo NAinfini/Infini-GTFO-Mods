@@ -5,8 +5,8 @@ using ForgeRuntime.Framework;
 namespace ForgeEnemy;
 
 /// <summary>The enemy-domain read rows of the node list's `values` section: `v-e-health`, `v-e-alive`,
-/// `v-e-type`, `v-e-sleep`, `v-e-where` and `v-e-tagged` — the six facts a plan reads out of one enemy without
-/// changing anything.
+/// `v-e-type`, `v-e-sleep`, `v-e-where`, `v-e-tagged` and `v-e-group` — the seven facts a plan reads out of one
+/// enemy without changing anything.
 ///
 /// They are `state`-kind rows at the `query` tier, which is the pair the framework's own value rows use: `state`
 /// is the value row's own kind — the one an on-demand read about the world is registered under, and the one the
@@ -31,6 +31,9 @@ namespace ForgeEnemy;
 /// the `forge.resource.zone` reference the framework's zone identity is written from.</item>
 /// <item>`tagged`: the enemy's own BioTracker tag flag and the seconds of tag time it still has
 /// (`EnemyAgent.IsTagged` / `EnemyAgent.EnemyTaggedTimer`).</item>
+/// <item>`group`: the enemy group the life belongs to — the state its own behaviour machine publishes to every
+/// peer, the type it was spawned as, and how frustrated its patrol has become (`EnemyAI.m_group`,
+/// `EnemyGroup.Data.currentState`, `.GroupType`, `.PatrolFrustration`).</item>
 /// </list>
 ///
 /// A read that cannot be made is the step's own refusal with a code, never a zero, an empty string or a false:
@@ -73,6 +76,10 @@ public static class EnemyNodeValueContract
     public const string TaggedCapability = "forge.query.enemy.tagged";
     public const string TaggedHandler = "gtfo.enemy.value.tagged";
 
+    /// <summary>`v-e-group`: the group the enemy belongs to and what its own state machine is doing.</summary>
+    public const string GroupCapability = "forge.query.enemy.group";
+    public const string GroupHandler = "gtfo.enemy.value.group";
+
     /// <summary>The binding a row is registered under: the capability's own suffix under this provider, the same
     /// rule the player value family uses, so either side can name the counterpart of a row.</summary>
     public static string Binding(string capabilityId) => ProviderId + ".binding." + capabilityId["forge.".Length..];
@@ -80,7 +87,8 @@ public static class EnemyNodeValueContract
     /// <summary>Every capability id this contract names, in the same order as <see cref="ValueRows"/>.</summary>
     public static readonly string[] CapabilityIds =
     {
-        HealthCapability, AliveCapability, TypeCapability, SleepingCapability, WhereCapability, TaggedCapability
+        HealthCapability, AliveCapability, TypeCapability, SleepingCapability, WhereCapability, TaggedCapability,
+        GroupCapability
     };
 
     /// <summary>Every handler name this contract declares, in the same order as
@@ -88,7 +96,7 @@ public static class EnemyNodeValueContract
     /// also its shape key, so a registration cannot supply an evaluator whose ports were never declared.</summary>
     public static readonly string[] HandlerNames =
     {
-        HealthHandler, AliveHandler, TypeHandler, SleepingHandler, WhereHandler, TaggedHandler
+        HealthHandler, AliveHandler, TypeHandler, SleepingHandler, WhereHandler, TaggedHandler, GroupHandler
     };
 
     /// <summary>Every binding id this contract declares, in the same order.</summary>
@@ -99,7 +107,7 @@ public static class EnemyNodeValueContract
         return ids;
     }
 
-    /// <summary>The six read-only rows, each a complete catalog entry: the id, the provider that owns it, the
+    /// <summary>The seven read-only rows, each a complete catalog entry: the id, the provider that owns it, the
     /// kind and tier the framework's rules require, and the ports the row really answers. A value row answers
     /// values only — no `next`, no `result`, no handle, and no write.</summary>
     public static IReadOnlyList<object> ValueRows() => Array.AsReadOnly(new[]
@@ -134,10 +142,26 @@ public static class EnemyNodeValueContract
             {
                 new { id = "value", type = "boolean" },
                 new { id = "remaining", type = "number", unit = "s" }
+            }),
+        ValueRow(GroupCapability, "敌人所属组", "读一个敌人所属敌人组的状态、组类型与巡逻挫败感。",
+            "Reads the enemy group one enemy belongs to: the state its own state machine is in, the type it was "
+            + "spawned as, and how frustrated its patrol has become.",
+            new object[]
+            {
+                // The state is the shared `enemy_group_state` set, whose seventeen members are the native `EGS`
+                // members in their own declaration order, so the port carries the member index the kernel's own
+                // set indexes (Q3: an enum port is an index on the wire, never a name).
+                new { id = "state", type = "enum", schema = "enemy_group_state" },
+                // The type is the native `EnemyGroupType` member name until the shared set lands: the framework
+                // refuses an enum port whose set it does not carry, and `enemy_group_type` is not in its table
+                // yet (the runtime unit owns that table). The spelling is the set's own, so the port becomes
+                // `type = "enum", schema = "enemy_group_type"` without renaming a single value.
+                new { id = "group_type", type = "string" },
+                new { id = "patrol_frustration", type = "number" }
             })
     });
 
-    /// <summary>The six bindings, one per row, paired with <see cref="ValueRows"/> by position. The role is
+    /// <summary>The seven bindings, one per row, paired with <see cref="ValueRows"/> by position. The role is
     /// `observe` for the reason the player value family uses it: an observation evaluated on demand registers
     /// through the evaluator table, and a `query` row is evaluated on demand by definition.</summary>
     public static IReadOnlyList<object> ValueBindings() => Array.AsReadOnly(new object[]
@@ -147,15 +171,17 @@ public static class EnemyNodeValueContract
         ValueBinding(TypeCapability, TypeHandler),
         ValueBinding(SleepingCapability, SleepingHandler),
         ValueBinding(WhereCapability, WhereHandler),
-        ValueBinding(TaggedCapability, TaggedHandler)
+        ValueBinding(TaggedCapability, TaggedHandler),
+        ValueBinding(GroupCapability, GroupHandler)
     });
 
-    /// <summary>The six registration support rows, paired with <see cref="ValueBindings"/> by position. A value
+    /// <summary>The seven registration support rows, paired with <see cref="ValueBindings"/> by position. A value
     /// read owns no object and writes nothing, so no row carries a permission.</summary>
     public static IReadOnlyList<BindingSupport> ValueSupport() => Array.AsReadOnly(new[]
     {
         ValueSupport(HealthCapability), ValueSupport(AliveCapability), ValueSupport(TypeCapability),
-        ValueSupport(SleepingCapability), ValueSupport(WhereCapability), ValueSupport(TaggedCapability)
+        ValueSupport(SleepingCapability), ValueSupport(WhereCapability), ValueSupport(TaggedCapability),
+        ValueSupport(GroupCapability)
     });
 
     /// <summary>The one shape of each value handler: the enemy it reads and the ports it answers with. Declared
@@ -167,7 +193,8 @@ public static class EnemyNodeValueContract
         [TypeHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
         [SleepingHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
         [WhereHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("position", "zone"),
-        [TaggedHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value", "remaining")
+        [TaggedHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value", "remaining"),
+        [GroupHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("state", "group_type", "patrol_frustration")
     };
 
     private static object ValueRow(string id, string label, string description, string descriptionEn, object[] outputs) => new

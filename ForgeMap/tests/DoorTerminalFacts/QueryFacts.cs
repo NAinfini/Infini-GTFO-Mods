@@ -49,6 +49,44 @@ public sealed class QueryFacts
     }
 
     [Fact]
+    public void APuzzlePortCarriesTheChainedPuzzleTheLockHolds()
+    {
+        // The reference is the one the scan row's own chained-puzzle resource provider publishes, so a plan can
+        // wire this output straight into `forge.action.map.scan_state`.
+        var answer = Evaluate(new { door = DoorReference() },
+            _ => new DoorQueryContract.DoorSample((int)eDoorStatus.Closed_LockedWithChainedPuzzle_Alarm, true, null, "PUZZLE_9"));
+        var puzzle = answer.GetProperty("puzzle");
+        Assert.Equal(AlarmWaveContract.ChainedPuzzleKind, puzzle.GetProperty("resourceKind").GetString());
+        Assert.Equal("PUZZLE_9", puzzle.GetProperty("resourceId").GetString());
+    }
+
+    [Fact]
+    public void APuzzlePortIsAbsentWhenTheLockHoldsNoPuzzle()
+    {
+        var answer = Answer(eDoorStatus.Closed);
+        Assert.False(answer.TryGetProperty("puzzle", out _));
+    }
+
+    [Fact]
+    public void AGlueOrStuckStatusIsNamedAsItsOwnField()
+    {
+        // The two obstructions are the door's own status values (dump.cs:688678-688680), reported by name so a
+        // plan does not compare `detail` against a status spelling.
+        var glued = Answer(eDoorStatus.GluedMax);
+        Assert.True(glued.GetProperty("glued").GetBoolean());
+        Assert.False(glued.GetProperty("stuck").GetBoolean());
+
+        var stuck = Answer(eDoorStatus.TryOpenStuckInGlue);
+        Assert.False(stuck.GetProperty("glued").GetBoolean());
+        Assert.True(stuck.GetProperty("stuck").GetBoolean());
+        Assert.Equal("try_open_stuck_in_glue", stuck.GetProperty("detail").GetString());
+
+        var broken = Answer(eDoorStatus.TryOpenStuckBroken);
+        Assert.True(broken.GetProperty("stuck").GetBoolean());
+        Assert.False(broken.GetProperty("glued").GetBoolean());
+    }
+
+    [Fact]
     public void AReferenceOfAnotherKindIsRefusedByName()
     {
         var refused = Refusal(new EntityReference("gtfo.player:steam-1", World.WorldEpoch, 1));

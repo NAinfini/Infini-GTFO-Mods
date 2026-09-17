@@ -25,14 +25,23 @@ public sealed class WeaponActionTests
     private static ForgeWeapon.WeaponActionOutcome Recoil(params (string Port, object? Value)[] inputs)
         => WeaponActionRuntime.Recoil(OverrideWorld.Context(new { }, inputs));
 
+    private static ForgeWeapon.WeaponActionOutcome Property(object parameters,
+        params (string Port, object? Value)[] inputs)
+        => WeaponActionRuntime.Property(OverrideWorld.Context(parameters, inputs));
+
     [Fact]
     public void a_rate_is_a_frequency_and_the_native_field_is_its_reciprocal()
     {
         var outcome = FireRate(("equipment", OverrideWorld.Entity(Equipment)), ("rate", 8d), ("duration", 40));
         Assert.Equal("", outcome.Code);
         Assert.Equal(Equipment, outcome.Equipment);
-        Assert.Equal(0.125, outcome.Fields.Single().Value, 12);
         Assert.Equal("fire_rate", outcome.Fields.Single().Name);
+        // The ledger stores the frequency the plan asked for, the way every other row's value travels: the
+        // reciprocal the block actually holds is produced at the write, which is the half that knows the field is
+        // `ShotDelay` and the only half that can resolve an `add` against the instance's own rate.
+        Assert.Equal(8d, outcome.Fields.Single().Value, 12);
+        Assert.Equal(WeaponOverrideOperation.Set, outcome.Fields.Single().Operation);
+        Assert.Equal(0.125, WeaponActionRuntime.ShotDelayFromRate(8d), 12);
         Assert.Equal(8d, WeaponActionRuntime.RateFromShotDelay(0.125), 12);
     }
 
@@ -133,6 +142,69 @@ public sealed class WeaponActionTests
         Assert.True(recoil);
         Assert.True(WeaponActionRuntime.HasDestination("fire_rate", WeaponActionRuntime.WeaponFamily.Bullet, out var plain));
         Assert.False(plain);
+    }
+
+    [Theory]
+    [InlineData("fire_rate", "add")]
+    [InlineData("burst_count", "subtract")]
+    [InlineData("spread_cone", "set")]
+    [InlineData("recoil_camera_kick", "add")]
+    public void a_property_request_carries_the_named_field_and_its_operation(string field, string operation)
+    {
+        var outcome = Property(new { field, operation }, ("equipment", OverrideWorld.Entity(Equipment)),
+            ("value", 2d), ("duration", 60));
+        Assert.Equal("", outcome.Code);
+        var accepted = outcome.Fields.Single();
+        Assert.Equal(field, accepted.Name);
+        Assert.Equal(2d, accepted.Value, 12);
+        Assert.True(WeaponOverrideLedger.TryParseOperation(operation, out var expected));
+        Assert.Equal(expected, accepted.Operation);
+    }
+
+    [Fact]
+    public void a_property_field_with_no_write_point_is_refused_by_name()
+    {
+        // `damage` is a real block member and still not a served name: the shipped code's read of it is not
+        // decoded, so this row refuses the name instead of writing a value nothing re-reads.
+        Assert.Equal(WeaponOverrideLedger.UnknownFieldCode,
+            Property(new { field = "damage", operation = "set" }, ("equipment", OverrideWorld.Entity(Equipment)),
+                ("value", 5d)).Code);
+        Assert.Equal(WeaponOverrideLedger.UnknownFieldCode,
+            Property(new { field = "not_a_field", operation = "add" }, ("equipment", OverrideWorld.Entity(Equipment)),
+                ("value", 5d)).Code);
+    }
+
+    [Fact]
+    public void a_property_request_without_a_field_or_with_an_operation_outside_the_three_is_refused()
+    {
+        // A missing `field` and an operation the write path has no arithmetic for are both the row's own mode,
+        // so both are refused under it rather than as a bad value.
+        Assert.Equal(WeaponActionRuntime.ModeUnsupportedCode,
+            Property(new { operation = "set" }, ("equipment", OverrideWorld.Entity(Equipment)), ("value", 1d)).Code);
+        Assert.Equal(WeaponActionRuntime.ModeUnsupportedCode,
+            Property(new { field = "fire_rate", operation = "multiply" },
+                ("equipment", OverrideWorld.Entity(Equipment)), ("value", 1d)).Code);
+        Assert.Equal(WeaponActionRuntime.ModeUnsupportedCode,
+            Property(new { field = "fire_rate" }, ("equipment", OverrideWorld.Entity(Equipment)), ("value", 1d)).Code);
+    }
+
+    [Fact]
+    public void a_property_value_that_is_not_a_number_and_a_negative_set_are_refused()
+    {
+        Assert.Equal(WeaponActionRuntime.InputUnsupportedCode,
+            Property(new { field = "fire_rate", operation = "set" },
+                ("equipment", OverrideWorld.Entity(Equipment))).Code);
+        Assert.Equal(WeaponActionRuntime.InputUnsupportedCode,
+            Property(new { field = "fire_rate", operation = "set" },
+                ("equipment", OverrideWorld.Entity(Equipment)), ("value", -1d)).Code);
+        // The same negative value is a subtraction when it is spelled as one, which is a change the block can
+        // hold, so the operation is what decides and not the sign.
+        var subtract = Property(new { field = "spread_cone", operation = "subtract" },
+            ("equipment", OverrideWorld.Entity(Equipment)), ("value", 3d));
+        Assert.Equal("", subtract.Code);
+        Assert.Equal(WeaponOverrideOperation.Subtract, subtract.Fields.Single().Operation);
+        Assert.Equal(WeaponOverrideLedger.StaleEquipmentCode,
+            Property(new { field = "fire_rate", operation = "set" }, ("value", 1d)).Code);
     }
 
     [Fact]

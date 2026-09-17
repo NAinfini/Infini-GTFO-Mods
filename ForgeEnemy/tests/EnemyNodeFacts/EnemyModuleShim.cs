@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Enemies;
 using ForgeRuntime.Framework;
 
@@ -66,6 +67,10 @@ internal sealed partial class EnemyModule
 
     internal bool IsRegistered => _registration.IsRegistered;
 
+    /// <summary>A handle cast the way the kernel's own effect handle is: through the registration this module
+    /// registered under, because a fixture has no plan and the step's handle comes from the kernel.</summary>
+    internal JsonElement MintHandle() => _registration.CreateEffectHandle("encounter");
+
     /// <summary>The node family's own rows, exactly as `EnemyModule.Registry()` composes them, with the handler,
     /// shape and evaluator tables that answer them. The two responders are the shim's own: they answer through
     /// the module instance this scene built, which is the one that owns the entity table.</summary>
@@ -74,7 +79,15 @@ internal sealed partial class EnemyModule
         var shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal);
         foreach (var shape in NodeActionShapes()) shapes.Add(shape.Key, shape.Value);
         foreach (var shape in NodeValueShapes()) shapes.Add(shape.Key, shape.Value);
-        return new RuntimeModule(RuntimeKernel.ApiVersion, RegistryJson, NodeActionHandlers(), NodeSupport().ToArray())
+        // The volume row is the one action family this suite drives by hand rather than through the node
+        // family's own table, so its body, shape and support row are appended here exactly as
+        // `EnemyActionFamilies` appends them to the production registration.
+        var handlers = NodeActionHandlers();
+        handlers[VolumeHandler] = EffectVolume;
+        shapes[VolumeHandler] = VolumePorts;
+        var support = NodeSupport().ToList();
+        support.AddRange(EnemyVolumeContract.Support());
+        return new RuntimeModule(RuntimeKernel.ApiVersion, RegistryJson, handlers, support.ToArray())
         {
             Shapes = shapes,
             Evaluators = NodeEvaluators(),
@@ -91,6 +104,15 @@ internal sealed partial class EnemyModule
             // declares them.
             EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>>
                 { ["gtfo.enemy"] = ResolveInstance },
+            // The one resource kind the node family's observation mints a payload from: `ability` is the game's
+            // own ability enum, and the provider is the production table, so a fact that names an ability names
+            // the same id `forge.action.enemy.ability` resolves.
+            ResourceProviders = new Dictionary<string, RuntimeResourceProvider>(StringComparer.Ordinal)
+                { [EnemyAbilityResources.Kind] = EnemyAbilityResources.Provider },
+            // The one row whose clock is the step's own `effect` block: the same restore callback the production
+            // registration carries, so a case can drive an ending the way the kernel does.
+            EffectRestores = new Dictionary<string, EffectRestoreHandler>(StringComparer.Ordinal)
+                { [VolumeHandler] = RestoreVolume },
             EntityCandidates = new Dictionary<string, Func<IReadOnlyList<EntityReference>>>
                 { ["gtfo.enemy"] = Candidates }
         };
@@ -105,6 +127,28 @@ internal sealed partial class EnemyModule
     private EntityReference? ResolveInstance(object instance)
         => instance is EnemyAgent enemy && _entities.TryGetValue(enemy.GlobalID, out var entry)
            && ReferenceEquals(entry.Enemy, enemy) && Resolve(entry.Reference) != null ? entry.Reference : null;
+
+    /// <summary>One native agent through the kernel's registered instance resolvers — the production reading the
+    /// ability-used fact resolves its target with. Only the kind this scene registers answers here; a second kind
+    /// the production registration would also carry is skipped exactly as it is there, because a kind with no
+    /// resolver registered cannot claim an instance.</summary>
+    private EntityReference? ResolveAgent(Agents.Agent? agent)
+    {
+        if (agent == null) return null;
+        foreach (var kind in AgentKinds)
+        {
+            EntityReference? reference;
+            try { reference = _kernel.ResolveEntityInstance(kind, agent); }
+            catch (RuntimeContractException error) when (error.Code == "entity-resolver") { continue; }
+            if (reference != null) return reference;
+        }
+        return null;
+    }
+
+    /// <summary>The kinds this provider resolves an agent instance as, in the production order. A player target
+    /// is attempted before it is given up on, so a fact about one is refused for the reason the provider refuses
+    /// it — an unregistered kind — rather than by skipping the lookup.</summary>
+    private static readonly string[] AgentKinds = { "gtfo.enemy", "gtfo.player" };
 
     /// <summary>Every live life this module tracks, as the selector's own candidate source.</summary>
     private IReadOnlyList<EntityReference> Candidates()
@@ -121,11 +165,13 @@ internal sealed partial class EnemyModule
     /// registers before this module, which is the order the host registers them in.
     ///
     /// The other action families the production registration also carries are not compiled here at all: this
-    /// suite's statement is the node-list family, and a row whose contract is absent cannot be named.</summary>
+    /// suite's statement is the node-list family and the one effect-volume row it drives itself, and a row whose
+    /// contract is absent cannot be named.</summary>
     private static string RegistryJson => RegistryHead
-        + EnemyNodeEffectContract.CapabilityRowsJson
-        + ",\n" + string.Join(",\n", System.Linq.Enumerable.Select(EnemyNodeValueContract.ValueRows(), RuntimeJson.From))
-        + "\n  ],\n  \"bindings\": [\n" + NodeBindingRowsJson + "\n  ]\n}";
+        + NodeCapabilityRowsJson
+        + ",\n" + EnemyVolumeContract.CapabilityRow
+        + "\n  ],\n  \"bindings\": [\n" + NodeBindingRowsJson
+        + ",\n" + EnemyVolumeContract.BindingRowJson + "\n  ]\n}";
 
     /// <summary>The assembled registry text, for a one-off inspection of the rows this shim registers.</summary>
     internal static string DumpRegistryJson() => RegistryJson;

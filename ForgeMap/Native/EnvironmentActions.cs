@@ -91,6 +91,11 @@ internal readonly struct EnvironmentZone
 /// </summary>
 internal sealed class EnvironmentActions
 {
+    /// <summary>The seconds one tick of plan time is. The kernel's tick is the level's own simulation step and
+    /// every time port of these rows is declared in ticks; the native fog and light fields take seconds, so the
+    /// conversion happens once, at the call site.</summary>
+    private const double SecondsPerTick = 1.0 / 60.0;
+
     /// <summary>The one authority refusal, spelled the way the other Map handlers spell it.</summary>
     internal const string AuthorityCode = "authority-or-phase";
     /// <summary>A request that named no target at all. The recipient contract makes the port non-optional, so
@@ -179,7 +184,7 @@ internal sealed class EnvironmentActions
         if (count < 0) return CommandResult.Rejected(CountCode);
         if (_events() is null) return CommandResult.Rejected(UnavailableCode);
 
-        float transition = (float)Number(context.Inputs, "transition", 0);
+        float transition = Seconds(Number(context.Inputs, "transition", 0));
         var rows = new List<EnvironmentRow>(zones.Count);
         if (scope == "expedition")
         {
@@ -344,8 +349,9 @@ internal sealed class EnvironmentActions
         return true;
     }
 
-    /// <summary>The `transition` length in seconds, zero when the plan named none — the write itself. A negative or
-    /// non-finite length is refused: there is no frame it could mean.</summary>
+    /// <summary>The `transition` length in seconds, zero when the plan named none — the write itself. The port is
+    /// declared in ticks, so a negative or non-finite tick count is refused before the conversion: there is no
+    /// frame it could mean.</summary>
     private static bool TryTransition(CommandContext context, out float transition, out CommandResult refusal)
     {
         transition = 0f;
@@ -355,9 +361,14 @@ internal sealed class EnvironmentActions
             || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return true;
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out double number)
             || !double.IsFinite(number) || number < 0) return false;
-        transition = (float)number;
+        transition = Seconds(number);
         return true;
     }
+
+    /// <summary>One authored time in the seconds the native fields take. Every time an author writes on these
+    /// rows is ticks — the runtime's own simulation unit — so the conversion happens once, here, at the boundary
+    /// where the value reaches the game's own float fields.</summary>
+    private static float Seconds(double ticks) => (float)(ticks * SecondsPerTick);
 
     /// <summary>The `forge.action.presentation.fog` command: the game's own fog transition, whose three
     /// arguments are the fog block id, the transition duration and the dimension the named zone belongs to.</summary>
@@ -374,7 +385,7 @@ internal sealed class EnvironmentActions
         data.Layer = (LG_LayerType)zone.Layer;
         data.LocalIndex = zone.LocalIndex;
         data.FogSetting = (uint)fog;
-        data.FogTransitionDuration = (float)Number(context.Inputs, "transition", 0);
+        data.FogTransitionDuration = Seconds(Number(context.Inputs, "transition", 0));
         return Issued(new List<EnvironmentRow> { Issue(context, data, zone) });
     }
 
@@ -407,10 +418,10 @@ internal sealed class EnvironmentActions
             // The game's own "loop until stopped" value. It is the default the vanilla slot uses, so an absent
             // `states` port means the same thing the level data means by it.
             data.SustainedEventStateCount = Integer(context.Parameters, "states", -1);
-            data.SustainedEventStateDuration = (float)Number(context.Inputs, "state_duration", 0);
-            data.SustainedEventDelay = (float)Number(context.Inputs, "start_delay", 0);
+            data.SustainedEventStateDuration = Seconds(Number(context.Inputs, "state_duration", 0));
+            data.SustainedEventDelay = Seconds(Number(context.Inputs, "start_delay", 0));
             data.FogSetting = (uint)fog;
-            data.FogTransitionDuration = (float)Number(context.Inputs, "transition", 0);
+            data.FogTransitionDuration = Seconds(Number(context.Inputs, "transition", 0));
             int sound = Integer(context.Inputs, "sound", -1);
             if (sound >= 0) data.SoundID = (uint)sound;
         }

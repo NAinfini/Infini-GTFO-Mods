@@ -168,62 +168,15 @@ public sealed class DoorTerminalActionTests
         // added after a read belongs to no table this case would still be reading.
         var shut = world.Entrance(world.Zone(0, LG_LayerType.MainLayer, eLocalZoneIndex.Zone_1), eDoorStatus.Closed);
         var open = world.Entrance(world.Zone(0, LG_LayerType.MainLayer, eLocalZoneIndex.Zone_2), eDoorStatus.Open);
-        var shutOutcome = DoorActions.Close(shut, AddressOf(shut), DoorOccupancyPolicy.Block, DoorForcePolicy.Normal);
+        var shutOutcome = DoorActions.Close(shut, AddressOf(shut));
         Require(shutOutcome.Commit == MapActionCommit.AlreadyInState && shutOutcome.Code == DoorActions.AlreadyClosed,
             "A closed door was not left alone: " + shutOutcome.Code);
         Require(shut.OpenCloseCalls == 0, "The interaction entry toggles, so asking a closed door to close would have opened it.");
-        var openOutcome = DoorActions.Close(open, AddressOf(open), DoorOccupancyPolicy.Block, DoorForcePolicy.Normal);
+        var openOutcome = DoorActions.Close(open, AddressOf(open));
         Require(openOutcome.Commit == MapActionCommit.Issued && openOutcome.Code == DoorActions.Closed,
             "An open door was not asked to close: " + openOutcome.Code);
         Require(open.OpenCloseCalls == 1 && open.LastOnlyUnlock == false,
             "The plain interaction entry was not the one entry asked to close.");
-    }
-
-    [Fact]
-    public void close_refuses_the_two_policies_no_native_entry_carries()
-    {
-        var world = Level();
-        var zone = world.Zone(0, LG_LayerType.MainLayer, eLocalZoneIndex.Zone_1);
-        var door = world.Entrance(zone, eDoorStatus.Open);
-        var crush = DoorActions.Close(door, AddressOf(door), DoorOccupancyPolicy.Crush, DoorForcePolicy.Normal);
-        Require(crush.Commit == MapActionCommit.Refused && crush.Code == DoorActions.CrushUnsupported,
-            "A crush request was not refused by name: " + crush.Code);
-        var force = DoorActions.Close(door, AddressOf(door), DoorOccupancyPolicy.Block, DoorForcePolicy.Force);
-        Require(force.Commit == MapActionCommit.Refused && force.Code == DoorActions.ForceCloseUnsupported,
-            "A forced close was not refused by name: " + force.Code);
-        Require(door.OpenCloseCalls == 0, "A request no native entry can carry was run in its plain form.");
-    }
-
-    [Fact]
-    public void alarm_wave_arms_and_disarms_the_doors_own_lock_component()
-    {
-        var world = Level();
-        var door = world.Entrance(world.Zone(0, LG_LayerType.MainLayer, eLocalZoneIndex.Zone_1), eDoorStatus.Open);
-        var locks = door.m_locks!.TryCast<LG_SecurityDoor_Locks>()!;
-        // The door's own alarm: the lock component reports that it carries one, and the puzzle it was set up
-        // with is the instance the two entries act on.
-        locks.m_hasAlarm = true;
-        var puzzle = new ChainedPuzzles.ChainedPuzzleInstance();
-        locks.ChainedPuzzleToSolve = puzzle;
-        var armed = DoorActions.SetAlarm(door, AddressOf(door), DoorAlarmMode.Start);
-        Require(armed.Commit == MapActionCommit.Issued && armed.Code == DoorActions.AlarmStarted,
-            "The door's own alarm wave was not armed: " + armed.Code);
-        var disarmed = DoorActions.SetAlarm(door, AddressOf(door), DoorAlarmMode.Stop);
-        Require(disarmed.Commit == MapActionCommit.Issued && disarmed.Code == DoorActions.AlarmStopped,
-            "The door's own alarm wave was not disarmed: " + disarmed.Code);
-        Require(puzzle.ActivateCalls == 1 && puzzle.DeactivateCalls == 1 && !puzzle.IsActive,
-            "The alarm's own master entries were not the members written.");
-    }
-
-    [Fact]
-    public void alarm_wave_refuses_a_door_that_holds_no_lock_component()
-    {
-        var world = Level();
-        var door = world.Entrance(world.Zone(0, LG_LayerType.MainLayer, eLocalZoneIndex.Zone_1), eDoorStatus.Open);
-        door.m_locks = null;
-        var outcome = DoorActions.SetAlarm(door, AddressOf(door), DoorAlarmMode.Start);
-        Require(outcome.Commit == MapActionCommit.Refused && outcome.Code == DoorActions.NoLockComponent,
-            "A door with no lock component was written to: " + outcome.Code);
     }
 
     [Fact]

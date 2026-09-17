@@ -107,28 +107,12 @@ public static class ControlContracts
     /// always second. Unit-bearing counts are ticks, and the timer handle's kind/lifetime are fixed here.</summary>
     private static object Graph(string kind)
     {
+        if (PrimitiveContracts.ControlGraphs.TryGetProperty(kind, out var primitive)) return primitive;
         object[] Inputs(params object[] extra) => new object[] { new { id = "in", type = "execution" } }.Concat(extra).ToArray();
         var execution = new { id = "next", type = "execution" };
         var timer = new { id = "timer", type = "handle", handleKind = "timer", lifetime = "encounter" };
         return kind switch
         {
-            "branch" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(new { id = "condition", type = "boolean" }),
-                outputs = new object[] { new { id = "then", type = "execution" }, new { id = "otherwise", type = "execution" } },
-                parameters = Array.Empty<object>()
-            },
-            "sequence" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(),
-                outputs = new object[] { new { id = "step_1", type = "execution" }, new { id = "step_2", type = "execution" } },
-                parameters = new object[] { new { id = "step_count", type = "integer", role = "structural", required = false, minimum = 2, maximum = 32 } },
-                variadic = new { side = "outputs", parameter = "step_count", port = new { id = "step", type = "execution" } }
-            },
             "parallel_all" => new
             {
                 domains = Domains,
@@ -161,44 +145,12 @@ public static class ControlContracts
                         slots = new object[] { new { id = "branch", type = "execution" } } }
                 }
             },
-            "delay" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(new { id = "duration", type = "integer", unit = "tick" }),
-                outputs = new object[] { execution, timer },
-                parameters = Array.Empty<object>()
-            },
-            "interval" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(new { id = "interval", type = "integer", unit = "tick" }, new { id = "count", type = "integer", optional = true }),
-                outputs = new object[] { execution, new { id = "pulse", type = "execution" }, timer },
-                parameters = new object[] { new { id = "first_pulse", type = "enum", role = "structural", required = true, set = "pulse_start" } }
-            },
             "repeat" => new
             {
                 domains = Domains,
                 execution = "host",
                 inputs = Inputs(new { id = "count", type = "integer" }),
                 outputs = new object[] { execution, new { id = "body", type = "execution" }, new { id = "index", type = "integer" } },
-                parameters = Array.Empty<object>()
-            },
-            "for_each" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(new { id = "candidates", type = "entity", cardinality = "many" }, new { id = "budget", type = "integer" }),
-                outputs = new object[] { execution, new { id = "body", type = "execution" }, new { id = "item", type = "entity" }, new { id = "index", type = "integer" } },
-                parameters = Array.Empty<object>()
-            },
-            "cancel" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(new { id = "task", type = "handle", handleKind = "timer", lifetime = "encounter" }),
-                outputs = new object[] { execution, new { id = "cancelled", type = "integer" } },
                 parameters = Array.Empty<object>()
             },
             // The rolling window: a live timer is re-armed from now and the handle it published stays valid, so a
@@ -240,8 +192,11 @@ public static class ControlContracts
                         slots = new object[] { new { id = "case", type = "execution" } } }
                 }
             },
-            // The position walk: `for_each`'s shape over a list of positions rather than candidate entities, so
-            // the same frame publishes `item` — the position in metres — and `index` on every round.
+            // The position walk: `for_each`'s shape over a list of points rather than candidate entities, so
+            // the same frame publishes `item` — the point in metres — the orientation that belongs to it and
+            // `index` on every round. `budget` bounds the rounds, and `shortfall` says what a round does when the
+            // list runs out before the budget does: `stop` ends the walk, which is the first member and therefore
+            // what an unwritten parameter means, and `repeat` starts the list over from its first point.
             "for_each_position" => new
             {
                 domains = Domains,
@@ -250,9 +205,14 @@ public static class ControlContracts
                 outputs = new object[]
                 {
                     execution, new { id = "body", type = "execution" },
-                    new { id = "item", type = "vector3", unit = "m" }, new { id = "index", type = "integer" }
+                    new { id = "item", type = "vector3", unit = "m" }, new { id = "rotation", type = "vector3", unit = "deg" },
+                    new { id = "index", type = "integer" }
                 },
-                parameters = Array.Empty<object>()
+                parameters = new object[]
+                {
+                    new { id = "shortfall", type = "enum", role = "structural", required = false,
+                        values = new[] { "stop", "repeat" } }
+                }
             },
             // The glue rule 142.3 adds: one possibly-absent value, the two ways out, and the value itself
             // republished for the `present` branch. The member list is the author's choice of value class and its
@@ -261,20 +221,6 @@ public static class ControlContracts
             // `graphGuardedHandleLifetimes`). A handle member spells both halves of a handle's contract — its kind
             // and the lifetime that goes with it (rule 142.1) — which is why it reads `handle:<kind>`; the
             // lifetime is resolved by `RuntimeGraphContracts.GuardedHandleKind`.
-            "present" => new
-            {
-                domains = Domains,
-                execution = "host",
-                inputs = Inputs(new { id = "value", type = "entity", valueTypeParameter = "value_type", optional = true, nullable = true }),
-                outputs = new object[]
-                {
-                    new { id = "present", type = "execution" }, new { id = "missing", type = "execution" },
-                    new { id = "value", type = "entity", valueTypeParameter = "value_type", nullable = true }
-                },
-                parameters = new object[] { new { id = "value_type", type = "enum", role = "structural", required = true,
-                    values = new[] { "number", "integer", "boolean", "string", "entity", "vector3",
-                        "handle:timer", "handle:subscription", "handle:effect" } } }
-            },
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind)
         };
     }

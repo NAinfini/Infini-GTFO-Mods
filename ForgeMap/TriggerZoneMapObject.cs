@@ -83,9 +83,10 @@ public sealed partial class MapObjectModule
             return null;
         }
         var subject = new MapObjectSubject(EntityId(address), address, _zoneSource, zone);
+        // The port order the capability row declares: the zone first, then the body that walked in or out.
         var outputs = Payload(
-            ("target", RuntimeJson.From(target)),
-            ("zone", RuntimeJson.From(subject.Reference)));
+            ("zone", RuntimeJson.From(subject.Reference)),
+            ("target", RuntimeJson.From(target)));
         // Nothing is listening on this row's binding: the kernel would answer `no-consumer` for the event this
         // call is about to build, so the event value is never built.
         if (Unsubscribed(TriggerZoneContract.BindingOf(fact))) return null;

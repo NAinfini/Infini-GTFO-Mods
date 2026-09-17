@@ -14,8 +14,8 @@ namespace ForgeWeapon.Tests.WeaponFacts;
 /// </summary>
 public sealed class HolderChannelTests
 {
-    /// <summary>Both rows are registered at the `owner` tier and both bindings are this provider's. A row that
-    /// lost its tier would be a reload the host performs against another player's inventory, which is the one
+    /// <summary>Every row is registered at the `owner` tier and every binding is this provider's. A row that lost
+    /// its tier would be a reload or a shot the host performs against another player's inventory, which is the one
     /// failure the tier exists to prevent.</summary>
     [Fact]
     public void BothRowsAreRegisteredAtTheOwnerTier()
@@ -26,19 +26,22 @@ public sealed class HolderChannelTests
         Assert.True(world.ProviderRegistered());
         Assert.Equal("owner", world.Row(WeaponHolderActionsContract.ReloadCapability).GetProperty("graph").GetProperty("execution").GetString());
         Assert.Equal("owner", world.Row(WeaponHolderActionsContract.ClipSetCapability).GetProperty("graph").GetProperty("execution").GetString());
+        Assert.Equal("owner", world.Row(WeaponHolderActionsContract.AutoFireCapability).GetProperty("graph").GetProperty("execution").GetString());
         var bindings = world.RegisteredBindings();
         Assert.Contains(WeaponHolderActionsContract.ReloadBinding, bindings);
         Assert.Contains(WeaponHolderActionsContract.ClipSetBinding, bindings);
-        Assert.Equal(2, bindings.Count(id => id.StartsWith(WeaponHolderChannelContract.ProviderId + ".binding.", StringComparison.Ordinal)));
+        Assert.Contains(WeaponHolderActionsContract.AutoFireBinding, bindings);
+        Assert.Equal(3, bindings.Count(id => id.StartsWith(WeaponHolderChannelContract.ProviderId + ".binding.", StringComparison.Ordinal)));
     }
 
     /// <summary>The owner-session table is the provider's own answer about the subject a step names, so it is
-    /// keyed by capability and its two keys are the same two rows the module declares: a declaration without its
+    /// keyed by capability and its keys are exactly the rows the module declares: a declaration without its
     /// resolver is a row the tier could only refuse.</summary>
     [Fact]
     public void TheOwnerSessionTableCoversEveryDeclaredRow()
     {
         var module = WeaponHolderActionsContract.Module(_ => "2", _ => CommandResult.Succeeded(RuntimeJson.EmptyObject),
+            _ => CommandResult.Succeeded(RuntimeJson.EmptyObject),
             _ => CommandResult.Succeeded(RuntimeJson.EmptyObject));
         var declared = WeaponHolderActionsContract.Capabilities()
             .Select(row => row.GetProperty("id").GetString()!).OrderBy(id => id, StringComparer.Ordinal).ToArray();
@@ -58,7 +61,7 @@ public sealed class HolderChannelTests
         world.Start();
         var declared = WeaponHolderActionsContract.Module(null);
         Assert.Empty(declared.OwnerSessions!);
-        Assert.Equal(2, WeaponHolderActionsContract.Capabilities().Count);
+        Assert.Equal(3, WeaponHolderActionsContract.Capabilities().Count);
         Assert.Equal("owner", world.Row(WeaponHolderActionsContract.ReloadCapability).GetProperty("graph").GetProperty("execution").GetString());
     }
 
@@ -114,8 +117,9 @@ public sealed class HolderChannelTests
         Assert.All(codes, code => Assert.Matches("^[a-z][a-z0-9]*(-[a-z0-9]+)*$", code));
     }
 
-    /// <summary>The capability ids the resolver table is built from are exactly the two rows the contract
-    /// declares, and a capability neither declares answers no kind: the table and the rows cannot drift.</summary>
+    /// <summary>The capability ids the resolver table is built from are exactly the rows the contract declares, in
+    /// declaration order, and a capability it does not declare answers no kind: the table and the rows cannot
+    /// drift.</summary>
     [Fact]
     public void TheResolverListAndTheRowsAreTheSameSet()
     {
@@ -124,5 +128,6 @@ public sealed class HolderChannelTests
         Assert.Equal(declared, WeaponHolderChannelContract.Capabilities.OrderBy(id => id, StringComparer.Ordinal).ToArray());
         Assert.Equal(WeaponHolderActionsContract.ReloadCapability, WeaponHolderChannelContract.Capabilities[0]);
         Assert.Equal(WeaponHolderActionsContract.ClipSetCapability, WeaponHolderChannelContract.Capabilities[1]);
+        Assert.Equal(WeaponHolderActionsContract.AutoFireCapability, WeaponHolderChannelContract.Capabilities[2]);
     }
 }

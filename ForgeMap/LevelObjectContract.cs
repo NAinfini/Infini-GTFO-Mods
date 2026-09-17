@@ -99,7 +99,7 @@ public static class LevelObjectContract
 
     /// <summary>The evaluator name the value row carries. A `query` row is dispatched to an evaluator,
     /// which is handed the budgeted query session and answers with the row's output ports.</summary>
-    public const string ScanStateHandler = "gtfo.map.scan_state";
+    public const string ScanStateHandler = "gtfo.map.scan_state_query";
 
     /// <summary>The permission every row here reads through: a plan that wants to know what a scan is doing
     /// reads the map object state and nothing else. The control side stays with the action rows, which declare

@@ -29,10 +29,8 @@ internal sealed class SelectorScene : IDisposable
     private const string ActionHandler = Provider + ".handler.record";
     private const string LevelReference = "31:A:0";
     private const string PlanId = "test.enemy.selector.query";
-    /// <summary>`relation` and `empty` are the declared capability's whole parameter list, in declaration order,
-    /// and a compiled plan carries member-set indexes: 2 = `hostile` in `recipient_relation`, 0 = `emit-empty` in
-    /// `empty_policy`.</summary>
-    internal static readonly object[] Hostile = { 2, 0 };
+    /// <summary>The reviewed roster has no structural parameters; extra constants are invalid.</summary>
+    internal static readonly object[] RosterConstants = Array.Empty<object>();
     private static readonly MethodInfo LayoutFrame = typeof(RuntimeKernel).Assembly
         .GetType("ForgeRuntime.Framework.RuntimeGraphContracts", true)!
         .GetMethod("Layout", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -67,7 +65,7 @@ internal sealed class SelectorScene : IDisposable
         firstLife = Spawn();
         for (var index = 0; index < extra; index++) Spawn();
         Kernel.StartRuntime(() => { });
-        Load(Hostile);
+        Load(RosterConstants);
     }
 
     /// <summary>The provider this suite stands up around the selector: the trigger the plan's entrypoint
@@ -136,9 +134,7 @@ internal sealed class SelectorScene : IDisposable
         return CommandResult.Succeeded(RuntimeJson.EmptyObject);
     }
 
-    /// <summary>Loads the plan again with another compiled constant frame, for the cases that vary `relation` or
-    /// `empty`. The plan shape is otherwise identical, so this is the same one node under another constant, and
-    /// the frame it replaces is unloaded first: one plan id names one loaded plan.</summary>
+    /// <summary>Reload with an exact constant frame, including intentionally invalid test frames.</summary>
     internal void Load(object[] selectorConstants)
     {
         var outcome = TryLoad(selectorConstants);

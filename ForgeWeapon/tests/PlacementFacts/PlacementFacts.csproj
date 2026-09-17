@@ -22,6 +22,7 @@
     <!-- The rows the module registers beside the placement pair: the module names their contracts, so they are
          compiled with it rather than reached through a built assembly. -->
     <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../WeaponStateTriggerContract.cs;../../CombatPrimitiveContract.cs" />
     <Compile Include="../../WeaponDeployableFactsContract.cs" />
     <Compile Include="../../WeaponMeleeHitContract.cs" />
     <!-- The three action families the module's declaration names: its capability and binding lists are built from
@@ -30,6 +31,9 @@
     <Compile Include="../../WeaponSupplyContract.cs" />
     <Compile Include="../../WeaponOverrideContract.cs" />
     <Compile Include="../../InventoryActionContract.cs" />
+    <!-- The reload and inventory-query rows the seed appends as well; the query contract's evaluators are the
+         reads file, so it compiles with them. -->
+    <Compile Include="../../ReloadInventoryContract.cs;../../InventoryQueryContract.cs;../../InventoryQueryReads.cs" />
     <Compile Include="../../ModuleDefinition.cs" />
     <Compile Include="PlacementWorld.cs;PlacementRowTests.cs;PlacementFactTests.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />

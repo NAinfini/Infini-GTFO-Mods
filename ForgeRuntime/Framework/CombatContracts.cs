@@ -43,144 +43,8 @@ public static class CombatContracts
         }
       ],
       "capabilities": [
-        {
-          "id": "forge.action.combat.heal",
-          "owner": "forge.contract.combat",
-          "kind": "action",
-          "label": "治疗目标",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "给你选中的目标回血。溢出规则：截断只回到上限；丢弃是会溢出就整次不治疗；溢出允许超过上限，做不到的目标会拒绝。",
-            "summary": "给你选中的目标回血。溢出规则：截断只回到上限；丢弃是会溢出就整次不治疗；溢出允许超过上限，做不到的目标会拒绝。",
-            "summaryEn": "Puts health back on the targets you picked. Clamp stops at maximum health; discard skips the whole heal if it would overflow; overheal may exceed the maximum, and targets that cannot are rejected.",
-            "labelEn": "Heal",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "enemy",
-              "weapon",
-              "tool",
-              "consumable",
-              "player"
-            ],
-            "execution": "host",
-            "inputs": [
-              {
-                "id": "in",
-                "type": "execution"
-              },
-              {
-                "id": "targets",
-                "type": "entity",
-                "cardinality": "many"
-              },
-              {
-                "entityKinds": ["gtfo.player", "gtfo.equipment"],
-                "id": "source",
-                "type": "entity"
-              },
-              {
-                "id": "amount",
-                "type": "number",
-                "unit": "hp"
-              },
-              {
-                "id": "cap",
-                "type": "number",
-                "unit": "hp",
-                "optional": true
-              }
-            ],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "result",
-                "type": "result",
-                "schema": "forge.result.combat.heal",
-                "codes": [
-                  "overheal-unsupported",
-                  "amount-out-of-range",
-                  "invalid-cap",
-                  "too-many-targets",
-                  "authority-or-phase",
-                  "not-attempted-after-unknown-commit",
-                  "stale-or-unsupported-recipient",
-                  "missing-health-receiver",
-                  "health-receiver-owner-mismatch",
-                  "not-alive",
-                  "invalid-health-state",
-                  "would-overheal",
-                  "quantization-failed",
-                  "state-changed-before-commit",
-                  "preflight-exception",
-                  "receiver-changed-during-commit",
-                  "unexpected-health-readback",
-                  "native-commit-exception",
-                  "readback-exception",
-                  "heal-all-rejected",
-                  "heal-all-unknown"
-                ],
-                "fields": [
-                  {
-                    "id": "target",
-                    "type": "entity"
-                  },
-                  {
-                    "id": "status",
-                    "type": "enum",
-                    "schema": "execution_outcome"
-                  },
-                  {
-                    "id": "committed",
-                    "type": "enum",
-                    "schema": "commit_state"
-                  },
-                  {
-                    "id": "code",
-                    "type": "string"
-                  },
-                  {
-                    "id": "amount",
-                    "type": "number",
-                    "unit": "hp"
-                  },
-                  {
-                    "id": "target_count",
-                    "type": "integer"
-                  }
-                ]
-              }
-            ],
-            "parameters": [
-              {
-                "id": "overheal_policy",
-                "type": "enum",
-                "role": "structural",
-                "required": true,
-                "values": [
-                  "clamp",
-                  "discard",
-                  "overheal"
-                ]
-              }
-            ],
-            "recipients": {
-              "input": "targets",
-              "target": "entity",
-              "cardinality": "many",
-              "requires": [
-                "health.heal"
-              ],
-              "result": "result"
-            }
-          }
-        },
+    """ + PrimitiveContracts.HealCapabilityJson + """
+        ,
         {
           "id": "forge.action.combat.damage",
           "owner": "forge.contract.combat",
@@ -473,11 +337,6 @@ public static class CombatContracts
               {
                 "id": "amount",
                 "type": "number"
-              },
-              {
-                "id": "duration",
-                "type": "integer",
-                "unit": "tick"
               }
             ],
             "outputs": [
@@ -497,7 +356,6 @@ public static class CombatContracts
                   "attribute-no-op",
                   "operation-unsupported",
                   "amount-out-of-range",
-                  "duration-out-of-range",
                   "too-many-targets",
                   "modifier-budget",
                   "handle-budget",

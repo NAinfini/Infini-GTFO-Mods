@@ -113,7 +113,8 @@ public static class LevelEventContract
     public static readonly string[] Layers = { "main", "secondary", "third" };
     /// <summary>The two things the countdown row can do, which are the two native events it can reach.</summary>
     public static readonly string[] TimerOperations = { "add", "reset" };
-    /// <summary>The three things the dimension row can do, which are the three native events it can reach.</summary>
+    /// <summary>The two things the dimension row can do with an index, which are the two native team events it can
+    /// reach besides `clear`.</summary>
     public static readonly string[] DimensionModes = { "flash", "warp", "clear" };
     /// <summary>The two ways the expedition-end row can end it: `instant_win` ends it now, `win_on_death` makes
     /// the next wipe the win the objective's own completion check looks for.</summary>
@@ -130,11 +131,18 @@ public static class LevelEventContract
     /// keeps.</summary>
     public static readonly HandlerShape TimerShape = new HandlerShape()
         .Inputs("seconds").Outputs("result").Parameters("operation");
-    /// <summary>The dimension command: the mode and the clear flag. `players` is declared and refused like the
-    /// countdown row's `objectives`: the three native events move the whole team, so a plan's own player set is
-    /// not a target this row can honor.</summary>
+    /// <summary>The dimension command: the mode, the destination index and the authored destination table.
+    /// `players` is a real target when the request carries a table — that is the EOS dimension-warp half folded in
+    /// here, and each named player lands on its own entry — and is refused when it does not, because the three
+    /// native team events move the whole team and a plan's own player set is then not a target this row can honor.
+    ///
+    /// The table is the row's `positions` and `look_dirs` collections, zipped by index, because this runtime has no
+    /// list parameter type: a `vector3` port with `cardinality = "many"` is the one collection form a plan can
+    /// author (`forge.control.flow.for_each_position` carries its own `positions` that way), and a plan's own
+    /// collection literal is what the frame builder folds into its constant pool. `positions` is metres and
+    /// `look_dirs` carries no unit at all: a facing direction is not a length.</summary>
     public static readonly HandlerShape DimensionShape = new HandlerShape()
-        .Inputs("dimension").Outputs("result").Parameters("mode", "clear");
+        .Inputs("players", "dimension", "positions", "look_dirs").Outputs("result").Parameters("mode");
     /// <summary>The expedition-end command: the outcome. `participants` is declared and refused for the same
     /// reason: the expedition ends for everyone in it, not for a subset a plan names.</summary>
     public static readonly HandlerShape ExpeditionEndShape = new HandlerShape()
@@ -173,6 +181,10 @@ public static class LevelEventContract
     /// carries no second spelling of them.</summary>
     public static object Port(string id, string type) => new { id, type };
     public static object Port(string id, string type, string[] entityKinds) => new { id, type, entityKinds };
+    /// <summary>An entity port the recipient contract declares as a collection: the framework requires the port's
+    /// own cardinality to be the one the contract names, and a per-recipient row addresses many players.</summary>
+    public static object ManyPort(string id, string type, string[] entityKinds)
+        => new { id, type, cardinality = "many", entityKinds };
     /// <summary>One resource input port: the kind and the schema name the provider answers for, so a plan that
     /// wires a reference of another kind fails the port rather than being read as the nearest one.</summary>
     public static object ResourcePort(string id, string kind, string schema)
@@ -181,6 +193,16 @@ public static class LevelEventContract
     public static object Integer(string id) => new { id, type = "integer" };
     /// <summary>One number port carrying the runtime's own tick unit.</summary>
     public static object Number(string id) => new { id, type = "number", unit = "tick" };
+    /// <summary>One collection port of `vector3` values, optional because a row accepts it only in the shape that
+    /// carries an authored table. It is the one collection form this runtime has for authored positions. A unit is
+    /// carried only when the caller names one: a position is metres, a facing direction is not a length.</summary>
+    public static object VectorList(string id, string? unit)
+        => unit == null
+            ? new { id, type = "vector3", cardinality = "many", optional = true }
+            : new { id, type = "vector3", cardinality = "many", unit, optional = true };
+    /// <summary>One integer port a row reads only in one of its shapes, so its absence is a legal request rather
+    /// than a missing input.</summary>
+    public static object OptionalInteger(string id) => new { id, type = "integer", optional = true };
 
     /// <summary>The level reference an expedition-start fact carries: the same identity string the `level`
     /// attachment matcher compares, read from the live expedition and never invented.</summary>
@@ -268,15 +290,15 @@ public static class LevelEventContract
             "forge.result.map.objective_timer", new[] { ("seconds", "number") },
             new { input = "objectives", target = "resource", cardinality = "one", requires = new[] { "objective.timer" }, result = "result" }),
         ActionRow(DimensionCapability, "全队闪入、传送进维度或清空维度",
-            "把整队闪一下、传送进另一个维度，或者清空一个维度。",
-            new object[] { Port("in", "execution"), Port("players", "entity", new[] { "gtfo.player" }), Integer("dimension") },
+            "把整队闪一下、按名单逐个传送进另一个维度，或者清空一个维度。",
             new object[]
             {
-                Enum("mode", DimensionModes, required: true),
-                new { id = "clear", type = "boolean", role = "structural", required = true }
+                Port("in", "execution"), ManyPort("players", "entity", new[] { "gtfo.player" }),
+                OptionalInteger("dimension"), VectorList("positions", "m"), VectorList("look_dirs", null)
             },
+            new object[] { Enum("mode", DimensionModes, required: true) },
             "forge.result.player.dimension", new[] { ("dimension", "integer") },
-            new { input = "players", target = "entity", cardinality = "one", requires = new[] { "player.dimension" }, result = "result" }),
+            new { input = "players", target = "entity", cardinality = "many", requires = new[] { "player.dimension" }, result = "result" }),
         ActionRow(ExpeditionEndCapability, "立即通关 / 全队倒地也算通关",
             "以明确的结果结束远征。",
             new object[] { Port("in", "execution"), Port("participants", "entity", new[] { "gtfo.player" }) },

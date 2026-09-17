@@ -203,7 +203,7 @@ internal static class Fixture
         var module = new RuntimeModule(RuntimeKernel.ApiVersion, registry.GetRawText(),
             new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
             {
-                [AlarmWaveContract.ScanStartHandler] = AlarmWaveActions.ExecuteStartScan,
+                [AlarmWaveContract.ScanStateHandler] = AlarmWaveActions.ExecuteScanState,
                 [AlarmWaveContract.WaveStartHandler] = AlarmWaveActions.ExecuteStartWave,
                 [AlarmWaveContract.WaveStopHandler] = AlarmWaveActions.ExecuteStopWave
             },

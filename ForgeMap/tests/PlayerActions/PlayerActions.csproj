@@ -15,6 +15,9 @@
          because the action layer resolves every recipient through that one identity path. -->
     <Compile Include="../../Native/PlayerActions.cs;../../Native/PlayerIdentityModule.cs;../../Native/PlayerObservation.cs" />
     <Compile Include="AssemblyAttributes.cs;PlayerActionWorld.cs;PlayerActionTests.cs;GameDoubles.cs;LifeWorldDoubles.cs" />
+    <!-- generic-player: the batch's own action half, compiled against the same doubles. -->
+    <Compile Include="../../Native/GenericPlayerActions.cs" />
+    <Compile Include="GenericPlayerTests.cs" />
     <!-- The capability rows, binding rows, support rows and handler shapes come from the game-independent Map
          assembly: the same declaration the runtime manifest and the website read. -->
     <ProjectReference Include="../../ForgeMap.csproj" />

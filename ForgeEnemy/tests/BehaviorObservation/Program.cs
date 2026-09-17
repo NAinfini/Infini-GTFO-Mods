@@ -22,7 +22,7 @@ Case("snapshot.exact-native-state", () =>
 {
     using var s = Started(); var x = s.Read() ?? throw new InvalidOperationException("Behavior snapshot unavailable.");
     Require(x.Reference == s.Ref && x.NativeState == (int)ES_StateEnum.PathMove, "State/ref mismatch.");
-    Require(x.HasValidTarget && x.ActiveAbility == (int)AgentAbility.Primary && x.CanTriggerAbilities && !x.Invisible,
+    Require(x.HasValidTarget && x.ActiveAbility == (int)AgentAbility.Melee && x.CanTriggerAbilities && !x.Invisible,
         "Behavior values changed or were inferred.");
 });
 Case("snapshot.no-mutation", () =>
@@ -90,7 +90,7 @@ Case("read.target-changed-mid-snapshot", () =>
 Case("read.ability-changed-mid-snapshot", () =>
 {
     using var s = Started(); var reads = 0;
-    s.Enemy.Abilities.OnAbilityRead = () => { if (++reads == 2) s.Enemy.Abilities.ActiveAbility = AgentAbility.Secondary; };
+    s.Enemy.Abilities.OnAbilityRead = () => { if (++reads == 2) s.Enemy.Abilities.ActiveAbility = AgentAbility.Ranged; };
     Require(s.Read() == null, "Unstable active ability was returned.");
 });
 Case("read.invisibility-changed-mid-snapshot", () =>

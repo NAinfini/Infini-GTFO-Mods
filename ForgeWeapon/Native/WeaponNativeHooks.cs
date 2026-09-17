@@ -32,7 +32,12 @@ internal static class WeaponNativeHooks
         typeof(MeleeSwingDamage), typeof(MeleeThirdPersonDamage), typeof(MeleeRemoteDamage),
         // The one chain in the shipped code that rebuilds an archetype, which is where an accepted instance
         // override is replayed from the ledger after the game has built the new block.
-        typeof(GearSpawnCompleted)
+        typeof(GearSpawnCompleted),
+        // This batch's own bodies: the two ends of a firing window, the two charge families, and the holder's
+        // own update the sight state is read from.
+        typeof(WeaponFireStarted), typeof(WeaponFireResolved), typeof(ShotgunFireStarted), typeof(ShotgunFireResolved),
+        typeof(MeleeChargeStarted), typeof(MeleeChargeRan), typeof(MeleeChargeEnded), typeof(MeleeChargeReleased),
+        typeof(RangedChargeRan), typeof(AimStateSampled)
     });
 
     /// <summary>Every hook class the package installs, in one list: this file's own set plus the two families that
@@ -178,6 +183,120 @@ internal static class BulletHit
     [HarmonyPostfix, HarmonyPriority(Priority.Last)]
     private static void Postfix(BulletWeapon __instance, Weapon.WeaponHitData weaponRayData)
         => WeaponNativeSession.Current?.Guard(session => session.Combat.Hit(weaponRayData));
+}
+
+// The two ends of one firing body, around the shot the four `Fire` patches above already count. The window is
+// what tells a shot that reached something from one that reached nothing: the native hit routine only runs when
+// a ray did reach something, so a shot with no impact in its own window is the miss the `shot_resolved` row
+// publishes. The bodies are the same two the shot fact is counted from, so a shot that is not an equipment life
+// this machine answers for produces no resolution either.
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.Fire))]
+internal static class WeaponFireStarted
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Prefix(BulletWeapon __instance)
+        => WeaponNativeSession.Current?.Guard(session => session.Combat.BeginFire(__instance));
+}
+
+[HarmonyPatch(typeof(BulletWeapon), nameof(BulletWeapon.Fire))]
+internal static class WeaponFireResolved
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(BulletWeapon __instance)
+        => WeaponNativeSession.Current?.Guard(session =>
+        {
+            if (session.Combat.ResolveFire(__instance) is { } shot) session.CombatFacts.ShotResolved(shot);
+        });
+}
+
+[HarmonyPatch(typeof(Shotgun), nameof(Shotgun.Fire))]
+internal static class ShotgunFireStarted
+{
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Prefix(Shotgun __instance)
+        => WeaponNativeSession.Current?.Guard(session => session.Combat.BeginFire(__instance));
+}
+
+[HarmonyPatch(typeof(Shotgun), nameof(Shotgun.Fire))]
+internal static class ShotgunFireResolved
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(Shotgun __instance)
+        => WeaponNativeSession.Current?.Guard(session =>
+        {
+            if (session.Combat.ResolveFire(__instance) is { } shot) session.CombatFacts.ShotResolved(shot);
+        });
+}
+
+// The two charge families. A melee charge is the `MWS_ChargeUp` state object's own life: `Enter` starts it,
+// `Update` runs it, `Exit` ends it, and `OnChargeupRelease` is the charged attack really being swung. A ranged
+// charge is the archetype's own per-frame update, read on both sides of the body so a charge that starts and
+// ends inside one update is still seen as both.
+[HarmonyPatch(typeof(MWS_ChargeUp), nameof(MWS_ChargeUp.Enter))]
+internal static class MeleeChargeStarted
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(MWS_ChargeUp __instance)
+        => WeaponNativeSession.Current?.Guard(_ => CombatFactsObserver.Current?.MeleeEntered(__instance));
+}
+
+[HarmonyPatch(typeof(MWS_ChargeUp), nameof(MWS_ChargeUp.Update))]
+internal static class MeleeChargeRan
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(MWS_ChargeUp __instance)
+        => WeaponNativeSession.Current?.Guard(_ => CombatFactsObserver.Current?.MeleeRan(__instance));
+}
+
+[HarmonyPatch(typeof(MWS_ChargeUp), nameof(MWS_ChargeUp.Exit))]
+internal static class MeleeChargeEnded
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(MWS_ChargeUp __instance)
+        => WeaponNativeSession.Current?.Guard(_ => CombatFactsObserver.Current?.MeleeEnded(__instance));
+}
+
+[HarmonyPatch(typeof(MWS_ChargeUp), "OnChargeupRelease")]
+internal static class MeleeChargeReleased
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(MWS_ChargeUp __instance)
+        => WeaponNativeSession.Current?.Guard(_ => CombatFactsObserver.Current?.MeleeReleased(__instance));
+}
+
+// A Harmony patch body is named for the patch point it is, and the patch point here is the body the game already
+// runs — this package drives no loop of its own. The priority keeps the reading after every other patch of the
+// same body, so what is read is the state the game finished deciding.
+[HarmonyPatch(typeof(BulletWeaponArchetype), nameof(BulletWeaponArchetype.Update))]
+internal static class RangedChargeRan
+{
+    private static readonly Dictionary<IntPtr, bool> Before = new();
+
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void Prefix(BulletWeaponArchetype __instance)
+    {
+        if (__instance == null) return;
+        Before[__instance.Pointer] = CombatFactsObserver.RangedCharging(__instance);
+    }
+
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(BulletWeaponArchetype __instance)
+    {
+        if (__instance == null) return;
+        Before.Remove(__instance.Pointer, out var before);
+        WeaponNativeSession.Current?.Guard(_ => CombatFactsObserver.Current?.RangedRan(__instance, before));
+    }
+}
+
+// The holder's own per-frame body, which is where the sights' state is finished being decided. The state is the
+// holder's own `ItemAimTrigger`, not the key that asked for it, so an aim that takes time to come up or that an
+// EMP folded away is still seen entering and leaving.
+[HarmonyPatch(typeof(FirstPersonItemHolder), "Update")]
+internal static class AimStateSampled
+{
+    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
+    private static void Postfix(FirstPersonItemHolder __instance)
+        => WeaponNativeSession.Current?.Guard(_ => CombatFactsObserver.Current?.AimSampled(__instance));
 }
 
 // A deployed object is a world instance separate from the backpack life that placed it, and its placement and

@@ -51,12 +51,15 @@ public static class WeaponActionRuntime
 
     /// <summary>Seconds between shots, the native `ArchetypeDataBlock.ShotDelay`, from a rate in shots per
     /// second. The catalog declares `rate` with no unit, so the reading is stated here and nowhere else: a rate
-    /// is a frequency, and the native field it has to become is its reciprocal.</summary>
+    /// is a frequency, and the native field it becomes is its reciprocal. The ledger stores the rate and the
+    /// native half converts at the write, so `add` on `fire_rate` means "two more shots per second" and not
+    /// "two more seconds between shots".</summary>
     public static double ShotDelayFromRate(double shotsPerSecond)
         => shotsPerSecond > 0 ? 1d / shotsPerSecond : 0d;
 
-    /// <summary>Shots per second from the native seconds-between-shots value, for a result row that has to
-    /// report back what was asked for rather than what the block stores.</summary>
+    /// <summary>Shots per second from the native seconds-between-shots value. The native half reads an
+    /// instance's own `ShotDelay` through this when it has to resolve an `add` or a `subtract` against the
+    /// value the block held before this package touched it.</summary>
     public static double RateFromShotDelay(double shotDelay)
         => shotDelay > 0 ? 1d / shotDelay : 0d;
 
@@ -121,8 +124,40 @@ public static class WeaponActionRuntime
             return WeaponActionOutcome.Refuse(equipment, InputUnsupportedCode);
         return WeaponActionOutcome.Ready(equipment, new[]
         {
-            new WeaponOverrideField("fire_rate", ShotDelayFromRate(rate))
+            new WeaponOverrideField("fire_rate", rate)
         });
+    }
+
+    /// <summary>
+    /// `forge.action.weapon.property`: the generic form of the three rows above, and the one every "change a
+    /// weapon number for a while" card lands on. Ports: `equipment`, `value`; structural parameters `field` (a
+    /// name from <see cref="WeaponOverrideLedger.Fields"/>) and `operation` (`set`, `add`, `subtract`).
+    ///
+    /// The value is in the unit the field's own name states — the same unit the specific row for that field uses
+    /// — and the native half is what converts it to the member the game reads. A field this build has no write
+    /// point for is refused with the ledger's own `override-field-unknown`, so an author is told which name is
+    /// not served rather than getting a silently ignored write. The effect handle the row declares is the
+    /// kernel's: this row answers with the target and the accepted value, the plan's own `effect` block times the
+    /// change, and the module's restore callback is what undoes the write when that effect ends.
+    /// </summary>
+    public static WeaponActionOutcome Property(CommandContext context)
+    {
+        var equipment = Equipment(context);
+        if (equipment == null) return WeaponActionOutcome.Refuse(null, WeaponOverrideLedger.StaleEquipmentCode);
+        var name = Parameter(context.Parameters, "field");
+        if (name == null) return WeaponActionOutcome.Refuse(equipment, ModeUnsupportedCode);
+        if (!WeaponOverrideLedger.IsKnownField(name))
+            return WeaponActionOutcome.Refuse(equipment, WeaponOverrideLedger.UnknownFieldCode);
+        if (!WeaponOverrideLedger.TryParseOperation(Parameter(context.Parameters, "operation"), out var operation))
+            return WeaponActionOutcome.Refuse(equipment, ModeUnsupportedCode);
+        if (!TryNumber(context.Inputs, "value", out var value))
+            return WeaponActionOutcome.Refuse(equipment, InputUnsupportedCode);
+        // Every destination behind these names is a non-negative physical quantity, so a negative `set` is a
+        // value the game cannot hold rather than an unusual one. A negative `add` is a `subtract` spelled the
+        // other way and is left alone.
+        if (operation == WeaponOverrideOperation.Set && value < 0)
+            return WeaponActionOutcome.Refuse(equipment, InputUnsupportedCode);
+        return WeaponActionOutcome.Ready(equipment, new[] { new WeaponOverrideField(name, value, operation) });
     }
 
     /// <summary>

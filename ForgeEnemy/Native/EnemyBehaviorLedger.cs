@@ -125,13 +125,18 @@ internal static class EnemyAbilityResources
 {
     internal const string Kind = "ability";
 
+    /// <summary>`AgentAbility.SpawnChildren`, the kind a birthing component is registered under. The profile
+    /// half asks for the component by this kind, so the value lives here, next to the table that names it, rather
+    /// than being spelled as a literal at the call site.</summary>
+    internal const byte SpawnChildrenAbility = 9;
+
     /// <summary>`AgentAbility` in declaration order, minus `None`. The id is the member's own name in lowercase
     /// snake case, which is stable across builds because it is the native member name, and the pair is one table
     /// so the resource an author writes and the value the action submits cannot disagree.</summary>
     private static readonly (string Id, byte Ability)[] Table =
     {
         ("melee", 1), ("ranged", 2), ("alarm", 3), ("defensive", 4), ("healing", 5),
-        ("group_enhance", 6), ("detection", 7), ("door_breaker", 8), ("spawn_children", 9)
+        ("group_enhance", 6), ("detection", 7), ("door_breaker", 8), ("spawn_children", SpawnChildrenAbility)
     };
 
     /// <summary>The provider's two answers to the kernel's resource table: every ability kind this provider owns,

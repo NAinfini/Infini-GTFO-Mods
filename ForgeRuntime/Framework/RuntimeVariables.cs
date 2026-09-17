@@ -308,14 +308,20 @@ internal sealed class RuntimeVariableStore
         return true;
     }
 
+    /// <summary>The `once` latches of the whole world, in one stable order: the checkpoint writer carries them and
+    /// nothing else reads them.</summary>
+    internal IReadOnlyList<string> Latches => once.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+
     /// <summary>The latches and values one checkpoint has to carry. A checkpoint restores the same world, so the
     /// same world epoch comes back with it and the snapshot's own epoch is what proves the entries belong to it.
-    /// </summary>
-    internal string Save(long worldEpoch) => RuntimeJson.StableText(RuntimeJson.From(new
+    /// <paramref name="gates"/> is the trigger gate table, already serialized by the store that owns it: the two
+    /// tables are written as properties of one checkpoint but neither is a variable of the other's store.</summary>
+    internal string Save(long worldEpoch, string gates) => RuntimeJson.StableText(RuntimeJson.From(new
     {
         worldEpoch,
         entries = Snapshot().Select(entry => new { name = entry.Name, scope = entry.ScopeKind, subject = entry.Subject, slot = entry.Slot, type = entry.Type, value = entry.Value }).ToArray(),
-        once = once.OrderBy(key => key, StringComparer.Ordinal).ToArray()
+        once = Latches.ToArray(),
+        gates = RuntimeJson.Parse(gates)
     }));
 
     /// <summary>
@@ -330,7 +336,7 @@ internal sealed class RuntimeVariableStore
     internal void Restore(string json)
     {
         var value = RuntimeJson.Parse(json);
-        RuntimeJson.Shape(value, "worldEpoch entries once");
+        RuntimeJson.Shape(value, "worldEpoch entries once", "gates");
         var restored = new Dictionary<string, RuntimeVariableEntry>(StringComparer.Ordinal);
         foreach (var row in RuntimeJson.Rows(value, "entries"))
         {

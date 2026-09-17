@@ -44,6 +44,7 @@ internal static class Cases
     {
         Suite.Test("a variable nobody wrote reads its declared initial value", LevelInitial);
         Suite.Test("a write is what the next read sees", LevelRoundTrip);
+        Suite.Test("a write publishes the value the address held before it", WritePrevious);
         Suite.Test("each scope stores its own subject and slot", ScopePartition);
         Suite.Test("a player who joined late reads the initial value", LateJoiner);
         Suite.Test("once fires per mount point", OncePerMount);
@@ -104,6 +105,27 @@ internal static class Cases
         Suite.Check(RuntimeJson.Parse(repeat).GetProperty("entries").GetArrayLength() == 1
             && RuntimeJson.Text(RuntimeJson.Parse(repeat).GetProperty("entries")[0], "name") == "test.seen",
             "the second advance's delta carries exactly the address whose value changed: " + repeat);
+    }
+
+    /// <summary>The write row's `previous` output over two dispatches: the address's declared initial value the
+    /// first time, and what the first write left behind the second time, so a comparison behind the write can ask
+    /// whether the value crossed a threshold without a second read step and a second address resolution.</summary>
+    private static void WritePrevious()
+    {
+        var world = new VariableFixture();
+        var builder = Variables(world, "test.vars.previous", ("test.shield", "level", "number"), ("test.before", "level", "number"))
+            .Initial("test.shield", 7).Initial("test.before", 0);
+        var writeShield = WriteStep(builder, "test.shield", "AWriteShield", new[] { PlanBuilder.Literal(ValueSlot(builder, "test.shield"), 42) }, 1);
+        WriteFromPrevious(builder, "test.before", writeShield, "BWriteBefore", null);
+        world.Load(builder.Build());
+        world.Ping("p1");
+        world.Advance(10);
+        Suite.Check(Value(world, "test.before|level||-1") == 7,
+            "the first write publishes the declared initial value as the value it replaced");
+        world.Ping("p2", tick: 11);
+        world.Advance(11);
+        Suite.Check(Value(world, "test.before|level||-1") == 42,
+            "the next write publishes what the address held, not a running total");
     }
 
     // ---------------------------------------------------------------------------------------------------------
@@ -445,6 +467,18 @@ internal static class Cases
 
     private static int WriteFrom(PlanBuilder builder, string name, int step, int producerPort, string nodeId, int? next)
         => WriteStep(builder, name, nodeId, new[] { PlanBuilder.FromStep(ValueSlot(builder, name), step, producerPort) }, next);
+
+    /// <summary>A write whose value comes from another write's own `previous` output: the value that address held
+    /// before that write, read as an output like any other.</summary>
+    private static int WriteFromPrevious(PlanBuilder builder, string name, int step, string nodeId, int? next)
+    {
+        var parameters = new Dictionary<string, object?> { ["name"] = name, ["value_type"] = Number };
+        var replaced = new Dictionary<string, object?> { ["name"] = "test.shield", ["value_type"] = Number };
+        var target = builder.Port("inputs", VariableContracts.WriteBinding, parameters, "value");
+        var source = builder.Port("outputs", VariableContracts.WriteBinding, replaced, "previous");
+        return builder.Step(nodeId, "control", VariableContracts.WriteBinding, parameters,
+            new[] { PlanBuilder.FromStep(target, step, source) }, new int?[] { next });
+    }
 
     /// <summary>The index of one payload port of the fixture trigger, so a case reads an event port by name.</summary>
     private static int Event(PlanBuilder builder, string port)

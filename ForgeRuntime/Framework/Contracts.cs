@@ -255,14 +255,21 @@ public delegate CommandResult CommandHandler(CommandContext context);
 public sealed class EvaluationContext
 {
     internal EvaluationContext(string nodeId, JsonElement parameters, JsonElement inputs, RuntimeQuerySession query,
-        RuntimeActorContext actors, RuntimeFactionRelations relations)
+        RuntimeActorContext actors, RuntimeFactionRelations relations, long tick,
+        Func<EntityReference, object?> entityInstance)
     {
         NodeId = nodeId; Parameters = parameters; Inputs = inputs; Query = query;
-        Actors = actors; Relations = relations;
+        Actors = actors; Relations = relations; Tick = tick; this.entityInstance = entityInstance;
     }
+    private readonly Func<EntityReference, object?> entityInstance;
     public string NodeId { get; }
     public JsonElement Parameters { get; }
     public JsonElement Inputs { get; }
+    /// <summary>The simulation tick this evaluation belongs to: the advancing machine's own current tick, the same
+    /// value the scheduler books a dispatch at. A row that answers with a duration answers in ticks of this clock
+    /// and never reads a game clock of its own, so a host and a replica describe the same span in the same unit —
+    /// which is the unit the catalog declares (`unit: tick`) and the only one a plan can compare against.</summary>
+    public long Tick { get; }
     /// <summary>The budgeted world read of a `query` step; unavailable — every read refused with
     /// `query-authority` — inside a `pure` step, whose contract keeps it out of the world entirely.</summary>
     public RuntimeQuerySession Query { get; }
@@ -274,6 +281,14 @@ public sealed class EvaluationContext
     /// actor the event does not carry is refused by name — no role is inferred from another, and no rule is
     /// invented for a faction pair the world says nothing about.</summary>
     public RuntimeFactionRelations Relations { get; }
+    /// <summary>
+    /// The native object one live reference names, asked of the provider that owns the reference's kind. This is
+    /// how a step reaches an entity another module owns — an enemy's damage limb, a map object's own component —
+    /// without holding that module's table: the owner registered the lookup with its resolver, the kernel checks
+    /// the reference is current, and an entity that is gone, a kind nobody registered or a reference the owner
+    /// does not recognize answers null rather than an object that is not there.
+    /// </summary>
+    public object? EntityInstance(EntityReference reference) => entityInstance(reference);
 }
 
 /// <summary>Returns an object keyed by output port id; the kernel validates every port of the resolved contract
@@ -402,10 +417,20 @@ public sealed record RuntimeModule(string ApiVersion, string RegistryJson,
     /// <summary>Optional native-instance lookups, owned by the same registered entity namespace. The input is whatever
     /// native object the owning provider documents; any other object must return null rather than guess.</summary>
     public IReadOnlyDictionary<string, Func<object, EntityReference?>>? EntityInstanceResolvers { get; init; }
+    /// <summary>Optional native-instance lookups by reference, owned by the same registered entity namespace: the
+    /// one object a live reference of this kind names, or null where that entity is gone or the reference is not
+    /// this provider's. It is the only door a handler of another module has onto a module's own entities — the
+    /// owner registers it beside the resolver it already owns for the kind, and no private table is exposed.</summary>
+    public IReadOnlyDictionary<string, Func<EntityReference, object?>>? EntityInstances { get; init; }
     /// <summary>`evaluate` binding handlers, keyed by handler name. Most modules register none; this
     /// is a normal empty default, not a compatibility shim.</summary>
     public IReadOnlyDictionary<string, EvaluatorHandler> Evaluators { get; init; } = EmptyEvaluators;
     private static readonly IReadOnlyDictionary<string, EvaluatorHandler> EmptyEvaluators = new Dictionary<string, EvaluatorHandler>();
+    /// <summary>What a module does when a kernel-managed effect ends, keyed by the handler name of the binding that
+    /// applied it — the same key the handler table uses. Registering one is what allows a plan to put an `effect`
+    /// block on that action at all: a duration nobody would be called back for is refused when the plan loads, so
+    /// an effect can never outlive the state it was applied to. Most modules register none.</summary>
+    public IReadOnlyDictionary<string, EffectRestoreHandler>? EffectRestores { get; init; }
     /// <summary>The candidate entities this module's own entity kinds expose to a `query` step, keyed by the kind
     /// its resolver already owns (`gtfo.enemy`). Discovery belongs to the provider that tracks the instances, so
     /// the kernel never scans a world: it hands the provider's own list back under the query budget. One kind has
@@ -465,14 +490,17 @@ public sealed record RuntimeFact(string BindingId, JsonElement Outputs);
 public sealed class CommandContext
 {
     internal CommandContext(RuntimeEvent origin, long tick, string commandId, string planId, string resourceId,
-        string resourceRevision, string nodeId, JsonElement parameters, JsonElement inputs, bool isHost)
+        string resourceRevision, string nodeId, JsonElement parameters, JsonElement inputs, bool isHost,
+        Func<EntityReference, object?> entityInstance)
     {
         EventId = origin.EventId; CauseId = origin.CauseId; RootEventId = origin.RootEventId ?? origin.EventId;
         WorldEpoch = origin.WorldEpoch; SimulationTick = tick; ScheduledTick = origin.SimulationTick;
         ScopeId = origin.ScopeId; CausalDepth = origin.CausalDepth;
         CommandId = commandId; PlanId = planId; ResourceId = resourceId; ResourceRevision = resourceRevision;
         NodeId = nodeId; Parameters = parameters; Inputs = inputs; IsHost = isHost;
+        this.entityInstance = entityInstance;
     }
+    private readonly Func<EntityReference, object?> entityInstance;
     public string EventId { get; }
     public string? CauseId { get; }
     public string RootEventId { get; }
@@ -492,7 +520,26 @@ public sealed class CommandContext
     public bool IsHost { get; }
     public JsonElement Parameters { get; }
     public JsonElement Inputs { get; }
+    /// <summary>The effect handle the kernel cast for this command, or null where the step's card declared no
+    /// `effect` block. The kernel owns the handle, the clock and the cancellation; the handler binds its own native
+    /// state to this value and does not mint a handle of its own, which is what keeps one effect from having two
+    /// names.</summary>
+    public JsonElement? EffectHandle { get; internal set; }
+    /// <summary>The layers this effect has after this command: one for a fresh application, up to the card's cap for
+    /// a stacking one. Null where the step declared no effect.</summary>
+    public int? EffectStacks { get; internal set; }
+    /// <summary>Whether this command should write a new layer. False on a refresh of a running effect — including an
+    /// application at the stacking cap — where the handler leaves what it wrote alone and the kernel restarts the
+    /// clock.</summary>
+    public bool EffectAddLayer { get; internal set; }
     public EntityReference GetEntityInput(string input) => RuntimeJson.Entity(Inputs.GetProperty(input));
+    /// <summary>
+    /// The native object one live reference names, asked of the provider that owns the reference's kind: the same
+    /// door <see cref="EvaluationContext.EntityInstance"/> opens for an evaluation, offered to a command handler
+    /// because an action that writes another module's entity — a push on an enemy limb, a heal on a player — has
+    /// to reach that object and must not reach the module's table.
+    /// </summary>
+    public object? EntityInstance(EntityReference reference) => entityInstance(reference);
 }
 
 public static class CommandStatuses
@@ -698,6 +745,9 @@ public sealed record TickResult(int EventsProcessed, int CommandsExecuted, int D
 {
     public IReadOnlyList<ScheduleReceipt> Schedules { get; init; } = Array.Empty<ScheduleReceipt>();
     public IReadOnlyList<StateLeaseReceipt> StateLeases { get; init; } = Array.Empty<StateLeaseReceipt>();
+    /// <summary>The trigger options this advance refused, one row per refused entry point. Empty on a replica: a
+    /// client runs what the host decided and asks no gate of its own.</summary>
+    public IReadOnlyList<TriggerGateReceipt> GateRefusals { get; init; } = Array.Empty<TriggerGateReceipt>();
     /// <summary>The `presentation` steps this advance decided to present, each addressed to the player sessions
     /// the runtime's own recipient resolver named. Empty on a replica, which presents what the host sends rather
     /// than what its own walk decides.</summary>

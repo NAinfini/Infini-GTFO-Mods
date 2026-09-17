@@ -18,9 +18,10 @@ namespace ForgeMap;
 /// **Where the timer numbers come from.** One member of `pWardenObjectiveState` is published, and it is read as
 /// it stands rather than derived:
 ///
-/// - `GetStartTimeFromLayer(layer)` — published as `start_time_seconds`. The accessor takes the layer, which is
-///   the strongest available confirmation that the time field belongs to the objective machine's clock and not to
-///   this provider.
+/// - `GetStartTimeFromLayer(layer)` — published as `start_time`, in ticks like every other time this runtime
+///   publishes. The accessor takes the layer, which is the strongest available confirmation that the time field
+///   belongs to the objective machine's clock and not to this provider; the native field is seconds and the
+///   conversion to ticks happens once, where the payload is built.
 ///
 /// **The countdown member is read by nothing here.** `extraTime` (offset 0x30, `System.Single`) and the engine's
 /// two entries for it (`WardenObjectiveManager.GetExtraTime()` / `SetExtraTime(System.Single)`) are recorded in
@@ -84,7 +85,7 @@ public static class LevelObjectiveValueContract
     /// does not carry a name for it until `probes/points.tsv` settles it in game.</summary>
     public static readonly HandlerShape Shape = new HandlerShape()
         .Inputs(InputPort)
-        .Outputs("kind", "timed", "phase", "sub_phase", "chain_index", "start_time_seconds",
+        .Outputs("kind", "timed", "phase", "sub_phase", "chain_index", "start_time",
             "solve_on_death", "exit_wave_triggered", "items_solved", "required_items");
 
     /// <summary>The three layer names, in the machine's own slot order. It is the level-event contract's own list
@@ -205,13 +206,20 @@ public static class LevelObjectiveValueContract
             phase,
             sub_phase = subPhase,
             chain_index = sample.ChainIndex,
-            start_time_seconds = sample.StartTime,
+            start_time = Ticks(sample.StartTime),
             solve_on_death = sample.SolveOnDeath,
             exit_wave_triggered = sample.ExitWaveTriggered,
             items_solved = sample.ItemsSolved,
             required_items = sample.RequiredItems
         });
     }
+
+    /// <summary>One authored time in the ticks this runtime publishes times in. The native field is seconds, and
+    /// the kernel's tick is the level's own simulation step.</summary>
+    private static double Ticks(double seconds) => seconds / SecondsPerTick;
+
+    /// <summary>The seconds one tick of plan time is.</summary>
+    private const double SecondsPerTick = 1.0 / 60.0;
 
     /// <summary>The resource id an `objective` input carries. A frame that has resolved the reference hands over
     /// the `resourceKind`/`resourceId` pair and a compiled frame hands over the id alone, exactly as the zone
@@ -260,7 +268,7 @@ public static class LevelObjectiveValueContract
           { "id": "phase", "type": "string" },
           { "id": "sub_phase", "type": "string" },
           { "id": "chain_index", "type": "integer" },
-          { "id": "start_time_seconds", "type": "number", "unit": "s" },
+          { "id": "start_time", "type": "number", "unit": "tick" },
           { "id": "solve_on_death", "type": "boolean" },
           { "id": "exit_wave_triggered", "type": "boolean" },
           { "id": "items_solved", "type": "integer" },

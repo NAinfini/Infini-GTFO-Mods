@@ -30,6 +30,11 @@ namespace UnityEngine
         public float x, y, z;
         public static Vector3 zero => new Vector3();
         public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        /// <summary>The agent's own `Position` is declared here as a plain tuple, the shape the node family's
+        /// reads prefer, while the volume row hands a position to the game's own allocator. The conversion is
+        /// what lets one double serve both readings.</summary>
+        public static implicit operator Vector3((float x, float y, float z) value)
+            => new Vector3(value.x, value.y, value.z);
     }
 }
 
@@ -95,6 +100,10 @@ namespace Enemies
         public UnityEngine.GameObject? Model;
         public AIG_CourseNode? CourseNode;
         public UnityEngine.GameObject? MainModelGO => Model;
+
+        /// <summary>The replication half the removal action reaches through: the game's own despawn entry is the
+        /// replicator's, not the agent's.</summary>
+        public EnemySync? Sync;
 
         /// <summary>The behaviour machine and the facing direction the snapshot observer reads. Both are read
         /// only by the observer this suite links, so the double models the two members it touches.</summary>
@@ -163,6 +172,49 @@ namespace Enemies
         /// <summary>The navigation component the snapshot observer reads the agent's speed from. The type is the
         /// game's own (`UnityEngine.AI.INavigation`), so the member is the one the build declares.</summary>
         public UnityEngine.AI.INavigation? m_navMeshAgent;
+
+        /// <summary>The group the life belongs to. The build declares it a field; the double reads it through a
+        /// property so a case can replace the group between the two reads the group row makes, which is the only
+        /// way a group swapped under a read can be driven.</summary>
+        public EnemyGroup? Group;
+        public Action? OnGroupRead;
+        public EnemyGroup? m_group
+        {
+            get { OnGroupRead?.Invoke(); return Group; }
+            set => Group = value;
+        }
+    }
+
+    /// <summary>The live group of one or more lives, modelled on the members the group reader touches: the
+    /// replicated packet the group publishes its state through, the type it was spawned as, and its patrol
+    /// frustration.</summary>
+    public sealed class EnemyGroup
+    {
+        public IntPtr Pointer = new(900);
+        public pEnemyGroupData Data = new();
+        public EnemyGroupType GroupType = EnemyGroupType.Patrolling;
+        public float PatrolFrustration;
+    }
+
+    /// <summary>The group's replicated packet. The build declares it a value type and its `currentState` an `EGS`
+    /// member, which is the field the state is read from.</summary>
+    public sealed class pEnemyGroupData
+    {
+        public EGS currentState = EGS.Idle;
+    }
+
+    /// <summary>The group-state vocabulary, in the build's own declaration order (`Enemies.EGS`).</summary>
+    public enum EGS : byte
+    {
+        Idle, HuntersSpawn, HuntersHunt, HuntersSearch, GuardsSpawn, GuardRespawn, GuardsIdle, GuardsHunting,
+        PatrolSpawn, PatrolMove, PatrolIdle, PatrolSearch, PatrolCombat, SurvivalSpawn, SurvivalHunt, DebugSpawn,
+        DebugIdle
+    }
+
+    /// <summary>The group-type vocabulary (`Enemies.EnemyGroupType`).</summary>
+    public enum EnemyGroupType : byte
+    {
+        Hibernating, Patrolling, Hunters, Survival, DebugSpawnUnit
     }
 
     public sealed class EnemyBehaviour
@@ -189,6 +241,9 @@ namespace Enemies
     {
         public EnemyAgent? m_agent;
         public void OnSpawn() { }
+        /// <summary>The replicator the game's own despawn is asked of. A case can leave it null to model an
+        /// instance whose replication half is already gone.</summary>
+        public SNetwork.IReplicator? Replicator;
     }
 
     public sealed class EnemyDataBlock
@@ -341,4 +396,132 @@ namespace HarmonyLib
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class HarmonyPriority : Attribute { public HarmonyPriority(int priority) { } }
     public static class Priority { public const int First = 0, Last = 800; }
+}
+
+namespace Agents
+{
+    /// <summary>The ability kinds an enemy's own component table is indexed by, in the build's declaration order.
+    /// The observation reads one of these out of the attack-start datum and maps it through the provider's own
+    /// resource table, so the double carries the member names and values and nothing else.</summary>
+    public enum AgentAbility : byte
+    {
+        None = 0, Melee = 1, Ranged = 2, Alarm = 3, Defensive = 4, Healing = 5,
+        GroupEnhance = 6, Detection = 7, DoorBreaker = 8, SpawnChildren = 9
+    }
+
+    /// <summary>The agent handle an attack-start datum names its target with. The game stores the agent by
+    /// reference and asks the handle for the instance, so the double answers the same way.</summary>
+    public sealed class pAgent
+    {
+        public Agent? Value;
+        public bool TryGet(out Agent? comp) { comp = Value; return Value != null; }
+        public void Set(Agent comp) => Value = comp;
+    }
+}
+
+namespace Enemies
+{
+    /// <summary>The attack-start body `ES_EnemyAttackBase` sends: which ability, at whom, for how long. The
+    /// members are the build's own field names, and a case writes them directly.</summary>
+    public struct pES_EnemyAttackData
+    {
+        public UnityEngine.Vector3 Position;
+        public UnityEngine.Vector3 TargetPosition;
+        public Agents.pAgent TargetAgent;
+        public byte AnimIndex;
+        public Agents.AgentAbility AbilityType;
+        public byte AbilityIndex;
+        public float Duration;
+    }
+}
+
+namespace SNetwork
+{
+    /// <summary>The replication interface a despawn is asked of. Only the one member the removal action calls is
+    /// modelled; a case records the call on its own implementation.</summary>
+    public interface IReplicator
+    {
+        void Despawn();
+    }
+
+    /// <summary>The replicator the double's own `EnemySync` hands out: it answers the despawn by running whatever
+    /// the case asked for, which is where a suite models the game's own teardown (or its absence).</summary>
+    public sealed class Replicator : IReplicator
+    {
+        public int Despawns;
+        public Action? OnDespawn;
+        public void Despawn() { Despawns++; OnDespawn?.Invoke(); }
+    }
+}
+
+/// <summary>The two volumes the effect-volume row drives. `EffectVolume` and its sphere are the game's own
+/// (global namespace in the build); the manager is the static registry every registered volume is applied
+/// through, and the double records what it holds so a case can prove registration and release.</summary>
+public abstract class EffectVolume
+{
+    public float modificationScale;
+    public bool invert;
+    public eEffectVolumeContents contents;
+    public eEffectVolumeModification modification;
+    public int effectOrder;
+}
+
+public sealed class EV_Sphere : EffectVolume
+{
+    public UnityEngine.Vector3 position;
+    public float minRadius;
+    public float maxRadius;
+}
+
+public enum eEffectVolumeContents { All = 0, Health = 1, Infection = 2 }
+public enum eEffectVolumeModification { Inflict = 0, Shield = 1 }
+
+public static class EffectVolumeManager
+{
+    /// <summary>The volumes the manager currently holds: the one list a release has to take a volume out of, and
+    /// the one a case reads to prove what a dispatch left behind.</summary>
+    public static readonly List<EffectVolume> Registered = new();
+    /// <summary>How many volumes were released, which is what a case asserts about a cancel or an expiry that is
+    /// expected to take volumes away even when it is also expected to have removed them all.</summary>
+    public static int Unregistrations;
+    /// <summary>A case turns this on to model a manager whose own registration refuses.</summary>
+    public static bool RefuseRegistration;
+    public static void RegisterVolume(EffectVolume volume)
+    {
+        if (RefuseRegistration) throw new InvalidOperationException("volume refused");
+        Registered.Add(volume);
+    }
+    public static void UnregisterVolume(EffectVolume volume) { Registered.Remove(volume); Unregistrations++; }
+    public static void Reset() { Registered.Clear(); Unregistrations = 0; RefuseRegistration = false; }
+}
+
+/// <summary>The game's own fog sphere allocator: the visible body the volume row allocates at the same position
+/// and radius. The double records the four settings and whether the allocation succeeded.</summary>
+public sealed class FogSphereAllocator
+{
+    public UnityEngine.Vector3 Position;
+    public float Range;
+    public float Density;
+    public UnityEngine.Color Radiance;
+    public float Intensity;
+    public bool Allocated;
+    public int Deallocations;
+    /// <summary>The number of allocation attempts this scene made, and the allocator the last successful one was
+    /// asked of: both are the suite's own record, so a case can prove a refusal allocated nothing at all and a
+    /// placement really drew its own visible body.</summary>
+    public static int Allocations;
+    public static FogSphereAllocator? LastAllocation;
+    /// <summary>A case turns this on to model the game's own sphere budget being full.</summary>
+    public static bool RefuseAllocation;
+    public void SetPositionRange(UnityEngine.Vector3 position, float range) { Position = position; Range = range; }
+    public void SetDensity(float density) => Density = density;
+    public void SetRadiance(UnityEngine.Color radiance, float intensity = 1f) { Radiance = radiance; Intensity = intensity; }
+    public bool TryAllocate()
+    {
+        Allocations++;
+        Allocated = !RefuseAllocation;
+        if (Allocated) LastAllocation = this;
+        return Allocated;
+    }
+    public void Deallocate() { Deallocations++; Allocated = false; }
 }

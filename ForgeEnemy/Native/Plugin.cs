@@ -55,6 +55,9 @@ public sealed class Plugin : BasePlugin
                 // left out of `EnemyHookInstall.Families` is a family nothing installs.
                 () => EnemyHookInstall.Install(harmony), harmony.UnpatchSelf);
             Session = created;
+            // Enemy profiles are static data, so they load once with the package and never during a level: a
+            // document that is refused is reported here instead of surprising an author mid-run.
+            created.Module.LoadProfiles(EnemyProfileStore.Discover(Paths.BepInExRootPath));
             EnemySpawnRequirementSource.Attach(message => Log.LogWarning(message));
             Log.LogInfo("Forge Enemy registered; native bindings remain implementation-only.");
         }

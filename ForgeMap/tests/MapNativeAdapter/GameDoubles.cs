@@ -41,6 +41,22 @@ public abstract class UnityObjectDouble
     public override int GetHashCode() => RuntimeHelpers.GetHashCode(this);
 }
 
+/// <summary>The interaction base every interactable derives from (dump.cs:563390, the global namespace the game
+/// declares it in). Only the member the interaction-prompt patch reads is mirrored: the prompt text the game
+/// draws, which is what a rule rewrites.</summary>
+public class Interact_Base : UnityEngine.Component
+{
+    public virtual string InteractionMessage { get; set; } = "";
+}
+
+/// <summary>The timed override a door button answers with (dump.cs:564287, `Interact_Base`'s own subclass). The
+/// revive hook's two members are mirrored as well: the interacting agent and the interaction's own target.</summary>
+public class Interact_Timed : Interact_Base
+{
+    public Player.PlayerAgent? Agent;
+    public Player.PlayerAgent? m_interactTargetAgent { get; set; }
+}
+
 namespace ForgeRuntime
 {
     public enum RuntimeMode { Off, Play, Authoring }
@@ -86,6 +102,20 @@ namespace UnityEngine
         public static Vector3 one => new(1f, 1f, 1f);
         public static bool operator ==(Vector3 a, Vector3 b) => a.x == b.x && a.y == b.y && a.z == b.z;
         public static bool operator !=(Vector3 a, Vector3 b) => !(a == b);
+        public static Vector3 operator +(Vector3 a, Vector3 b) => new(a.x + b.x, a.y + b.y, a.z + b.z);
+        public static Vector3 operator -(Vector3 a, Vector3 b) => new(a.x - b.x, a.y - b.y, a.z - b.z);
+        public static Vector3 operator *(Vector3 a, float scale) => new(a.x * scale, a.y * scale, a.z * scale);
+        public float sqrMagnitude => x * x + y * y + z * z;
+        public float magnitude => MathF.Sqrt(sqrMagnitude);
+        public Vector3 normalized
+        {
+            get
+            {
+                var length = magnitude;
+                return length <= 0f ? zero : new Vector3(x / length, y / length, z / length);
+            }
+        }
+        public static float Distance(Vector3 a, Vector3 b) => (a - b).magnitude;
         public override bool Equals(object? other) => other is Vector3 v && this == v;
         public override int GetHashCode() => HashCode.Combine(x, y, z);
     }
@@ -125,6 +155,8 @@ namespace UnityEngine
     public static class Time
     {
         public static float deltaTime { get; set; } = 1f / 60f;
+        /// <summary>The frame's own absolute time, which the interaction-prompt readback stamps a rule with.</summary>
+        public static float time { get; set; }
     }
 
     /// <summary>The one Unity object the HUD placements touch: object creation and destruction are recorded so a
@@ -206,6 +238,13 @@ namespace UnityEngine
         public T? GetComponent<T>() where T : class
             => parts.TryGetValue(typeof(T), out var part) ? part as T : null;
 
+        /// <summary>The parent lookup the world-event reader uses to reach the area its object stands in. The
+        /// fixture keeps one parent per object, which is all the reader asks for.</summary>
+        public Component? Parent;
+
+        public T? GetComponentInParent<T>() where T : class
+            => GetComponent<T>() ?? Parent?.GetComponent<T>();
+
         public T AddComponent<T>() where T : Component, new()
         {
             var part = new T();
@@ -259,14 +298,25 @@ namespace Il2CppInterop.Runtime.InteropTypes.Arrays
 
         public int Length => _items.Length;
         public T this[int index] { get => _items[index]; set => _items[index] = value; }
+        /// <summary>The array's own contents, which is how a double's write is read back by a case; the interop
+        /// type converts to a managed array the same way.</summary>
+        public T[] ToArray() => _items;
+        public static implicit operator T[](Il2CppStructArray<T> value) => value._items;
     }
 }
 
 namespace Il2CppSystem.Collections.Generic
 {
-    public class Dictionary<TKey, TValue> : System.Collections.Generic.Dictionary<TKey, TValue> where TKey : notnull { }
+    /// <summary>The interop table: the same dictionary plus the interop base's own collected flag, which the
+    /// production readers test before they read a table the game handed them.</summary>
+    public class Dictionary<TKey, TValue> : System.Collections.Generic.Dictionary<TKey, TValue> where TKey : notnull
+    {
+        public bool WasCollected => false;
+    }
     /// <summary>The interop assembly's own set, which is the type the warp gate reads off the agent.</summary>
     public class HashSet<T> : System.Collections.Generic.HashSet<T> { }
+    /// <summary>The interop list the native members take where the game itself builds one.</summary>
+    public class List<T> : System.Collections.Generic.List<T> { }
 }
 
 namespace Globals
@@ -518,6 +568,13 @@ namespace Player
         }
         public PLOC_State m_currentStateEnum;
         public PLOC_State m_lastStateEnum;
+        /// <summary>The time the machine entered its current state, which the movement rows report as `since`.</summary>
+        public float m_changeStateTime;
+        /// <summary>The impulse channel the push rows write and read back: the game keeps one accumulated force
+        /// per body, and these two entries are its own.</summary>
+        public UnityEngine.Vector3 ExternalPushForce;
+        public void AddExternalPushForce(UnityEngine.Vector3 force) => ExternalPushForce = ExternalPushForce + force;
+        public UnityEngine.Vector3 GetExternalPushForce() => ExternalPushForce;
         /// <summary>The state instance the machine is currently in; the downed state is reached through the same
         /// cast the production reader performs.</summary>
         public object? CurrentStateInstance;
@@ -535,14 +592,8 @@ namespace Player
         public void OnPlayerRevived() { }
     }
 
-    /// <summary>The base of every timed interaction. Only the members the revive hook reads are mirrored: the
-    /// interacting agent, the interaction's own owner and the player the interaction belongs to.</summary>
-    public class Interact_Timed : UnityObjectDouble
-    {
-        public PlayerAgent? Agent;
-        public PlayerAgent? m_interactTargetAgent { get; set; }
-    }
-
+    /// <summary>The base of every timed interaction, in the global namespace the game declares it in; the two
+    /// members the revive hook reads live on it.</summary>
     public sealed class Interact_Revive : Interact_Timed
     {
         public PlayerAgent? m_owner;
@@ -702,6 +753,14 @@ namespace Player
         public PlayerLocomotion? Locomotion;
         public Interact_Revive? ReviveInteraction;
         public PlayerInventory? Inventory;
+        /// <summary>The stamina component the stamina row writes and the camera the shake row writes, both read
+        /// through the agent exactly as the interop exposes them.</summary>
+        public PlayerStamina? Stamina;
+        public FPSCamera? FPSCamera;
+        /// <summary>The eye the presentation rows measure from, and the direction a liquid job is aimed.</summary>
+        public UnityEngine.Vector3 EyePosition;
+        public UnityEngine.Vector3 Forward = new(0f, 0f, 1f);
+        public UnityEngine.Vector3 Position;
         /// <summary>The states this agent accepts a warp in; the game's own set for a player on the ground.</summary>
         public Il2CppSystem.Collections.Generic.HashSet<PlayerLocomotion.PLOC_State>? m_warpableStates = new()
         {
@@ -891,8 +950,9 @@ namespace GameData
     public enum eWardenObjectiveEventType
     {
         None = 0, AllLightsOff = 3, AllLightsOn = 4, PlaySound = 5, SetFogSetting = 6, DimensionFlashTeam = 7,
-        DimensionWarpTeam = 8, LightsInZone = 13, LightsInZoneToggle = 14, AnimationTrigger = 15,
-        SetNavMarker = 17, AddToTimer = 24, ResetTimer = 25, WinOnDeath = 26, ForceInstantWin = 27,
+        DimensionWarpTeam = 8, UpdateCustomSubObjective = 11, LightsInZone = 13, LightsInZoneToggle = 14,
+        AnimationTrigger = 15, SetNavMarker = 17, StepProgressionObjective = 18, SetWorldEventCondition = 19,
+        AddToTimer = 24, ResetTimer = 25, WinOnDeath = 26, ForceInstantWin = 27,
         DialogueOnClosest = 28, ClearDimension = 30, StartRepeatingFog = 31, StopSustainedEvent = 32
     }
 
@@ -927,6 +987,12 @@ namespace GameData
         public float SustainedEventDelay { get; set; }
         public bool ClearDimension { get; set; }
         public string WorldEventObjectFilter { get; set; } = "";
+        /// <summary>The sub-objective text members (dump.cs: the two `LocalizedText` properties the objective-event
+        /// rows write), and the condition slot the world-event row writes.</summary>
+        public Localization.LocalizedText? CustomSubObjectiveHeader { get; set; }
+        public Localization.LocalizedText? CustomSubObjective { get; set; }
+        public int ConditionIndex { get; set; }
+        public bool IsTrue { get; set; }
     }
 
     /// <summary>One specific terminal spawn of a zone's data block. The production reader counts them, because a
@@ -1278,6 +1344,9 @@ namespace LevelGeneration
     public sealed class LG_Area : UnityEngine.Component
     {
         public LG_Geomorph? m_geomorph;
+        /// <summary>The zone the area was generated in, which the world-event reader reaches through the object's
+        /// parent chain.</summary>
+        public LG_Zone? m_zone;
     }
 
     /// <summary>One generated room. Its prefab object is the asset identity a room search matches, and its own
@@ -1355,6 +1424,30 @@ namespace LevelGeneration
         public bool CommandIsHidden(TERM_Command command) => HiddenCommands.Contains(command);
         public void TrySyncSetCommandHidden(TERM_Command command) => HiddenCommands.Add(command);
         public void TrySyncSetCommandShow(TERM_Command command) => HiddenCommands.Remove(command);
+
+        /// <summary>The terminal's own log files, keyed by file name, which is the table the content action adds
+        /// to and removes from and the table the visibility switch reads. `m_logFileDatas` is the member's own
+        /// spelling in the interop.</summary>
+        public Dictionary<string, GameData.TerminalLogFileData> LogFiles { get; } = new(StringComparer.Ordinal);
+        public void AddLocalLog(GameData.TerminalLogFileData data, bool visible)
+        {
+            data.IsVisible = visible;
+            LogFiles[data.FileName] = data;
+        }
+        public bool RemoveLocalLog(string fileName) => LogFiles.Remove(fileName);
+        public bool IsLogVisible(string fileName) => LogFiles.TryGetValue(fileName, out var file) && file.IsVisible;
+        public void SetLogVisible(string fileName, bool visible)
+        {
+            if (LogFiles.TryGetValue(fileName, out var file)) file.IsVisible = visible;
+        }
+        /// <summary>The table the game itself reads back, as the interop dictionary the production reader calls
+        /// `ContainsKey` on.</summary>
+        public Il2CppSystem.Collections.Generic.Dictionary<string, GameData.TerminalLogFileData> GetLocalLogs()
+        {
+            var table = new Il2CppSystem.Collections.Generic.Dictionary<string, GameData.TerminalLogFileData>();
+            foreach (var pair in LogFiles) table[pair.Key] = pair.Value;
+            return table;
+        }
     }
 
     /// <summary>One line a printed request appended: the terminal's own line kind, the text and the native
@@ -1369,6 +1462,15 @@ namespace LevelGeneration
         public Dictionary<string, TERM_Command> Commands { get; } = new(StringComparer.OrdinalIgnoreCase);
         public int ParseCalls;
         public string? LastInput;
+        /// <summary>The commands this terminal now answers to, by the slot the content action wrote them into.
+        /// The real member registers one and reports whether the slot was free.</summary>
+        public List<string> Added { get; } = new();
+        public bool AddCommand(TERM_Command command, string commandString, Localization.LocalizedText helpString,
+            TERM_CommandRule rule, Il2CppSystem.Collections.Generic.List<GameData.WardenObjectiveEventData> events)
+        {
+            Added.Add(commandString);
+            return true;
+        }
         public bool TryGetCommand(string inputString, out TERM_Command command, out string param1, out string param2)
         {
             ParseCalls++;

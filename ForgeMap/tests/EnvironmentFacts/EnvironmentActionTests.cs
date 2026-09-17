@@ -42,13 +42,14 @@ public sealed class EnvironmentActionTests
     {
         using var world = EnvironmentWorld.Start();
         var context = Contexts.Command(EnvironmentContract.LightingCapability,
-            new { zones = new[] { EnvironmentWorld.Zone(0, 0, 3) }, transition = 12.5, position = new[] { 1.0, 0.0, 1000.0 }, count = 5 },
+            new { zones = new[] { EnvironmentWorld.Zone(0, 0, 3) }, transition = 750, position = new[] { 1.0, 0.0, 1000.0 }, count = 5 },
             new { scope = 0, mode = 0 });
 
         Assert.Equal("succeeded", world.Host.HandleLighting(context).Status);
         var data = EnvironmentWorld.LastEvent!;
         Assert.Equal(eWardenObjectiveEventType.LightsInZone, data.Type);
         Assert.True(data.Enabled);
+        // The port is declared in ticks and the native field takes seconds: 750 ticks is 12.5 s.
         Assert.Equal(12.5f, data.Duration);
         Assert.Equal(5, data.Count);
         Assert.Equal(1f, data.Position.x);
@@ -190,7 +191,7 @@ public sealed class EnvironmentActionTests
     {
         using var world = EnvironmentWorld.Start();
         var context = Contexts.Command(EnvironmentContract.FogCapability,
-            new { zone = EnvironmentWorld.Zone(2, 1, 4), fog = 175, transition = 30.0 }, null);
+            new { zone = EnvironmentWorld.Zone(2, 1, 4), fog = 175, transition = 1800 }, null);
 
         var result = world.Host.HandleFog(context);
 
@@ -198,6 +199,7 @@ public sealed class EnvironmentActionTests
         var data = EnvironmentWorld.LastEvent!;
         Assert.Equal(eWardenObjectiveEventType.SetFogSetting, data.Type);
         Assert.Equal(175u, data.FogSetting);
+        // 1800 ticks is the 30 s the native transition field takes.
         Assert.Equal(30f, data.FogTransitionDuration);
         Assert.Equal((eDimensionIndex)2, data.DimensionIndex);
         Assert.Equal((eLocalZoneIndex)4, data.LocalIndex);
@@ -219,7 +221,7 @@ public sealed class EnvironmentActionTests
     {
         using var world = EnvironmentWorld.Start();
         var context = Contexts.Command(EnvironmentContract.FogCycleCapability,
-            new { zone = EnvironmentWorld.Zone(0, 0, 3), fog = 176, transition = 5.0, state_duration = 45.0, start_delay = 30.0, sound = 7 },
+            new { zone = EnvironmentWorld.Zone(0, 0, 3), fog = 176, transition = 300, state_duration = 2700, start_delay = 1800, sound = 7 },
             new { mode = 0, slot = 2, states = -1 });
 
         var result = world.Host.HandleFogCycle(context);
@@ -229,6 +231,7 @@ public sealed class EnvironmentActionTests
         Assert.Equal(eWardenObjectiveEventType.StartRepeatingFog, data.Type);
         Assert.Equal(2, data.SustainedEventSlotIndex);
         Assert.Equal(-1, data.SustainedEventStateCount);
+        // Every one of these ports is ticks: 2700 ticks is 45 s, 1800 ticks is 30 s.
         Assert.Equal(45f, data.SustainedEventStateDuration);
         Assert.Equal(30f, data.SustainedEventDelay);
         Assert.Equal(176u, data.FogSetting);

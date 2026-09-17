@@ -294,6 +294,12 @@ internal sealed class TerminalObjectActions
         return MapObjectTerminalAddress.TryParse(id[Prefix.Length..]);
     }
 
+    /// <summary>The terminal a reference addresses, through the two reads a terminal lookup is made of: the
+    /// category's own address grammar and the observation table that address resolves in. A reference of another
+    /// category, or one whose address no observed terminal carries, answers null.</summary>
+    internal static LG_ComputerTerminal? ResolveByAddress(EntityReference? reference)
+        => Address(reference) is { } address ? TerminalObservation.ByAddress(address) : null;
+
     /// <summary>One classification of the catalog's `severity` parameter onto the terminal's own line kinds.
     /// The parameter is the plan's structural choice, so it arrives in the node's constant bag; a value outside
     /// the catalog's three members — including an absent one, which is not a severity a line may be printed

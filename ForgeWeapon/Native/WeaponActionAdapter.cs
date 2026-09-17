@@ -7,8 +7,8 @@ using ForgeRuntime.Framework;
 namespace ForgeWeapon.Native;
 
 /// <summary>
-/// The three numerical instance-override rows as this package executes them: `fire_rate`, `spread` and `recoil`.
-/// The decisions are made in <see cref="WeaponActionRuntime"/> and the writes in
+/// The four numerical instance-override rows as this package executes them: `fire_rate`, `spread`, `recoil` and
+/// the generic `property`. The decisions are made in <see cref="WeaponActionRuntime"/> and the writes in
 /// <see cref="WeaponOverrideApplier"/>; this file is the seam between them and one dispatched command — it reads
 /// the request frame, hands the decision a ledger to record against, and answers with the row's own result
 /// schema.
@@ -37,6 +37,7 @@ internal sealed class WeaponActionAdapter
         _canExecute = canExecute ?? throw new ArgumentNullException(nameof(canExecute));
         _applier = applier ?? throw new ArgumentNullException(nameof(applier));
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        Current = this;
     }
 
     /// <summary>Whether this side may write an instance's block: the host's own readiness and the host flag the
@@ -50,19 +51,48 @@ internal sealed class WeaponActionAdapter
     }
 
     /// <summary>`forge.action.weapon.fire_rate`. Result fields: the four fixed columns, then `rate`.</summary>
-    internal CommandResult FireRate(CommandContext context) => Run(context, WeaponActionRuntime.FireRate);
+    internal CommandResult FireRate(CommandContext context)
+        => Run(context, WeaponActionRuntime.FireRate, NamedFields);
 
     /// <summary>`forge.action.weapon.spread`. Result fields: the four fixed columns, then `cone`.</summary>
-    internal CommandResult Spread(CommandContext context) => Run(context, WeaponActionRuntime.Spread);
+    internal CommandResult Spread(CommandContext context)
+        => Run(context, WeaponActionRuntime.Spread, NamedFields);
 
     /// <summary>`forge.action.weapon.recoil`. Result fields: the four fixed columns, then `horizontal`.</summary>
-    internal CommandResult Recoil(CommandContext context) => Run(context, WeaponActionRuntime.Recoil);
+    internal CommandResult Recoil(CommandContext context)
+        => Run(context, WeaponActionRuntime.Recoil, NamedFields);
+
+    /// <summary>`forge.action.weapon.property`. Result fields: the four fixed columns, then `field` and `value`.</summary>
+    internal CommandResult Property(CommandContext context)
+        => Run(context, WeaponActionRuntime.Property, PropertyFields);
 
     /// <summary>
-    /// The shared body of the three block-replacing rows: decide, refuse as decided, otherwise record the request
+    /// The `property` row's own restore callback, which the kernel calls when the effect its card asked for ends —
+    /// by its duration, by a cancellation, by a released plan or by the world. What ends is what this card's writer
+    /// set on the instance the application was about; a request the kernel kept after the module had already undone
+    /// it is the no-op it should be.
+    ///
+    /// The context's subject is the row's own `equipment` recipient, and the kernel's plan/node identity is the
+    /// ledger's writer identity, so nothing here has to keep a table of handles beside the ledger.
+    /// </summary>
+    internal static void RestoreProperty(RuntimeEffectContext context)
+    {
+        if (Current is not { } adapter || context.Subject.Count == 0) return;
+        if (!adapter._applier.Ledger.RevertWriter(context.Subject[0], context.PlanId, context.NodeId, out var code))
+            adapter._report("weapon.override-restore-refused equipment=" + context.Subject[0].Id + " code=" + code);
+    }
+
+    /// <summary>The adapter the registration's own restore table answers from, for the same reason the handler
+    /// table does: the table is built before the adapter that holds the ledger exists, so one package registers one
+    /// adapter and the table holds a static entry point that answers from here.</summary>
+    internal static WeaponActionAdapter? Current { get; private set; }
+
+    /// <summary>
+    /// The shared body of the four block-replacing rows: decide, refuse as decided, otherwise record the request
     /// in the ledger — which is what writes it — and answer with the row's own result fields.
     /// </summary>
-    private CommandResult Run(CommandContext context, Func<CommandContext, WeaponActionOutcome> decide)
+    private CommandResult Run(CommandContext context, Func<CommandContext, WeaponActionOutcome> decide,
+        Func<IReadOnlyList<WeaponOverrideField>, IReadOnlyList<object>> extra)
     {
         if (!Authoritative()) return CommandResult.Rejected(AuthorityCode);
         var outcome = decide(context);
@@ -80,7 +110,7 @@ internal sealed class WeaponActionAdapter
             return CommandResult.Rejected(code);
         }
         return CommandResult.Succeeded(Rows(equipment, CommandStatuses.Succeeded, CommitStates.Confirmed,
-            AppliedCode, ResultFields(outcome)));
+            AppliedCode, extra(outcome.Fields)));
     }
 
     /// <summary>The one line every accepted request answers with, in the row's own field order: the four fixed
@@ -91,31 +121,40 @@ internal sealed class WeaponActionAdapter
         => RuntimeJson.From(new { rows = new[] { new ResultRow(equipment, status, commitState, code, extra) } });
 
     /// <summary>
-    /// The row's own extra result fields, in catalog order and only for the fields the request actually set. A
-    /// port the plan left out is absent from the result rather than reported as zero: zero is a value this
+    /// The named rows' own extra result fields, in catalog order and only for the fields the request actually
+    /// set. A port the plan left out is absent from the result rather than reported as zero: zero is a value this
     /// package would have had to invent.
     /// </summary>
-    private static IReadOnlyList<object> ResultFields(WeaponActionOutcome outcome)
+    private static IReadOnlyList<object> NamedFields(IReadOnlyList<WeaponOverrideField> fields)
     {
-        var fields = new List<object>(1);
-        foreach (var field in outcome.Fields)
+        var extra = new List<object>(1);
+        foreach (var field in fields)
         {
             switch (field.Name)
             {
                 case "fire_rate":
-                    // The row's own field is the rate the plan asked for, so the native seconds-between-shots
-                    // value is converted back rather than reported raw.
-                    fields.Add(new RateField(WeaponActionRuntime.RateFromShotDelay(field.Value)));
+                    // The row's own field is the rate the plan asked for, which is the unit the ledger stores:
+                    // the native seconds-between-shots value is produced at the write and never travels back.
+                    extra.Add(new RateField(field.Value));
                     break;
                 case "recoil_horizontal":
-                    fields.Add(new HorizontalField(field.Value));
+                    extra.Add(new HorizontalField(field.Value));
                     break;
                 case "spread_cone":
-                    fields.Add(new ConeField(field.Value));
+                    extra.Add(new ConeField(field.Value));
                     break;
             }
         }
-        return fields;
+        return extra;
+    }
+
+    /// <summary>`property`'s two extra fields: which name was accepted, and the value that was resolved against
+    /// it. Both are the request's own, so a caller reads back what this row took rather than what the block now
+    /// stores — the block's value is the native member, which is a different unit for `fire_rate`.</summary>
+    private static IReadOnlyList<object> PropertyFields(IReadOnlyList<WeaponOverrideField> fields)
+    {
+        var field = fields[0];
+        return new object[] { new PropertyNameField(field.Name), new PropertyValueField(field.Value) };
     }
 
     /// <summary>A duration input in ticks, or 0 for a request that lasts as long as the life does. An absent
@@ -146,4 +185,9 @@ internal sealed class WeaponActionAdapter
 
     /// <summary>`spread`'s own result field.</summary>
     private sealed record ConeField([property: JsonPropertyName("cone")] double Cone);
+
+    /// <summary>`property`'s own result fields.</summary>
+    private sealed record PropertyNameField([property: JsonPropertyName("field")] string Field);
+
+    private sealed record PropertyValueField([property: JsonPropertyName("value")] double Value);
 }

@@ -217,8 +217,13 @@ public sealed class ContractFacts
         Assert.Equal("query", graph.GetProperty("execution").GetString());
         Assert.Equal(new[] { "door" }, graph.GetProperty("inputs").EnumerateArray()
             .Select(port => port.GetProperty("id").GetString()).ToArray());
-        Assert.Equal(new[] { "state", "detail", "locked", "key" }, graph.GetProperty("outputs").EnumerateArray()
+        Assert.Equal(new[] { "state", "detail", "locked", "key", "puzzle", "glued", "stuck" }, graph.GetProperty("outputs").EnumerateArray()
             .Select(port => port.GetProperty("id").GetString()).ToArray());
+        // The puzzle output is the chained-puzzle resource the scan row takes, so its kind is that row's kind.
+        var puzzle = graph.GetProperty("outputs").EnumerateArray()
+            .Single(port => port.GetProperty("id").GetString() == "puzzle");
+        Assert.Equal("resource", puzzle.GetProperty("type").GetString());
+        Assert.Equal(AlarmWaveContract.ChainedPuzzleKind, puzzle.GetProperty("resourceKind").GetString());
         Assert.Equal(new[] { "world" }, graph.GetProperty("reads").EnumerateArray()
             .Select(read => read.GetString()).ToArray());
         var binding = RuntimeJson.Parse(DoorQueryContract.BindingRowJson);
@@ -226,7 +231,7 @@ public sealed class ContractFacts
         Assert.Equal(DoorQueryContract.HandlerName, binding.GetProperty("handler").GetString());
         Assert.Equal("observe", binding.GetProperty("role").GetString());
         Assert.Equal(new[] { "door" }, DoorQueryContract.Shape.InputPorts);
-        Assert.Equal(new[] { "state", "detail", "locked", "key" }, DoorQueryContract.Shape.OutputPorts);
+        Assert.Equal(new[] { "state", "detail", "locked", "key", "puzzle", "glued", "stuck" }, DoorQueryContract.Shape.OutputPorts);
     }
 
     [Fact]

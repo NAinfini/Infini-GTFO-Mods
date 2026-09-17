@@ -197,6 +197,32 @@ public sealed partial class RuntimeKernel
         return EntityZoneResolution.InZone(zone);
     }
 
+    /// <summary>
+    /// The native object one live reference names, asked of the provider that owns the reference's kind and of
+    /// nobody else. It is the one door a handler has onto another module's entities: the owner registers the lookup
+    /// beside the resolver it already owns for that kind — one owner per kind, as every other table here — and no
+    /// module's private table is exposed. An entity that is gone, a kind nobody registered or a reference this
+    /// provider does not recognize answers null, exactly as an absent optional package does; only a lookup that
+    /// throws is a failure, because the caller cannot tell a broken table from an entity that is not there.
+    /// </summary>
+    public object? EntityInstance(EntityReference reference)
+    {
+        ReadThread(); AcceptRuntimeWork(); ArgumentNullException.ThrowIfNull(reference);
+        var kind = RuntimeJson.KindOf(reference.Id);
+        RuntimeJson.Require(kind.Length > 0, "entity-instance", "An entity reference is required.");
+        if (StartupState != RuntimeStartupState.Ready || !worldStarted) return null;
+        if (!registry.EntityInstances.TryGetValue(kind, out var registered)) return null;
+        // The reference is judged current before its object is handed out: a lookup that answered for a previous
+        // life would hand a handler a native instance the world no longer has.
+        if (!registry.Resolvers.TryGetValue(kind, out var resolver)) return null;
+        bool live;
+        try { live = resolver.Resolve(reference); }
+        catch (Exception) { throw new RuntimeContractException("entity-resolver-failed", reference.Id); }
+        if (!live) return null;
+        try { return registered.Instance(reference); }
+        catch (Exception) { throw new RuntimeContractException("entity-instance-failed", reference.Id); }
+    }
+
     /// <summary>Asks only the provider owning <paramref name="kind"/> for the current reference of a native instance.
     /// No enumeration and no other provider is consulted; an instance that is unknown or no longer current is null.
     /// A kind no provider registered is unresolved for the same reason: every domain package is optional, so the

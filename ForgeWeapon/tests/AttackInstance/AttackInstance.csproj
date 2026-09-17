@@ -36,6 +36,7 @@
          member exists. -->
     <Compile Include="../../Native/AttackInstanceModule.cs" />
     <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../WeaponStateTriggerContract.cs;../../CombatPrimitiveContract.cs" />
     <Compile Include="../../ModuleDefinition.cs" />
     <!-- The other two contracts the provider seed registers: the module names them, so their rows are compiled
          here rather than assumed. -->
@@ -44,6 +45,9 @@
          these contracts whether or not a body is supplied for them, so the module cannot be compiled without
          them. None of the three names a game type. -->
     <Compile Include="../../WeaponSupplyContract.cs;../../WeaponOverrideContract.cs;../../InventoryActionContract.cs" />
+    <!-- The reload and inventory-query rows the seed appends as well; the query contract's evaluators are the
+         reads file, so it compiles with them. -->
+    <Compile Include="../../ReloadInventoryContract.cs;../../InventoryQueryContract.cs;../../InventoryQueryReads.cs" />
     <Compile Include="AttackWorld.cs;AttackInstanceTests.cs;ContractTests.cs;NativeMemberTests.cs;GameDoubles.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />

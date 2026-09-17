@@ -8,7 +8,7 @@ using ForgeRuntime.Framework;
 
 namespace ForgeEnemy.Native;
 
-/// <summary>The six read-only value rows of the enemy domain (`v-e-health`, `v-e-alive`, `v-e-type`, `v-e-sleep`,
+/// <summary>The seven read-only value rows of the enemy domain (`v-e-health`, `v-e-alive`, `v-e-type`, `v-e-sleep`,
 /// `v-e-where`, `v-e-tagged`).
 ///
 /// Every one of them is a `query` step, and every one of them reads the world exactly once through the kernel's
@@ -40,6 +40,7 @@ internal sealed class EnemyNodeValueReads
     internal const string TypeUnavailableCode = "enemy-type-unavailable";
     internal const string StateUnavailableCode = "enemy-state-unavailable";
     internal const string TagUnavailableCode = "enemy-tag-unavailable";
+    internal const string GroupUnavailableCode = "enemy-group-unavailable";
     internal const string MissingFieldCode = "missing-field";
 
     /// <summary>The member of the shared `ai_state` set that means "no state an author can act on". A behaviour
@@ -84,7 +85,8 @@ internal sealed class EnemyNodeValueReads
         [EnemyNodeValueContract.TypeHandler] = Evaluate(Type),
         [EnemyNodeValueContract.SleepingHandler] = Evaluate(Sleeping),
         [EnemyNodeValueContract.WhereHandler] = Evaluate(Where),
-        [EnemyNodeValueContract.TaggedHandler] = Evaluate(Tagged)
+        [EnemyNodeValueContract.TaggedHandler] = Evaluate(Tagged),
+        [EnemyNodeValueContract.GroupHandler] = Evaluate(Group)
     };
 
     private static EvaluatorHandler Evaluate(Func<EnemyNodeValueReads, EvaluationContext, EntityReference, RuntimeEntitySnapshot, JsonElement> answer)
@@ -110,7 +112,7 @@ internal sealed class EnemyNodeValueReads
         return (reference, snapshot!);
     }
 
-    // The six answers, over the one budgeted read the evaluator already made. They are internal rather than
+    // The seven answers, over the one budgeted read the evaluator already made. They are internal rather than
     // private so this package's focused tests can drive a row with a written snapshot and a written instance: a
     // value row's whole contract is which ports it carries and which refusal it raises, and neither needs a
     // dispatch to be exercised.
@@ -205,6 +207,114 @@ internal sealed class EnemyNodeValueReads
         var tag = EnemyEntityObserver.ReadTag(enemy);
         return ReferenceEquals(_enemyOf(reference), enemy) ? tag : null;
     }
+
+    private static JsonElement Group(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference,
+        RuntimeEntitySnapshot snapshot) => AnswerGroup(reads.ReadGroup(reference));
+
+    /// <summary>One group's own facts: the state as the index of the shared `enemy_group_state` set, the type as
+    /// the native `EnemyGroupType` member name, and the patrol counter as the number the game keeps.</summary>
+    internal sealed record GroupReading(int State, string GroupType, float PatrolFrustration);
+
+    /// <summary>The group row's answer, over the reading the reader made. A life the game put in no group is a
+    /// refusal with a code, not an empty state: the group a life does not have is not the group a question about
+    /// a group can be answered from.</summary>
+    internal static JsonElement AnswerGroup(GroupReading? reading)
+    {
+        if (reading is not { } group)
+            throw new RuntimeContractException(GroupUnavailableCode, "This life belongs to no live enemy group.");
+        return RuntimeJson.From(new
+        {
+            // Q3: an enum port carries the member-set index, never the member name.
+            state = group.State,
+            group_type = group.GroupType,
+            patrol_frustration = group.PatrolFrustration
+        });
+    }
+
+    /// <summary>The group read goes through the module's own live-instance lookup, the way every other read this
+    /// layer makes does, and the same instance is looked up again afterwards: a life that ended under the read
+    /// is not a reading of either life.</summary>
+    private GroupReading? ReadGroup(EntityReference reference)
+    {
+        var enemy = _enemyOf(reference);
+        if (enemy == null) return null;
+        var reading = ReadLiveGroup(enemy);
+        return ReferenceEquals(_enemyOf(reference), enemy) ? reading : null;
+    }
+
+    /// <summary>The three facts one live group owns, read from the public members the game's own group logic
+    /// reads: the group the life reaches through `EnemyAI.m_group`, the state the group publishes to every peer
+    /// inside its replicated data packet (`EnemyGroup.Data.currentState`, an `EGS` member), the type it was
+    /// spawned as and its patrol frustration. The declarations are spelled out so each answer is a member of a
+    /// native enum and not a number that happens to live in the same field, and the group is read back
+    /// afterwards, so a group replaced under the read is not a reading of either group.
+    ///
+    /// A member outside either declared vocabulary is refused rather than reported: the state is published as an
+    /// index into the shared `enemy_group_state` set, and an ordinal the set does not have would be an index into
+    /// somebody else's member.</summary>
+    private static GroupReading? ReadLiveGroup(EnemyAgent enemy)
+    {
+        try
+        {
+            if (enemy.Pointer == IntPtr.Zero || !enemy.IsSetup) return null;
+            var ai = enemy.AI;
+            var group = ai?.m_group;
+            if (group == null || group.Pointer == IntPtr.Zero) return null;
+            EGS state = group.Data.currentState;
+            EnemyGroupType groupType = group.GroupType;
+            float frustration = group.PatrolFrustration;
+            var again = enemy.AI?.m_group;
+            if (again == null || again.Pointer != group.Pointer) return null;
+            if (GroupStateIndex(state) is not { } index || GroupTypeName(groupType) is not { } type) return null;
+            return new GroupReading(index, type, frustration);
+        }
+        catch (Exception)
+        {
+            // A value question is asked from the game's own dispatch, so a group whose native members throw
+            // answers "no readable group" instead of escaping into the caller.
+            return null;
+        }
+    }
+
+    /// <summary>Native `EGS` to the index of the shared `enemy_group_state` set. The set is the native enum in
+    /// its own declaration order — `idle` first, `debug_idle` last — so the member a native value names and the
+    /// index this row publishes are decided in one place, and a member the set does not carry answers nothing.
+    /// The members are named rather than counted so a build that reorders the enum cannot shift the set.</summary>
+    internal static int? GroupStateIndex(EGS state) => state switch
+    {
+        EGS.Idle => 0,
+        EGS.HuntersSpawn => 1,
+        EGS.HuntersHunt => 2,
+        EGS.HuntersSearch => 3,
+        EGS.GuardsSpawn => 4,
+        EGS.GuardRespawn => 5,
+        EGS.GuardsIdle => 6,
+        EGS.GuardsHunting => 7,
+        EGS.PatrolSpawn => 8,
+        EGS.PatrolMove => 9,
+        EGS.PatrolIdle => 10,
+        EGS.PatrolSearch => 11,
+        EGS.PatrolCombat => 12,
+        EGS.SurvivalSpawn => 13,
+        EGS.SurvivalHunt => 14,
+        EGS.DebugSpawn => 15,
+        EGS.DebugIdle => 16,
+        _ => null
+    };
+
+    /// <summary>Native `EnemyGroupType` to the member spelling the shared `enemy_group_type` set will carry —
+    /// the lower-cased native member name with a case boundary becoming an underscore, the same rule
+    /// `enemy_group_state` and the map family's own sets use. The port is a string until that set exists, and
+    /// this is the one place the spelling is decided either way.</summary>
+    internal static string? GroupTypeName(EnemyGroupType groupType) => groupType switch
+    {
+        EnemyGroupType.Hibernating => "hibernating",
+        EnemyGroupType.Patrolling => "patrolling",
+        EnemyGroupType.Hunters => "hunters",
+        EnemyGroupType.Survival => "survival",
+        EnemyGroupType.DebugSpawnUnit => "debug_spawn_unit",
+        _ => null
+    };
 
     private void CheckThread()
     {

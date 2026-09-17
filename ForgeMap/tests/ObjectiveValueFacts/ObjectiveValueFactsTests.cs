@@ -121,7 +121,7 @@ public sealed class ObjectiveValueFactsTests
         Assert.Equal("started", answer.GetProperty("phase").GetString());
         Assert.Equal("in_zone_find_item", answer.GetProperty("sub_phase").GetString());
         Assert.Equal(3, answer.GetProperty("chain_index").GetInt32());
-        Assert.Equal(123.5, answer.GetProperty("start_time_seconds").GetDouble(), 3);
+        Assert.Equal(7410, answer.GetProperty("start_time").GetDouble(), 3); // 123.5 s in ticks
         Assert.True(answer.GetProperty("solve_on_death").GetBoolean());
         Assert.False(answer.GetProperty("exit_wave_triggered").GetBoolean());
         Assert.Equal(3, answer.GetProperty("items_solved").GetInt32());
@@ -145,7 +145,7 @@ public sealed class ObjectiveValueFactsTests
         // declares, of which the one time value is the state's own start time.
         var answer = Read("layer:main");
         Assert.False(answer.TryGetProperty("time_left_seconds", out _));
-        Assert.Equal(123.5, answer.GetProperty("start_time_seconds").GetDouble(), 3);
+        Assert.Equal(7410, answer.GetProperty("start_time").GetDouble(), 3); // 123.5 s in ticks
     }
 
     [Fact]
@@ -302,13 +302,13 @@ public sealed class ObjectiveValueFactsTests
         machine.Layer("main", eWardenObjectiveType.Survival);
         machine.State.main_startTime = 10f;
         using var first = ObjectiveWorld.Start(1);
-        Assert.Equal(10, Read("layer:main").GetProperty("start_time_seconds").GetDouble(), 3);
+        Assert.Equal(600, Read("layer:main").GetProperty("start_time").GetDouble(), 3); // 10 s in ticks
 
         // The same process, a second world: the read answers the state it finds now, because the row keeps no
         // value of its own between reads.
         machine.State.main_startTime = 5f;
         using var second = ObjectiveWorld.Start(2);
-        Assert.Equal(5, Read("layer:main").GetProperty("start_time_seconds").GetDouble(), 3);
+        Assert.Equal(300, Read("layer:main").GetProperty("start_time").GetDouble(), 3); // 5 s in ticks
         Assert.Equal(2, second.Kernel.WorldEpoch);
         Assert.Equal(1, first.Kernel.WorldEpoch);
     }

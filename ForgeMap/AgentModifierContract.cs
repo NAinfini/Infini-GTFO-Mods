@@ -39,37 +39,21 @@ public static class AgentModifierContract
     /// <summary>The catalog's own domain list for these rows, in its own order.</summary>
     public static readonly string[] Domains = { "enemy", "weapon", "tool", "consumable", "player" };
 
-    /// <summary>Every code the apply handler can answer with besides the committed row. Declared on the
-    /// capability so a refusal is part of the contract rather than a string invented at run time.</summary>
-    public static readonly string[] ApplyCodes =
-    {
-        "authority-or-phase", "modifier-target-kind", "stale-or-unsupported-recipient", "attribute-unknown",
-        "attribute-no-op", "operation-unsupported", "amount-out-of-range", "duration-out-of-range",
-        "too-many-targets", "modifier-budget", "handle-budget", "modifier-id-exhausted", "native-commit-exception",
-        "not-attempted-after-unknown-commit", "attribute-all-rejected", "attribute-all-unknown"
-    };
-
-    /// <summary>Every code the remove handler can answer with besides the committed row.</summary>
-    public static readonly string[] RemoveCodes =
-    {
-        "authority-or-phase", "modifier-handle-missing", "stale-handle", "attribute-unknown",
-        "modifier-attribute-mismatch", "too-many-targets", "native-clear-exception",
-        "not-attempted-after-unknown-commit", "attribute-all-rejected", "attribute-all-unknown"
-    };
-
     /// <summary>Both capability rows as the combat contract declares them, for this provider's own shape checks:
     /// the declaration lives in `CombatContracts` because a row may only be declared by the provider that owns
-    /// it.</summary>
+    /// it. The rows' own code tables are that file's too — this provider keeps no second copy beside them.</summary>
     public static readonly JsonElement ApplyCapability = CombatContracts.AttributeApplyCapability;
 
     /// <inheritdoc cref="ApplyCapability"/>
     public static readonly JsonElement RemoveCapability = CombatContracts.AttributeRemoveCapability;
 
     /// <summary>The apply handler's own ports, resolved once at registration against the capability: the recipient
-    /// collection, the source reference, the attribute member, the amount and the lifetime, with the one
-    /// structural operation. The native half reads this shape rather than describing a second one.</summary>
+    /// collection, the source reference, the attribute member and the amount, with the one structural operation.
+    /// The native half reads this shape rather than describing a second one. The row carries no `duration` port:
+    /// how long the modification lasts is the plan's own `effect` block on the step (plan §3.4 动作卡), which the
+    /// kernel times through the effect handle this row's capability publishes as `modifier`.</summary>
     public static readonly HandlerShape ApplyShape = new HandlerShape()
-        .Inputs("targets", "source", "attribute", "amount", "duration").Outputs("result", "modifier").Parameters("operation");
+        .Inputs("targets", "source", "attribute", "amount").Outputs("result", "modifier").Parameters("operation");
 
     /// <summary>The remove handler's ports: the effect handles the apply row handed out, and the optional
     /// attribute the request narrows them to.</summary>

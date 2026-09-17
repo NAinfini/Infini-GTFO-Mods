@@ -19,6 +19,14 @@ namespace UnityEngine
         public float x, y, z;
         public static Vector3 zero => new Vector3();
     }
+    /// <summary>The glow colour the appearance component interpolates towards. The four components are stored as
+    /// declared, so an enemy profile case can read back the exact value a document named.</summary>
+    public partial struct Color
+    {
+        public float r, g, b, a;
+        public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; }
+        public Color(float r, float g, float b) : this(r, g, b, 1f) { }
+    }
 }
 namespace UnityEngine.AI
 {
@@ -28,7 +36,7 @@ namespace UnityEngine.AI
 }
 namespace Agents
 {
-    public enum AgentAbility { None = 0, Primary = 1, Secondary = 2 }
+    public enum AgentAbility { None = 0, Melee = 1, Ranged = 2, Alarm = 3, Defensive = 4, Healing = 5, GroupEnhance = 6, Detection = 7, DoorBreaker = 8, SpawnChildren = 9 }
     // The common native base: an AI target is an Agent, and only its registered provider names it. Its interop
     // wrapper carries the native pointer, which is the identity a fact compares when two reads of one field
     // each mint a fresh wrapper.
@@ -58,6 +66,7 @@ namespace Enemies
         { get => OnPositionRead?.Invoke() ?? _position; set => _position = value; }
         public Dam_EnemyDamageBase Damage = null!;
         public EnemyAI AI = null!;
+        public EnemyAppearance Appearance = null!;
         public EnemyLocomotion Locomotion = null!;
         public EnemyAbilities Abilities = null!;
         // `EnemyAgent.m_lastDamageInflictor` (interop `Modules-ASM.dll`): the agent the receiver registered for
@@ -103,8 +112,19 @@ namespace Enemies
     public sealed class EnemySync
     {
         public EnemyAgent? m_agent;
+        public EnemyReplicator? Replicator;
         public void OnSpawn() { }
         public void OnDespawn() { }
+    }
+
+    /// <summary>The replicator an agent's sync half exposes: the game's own despawn entry, which is what the
+    /// remove row submits. `Despawned` is what the suite reads to prove the call was made, and `OnDespawn` lets a
+    /// case model the receiver's own teardown.</summary>
+    public sealed class EnemyReplicator
+    {
+        public int Despawns;
+        public Action? OnDespawn;
+        public void Despawn() { Despawns++; OnDespawn?.Invoke(); }
     }
     // The build's own values (interop `Modules-ASM.dll`, ES_StateEnum): the state machines are read as integers
     // and never written by the module.
@@ -161,7 +181,29 @@ namespace Enemies
         public EnemyAI? m_ai;
         public IntPtr Pointer = new(13);
         public float m_biggestDetectionBuildup;
+        // The four parameters an enemy profile may set, plus the one switch it deliberately does not touch: a case
+        // writes the switch itself to prove the profile left it alone.
+        public float m_movementDetectionDistance = 10f;
+        public float m_detectionBuildupSpeed = 1f;
+        public float m_detectionCooldownSpeed = 1f;
+        public bool m_noiseDetectionOn;
+        public float m_noiseDetectionRange = 5f;
+        public void Setup(EnemyAI ai) { m_ai = ai; }
         public void UpdateTargets() { }
+    }
+    /// <summary>The appearance component: only the two members an enemy profile reaches. `InterpolateGlow` is the
+    /// native entry point the game itself uses to change the glow colour, so the double records the call instead of
+    /// writing a field — a case asserts the profile went through that one path.</summary>
+    public sealed class EnemyAppearance
+    {
+        public EnemyAgent? m_owner;
+        public IntPtr Pointer = new(14);
+        public int Interpolations;
+        public UnityEngine.Color LastGlow;
+        public float LastTransition = -1f;
+        public void Setup(EnemyAgent owner) { m_owner = owner; }
+        public void InterpolateGlow(UnityEngine.Color col, float transitionTime)
+        { Interpolations++; LastGlow = col; LastTransition = transitionTime; }
     }
     public sealed partial class EnemyLocomotion
     {
@@ -208,11 +250,23 @@ public sealed partial class Dam_EnemyDamageLimb
     public IntPtr Pointer = new IntPtr(210);
     public Dam_EnemyDamageBase m_base = null!;
     public int m_limbID;
+    // The four values an enemy profile may write, at the build's own defaults, plus the native type setter. The
+    // setter is the entry point the module uses, so the double counts it rather than trusting the field.
+    public float m_healthMax = 100f;
+    public float m_health = 100f;
+    public float m_weakspotDamageMulti = 1f;
+    public float m_armorDamageMulti = 1f;
+    public eLimbDamageType m_type = eLimbDamageType.Normal;
+    public int TypeSets;
+    public void SetLimbDamageType(eLimbDamageType type) { TypeSets++; m_type = type; }
     public bool Destroyed;
     public Action? OnDestroyedRead;
     public bool IsDestroyed { get { OnDestroyedRead?.Invoke(); return Destroyed; } set { Destroyed = value; } }
     public void DestroyLimb() { IsDestroyed = true; }
 }
+/// <summary>The build's own limb roles (dump.cs `eLimbDamageType`, global namespace). A profile names one of these
+/// by name, never by integer.</summary>
+public enum eLimbDamageType { Normal = 0, Weakspot = 1, Armor = 2 }
 public sealed partial class Dam_EnemyDamageBase
 {
     public Dam_EnemyDamageLimb[] DamageLimbs = System.Array.Empty<Dam_EnemyDamageLimb>();

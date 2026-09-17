@@ -6,6 +6,8 @@ using static T;
 if (args.Length != 1) { Console.Error.WriteLine("Usage: EnemyNodeFacts <report.json>"); return 2; }
 ValueCases.Run();
 ActionCases.Run();
+VolumeCases.Run();
+AbilityUsedCases.Run();
 FactCases.Run();
 
 int failed = Rows.Count(x => !x.Passed), passed = Rows.Count - failed;

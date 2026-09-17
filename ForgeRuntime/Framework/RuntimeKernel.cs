@@ -53,6 +53,11 @@ public sealed partial class RuntimeKernel
     private readonly Dictionary<string, long> modules = new(StringComparer.Ordinal);
     private readonly Dictionary<string, LoadedPlan> plans = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<Work>> subscriptions = new(StringComparer.Ordinal);
+    /// <summary>The receiver triggers a loaded card's `end_on` abilities name. An ending is a third consumer of a
+    /// binding besides a mounted entry and a `g-wait`: the event is walked so the effects it ends end on the tick it
+    /// lands in, and no entry point is dispatched for it.</summary>
+    private readonly HashSet<string> endOnBindings = new(StringComparer.Ordinal);
+    private static readonly List<Work> NoWork = new();
     private readonly PriorityQueue<Pending, (long Tick, long Sequence)> queue = new();
     private readonly Dictionary<string, string> history = new(StringComparer.Ordinal);
     private readonly HashSet<(string Provider, string Scope)> cancelled = new();
@@ -96,6 +101,17 @@ public sealed partial class RuntimeKernel
         /// and it is recomputed rather than trusted.</summary>
         internal IReadOnlyList<PendingPlan>? PlanUsage;
         internal long PlanUsageGeneration = -1;
+        /// <summary>The work this dispatch may actually walk: the enqueue's claim once a plan unloaded since is
+        /// dropped, and once the gate has dropped the entries whose options refuse this activation. Null until the
+        /// gate has been asked, which is what distinguishes "not decided yet" from "everything was admitted".</summary>
+        internal IReadOnlyList<Work>? Admitted;
+        /// <summary>The tick <see cref="Admitted"/> was decided in. A queued dispatch waits its turn, and a plan may
+        /// load or unload while it waits, so the gate is asked in the tick the dispatch runs in and this is what says
+        /// whether it already has been.</summary>
+        internal long DecidedTick = -1;
+        /// <summary>The entry points this dispatch asked a gate about and was refused: the refusals this same
+        /// computation produced, reported once so a receipt that names them is not written twice.</summary>
+        internal List<TriggerGateReceipt>? GateRefusals;
         /// <summary>The first half of every step's command identity: the publisher and the event, quoted by the
         /// JSON encoder, so a step appends its own precomputed half instead of serializing a four-element array.</summary>
         internal string? CommandPrefix;
@@ -192,6 +208,8 @@ public sealed partial class RuntimeKernel
             registry.EntityObservers.Remove(key);
         foreach (var key in registry.EntityInstanceResolvers.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
             registry.EntityInstanceResolvers.Remove(key);
+        foreach (var key in registry.EntityInstances.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
+            registry.EntityInstances.Remove(key);
         // A candidate source is claimed per kind and one kind has exactly one owner, so the kinds go with the
         // provider: a leftover would refuse the replacement provider's claim as a conflict and would keep handing
         // a query step entities the kernel no longer has any provider for.
@@ -223,6 +241,11 @@ public sealed partial class RuntimeKernel
             registry.OwnerSessions.Remove(key);
         for (var slot = 0; slot < handleSlots.Count; slot++)
             if (handleSlots[slot] is { Active: true } entry && entry.ProviderId == provider) ReleaseHandle(slot);
+        // With the handles go the effects that named them: the module is called back while its own registration
+        // still exists, so the native state it wrote is undone rather than left running for a provider that is gone.
+        ReclaimEffectProvider(provider, CurrentTick);
+        foreach (var key in registry.EffectRestores.Where(x => x.Value.Owner == provider).Select(x => x.Key).ToArray())
+            registry.EffectRestores.Remove(key);
         foreach (var id in plans.Where(x => x.Value.Modules.ContainsKey(provider)).Select(x => x.Key).ToArray()) plans.Remove(id);
         UnregisterLogGate(provider);
         lifecycleGeneration++;
@@ -324,10 +347,11 @@ public sealed partial class RuntimeKernel
             Tick = CurrentTick, WorldEpoch = WorldEpoch, Path = path, Plan = plan, Permissions = permissions });
     }
     public bool UnloadPlan(string planId)
-    { Mutable(); var removed = plans.Remove(planId); if (removed) { ForgetVariables(planId); lifecycleGeneration++; RebuildSubscriptions(); } return removed; }
+    { Mutable(); var removed = plans.Remove(planId); if (removed) { ReclaimEffectPlan(planId, CurrentTick); ForgetVariables(planId); lifecycleGeneration++; RebuildSubscriptions(); } return removed; }
     private void RebuildSubscriptions()
     {
         subscriptions.Clear();
+        endOnBindings.Clear();
         foreach (var plan in plans.Values.OrderBy(p => p.Plan.Id, StringComparer.Ordinal))
             foreach (var entry in plan.Plan.Entries)
             {
@@ -335,22 +359,32 @@ public sealed partial class RuntimeKernel
                 // The template item names no subject: which entities a dispatch is about is decided by the mount
                 // comparison of that dispatch, and the claimed copy carries the answer.
                 work.Add(new Work(plan, entry, Array.Empty<EntityReference>()));
+                // The `end_on` abilities of the same plan, resolved at load to the receiver's trigger binding: a
+                // card that ends an effect when its receiver dies consumes that trigger whether or not it mounts an
+                // entry point of its own on it.
+                foreach (var step in entry.Steps)
+                    if (step.Effect is { } effect)
+                        foreach (var binding in effect.EndsOn) endOnBindings.Add(binding);
             }
         // The gates are refreshed here and nowhere else, because this is the one place the subscription table is
         // rebuilt: a publisher's own boolean changes exactly when the set of plans mounted on its binding does.
         RefreshSubscriptionGates();
     }
     /// <summary>
-    /// Recomputes every gate from the two things that consume a binding: a loaded plan mounted on it, and a
-    /// suspended `g-wait` naming it. Both make a publish reach somebody, so the gate is open while either is there,
-    /// and it is refreshed wherever one of the two tables changes.
+    /// Recomputes every gate from the three things that consume a binding: a loaded plan mounted on it, a suspended
+    /// `g-wait` naming it, and an `end_on` ability that ends an effect on it. All three make a publish reach
+    /// somebody, so the gate is open while any of them is there, and it is refreshed wherever one of the tables
+    /// changes.
     /// </summary>
     private void RefreshSubscriptionGates()
     {
         foreach (var gate in subscriptionGates.Values)
-            gate.HasSubscribers = subscriptions.ContainsKey(gate.BindingId) || waits.ContainsKey(gate.BindingId);
+            gate.HasSubscribers = Consumes(gate.BindingId);
     }
-    public bool HasSubscribers(string bindingId) { ReadThread(); return subscriptions.ContainsKey(bindingId); }
+    /// <summary>Whether anything in this kernel would read an event published on one binding.</summary>
+    private bool Consumes(string bindingId) =>
+        subscriptions.ContainsKey(bindingId) || waits.ContainsKey(bindingId) || endOnBindings.Contains(bindingId);
+    public bool HasSubscribers(string bindingId) { ReadThread(); return Consumes(bindingId); }
     /// <summary>The gate of one binding, resolved by its own provider. The binding must be the caller's: a publisher
     /// asks about its own trigger, and a gate handed to someone else would answer a question that is not theirs.</summary>
     internal RuntimeSubscriptionGate SubscriptionGate(string provider, string bindingId)
@@ -359,7 +393,7 @@ public sealed partial class RuntimeKernel
         RuntimeJson.Require(registry.Bindings.TryGetValue(bindingId, out var binding) && RuntimeJson.Text(binding, "providerId") == provider, "binding-owner", bindingId);
         if (!subscriptionGates.TryGetValue(bindingId, out var gate))
         {
-            gate = new RuntimeSubscriptionGate(bindingId) { HasSubscribers = subscriptions.ContainsKey(bindingId) || waits.ContainsKey(bindingId) };
+            gate = new RuntimeSubscriptionGate(bindingId) { HasSubscribers = Consumes(bindingId) };
             subscriptionGates.Add(bindingId, gate);
         }
         return gate;
@@ -375,12 +409,15 @@ public sealed partial class RuntimeKernel
             if (RuntimeJson.Text(entry.Value, "providerId") == provider) gates[entry.Key] = SubscriptionGate(provider, entry.Key);
         return gates;
     }
-    public void BeginWorld(long worldEpoch)
+    public void BeginWorld(long worldEpoch, long? gateSeed = null)
     {
         Mutable(); AcceptRuntimeWork(true); RuntimeJson.Integer(worldEpoch);
         RuntimeJson.Require(!worldStarted || worldEpoch > WorldEpoch, "world-epoch", "A new world must advance its epoch.");
         long? previousWorldEpoch = worldStarted ? WorldEpoch : null;
         StopScheduledSource(null, null, "world-ended"); StopStateSource(null, null, "world-ended");
+        // Every effect the old world holds is undone before the epoch moves: a module's restore callback is the
+        // only thing that can put a native instance back, and after this line the handles it names are gone.
+        ReclaimEffects(CurrentTick);
         WorldEpoch = worldEpoch; worldStarted = true; CurrentTick = -1; worldHost = null; scheduledThisTick = 0; deferredLogged = false;
         queue.Clear(); history.Clear(); cancelled.Clear(); planTickUsage.Clear(); eventsThisTick = commandsThisTick = 0;
         // A new world invalidates everything derived from the old one: the queue is gone, no plan's capture survives
@@ -392,8 +429,10 @@ public sealed partial class RuntimeKernel
         // publish theirs. The parent index is observations of a world too, so it starts empty with them.
         handleSlots.Clear(); controlWalk.Clear(); BeginActivation(); children.Clear();
         // A variable from the previous world names entities that no longer exist, and a suspended `g-wait` waits on
-        // an event of that world: values and latches go, the declarations the loaded plans own stay.
-        BeginVariableWorld();
+        // an event of that world: values and latches go, the declarations the loaded plans own stay. The gate
+        // store's die takes this world's seed here, drawn by the host that began the world; an explicit seed is
+        // what a test or a replay passes, and the checkpoint carries it from then on.
+        BeginVariableWorld(gateSeed ?? Random.Shared.NextInt64());
         relations = new RuntimeFactionRelations(Array.Empty<RuntimeFactionRelation>());
         LogWorldBegan();
         NotifyLifecycle(RuntimeLifecycleKind.WorldChanged, previousWorldEpoch);
@@ -427,7 +466,11 @@ public sealed partial class RuntimeKernel
                     ValidateEvent(waited, registry.Capabilities[RuntimeJson.Text(binding, "capabilityId")]);
                     WakeWaiters(waited);
                 }
-                return new DispatchResult("ignored", "no-consumer", value.EventId);
+                // An `end_on` ability is a consumer too, and the one consumer whose answer is a tick's decision
+                // rather than a handler's: the event is queued like any other so the effects it ends end inside the
+                // advance it lands in, and no entry point is dispatched for it.
+                else if (!endOnBindings.Contains(value.BindingId)) return new DispatchResult("ignored", "no-consumer", value.EventId);
+                registeredWork = NoWork;
             }
             RuntimeJson.Require(worldStarted && value.WorldEpoch == WorldEpoch, "stale-world", value.EventId);
             RuntimeJson.Text(value.EventId); RuntimeJson.Text(value.ScopeId);
@@ -457,7 +500,9 @@ public sealed partial class RuntimeKernel
             // carries. An event no plan claims is ignored here rather than queued, so a filtered-out trigger costs
             // the tick nothing.
             var work = ClaimedWork(registeredWork, snapshot);
-            if (work.Length == 0) return new DispatchResult("ignored", "attachment-mismatch", value.EventId);
+            // A dispatch no mounted card claims is ignored rather than queued — unless an `end_on` ability named
+            // this binding, whose reading is the event itself and not the mount that carried it.
+            if (work.Length == 0 && !endOnBindings.Contains(value.BindingId)) return new DispatchResult("ignored", "attachment-mismatch", value.EventId);
             // The claimed work is a decision of the enqueue, so the grouping and the command bound are computed here
             // once and travel with the item: the budget question the tick asks is answered from these numbers
             // instead of rebuilding the same groups.
@@ -626,6 +671,7 @@ public sealed partial class RuntimeKernel
         ownerOutputs.Clear();
         var commands = new List<CommandReceipt>(); var events = new List<EventReceipt>(); var processed = 0; var executed = 0;
         var scheduleReports = new List<ScheduleReceipt>(); var leaseReports = new List<StateLeaseReceipt>();
+        var gateRefusals = new List<TriggerGateReceipt>();
         advancing = true;
         try
         {
@@ -643,6 +689,10 @@ public sealed partial class RuntimeKernel
                 return new TickResult(0, 0, 0, commands, events) { Schedules = scheduleReports.AsReadOnly(), StateLeases = leaseReports.AsReadOnly() };
             }
             CleanScheduledLifetimes(scheduleReports); CleanStateLifetimes(leaseReports); CleanHandleLifetimes();
+            // The effect pass runs before the queue is walked and owns its own receipts: a layer's period re-runs an
+            // action that is already applied, which is not a second arrival at the event that applied it.
+            pulseReceipts = commands; pulseEvents = events; pulseFacts.Clear();
+            CleanEffectLifetimes();
             while (queue.TryPeek(out var pending, out var priority) && priority.Tick <= simulationTick)
             {
                 if (pending.Schedule != null && !PreparePulse(pending, scheduleReports)) continue;
@@ -687,14 +737,34 @@ public sealed partial class RuntimeKernel
                     LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "source-lifecycle", pending.Provider);
                     events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "source-lifecycle")); continue;
                 }
+                // The `end_on` abilities are read before the walk: an effect a receiver's own event ends is over by
+                // the time the same dispatch could apply it again, and nothing is dispatched for the ending event.
+                EndEffectOn(pending.Event);
                 var groups = PendingPlans(pending, out var active);
+                if (pending.GateRefusals is { } refusals)
+                {
+                    // The gate's own answer, recorded before the walk: which entry was refused and which of its
+                    // options refused it is the whole of what a plan author has to debug with.
+                    gateRefusals.AddRange(refusals);
+                    foreach (var refusal in refusals) LogGateRefused(refusal, pending.Event.BindingId, pending.Event.EventId);
+                }
                 var count = 0;
                 foreach (var group in groups) count += group.Steps;
                 if (active.Count == 0)
                 {
-                    if (pending.Schedule != null) EndSchedule(pending.Schedule, "cancelled", "plan-unloaded");
-                    LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, "plan-unloaded", pending.Provider);
-                    events.Add(new EventReceipt(pending.Event.EventId, "cancelled", "plan-unloaded")); continue;
+                    if (pending.Work.Count == 0)
+                    {
+                        // The dispatch was queued for the `end_on` abilities it ends and nothing else: no card
+                        // claimed it, so it is an event nobody consumed rather than a plan that went away.
+                        events.Add(new EventReceipt(pending.Event.EventId, "ignored", "no-consumer")); continue;
+                    }
+                    // A dispatch every claimed entry refused is not a dispatch with nothing left to do: the plans
+                    // are loaded and their cards matched, and the gate is the reason nothing ran.
+                    var gated = pending.GateRefusals is { Count: > 0 };
+                    var code = gated ? "gate-refused" : "plan-unloaded";
+                    if (pending.Schedule != null) EndSchedule(pending.Schedule, "cancelled", code);
+                    LogEventCancelled(pending.Event.BindingId, pending.Event.EventId, code, pending.Provider);
+                    events.Add(new EventReceipt(pending.Event.EventId, gated ? "rejected" : "cancelled", code)); continue;
                 }
                 if (pending.Schedule != null && !AdmitPulse(pending, scheduleReports))
                 {
@@ -846,9 +916,25 @@ public sealed partial class RuntimeKernel
                                 // here, and nothing about the walk is special to an action.
                                 var handler = registry.Handlers[step.BindingId];
                                 LogStepStarted(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId);
-                                currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(inputs), isHost);
+                                // A step whose card carries a duration option opens its effect before the handler
+                                // runs: the handle is the kernel's, and the clock and the layer count are only made
+                                // real once the command says it committed. A `handle-budget` refusal here is a
+                                // pre-invocation failure like any other, so nothing is written for it.
+                                var inputFrame = RuntimeJson.From(inputs);
+                                var effect = step.Effect is { } duration ? BeginEffect(step, duration, item.Plan.Plan, inputFrame, pending.Event, CommandPrefixOf(pending)) : null;
+                                if (effect != null && pending.Schedule == null) pulseFacts[step.BindingId] = pending;
+                                currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, inputFrame, isHost, EntityInstance)
+                                {
+                                    EffectHandle = effect?.Slot.Handle,
+                                    // The count is what this application leaves behind, not what stands before it:
+                                    // a fresh instance is its first layer even though the layer is only committed
+                                    // once the command says it committed, and an application at the cap adds none.
+                                    EffectStacks = effect == null ? null : effect.Slot.Layers.Count + (effect.AddLayer ? 1 : 0),
+                                    EffectAddLayer = effect?.AddLayer ?? false
+                                };
                                 executed++; invoked = true;
                                 result = NormalizeInvokedResult(handler(currentCommand));
+                                if (effect != null) CommitEffect(effect, result, simulationTick, commandId, ref result);
                                 if (result.Facts.Count > 0) PublishConfirmedFacts(result, step.BindingId, pending, simulationTick, events);
                             }
                         }
@@ -899,11 +985,12 @@ public sealed partial class RuntimeKernel
                 if (!failed) events.Add(new EventReceipt(pending.Event.EventId, "processed", "dispatched"));
             }
         }
-        finally { currentCommand = null; currentEventRows = null; advancing = false; }
+        finally { currentCommand = null; currentEventRows = null; advancing = false; pulseReceipts = null; pulseEvents = null; pulseFacts.Clear(); }
         return new TickResult(processed, executed, queue.Count, commands, events)
         {
             Schedules = scheduleReports.AsReadOnly(),
             StateLeases = leaseReports.AsReadOnly(),
+            GateRefusals = gateRefusals.Count == 0 ? Array.Empty<TriggerGateReceipt>() : gateRefusals.ToArray(),
             // The intents are handed out with the tick that decided them, which is what makes "the host decided
             // the timing" true: a caller that reads this result holds exactly the presentations of this advance.
             Presentations = presentationOutputs.Count == 0 ? Array.Empty<PresentationOutput>() : presentationOutputs.ToArray(),
@@ -937,18 +1024,86 @@ public sealed partial class RuntimeKernel
     /// before it is walked is a plan unloading, which is exactly what the lifecycle generation reports. While the
     /// number stands still the enqueue's own grouping is the answer, and the same question asked twice — by the
     /// budget check and then by the walk — is answered once.
+    ///
+    /// The gate is asked here rather than at the enqueue because it is a decision about a dispatch, not about a
+    /// claim, and it is asked exactly once because it charges what it admits: <see cref="Pending.Admitted"/> is the
+    /// answer, and a recomputation after a plan unloaded gates what survived instead of recharging what was already
+    /// admitted.
     /// </summary>
     private IReadOnlyList<PendingPlan> PendingPlans(Pending pending, out IReadOnlyList<Work> active)
     {
-        if (pending.PlanUsage != null && pending.PlanUsageGeneration == lifecycleGeneration)
-        { active = pending.Work; return pending.PlanUsage; }
+        if (pending.Admitted is { } admitted && pending.PlanUsageGeneration == lifecycleGeneration
+            && pending.DecidedTick == CurrentTick)
+        { active = admitted; return pending.PlanUsage!; }
         var live = new List<Work>();
         for (var i = 0; i < pending.Work.Count; i++)
             if (plans.TryGetValue(pending.Work[i].Plan.Plan.Id, out var loaded) && ReferenceEquals(loaded, pending.Work[i].Plan)) live.Add(pending.Work[i]);
         active = live;
-        var usage = PlanUsageOf(live);
-        pending.PlanUsage = usage; pending.PlanUsageGeneration = lifecycleGeneration;
+        pending.GateRefusals = null;
+        if (triggerGates.HasGates && pending.Schedule == null) active = GateWork(pending, live);
+        var usage = PlanUsageOf(active);
+        pending.Admitted = active; pending.PlanUsage = usage;
+        pending.PlanUsageGeneration = lifecycleGeneration; pending.DecidedTick = CurrentTick;
         return usage;
+    }
+    /// <summary>
+    /// Drops the work items whose entry point's own trigger options refuse this activation, asking each entry once
+    /// however many subjects it claimed. The question is per activation, not per subject: a threshold counts the
+    /// events a card matched, so one event that claims three enemies is one arrival.
+    ///
+    /// Only an event dispatch is gated. A schedule pulse is a control step's own clock and a `g-wait` resumption is
+    /// the continuation of an activation a gate already admitted, so neither is a second arrival at the card.
+    /// </summary>
+    private List<Work> GateWork(Pending pending, List<Work> live)
+    {
+        var admitted = new List<Work>(live.Count);
+        // The entry points already asked, so one activation that claimed several subjects is one arrival: a
+        // threshold counts the events a card matched, not the entities each of them expanded to.
+        var asked = new HashSet<(LoadedPlan Plan, string Node)>();
+        for (var i = 0; i < live.Count; i++)
+        {
+            var item = live[i];
+            var planId = item.Plan.Plan.Id;
+            if (!triggerGates.TryEntries(planId, out var entries) || !entries.TryGetValue(item.Entry.NodeId, out var gate))
+            { admitted.Add(item); continue; }
+            if (!asked.Add((item.Plan, item.Entry.NodeId))) { admitted.Add(item); continue; }
+            var player = GatePlayer(gate, pending.Event, item);
+            var verdict = triggerGates.Admit(planId, item.Entry.NodeId, gate, CurrentTick, player,
+                GateInstance(gate, item), GateResolver(gate, item), pending.Event.Outputs,
+                pending.GateRefusals ??= new List<TriggerGateReceipt>());
+            if (verdict) admitted.Add(item);
+        }
+        // Nothing was refused: the caller keeps the list it built, with no second copy of a dispatch's work.
+        return admitted.Count == live.Count ? live : admitted;
+    }
+    /// <summary>
+    /// The entity a per-instance trigger option is booked against: the entity this plan's own mount target accepted
+    /// for this event, which is the instance the card counts and the one whose death drops the count. Only a
+    /// per-instance gate is asked, because that is the only scope whose subject is the mount rather than the event.
+    /// </summary>
+    private static EntityReference? GateInstance(TriggerGateOptions gate, Work item)
+        => gate.Scope == TriggerGateContract.InstanceScope && item.Subjects.Count == 1 ? item.Subjects[0] : null;
+
+    /// <summary>The resolver a per-instance gate asks whether its booked entity is still part of the world: the
+    /// entity's own kind decides, and a kind nothing resolves counts as current.</summary>
+    private Func<EntityReference, bool>? GateResolver(TriggerGateOptions gate, Work item)
+    {
+        if (gate.Scope != TriggerGateContract.InstanceScope || item.Subjects.Count != 1) return null;
+        return registry.Resolvers.TryGetValue(RuntimeJson.KindOf(item.Subjects[0].Id), out var resolver)
+            ? resolver.Resolve : null;
+    }
+    /// <summary>
+    /// The entity a per-player trigger option is charged against: the event's own `instigator` where it names one,
+    /// and otherwise the entity the plan's mount accepted for this event. A player-caused event carries the player,
+    /// and an event about one entity is charged to that entity — both are "the player this is about", and a gate
+    /// with a per-player booking refuses rather than guesses where the event carries neither. Only a per-player gate
+    /// is asked: the other two scopes book the level and the mount, and neither reads the event's actors.
+    /// </summary>
+    private static EntityReference? GatePlayer(TriggerGateOptions gate, RuntimeEvent value, Work item)
+    {
+        if (gate.Scope != TriggerGateContract.PlayerScope) return null;
+        var instigator = RuntimeActorRoles.FromTriggerEvent(value, item.Subjects).Get("instigator");
+        return instigator ?? (item.Subjects.Count == 1 ? item.Subjects[0] : null);
     }
     /// <summary>The work of one dispatch grouped by plan, in the order the plans were first claimed, with each
     /// plan's command bound. One pass, no grouping object and no closure: the numbers are read as often as the

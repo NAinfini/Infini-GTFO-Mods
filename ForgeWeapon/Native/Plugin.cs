@@ -51,7 +51,11 @@ public sealed class Plugin : BasePlugin
                     // reload, placement, device and melee patches are installed with the ones it already had.
                     foreach (var type in WeaponNativeHooks.Installed)
                         harmony.CreateClassProcessor(type).Patch();
-                }, harmony.UnpatchSelf, Paths.BepInExRootPath);
+                }, harmony.UnpatchSelf, Paths.BepInExRootPath,
+                // The one body whose signature a game-free build cannot carry: the launch row's spawn call reaches
+                // a native prefab. It is built from this side, so the session declares the row only because a body
+                // was really supplied for it, and the body's own readiness gate is the session's.
+                gate => new WeaponProjectileActions(kernel, gate, message => Log.LogWarning(message)).Launch);
             Log.LogInfo("Forge Weapon authored equipment, shot, hit, reload, melee-hit and deployed-device facts"
                 + " with gtfo.player owners, and executes the game's own enemy tag, the ammunition add/consume"
                 + " pair, the three weapon instance overrides and the inventory give/consume pair; native bindings"

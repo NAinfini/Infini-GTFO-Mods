@@ -32,19 +32,23 @@ internal sealed record StepInput(string Name, string? EventPort, JsonElement? Li
 /// the owner are decided once instead of at every dispatch. <see cref="CommandSuffix"/> is the second half of this
 /// step's command identity — the plan and the node, quoted by the JSON encoder — so a dispatch composes the identity
 /// from two strings instead of serializing a four-element array per step.</summary>
+/// <summary>One step's own duration options, resolved once at load: null where the card declared no `effect`
+/// block, in which case the action is the fire-and-forget write it always was.</summary>
 internal sealed record ResolvedStep(string NodeId, string NodeKind, string BindingId, int BindingIndex, int HandlerIndex,
     JsonElement Parameters, IReadOnlyList<StepInput> Inputs, IReadOnlySet<string> Promoted, IReadOnlyList<int?> Successors,
     JsonElement Contract, StepFrames Frames, string ProviderId, string CapabilityId, string Execution, string CommandSuffix,
-    string? Control = null, string? ValuePort = null);
+    string? Control = null, string? ValuePort = null, EffectOptions? Effect = null);
 
 /// <summary>One compiled entrypoint: dispatch starts at <see cref="Start"/> (an index into <see cref="Steps"/>,
 /// always an `action` or `control` step) and follows `successors`; `pure` steps are read on demand, never dispatched.
 /// <see cref="TriggerContract"/> is the entry's trigger graph: its outputs are the event payload frame's ports.
 /// <see cref="Scope"/> is the map object this entry's trigger is attached to, as the canonical address the plan
 /// carries, or null for a trigger attached to no one object (rule 143.11): an entry with a scope is dispatched only
-/// for events whose own subject is that object, and an entry without one for every event of its binding.</summary>
+/// for events whose own subject is that object, and an entry without one for every event of its binding.
+/// <see cref="Gate"/> is the entry's own trigger options, resolved once at load: null where the card declares none,
+/// in which case every dispatch the entry claims is walked.</summary>
 internal sealed record ResolvedEntry(string NodeId, string BindingId, int Start, IReadOnlyList<ResolvedStep> Steps, JsonElement TriggerContract,
-    string? Scope = null)
+    string? Scope = null, TriggerGateOptions? Gate = null)
 {
     /// <summary>Upper bound on commands one dispatch of this entry can produce: only `action`/`control` steps are
     /// ever placed on the walked path; `pure` and `query` steps are read on demand and never appear in
@@ -208,7 +212,8 @@ internal static class RuntimePlan
     }
     private sealed record Node(string Id, string Kind, string BindingId, int HandlerIndex, JsonElement Graph, JsonElement Parameters,
         JsonElement[] Constants, JsonElement Contract, IReadOnlySet<string> Promoted,
-        string? Control = null, int BodyOutput = -1, string? ValuePort = null, string? TriggerAddress = null);
+        string? Control = null, int BodyOutput = -1, string? ValuePort = null, string? TriggerAddress = null,
+        EffectOptions? Effect = null);
 
     /// <summary>The first slice of validation, shared by <see cref="Parse"/> and <see cref="PeekIdentity"/>: shape, version,
     /// runtime lock, authority/failure policy and the planId/resource identity. A file that fails here has no identity and
@@ -320,6 +325,7 @@ internal static class RuntimePlan
             RuntimeJson.Require(expectedAuthority.Contains(executionAuthority)
                 && RuntimeJson.Strings(graph.GetProperty("domains")).Contains(domain, StringComparer.Ordinal), "node-domain-authority", nodeId);
             string? control = null; var bodyOutput = -1; string? valuePort = null; string? triggerAddress = null;
+            EffectOptions? effect = null;
             var definitions = RuntimeJson.Rows(graph, "parameters");
             RuntimeJson.Require(definitions.All(p => RuntimeJson.Text(p, "type") != "recipient-policy"), "unsupported-parameter", nodeId);
             var layout = row.GetProperty("layout");
@@ -379,6 +385,49 @@ internal static class RuntimePlan
                     RuntimeJson.Require(RuntimeJson.Text(binding, "role") == "execute", "binding-role", nodeId);
                     RuntimeJson.Require(registry.Handlers.ContainsKey(bindingId), "action-handler", nodeId);
                     RuntimeJson.Require(inputExecution.Length == 1 && !RuntimeJson.Flag(inputExecution[0], "optional") && outputExecution.Length <= 1, "action-shape", nodeId);
+                    // The step's own duration options (plan §3.4 动作卡). They are read here, once, because every
+                    // one of them is an answer a handler would otherwise have to keep a clock for: the kernel owns
+                    // the handle and the timing, and a card may only ask for one where the module that applies the
+                    // effect registered the callback that ends it.
+                    effect = EffectOptions.Parse(row);
+                    if (effect != null)
+                    {
+                        RuntimeJson.Require(executionAuthority == "host", "effect-tier",
+                            "effect belongs to a host action: only the authoritative side may keep a clock a replica has to agree with.");
+                        var retains = registry.EffectRestores.ContainsKey(bindingId);
+                        // An action that changes persistent native state registers the callback that undoes it, and
+                        // only such an action may carry a duration at all. An action that only runs once per period
+                        // — damage, healing, stamina — changes nothing that has to be given back, so a period is
+                        // exactly what it is allowed to carry without a callback (plan §3.2 I-PLAN 适用范围).
+                        RuntimeJson.Require(retains || effect.Interval != null, "effect-unsupported",
+                            "This action declares no restore callback, so it may only carry a periodic effect (effect.interval).");
+                        RuntimeJson.Require(!effect.Cancel || RuntimeKernel.EffectHandlePort(graph) != null, "effect-handle",
+                            "effect.cancel needs an effect handle output on the row.");
+                        // Every `end_on` ability is resolved once, here, to the trigger binding that carries it and
+                        // to the kinds it can be about: an ability that cannot be about a receiver of this action
+                        // could never end it, which is a card worth refusing rather than a field nothing reads.
+                        var endsOn = new List<string>(effect.EndsOn.Count);
+                        foreach (var ability in effect.EndsOn)
+                        {
+                            RuntimeJson.Require(registry.Capabilities.TryGetValue(ability, out var endsCapability)
+                                && RuntimeJson.Text(endsCapability, "kind") == "trigger", "effect-end-on",
+                                "effect.end_on names an ability this registry does not carry as a trigger: " + ability);
+                            RuntimeJson.Require(endsCapability.TryGetProperty("graph", out var endsGraph)
+                                && RuntimeKernel.EndOnCovers(endsGraph, graph), "effect-end-on",
+                                "effect.end_on names a trigger whose subject kinds do not cover this action's receivers: " + ability);
+                            var triggerBinding = registry.Bindings.Values.FirstOrDefault(candidate =>
+                                RuntimeJson.Text(candidate, "capabilityId") == ability);
+                            RuntimeJson.Require(triggerBinding.ValueKind == JsonValueKind.Object, "effect-end-on",
+                                "effect.end_on names a trigger nothing binds: " + ability);
+                            var triggerBindingId = RuntimeJson.Text(triggerBinding, "id");
+                            endsOn.Add(triggerBindingId);
+                            // The receiver's trigger is a binding this plan consumes, so it belongs to the plan's
+                            // binding lock like every row's own binding: the ending is read from a dispatch on it,
+                            // and a lock that left it out would let the plan run against a provider it never named.
+                            used.Add(triggerBindingId);
+                        }
+                        effect = effect with { EndOn = endsOn };
+                    }
                     break;
                 case "control":
                     RuntimeJson.Require(RuntimeJson.Text(binding, "role") == "execute", "binding-role", nodeId);
@@ -445,7 +494,7 @@ internal static class RuntimePlan
             // moved, not validated as a value.
             foreach (var port in (kind == "trigger" ? outputs : kind is "pure" or "query" ? outputs : inputs).Where(p => RuntimeJson.Text(p, "type") != "execution"))
                 RuntimeJson.Require(MovablePort(port), kind == "trigger" ? "unsupported-event-port" : "unsupported-input-port", nodeId + "." + RuntimeJson.Text(port, "id"));
-            return new Node(nodeId, kind, bindingId, HandlerIndex(bindingId), graph, parameters, constants, authoritative, promoted, control, bodyOutput, valuePort, triggerAddress);
+            return new Node(nodeId, kind, bindingId, HandlerIndex(bindingId), graph, parameters, constants, authoritative, promoted, control, bodyOutput, valuePort, triggerAddress, effect);
         }
 
         /// <summary>
@@ -633,9 +682,13 @@ internal static class RuntimePlan
         var entryContracts = new List<EntryContract>();
         var entryStart = new List<int>();
         var entryTrigger = new List<(string NodeId, string BindingId, JsonElement Contract, string? TriggerAddress)>();
+        // One entry's trigger options, or null where its card declares none. Parsed here and carried on the
+        // entrypoint: the options are a structural property of the entry, so nothing about them is re-read per event.
+        var entryGate = new List<TriggerGateOptions?>();
         foreach (var entry in entryRows)
         {
-            RuntimeJson.Shape(entry, "nodeId binding layout start steps");
+            RuntimeJson.Shape(entry, "nodeId binding layout start steps", "gate");
+            var gate = TriggerGateContract.Parse(entry, attachments);
             var trigger = Load(entry, "trigger");
             var eventPorts = RuntimeJson.Rows(trigger.Contract, "outputs");
             var stepRows = RuntimeJson.Rows(entry, "steps", ceiling.MaxStepsPerEntrypoint);
@@ -644,7 +697,7 @@ internal static class RuntimePlan
             for (var i = 0; i < stepRows.Length; i++)
             {
                 var stepRow = stepRows[i];
-                RuntimeJson.Shape(stepRow, "nodeId nodeKind binding layout inputs successors");
+                RuntimeJson.Shape(stepRow, "nodeId nodeKind binding layout inputs successors", "effect");
                 var nodeKind = RuntimeJson.Text(stepRow, "nodeKind");
                 RuntimeJson.Require(nodeKind is "action" or "control" or "pure" or "query", "node-kind", RuntimeJson.Text(stepRow, "nodeId"));
                 nodes[i] = Load(stepRow, nodeKind);
@@ -676,7 +729,13 @@ internal static class RuntimePlan
             }
             var presentBranch = PresentBranch(nodes, successors, startIndex);
             var stepInputs = new List<StepInput>[stepRows.Length];
-            for (var i = 0; i < stepRows.Length; i++) stepInputs[i] = ResolveInputs(i, stepRows[i], nodes[i], eventPorts, nodes, presentBranch);
+            for (var i = 0; i < stepRows.Length; i++)
+            {
+                stepInputs[i] = ResolveInputs(i, stepRows[i], nodes[i], eventPorts, nodes, presentBranch);
+                // Proof travels with the producer, not with the downstream consumer's desired kind.
+                nodes[i] = nodes[i] with { Contract = RuntimeEntityKindFlow.Resolve(nodes[i].Contract,
+                    input => stepInputs[i].FirstOrDefault(value => value.Name == input)?.Port) };
+            }
             // Edge direction: a successor always names a strictly later step; a pure read always names a strictly earlier one.
             for (var i = 0; i < stepRows.Length; i++)
                 foreach (var next in successors[i])
@@ -732,6 +791,7 @@ internal static class RuntimePlan
             entryNodes.Add(nodes);
             entryStart.Add(start);
             entryTrigger.Add((trigger.Id, trigger.BindingId, trigger.Contract, trigger.TriggerAddress));
+            entryGate.Add(gate);
         }
         RuntimeJson.Require(entryContracts.Count > 0 && total <= ceiling.MaxTotalSteps, "plan-step-budget", id);
         // Per-trigger command bound: every entrypoint of one trigger contributes its dispatchable steps, and a
@@ -770,10 +830,10 @@ internal static class RuntimePlan
                     entryNodes[entry][i].Parameters, step.Inputs, step.Promoted, step.Successors, step.Contract, frame.Steps[stepOffset + i],
                     RuntimeJson.Text(binding, "providerId"), capabilityId, execution,
                     "," + RuntimeJson.Quote(id) + "," + RuntimeJson.Quote(step.NodeId) + "]",
-                    entryNodes[entry][i].Control, entryNodes[entry][i].ValuePort));
+                    entryNodes[entry][i].Control, entryNodes[entry][i].ValuePort, entryNodes[entry][i].Effect));
             }
             stepOffset += steps.Count;
-            resolved.Add(new ResolvedEntry(entryContracts[entry].NodeId, entryTrigger[entry].BindingId, entryStart[entry], steps, entryContracts[entry].Trigger, entryTrigger[entry].TriggerAddress));
+            resolved.Add(new ResolvedEntry(entryContracts[entry].NodeId, entryTrigger[entry].BindingId, entryStart[entry], steps, entryContracts[entry].Trigger, entryTrigger[entry].TriggerAddress, entryGate[entry]));
         }
         return new ResolvedPlan(id, resourceId, revision, domain, limits, resolved, closure, RuntimeJson.StableText(plan), permissions, attachments, frame, variableRows);
     }

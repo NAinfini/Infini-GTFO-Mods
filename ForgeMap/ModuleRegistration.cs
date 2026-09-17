@@ -40,9 +40,11 @@ public static class ModuleRegistration
         RuntimeJson.Parse(EnvironmentContract.EnvironmentStateCapabilityJson),
         RuntimeJson.Parse(EnvironmentContract.ZoneLightsCapabilityJson),
         RuntimeJson.Parse(HudContract.ValueCapabilityJson),
-        // The three scan/wave execute rows and their resource kinds (ruling 129.4; the two alarm rows were
-        // deleted by a later ruling — an alarm is the chained puzzle `scan_start` activates).
-        RuntimeJson.Parse(AlarmWaveContract.ScanStartCapabilityJson),
+        // The three scan/wave execute rows and their resource kinds: the scan row is one instance kind's three
+        // interactions (`start`/`complete`/`reset`), and a door's alarm is that same instance rather than a row
+        // of its own. The alarm action was deleted: a plan reads the door's puzzle from
+        // `forge.query.map.door_state`'s `puzzle` output and starts it through this row.
+        RuntimeJson.Parse(AlarmWaveContract.ScanStateCapabilityJson),
         RuntimeJson.Parse(AlarmWaveContract.WaveStartCapabilityJson),
         RuntimeJson.Parse(AlarmWaveContract.WaveStopCapabilityJson),
         // The `v-obj` value row, and the level-event family's own rows: its eight trigger bindings name canonical
@@ -55,6 +57,21 @@ public static class ModuleRegistration
     }
         .Concat(LevelEventContract.CapabilityRows())
         .Concat(TriggerZoneContract.CapabilityRows())
+        // map-a: the world-event family's three rows — the two trigger components a world event object carries and
+        // the one action that sets a condition slot. Declared by their own contract, appended here.
+        .Concat(WorldEventContract.CapabilityRows())
+        // map-a: the objective-event family's two rows — the sub-objective text a level event writes and the step a
+        // progression objective advances by. Declared by their own contract, appended here.
+        .Concat(ObjectiveEventContract.CapabilityRows())
+        // generic-map-objects: the interaction-prompt row the stopped EOS security-door feature folds into, and
+        // the row the stopped door-terminal feature folds into. The wave-tuning rows are gone: that source is a
+        // level field, applied from the package document at level load and not an action.
+        .Concat(InteractionTextContract.CapabilityRows())
+        .Concat(TerminalContentContract.CapabilityRows())
+        // generic-map-objects: the one map-object state row — the interaction switch the EOS object-state and
+        // terminal-active rows fold into. The alarm switch the retired `door_alarm` folded into was deleted by
+        // the rulings: a door's alarm is the scan row's own instance kind.
+        .Concat(MapStateContract.CapabilityRows())
         .ToArray();
 
     /// <summary>Every capability row of the registration, in the order the contracts declare them: the terminal
@@ -74,6 +91,12 @@ public static class ModuleRegistration
         .Concat(new object[] { MovementProfileContract.Row() })
         .Concat(PlayerStateContract.ValueRows())
         .Concat(new object[] { PlayerCommandContract.DownRow() })
+        // generic-player: the impulse, stamina and two presentation rows of this batch, plus the movement-state
+        // query row. Declared by their own contracts, appended here like every other family's.
+        .Concat(new object[] { CombatImpulseContract.Row() })
+        .Concat(new object[] { PlayerStaminaContract.Row() })
+        .Concat(new object[] { PlayerMovementStateContract.CapabilityRow() })
+        .Concat(PresentationActionContract.CapabilityRows())
         .ToArray();
 
     /// <summary>Every binding row, in the same order as the capabilities above: one row per handler this provider
@@ -99,6 +122,19 @@ public static class ModuleRegistration
         .Concat(LevelEventContract.BindingRows())
         .Concat(TriggerZoneContract.BindingRows())
         .Concat(new object[] { RuntimeJson.Parse(LevelObjectiveValueContract.BindingRowJson) })
+        // map-a: the world-event family's two observe bindings and its one execute binding.
+        .Concat(WorldEventContract.BindingRows())
+        // map-a: the objective-event family's two execute bindings.
+        .Concat(ObjectiveEventContract.BindingRows())
+        // generic-map-objects: one binding per folded row, in the same order as the capability rows above.
+        .Concat(InteractionTextContract.BindingRows())
+        .Concat(TerminalContentContract.BindingRows())
+        .Concat(MapStateContract.BindingRows())
+        // generic-player: one binding per row above, in the same order.
+        .Concat(new object[] { CombatImpulseContract.BindingRow() })
+        .Concat(new object[] { PlayerStaminaContract.BindingRow() })
+        .Concat(new object[] { PlayerMovementStateContract.BindingRow() })
+        .Concat(PresentationActionContract.BindingRows())
         .ToArray();
 
     /// <summary>One support row per implemented binding, each carrying the permission its own contract declares.
@@ -125,6 +161,19 @@ public static class ModuleRegistration
         .Concat(LevelEventContract.Supports())
         .Concat(TriggerZoneContract.Supports())
         .Concat(new[] { LevelObjectiveValueContract.Support() })
+        // map-a: one support row per world-event binding.
+        .Concat(WorldEventContract.Supports())
+        // map-a: one support row per objective-event binding.
+        .Concat(ObjectiveEventContract.Supports())
+        // generic-map-objects: one support row per folded binding.
+        .Concat(InteractionTextContract.Supports())
+        .Concat(TerminalContentContract.Supports())
+        .Concat(MapStateContract.Supports())
+        // generic-player: one support row per binding above, in the same order.
+        .Concat(new[] { CombatImpulseContract.Support() })
+        .Concat(new[] { PlayerStaminaContract.Support() })
+        .Concat(new[] { PlayerMovementStateContract.Support() })
+        .Concat(PresentationActionContract.Supports())
         .ToArray();
 
     /// <summary>The one shape table the registration carries: this declaration's own entries — the two selectors
@@ -161,6 +210,19 @@ public static class ModuleRegistration
         foreach (var (name, shape) in AlarmWaveContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in LevelEventContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in LevelObjectiveValueContract.Shapes()) shapes[name] = shape;
+        // map-a: the world-event condition action's port layout.
+        foreach (var (name, shape) in WorldEventContract.Shapes()) shapes[name] = shape;
+        // map-a: the objective-event family's two handler layouts.
+        foreach (var (name, shape) in ObjectiveEventContract.Shapes()) shapes[name] = shape;
+        // generic-map-objects: the folded rows' port layouts, read from the same contracts their rows come from.
+        foreach (var (name, shape) in InteractionTextContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in TerminalContentContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in MapStateContract.Shapes()) shapes[name] = shape;
+        // generic-player: the batch's port layouts, read from the same contracts their rows come from.
+        foreach (var (name, shape) in CombatImpulseContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in PlayerStaminaContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in PlayerMovementStateContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in PresentationActionContract.Shapes()) shapes[name] = shape;
         return shapes;
     }
 

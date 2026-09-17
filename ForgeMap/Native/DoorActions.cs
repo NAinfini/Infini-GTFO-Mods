@@ -16,34 +16,6 @@ internal enum DoorBypassPolicy
     Force
 }
 
-/// <summary>What a close request may do about a body standing in the doorway. The door's own interaction entry
-/// carries no occupancy decision, so `Crush` is refused rather than quietly run as a normal close.</summary>
-internal enum DoorOccupancyPolicy
-{
-    /// <summary>Do not displace anything: the door's own interaction entry is asked and nothing overrides it.</summary>
-    Block,
-    /// <summary>Displace whatever stands in the doorway. No native entry takes this decision.</summary>
-    Crush
-}
-
-/// <summary>What a close request may do about the door's own resistance. The door's interaction entry has no
-/// force form, so `Force` is refused rather than reported as a close.</summary>
-internal enum DoorForcePolicy
-{
-    /// <summary>The door's own interaction entry decides whether it may close.</summary>
-    Normal,
-    /// <summary>Close whatever the door's own state says. No native entry takes this decision.</summary>
-    Force
-}
-
-internal enum DoorAlarmMode
-{
-    /// <summary>Start the door's own alarm puzzle.</summary>
-    Start,
-    /// <summary>Stop the door's own alarm puzzle.</summary>
-    Stop
-}
-
 /// <summary>
 /// The door half of the native execution layer: one method per door action, each taking the instance the address
 /// layer resolved and the address it was resolved through, and each writing through the door's or its lock
@@ -52,10 +24,10 @@ internal enum DoorAlarmMode
 ///
 /// Two rules hold for every method. The instance is re-checked against its address before anything is written,
 /// so a door that was replaced, moved to another zone or torn down under a stale reference is refused rather
-/// than acted on. And a request whose arguments no native entry can carry is refused by name — the interaction
-/// entry takes neither an occupancy policy nor a force flag, and the addressed door kind's damage entry carries
-/// nothing at all — because running the plain form of such a request and reporting it as the requested one would
-/// be a success this layer cannot back.
+/// than acted on. And the addressed door kind's damage entry carries nothing at all, so a request for it is
+/// refused by name rather than reported as a success this layer cannot back. A close carries no policy: the
+/// door's own interaction entry is the one close entry the game has, and a request that asked for a crush or a
+/// forced close is no longer expressible — the catalog ports are gone.
 ///
 /// A native read that throws is not caught here: an action runs inside the same session guard as the readbacks,
 /// which disables the provider once instead of letting this layer swallow a failure the rest of the session
@@ -85,27 +57,10 @@ internal static class DoorActions
     internal const string Locked = "door-locked";
     /// <summary>The door's own interaction gate refuses interaction right now.</summary>
     internal const string InteractionNotAllowed = "door-interaction-not-allowed";
-    /// <summary>An occupancy policy no native entry carries.</summary>
-    internal const string CrushUnsupported = "door-crush-unsupported";
-    /// <summary>A close force policy no native entry carries.</summary>
-    internal const string ForceCloseUnsupported = "door-force-close-unsupported";
-    /// <summary>The door holds no lock component, so it has no lock condition and no alarm puzzle to write.</summary>
+    /// <summary>The door holds no lock component, so it has no lock condition to write.</summary>
     internal const string NoLockComponent = "door-no-lock-component";
-    /// <summary>The door's own alarm puzzle did not read, so no alarm can be started or stopped on it.</summary>
-    internal const string NoAlarmPuzzle = "door-no-alarm-puzzle";
-    /// <summary>The door's own lock is not an alarm lock: its puzzle is a scan or a lock of another kind, and
-    /// this action is the alarm row's.</summary>
-    internal const string NotAnAlarm = "door-not-an-alarm";
-    /// <summary>The door's own alarm puzzle already reads active, so nothing had to be started.</summary>
-    internal const string AlarmAlreadyActive = "door-alarm-already-active";
-    /// <summary>The door's own alarm puzzle already reads inactive, so nothing had to be stopped.</summary>
-    internal const string AlarmNotActive = "door-alarm-not-active";
     internal const string Opened = "door-open-issued";
     internal const string Closed = "door-close-issued";
-    /// <summary>The door's own alarm puzzle was activated.</summary>
-    internal const string AlarmStarted = "door-alarm-started";
-    /// <summary>The door's own alarm puzzle was deactivated.</summary>
-    internal const string AlarmStopped = "door-alarm-stopped";
     internal const string LockedWithKey = "door-lock-key-issued";
     internal const string LockedWithoutKey = "door-lock-no-key-issued";
     internal const string KeyItemUnusable = "door-key-item-unusable";
@@ -143,53 +98,16 @@ internal static class DoorActions
     }
 
     /// <summary>Asks a door to close. A door that is not open is left alone, because the same interaction entry
-    /// toggles. The two catalog policies this request can carry are checked before anything is written: the
-    /// native entry takes neither, so a request for either is refused by name.</summary>
-    internal static MapActionOutcome Close(LG_SecurityDoor door, MapObjectReference address,
-        DoorOccupancyPolicy occupancy, DoorForcePolicy force)
+    /// toggles. Nothing else is carried: the door's own entry is the one close entry the game has, and the
+    /// catalog's two close policies are gone on both sides.</summary>
+    internal static MapActionOutcome Close(LG_SecurityDoor door, MapObjectReference address)
     {
         if (Unusable(door, address) is { } refused) return refused;
         if (Read(door) is not { } state) return MapActionOutcome.Refused(Stale);
-        if (occupancy == DoorOccupancyPolicy.Crush) return MapActionOutcome.Refused(CrushUnsupported);
-        if (force == DoorForcePolicy.Force) return MapActionOutcome.Refused(ForceCloseUnsupported);
         if (state.Status == (int)eDoorStatus.Destroyed) return MapActionOutcome.Refused(Destroyed);
         if (!IsOpen(state.Status)) return MapActionOutcome.AlreadyInState(AlreadyClosed);
         door.AttemptOpenCloseInteraction(false);
         return MapActionOutcome.Issued(Closed);
-    }
-
-    /// <summary>Starts or stops the alarm the door itself owns, through the puzzle instance its lock component
-    /// holds.
-    ///
-    /// The door's alarm is a `ChainedPuzzleInstance`, not the lock component's active-enemy-wave flag: the level
-    /// creates it in `LG_SecurityDoor.SetupChainedPuzzleLock` (which calls `ChainedPuzzleManager.CreatePuzzleInstance`
-    /// and subscribes to its solved callback) and stores it in the lock's own `ChainedPuzzleToSolve`, and the
-    /// instance's `MasterActivate` is the master-side activation whose verified call edge is the enemy wave the
-    /// alarm raises. `MasterDeactivate` is the matching master-side stop. The lock's own `m_hasAlarm` says whether
-    /// its puzzle is an alarm at all, so a door locked with a scan or with anything else is refused by name
-    /// instead of being started as an alarm.
-    ///
-    /// The mode is applied to the door's own state: a puzzle that already reads active is left alone when asked
-    /// to start and deactivated when asked to stop, and the other way round, so a repeated request never
-    /// re-triggers a wave or stops one that is already stopped.</summary>
-    internal static MapActionOutcome SetAlarm(LG_SecurityDoor door, MapObjectReference address, DoorAlarmMode mode)
-    {
-        if (Unusable(door, address) is { } refused) return refused;
-        if (Read(door) is not { } state) return MapActionOutcome.Refused(Stale);
-        if (state.Status == (int)eDoorStatus.Destroyed) return MapActionOutcome.Refused(Destroyed);
-        if (Locks(door) is not { } locks) return MapActionOutcome.Refused(NoLockComponent);
-        if (!locks.m_hasAlarm) return MapActionOutcome.Refused(NotAnAlarm);
-        var puzzle = locks.ChainedPuzzleToSolve;
-        if (puzzle == null || puzzle.WasCollected) return MapActionOutcome.Refused(NoAlarmPuzzle);
-        if (puzzle.IsActive)
-        {
-            if (mode == DoorAlarmMode.Start) return MapActionOutcome.AlreadyInState(AlarmAlreadyActive);
-            puzzle.MasterDeactivate();
-            return MapActionOutcome.Issued(AlarmStopped);
-        }
-        if (mode == DoorAlarmMode.Stop) return MapActionOutcome.AlreadyInState(AlarmNotActive);
-        puzzle.MasterActivate();
-        return MapActionOutcome.Issued(AlarmStarted);
     }
 
     /// <summary>Locks a door with a key item, through the lock component's own key setup. The key item is the

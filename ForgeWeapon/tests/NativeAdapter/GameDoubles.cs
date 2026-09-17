@@ -55,6 +55,8 @@ public class ItemEquippable : Item
 public sealed class Transform
 {
     public UnityEngine.Vector3 position;
+    /// <summary>The direction the object faces, which is what the hit-context reading compares a shot against.</summary>
+    public UnityEngine.Vector3 forward = new(0f, 0f, 1f);
     public UnityEngine.Vector3 localPosition;
     public UnityEngine.Vector3 localEulerAngles;
     public UnityEngine.Vector3 localScale = new(1, 1, 1);
@@ -89,6 +91,13 @@ public class Weapon : ItemEquippable
     public class WeaponHitData
     {
         public UnityEngine.Vector3 fireAtPos;
+        /// <summary>Whether the firing body wrote a direction for this ray, and the direction it wrote. The
+        /// hit-context reading compares it against the target's own facing.</summary>
+        public bool hasFireDir;
+        public UnityEngine.Vector3 fireDir;
+        /// <summary>The reach the ray was sent with. The shot-resolution row reads the impact's own distance
+        /// against it to decide whether the ray had already passed through geometry.</summary>
+        public float maxRayDist;
         public UnityEngine.RaycastHit rayHit;
         public Player.PlayerAgent? owner;
     }
@@ -172,16 +181,27 @@ namespace UnityEngine
     {
         public float x, y, z;
         public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        public static Vector3 operator -(Vector3 left, Vector3 right)
+            => new(left.x - right.x, left.y - right.y, left.z - right.z);
+        public static Vector3 operator /(Vector3 value, float divisor)
+            => new(value.x / divisor, value.y / divisor, value.z / divisor);
+        public float magnitude => (float)Math.Sqrt(x * x + y * y + z * z);
+        /// <summary>The one Unity member the backstab reading uses.</summary>
+        public static float Dot(Vector3 left, Vector3 right) => left.x * right.x + left.y * right.y + left.z * right.z;
     }
     public struct RaycastHit
     {
         public Vector3 point;
+        public Vector3 normal;
+        public float distance;
         public bool hasHit;
         public Collider? collider;
     }
-    /// <summary>Unity's own hierarchy lookup: a hit collider finds the limb and the agent above it.</summary>
+    /// <summary>Unity's own hierarchy lookup: a hit collider finds the limb and the agent above it. Every Unity
+    /// object carries its own transform, which is what the hit-context reading reads a target's facing from.</summary>
     public abstract class Component : UnityObjectDouble
     {
+        public Transform transform = new();
         public T? GetComponentInParent<T>() where T : class => this as T ?? Parent?.GetComponentInParent<T>();
         public Component? Parent;
         public GameObject? gameObject;
@@ -486,6 +506,9 @@ namespace Player
     {
         public SNetwork.SNet_Player Owner = null!;
         public PlayerInventoryBase Inventory = null!;
+        /// <summary>The agent's own first-person holder, which is where the sight state a fire request requires is
+        /// read from. The game declares it as a property on the agent's own hierarchy.</summary>
+        public FirstPersonItemHolder? FPItemHolder;
     }
     public sealed class BackpackItem
     {
@@ -684,6 +707,14 @@ namespace Gear
         public GameData.RecoilDataBlock? m_recoilData;
         public float m_nextShotTimer;
         public float m_nextBurstTimer;
+        /// <summary>The ranged charge the archetype's own per-frame update runs: the weapon it belongs to, the flag
+        /// the charge fact is read from, the elapsed timer the proportion is measured with, and the threshold the
+        /// weapon's own data answers.</summary>
+        public BulletWeapon? m_weapon;
+        public bool m_inChargeup;
+        public float m_chargeupTimer;
+        public float ChargeupDelay() => 1f;
+        public void Update() { }
     }
 }
 

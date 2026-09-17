@@ -43,7 +43,7 @@ internal sealed class WeaponHolderModule : IDisposable
     /// this machine can answer: the rows, their bindings, their shapes and their owner-session table all come from
     /// the same place, so a declared row can never lack the resolver its tier needs.</summary>
     private RuntimeModule Build()
-        => WeaponHolderActionsContract.Module(WeaponHolderChannel.SessionOf, Reload, ClipSet);
+        => WeaponHolderActionsContract.Module(WeaponHolderChannel.SessionOf, Reload, ClipSet, AutoFire);
 
     /// <summary>`forge.action.weapon.reload`. Refusals, in the order they are checked: a command that is not
     /// addressed here, an equipment instance this machine cannot see, an equipment that is not the held item, and
@@ -99,6 +99,31 @@ internal sealed class WeaponHolderModule : IDisposable
         });
     }
 
+    /// <summary>
+    /// `forge.action.weapon.auto_fire`. The same order of checks as the magazine rows — addressed here, the
+    /// equipment is this machine's held instance — and then the one this row adds: the weapon's own state has to
+    /// be the one the request named. The shot is the native `Fire` body, so the magazine, the fire rate and the
+    /// replicated shot count are the game's; the result carries the fixed columns alone, because one `Fire` body
+    /// is one shot and a count here would always read one.
+    /// </summary>
+    private CommandResult AutoFire(CommandContext context)
+    {
+        if (!Read(context, out var equipment, out var holder, out var failure)) return failure!;
+        if (!WeaponHolderChannel.IsLocalHolder(equipment))
+            return CommandResult.Rejected(WeaponHolderChannelContract.NotAddressedCode);
+        var requiredState = Text(context.Parameters, "required_state") ?? WeaponHolderActionsContract.StateNone;
+        if (!WeaponHolderChannel.TryFire(equipment, requiredState, out var code))
+        {
+            _report("weapon.holder-fire-refused equipment=" + equipment.Id + " state=" + requiredState + " code=" + code);
+            return CommandResult.Rejected(code);
+        }
+        return CommandResult.Succeeded(Fired(equipment), new[]
+        {
+            new RuntimeFact(WeaponHolderActionsContract.AutoFireBinding,
+                RuntimeJson.From(new { actor = holder, equipment }))
+        });
+    }
+
     /// <summary>The two ports both handlers read, plus the refusals that belong to reading them. A frame with no
     /// equipment, or with one this machine has no live instance for, is refused before any write is attempted.
     /// The `holder` port is carried into the fact's actor port: it is the plan's own declaration of whose weapon
@@ -128,6 +153,21 @@ internal sealed class WeaponHolderModule : IDisposable
                 {
                     target = equipment, status = CommandStatuses.Succeeded,
                     committed = CommitStates.Confirmed, code = "", clip
+                }
+            }
+        });
+
+    /// <summary>One result row for the fire row: the four fixed columns every action result carries. A shot that
+    /// the native body really produced is the fact of this row having run at all, so there is no fifth column.</summary>
+    private static JsonElement Fired(EntityReference equipment)
+        => RuntimeJson.From(new
+        {
+            rows = new[]
+            {
+                new
+                {
+                    target = equipment, status = CommandStatuses.Succeeded,
+                    committed = CommitStates.Confirmed, code = ""
                 }
             }
         });

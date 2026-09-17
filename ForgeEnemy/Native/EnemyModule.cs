@@ -132,6 +132,17 @@ internal sealed partial class EnemyModule : IDisposable
             // the row that needs it.
             PresentationSessions = new Dictionary<string, Func<IReadOnlyList<EntityReference>?, IReadOnlyList<string>?>>(StringComparer.Ordinal)
                 { [ProviderId] = PresentationAudience },
+            // The one resource kind this provider owns: `ability` is the game's own ability enum, and the same
+            // table answers both directions — the id an ability action resolves and the id the ability-used fact
+            // publishes — so a plan that triggers an ability and a plan that watches for one name one thing.
+            ResourceProviders = new Dictionary<string, RuntimeResourceProvider>(StringComparer.Ordinal)
+                { [EnemyAbilityResources.Kind] = EnemyAbilityResources.Provider },
+            // The one row whose clock is the step's own `effect` block: `forge.action.combat.effect_volume`
+            // registers the callback the kernel ends that effect through, which is what allows the card to carry a
+            // duration at all. It is the module's own method, so the callback runs against the ledger of the
+            // process the effect was applied in and every end can carry it out on its own.
+            EffectRestores = new Dictionary<string, EffectRestoreHandler>(StringComparer.Ordinal)
+                { [VolumeHandler] = RestoreVolume },
             // A session with no way to read an enemy's block does not register the kind at all: a plan naming
             // `enemy-type` is then refused when it loads instead of being accepted and never dispatched. The
             // kind is matched against the event's own subject, the enemy instance the block was read from.
@@ -217,6 +228,10 @@ internal sealed partial class EnemyModule : IDisposable
         var reference = new EntityReference("gtfo.enemy:" + enemy.GlobalID.ToString(CultureInfo.InvariantCulture),
             _kernel.WorldEpoch, checked(++_nextLife));
         _entities[enemy.GlobalID] = new Entry(enemy, reference, enemy.Pointer);
+        // The profile goes on once per native life, right here: the spawn path runs after the receiver finished
+        // setting itself up (limb array, detection and appearance components all built), and on every peer from
+        // the same documents, so there is nothing to replicate and no second application point to keep in step.
+        ApplyProfiles(enemy);
         return reference;
     }
 

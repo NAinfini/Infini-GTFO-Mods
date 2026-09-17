@@ -28,9 +28,12 @@
          sibling slices at once and cannot be compiled here without also compiling their half-finished partials.
          Everything the family itself does is the production source, unchanged: the plugin lifetime, the Harmony
          hook classes and the wave sibling are not part of this suite's statement. -->
-    <Compile Include="../../EnemyNodeEffectContract.cs;../../EnemyNodeTriggerContract.cs;../../EnemyNodeValueContract.cs" LinkBase="Contract" />
+    <Compile Include="../../EnemyNodeEffectContract.cs;../../EnemyNodeTriggerContract.cs;../../EnemyNodeValueContract.cs;../../EnemyAbilityUsedContract.cs;../../EnemyVolumeContract.cs" LinkBase="Contract" />
     <Compile Include="../../ModuleDefinition.cs" Link="Contract/ModuleDefinition.cs" />
-    <Compile Include="../../Native/EnemyNodeEffectActions.cs;../../Native/EnemyNodeValueReads.cs;../../Native/EnemyNodeFacts.cs;../../Native/EnemyNodeRegistration.cs" LinkBase="Native" />
+    <Compile Include="../../Native/EnemyNodeEffectActions.cs;../../Native/EnemyNodeValueReads.cs;../../Native/EnemyNodeFacts.cs;../../Native/EnemyNodeRegistration.cs;../../Native/EnemyAbilityUsedFacts.cs;../../Native/EnemyVolumeActions.cs" LinkBase="Native" />
+    <!-- The ability resource table the fact reader mints its `ability` port from. It is the production file, not
+         a copy of the table: the id a plan triggers and the id a fact publishes have to be the same one. -->
+    <Compile Include="../../Native/EnemyBehaviorLedger.cs" Link="Native/EnemyBehaviorLedger.cs" />
     <!-- The zone responder the `where` row's kernel read goes to is the production partial, not a copy of it: the
          refusal a life this provider cannot place makes is the one this suite asserts, so it cannot drift. -->
     <Compile Include="../../Native/EnemyModule.Zones.cs" Link="Native/EnemyModule.Zones.cs" />
@@ -38,7 +41,7 @@
          remaining seconds, and the official enemy type block. They are the production files, not copies, so a
          row cannot drift from the reading it claims. -->
     <Compile Include="../../Native/Observation/EnemyEntityObserver.cs;../../Native/Observation/EnemyTypeReader.cs" LinkBase="Native/Observation" />
-    <Compile Include="GameDoubles.cs;EnemyModuleShim.cs;Scene.cs;ValueCases.cs;ActionCases.cs;FactCases.cs;Program.cs" />
+    <Compile Include="GameDoubles.cs;EnemyModuleShim.cs;Scene.cs;ValueCases.cs;ActionCases.cs;VolumeCases.cs;AbilityUsedCases.cs;FactCases.cs;Program.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
     <Reference Include="Il2CppInterop.Runtime" HintPath="$(GTFOBepInExPath)/core/Il2CppInterop.Runtime.dll" />

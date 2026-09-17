@@ -7,22 +7,28 @@ using ForgeRuntime.Framework;
 
 namespace ForgeWeapon.Tests.WeaponFacts;
 
-/// <summary>The declaration half of the holder rows: the two owner-tier actions and the registration that makes
+/// <summary>The declaration half of the holder rows: the three owner-tier actions and the registration that makes
 /// them executable. The registration is built by the production contract and handed to a real kernel, so these
 /// cases assert against what the runtime accepted rather than against the text that asked for it.</summary>
 public sealed class HolderRowsTests
 {
-    private static readonly (string Id, string[] Inputs, string[] Parameters)[] Rows = new[]
+    /// <summary>Each row's own ports, parameters and result field. The magazine pair writes a magazine and answers
+    /// with the clip it left behind; the fire row has no field of its own, because one native `Fire` body is one
+    /// shot.</summary>
+    private static readonly (string Id, string[] Inputs, string[] Parameters, string? Field)[] Rows = new[]
     {
         (WeaponHolderActionsContract.ReloadCapability,
-            new[] { "in", "equipment", "holder", "reload_profile" }, new[] { "chamber_policy", "transfer_policy" }),
+            new[] { "in", "equipment", "holder", "reload_profile" }, new[] { "chamber_policy", "transfer_policy" }, "clip"),
         (WeaponHolderActionsContract.ClipSetCapability,
-            new[] { "in", "equipment", "holder", "amount" }, new[] { "clip_policy" })
+            new[] { "in", "equipment", "holder", "amount" }, new[] { "clip_policy" }, "clip"),
+        (WeaponHolderActionsContract.AutoFireCapability,
+            new[] { "in", "equipment", "holder" }, new[] { "required_state" }, null)
     };
 
-    /// <summary>Every row is declared with the ports and parameters the node list's two actions need, and both
-    /// declare the `owner` tier: the whole point of the pair is that the write happens on the holder's machine, so
-    /// a row that lost its tier would be a reload the host performs against somebody else's inventory.</summary>
+    /// <summary>Every row is declared with the ports and parameters the node list's actions need, and all three
+    /// declare the `owner` tier: the whole point of the family is that the write happens on the holder's machine,
+    /// so a row that lost its tier would be a reload or a shot the host performs against somebody else's
+    /// inventory.</summary>
     [Fact]
     public void BothRowsAreOwnerTierActionsWithTheirOwnPorts()
     {
@@ -30,7 +36,7 @@ public sealed class HolderRowsTests
         Assert.Equal(Rows.Select(row => row.Id).ToArray(), declared.Select(row => row.GetProperty("id").GetString()).ToArray());
         for (var index = 0; index < Rows.Length; index++)
         {
-            var (id, inputs, parameters) = Rows[index];
+            var (id, inputs, parameters, _) = Rows[index];
             var graph = declared[index].GetProperty("graph");
             Assert.Equal("owner", graph.GetProperty("execution").GetString());
             Assert.Equal("action", declared[index].GetProperty("kind").GetString());
@@ -44,15 +50,19 @@ public sealed class HolderRowsTests
     }
 
     /// <summary>The result rows carry the four fixed columns every action result carries, in the kernel's own
-    /// order, and then this pair's one extra field.</summary>
+    /// order, and then this row's own field when it declares one.</summary>
     [Fact]
     public void BothResultRowsCarryTheFixedColumnsThenTheClip()
     {
-        foreach (var row in WeaponHolderActionsContract.Capabilities())
+        var declared = WeaponHolderActionsContract.Capabilities();
+        for (var index = 0; index < Rows.Length; index++)
         {
-            var result = row.GetProperty("graph").GetProperty("outputs").EnumerateArray()
+            var result = declared[index].GetProperty("graph").GetProperty("outputs").EnumerateArray()
                 .Single(port => port.GetProperty("id").GetString() == "result");
-            Assert.Equal(new[] { "target", "status", "committed", "code", "clip" },
+            var expected = Rows[index].Field is { } own
+                ? new[] { "target", "status", "committed", "code", own }
+                : new[] { "target", "status", "committed", "code" };
+            Assert.Equal(expected,
                 result.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("id").GetString()).ToArray());
         }
     }
@@ -63,7 +73,7 @@ public sealed class HolderRowsTests
     public void EveryRowCarriesOneExecuteBinding()
     {
         var bindings = WeaponHolderActionsContract.Bindings();
-        Assert.Equal(2, bindings.Count);
+        Assert.Equal(Rows.Length, bindings.Count);
         foreach (var row in bindings)
         {
             var binding = RuntimeJson.From(row);
@@ -86,26 +96,30 @@ public sealed class HolderRowsTests
         using var world = new HolderWorld();
         world.Register(_ => Session);
         world.Start();
-        Assert.Equal(new[] { WeaponHolderActionsContract.ReloadCapability, WeaponHolderActionsContract.ClipSetCapability },
+        Assert.Equal(new[] { WeaponHolderActionsContract.ReloadCapability, WeaponHolderActionsContract.ClipSetCapability,
+            WeaponHolderActionsContract.AutoFireCapability },
             WeaponHolderChannelContract.Capabilities.ToArray());
         var module = WeaponHolderActionsContract.Module(_ => Session,
+            context => CommandResult.Succeeded(RuntimeJson.EmptyObject),
             context => CommandResult.Succeeded(RuntimeJson.EmptyObject),
             context => CommandResult.Succeeded(RuntimeJson.EmptyObject));
         foreach (var capability in WeaponHolderChannelContract.Capabilities)
             Assert.True(module.OwnerSessions!.ContainsKey(capability), capability + " has no owner-session resolver.");
-        Assert.Equal(2, module.Handlers.Count);
-        Assert.Equal(2, module.Shapes.Count);
+        Assert.Equal(3, module.Handlers.Count);
+        Assert.Equal(3, module.Shapes.Count);
     }
 
     /// <summary>A registration that supplies one body declares only that row's binding: the other row's shape
-    /// would have no handler, which the registry refuses, so the two travel together.</summary>
+    /// would have no handler, which the registry refuses, so a body and its row travel together.</summary>
     [Fact]
     public void OneSuppliedBodyDeclaresOneBinding()
     {
         var one = WeaponHolderActionsContract.Module(_ => Session, context => CommandResult.Succeeded(RuntimeJson.EmptyObject));
         Assert.Single(one.Handlers);
-        Assert.Equal(2, one.OwnerSessions!.Count);
+        Assert.Equal(3, one.OwnerSessions!.Count);
         Assert.Single(WeaponHolderActionsContract.Module(_ => Session, null, context => CommandResult.Succeeded(RuntimeJson.EmptyObject)).Handlers);
+        Assert.Single(WeaponHolderActionsContract.Module(_ => Session, null, null,
+            context => CommandResult.Succeeded(RuntimeJson.EmptyObject)).Handlers);
     }
 
     /// <summary>The holder provider declares no package dependency: it reads equipment identities through the
@@ -134,12 +148,12 @@ public sealed class HolderRowsTests
         Assert.Empty(declaredOnly.OwnerSessions!);
         Assert.Empty(declaredOnly.Handlers);
         var withResolver = WeaponHolderActionsContract.Module(_ => "2");
-        Assert.Equal(2, withResolver.OwnerSessions!.Count);
+        Assert.Equal(3, withResolver.OwnerSessions!.Count);
         Assert.Empty(withResolver.Handlers);
     }
 
-    /// <summary>The registered rows are the ones a plan compiles against: the kernel accepted both bindings, both
-    /// capabilities came back with the `owner` tier, and the shapes resolved — a handler whose ports the graph does
+    /// <summary>The registered rows are the ones a plan compiles against: the kernel accepted every binding, every
+    /// capability came back with the `owner` tier, and the shapes resolved — a handler whose ports the graph does
     /// not declare is refused at registration, so reaching this point is itself the assertion.</summary>
     [Fact]
     public void TheKernelAcceptsBothRowsAtTheirOwnTier()
@@ -149,8 +163,10 @@ public sealed class HolderRowsTests
         world.Start();
         Assert.Contains(WeaponHolderActionsContract.ReloadBinding, world.RegisteredBindings());
         Assert.Contains(WeaponHolderActionsContract.ClipSetBinding, world.RegisteredBindings());
+        Assert.Contains(WeaponHolderActionsContract.AutoFireBinding, world.RegisteredBindings());
         Assert.Equal("owner", world.Row(WeaponHolderActionsContract.ReloadCapability).GetProperty("graph").GetProperty("execution").GetString());
         Assert.Equal("owner", world.Row(WeaponHolderActionsContract.ClipSetCapability).GetProperty("graph").GetProperty("execution").GetString());
+        Assert.Equal("owner", world.Row(WeaponHolderActionsContract.AutoFireCapability).GetProperty("graph").GetProperty("execution").GetString());
     }
 
     /// <summary>The structural parameters are the native behaviour set, not a wish list: `chamber_policy` has the

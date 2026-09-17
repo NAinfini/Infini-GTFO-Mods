@@ -49,6 +49,57 @@ internal static class ObservedFilterTests
             catch (Exception error) { check(false, "filter " + name + ": " + error.Message); }
         }
         Boundaries(check);
+        Members(check);
+    }
+
+    /// <summary>The row's three optional members over one world: a live enemy, a sleeping one, one whose state no
+    /// observer publishes, and a map object. Every member defaults to the one that filters nothing, which is what
+    /// the cross-language cases — written before these members existed — prove by selecting on the relation alone.
+    /// </summary>
+    private static void Members(Action<bool, string> check)
+    {
+        var anchor = Row("anchor", "blue", aiState: "patrolling");
+        var awake = Row("awake", "blue", aiState: "patrolling");
+        var asleep = Row("asleep", "blue", aiState: "hibernating");
+        var stateless = Row("stateless", "blue");
+        var door = Row("door", "blue", tags: new[] { "map-object.category=door" });
+        using var world = new ObservationWorld(new[] { anchor, awake, asleep, stateless, door });
+        var rules = new RuntimeFactionRelations(new[] { new RuntimeFactionRelation("blue", "blue", "ally") });
+        var enemies = new[] { awake.Ref, asleep.Ref };
+        var all = new[] { awake.Ref, asleep.Ref, stateless.Ref, door.Ref };
+        RecipientFilterSelection Select(IReadOnlyList<EntityReference> input, string state = "any",
+            bool doors = true, bool self = true)
+            => ObservedRecipientFilter.Select(world.Session(), input, anchor.Ref, rules,
+                RecipientFilterRequest.Read("ally", state, null, doors, self));
+        check(Select(all).Selected.Count == 4, "an unwritten state and both flags filter nothing");
+        check(Select(enemies, state: "awake").Selected.SequenceEqual(new[] { awake.Ref }),
+            "awake keeps the candidate whose own state is not the sleeping one");
+        check(Select(enemies, state: "sleeping").Selected.SequenceEqual(new[] { asleep.Ref }),
+            "sleeping keeps the candidate whose own state is the sleeping one");
+        check(Select(all, doors: false).Selected.SequenceEqual(
+                ObservedSpaceNodes.IdentityOrder(new[] { awake.Ref, asleep.Ref, stateless.Ref })),
+            "a walk that does not treat doors as damageable drops the door and keeps every entity");
+        check(Select(all, doors: true).Selected.SequenceEqual(
+                ObservedSpaceNodes.IdentityOrder(new[] { awake.Ref, asleep.Ref, stateless.Ref, door.Ref })),
+            "a walk that treats doors as damageable keeps the door");
+        // `include_self` decides whether the anchor itself may come back, which is the only candidate it could add:
+        // the anchor is measured against itself as `self`, never as the relation the row asked for.
+        check(Select(new[] { anchor.Ref, asleep.Ref }).Selected.SequenceEqual(new[] { asleep.Ref }),
+            "an anchor that is also a candidate answers the row's relation, not itself");
+        check(Select(new[] { anchor.Ref }, self: false).Selected.Count == 0,
+            "a walk that excludes its own source leaves the source out of its own result");
+        // A candidate whose own state no observer published is refused, never answered as awake: the row reads a
+        // value, and a substituted one would filter on something nobody read.
+        Reject(RecipientFilterRequest.StateUnknownCode, () => Select(all, state: "sleeping"), check);
+        // The row declares no `origin`: how an entity entered the level is a reading no provider publishes, so the
+        // parameter is gone rather than declared-and-always-refused, and a hand-built member is as unknown as any
+        // other name outside the two vocabularies the row keeps.
+        Reject("recipient-state", () => Select(all, state: "dormant"), check);
+        Reject("recipient-state", () => RecipientFilterRequest.Read("ally", "spawned"), check);
+        Reject("recipient-relation", () => RecipientFilterRequest.Read("friend", "any"), check);
+        check(world.Kernel.QueuedEvents == 0 && world.Kernel.LoadedPlans == 0,
+            "no member of the filter row schedules work or loads a plan");
+        check(world.Observations > 0, "the members are read from the one observation the row already made");
     }
 
     private static void Boundaries(Action<bool, string> check)
@@ -127,7 +178,8 @@ internal static class ObservedFilterTests
         catch (Exception error) { check(false, "filter " + code + ": wrong exception " + error.GetType().Name); }
     }
 
-    private static RuntimeEntitySnapshot Row(string id, string? faction, long life = 1)
+    private static RuntimeEntitySnapshot Row(string id, string? faction, long life = 1, string? aiState = null,
+        string[]? tags = null)
         => new(new EntityReference("test.filter:" + id, 1, life), "enemy", faction, "alive",
-            new[] { "marked" }, new[] { "test.receiver.health" }, new[] { 0d, 0d, 0d });
+            tags ?? new[] { "marked" }, new[] { "test.receiver.health" }, new[] { 0d, 0d, 0d }, aiState: aiState);
 }

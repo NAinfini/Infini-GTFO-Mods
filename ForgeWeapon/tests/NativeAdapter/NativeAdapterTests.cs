@@ -129,11 +129,19 @@ public sealed class NativeAdapterTests
             // The two evaluator-answered reads: `observe` rows like the ones above, answered on demand instead of
             // by a dispatched body, so neither appears in the executed list below.
             InventoryQueryContract.EquipmentAmmoBinding, InventoryQueryContract.InventoryItemBinding,
+            // This batch's own state and combat rows: the charge and aim triggers and the shot-resolution trigger.
+            // The third is the one trigger here the provider's own native half publishes.
+            WeaponStateTriggerContract.ChargeStateBinding, WeaponStateTriggerContract.AimStateBinding,
+            CombatPrimitiveContract.ShotResolvedBinding,
+            // The launch row the session supplies a body for: the game's own projectile spawn, so it is declared
+            // as an executed row rather than an observed one.
+            CombatPrimitiveContract.ProjectileLaunchBinding,
             // The action rows the session's own registration carries beside the observations: the ammunition
-            // pair, the three instance overrides and the inventory give/consume pair. `drop` declares no row and
+            // pair, the four instance overrides and the inventory give/consume pair. `drop` declares no row and
             // has no body, so nothing here names it.
             WeaponSupplyContract.AmmoAddBinding, WeaponSupplyContract.AmmoConsumeBinding,
             WeaponOverrideContract.FireRateBinding, WeaponOverrideContract.SpreadBinding, WeaponOverrideContract.RecoilBinding,
+            WeaponOverrideContract.PropertyBinding,
             InventoryActionContract.GiveBinding, InventoryActionContract.ConsumeBinding
         };
         Require(bindings.Select(b => b.GetProperty("id").GetString()!).OrderBy(id => id, StringComparer.Ordinal)
@@ -145,7 +153,9 @@ public sealed class NativeAdapterTests
         {
             WeaponSupplyContract.AmmoAddBinding, WeaponSupplyContract.AmmoConsumeBinding,
             WeaponOverrideContract.FireRateBinding, WeaponOverrideContract.SpreadBinding, WeaponOverrideContract.RecoilBinding,
-            InventoryActionContract.GiveBinding, InventoryActionContract.ConsumeBinding
+            WeaponOverrideContract.PropertyBinding,
+            InventoryActionContract.GiveBinding, InventoryActionContract.ConsumeBinding,
+            CombatPrimitiveContract.ProjectileLaunchBinding
         };
         Require(bindings.All(b => b.GetProperty("role").GetString()
             == (executed.Contains(b.GetProperty("id").GetString()!, StringComparer.Ordinal) ? "execute" : "observe")),

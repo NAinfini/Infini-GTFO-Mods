@@ -24,7 +24,8 @@ public static class ObservedQueryModule
         ObservedCollectionDeclarations.Family,
         ObservedEntityDeclarations.Family,
         ObservedListDeclarations.Family,
-        ObservedEntityStateDeclarations.Family);
+        ObservedEntityStateDeclarations.Family,
+        ObservedTimeDeclarations.Family);
 
     /// <summary>The declared rows in registration order. Public because the contract tests iterate the same table
     /// the module registers instead of restating it.</summary>

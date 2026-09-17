@@ -39,9 +39,11 @@ namespace ForgeEnemy.Native;
 internal sealed partial class EnemyModule
 {
     internal const string KillBinding = EnemyNodeEffectContract.KillBinding;
+    internal const string RemoveBinding = EnemyNodeEffectContract.RemoveBinding;
     internal const string MarkBinding = EnemyNodeEffectContract.MarkBinding;
     internal const string TargetBinding = EnemyNodeEffectContract.TargetBinding;
     internal const string KillHandler = EnemyNodeEffectContract.KillHandler;
+    internal const string RemoveHandler = EnemyNodeEffectContract.RemoveHandler;
     internal const string MarkHandler = EnemyNodeEffectContract.MarkHandler;
     internal const string TargetHandler = EnemyNodeEffectContract.TargetHandler;
 
@@ -65,15 +67,17 @@ internal sealed partial class EnemyModule
     private const double MinimumChance = 0.0, MaximumChance = 1.0;
     private const double MinimumColorComponent = 0.0, MaximumColorComponent = 1.0;
 
-    /// <summary>The three rows' own ports, resolved at registration against the capability rows in
+    /// <summary>The four rows' own ports, resolved at registration against the capability rows in
     /// `EnemyNodeEffectContract`.</summary>
     internal static readonly HandlerShape KillPorts = EnemyNodeEffectContract.KillShape();
+    internal static readonly HandlerShape RemovePorts = EnemyNodeEffectContract.RemoveShape();
     internal static readonly HandlerShape MarkPorts = EnemyNodeEffectContract.MarkShape();
     internal static readonly HandlerShape TargetPorts = EnemyNodeEffectContract.TargetShape();
 
     /// <summary>One target's line in a node action's result, in the row order the schema declares: the four
     /// fixed columns first, then the action's own fields. Field names are the wire contract's, so each is spelled
-    /// here exactly as `EnemyNodeEffectContract` spells it.</summary>
+    /// here exactly as `EnemyNodeEffectContract` spells it. `kill` and `remove` share this row because their two
+    /// schemas declare the same five columns.</summary>
     private sealed record KillRow(EntityReference Target, string Status, string Committed, string Code,
         [property: JsonPropertyName("target_count")] int TargetCount);
     private sealed record MarkRow(EntityReference Target, string Status, string Committed, string Code,
@@ -135,6 +139,52 @@ internal sealed partial class EnemyModule
         }
         return AggregateNodeRows(OutcomeRows(rows, row => row.Committed, row => row.Code),
             RuntimeJson.From(new { results = rows }), "kill");
+    }
+
+    /// <summary>`forge.action.enemy.remove`. The world is written once per target, through the game's own
+    /// replication despawn: an enemy's replicator is asked to go away, which is the path a despawned enemy always
+    /// takes, and no life ends, no death settlement runs and no corpse is left behind.
+    ///
+    /// The call reports nothing, so the proof of a committed removal is this module's own despawn observation:
+    /// the reference this provider minted for the target no longer resolves once the game's despawn hook has run.
+    /// A target still resolvable after the call is an unknown commit, never a claimed one, and the run then stops
+    /// committing further targets rather than writing a world whose first write is already in doubt.</summary>
+    internal CommandResult Remove(CommandContext context)
+    {
+        if (!CanExecute) return CommandResult.Rejected("authority-or-phase");
+        var targets = Entities(context.Inputs, "targets");
+        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected("too-many-targets");
+
+        var rows = new List<KillRow>(targets.Length);
+        bool stopCommitting = false;
+        foreach (var target in targets)
+        {
+            KillRow Row(string status, string commitState, string code)
+                => new(target, status, commitState, code, targets.Length);
+            if (stopCommitting)
+            {
+                rows.Add(Row(CommandStatuses.Failed, CommitStates.Unknown, "not-attempted-after-unknown-commit"));
+                continue;
+            }
+            var entry = Resolve(target);
+            if (entry == null) { rows.Add(Row(CommandStatuses.Rejected, CommitStates.None, "stale-or-unsupported-recipient")); continue; }
+            var enemy = entry.Enemy;
+            try
+            {
+                if (!enemy.Alive) { rows.Add(Row(CommandStatuses.Rejected, CommitStates.None, "not-alive")); continue; }
+                var replicator = enemy.Sync?.Replicator;
+                if (replicator == null) { rows.Add(Row(CommandStatuses.Rejected, CommitStates.None, "replicator-unavailable")); continue; }
+                replicator.Despawn();
+                // The game's own despawn is what this module observes, so the removal is confirmed by the
+                // reference it minted no longer answering — not by the call's own return.
+                if (Resolve(target) != null)
+                { rows.Add(Row(CommandStatuses.Failed, CommitStates.Unknown, "removal-unseen")); stopCommitting = true; continue; }
+            }
+            catch (Exception) { rows.Add(Row(CommandStatuses.Failed, CommitStates.Unknown, "readback-exception")); stopCommitting = true; continue; }
+            rows.Add(Row(CommandStatuses.Succeeded, CommitStates.Confirmed, "committed"));
+        }
+        return AggregateNodeRows(OutcomeRows(rows, row => row.Committed, row => row.Code),
+            RuntimeJson.From(new { results = rows }), "remove");
     }
 
     /// <summary>`forge.action.enemy.mark`. The request check runs before the first target: an unknown visibility
@@ -380,4 +430,14 @@ internal sealed partial class EnemyModule
 
     /// <summary>The seconds a tick count is worth, which is the unit the native marker's own lifetime is in.</summary>
     private static double Seconds(long ticks) => ticks * SecondsPerTick;
+
+    /// <summary>The same step read the other way: a native length in seconds as plan ticks, rounded to the
+    /// nearest tick and saturated rather than wrapped, so a length the clock cannot measure is published as the
+    /// longest tick there is instead of as a negative one.</summary>
+    private static long Ticks(double seconds)
+    {
+        double ticks = Math.Round(seconds / SecondsPerTick, MidpointRounding.AwayFromZero);
+        if (ticks <= 0) return 0;
+        return ticks >= long.MaxValue ? long.MaxValue : (long)ticks;
+    }
 }

@@ -141,6 +141,30 @@ namespace LevelGeneration
         }
         public void ForceOpenSecurityDoor() { ForceOpenCalls++; }
     }
+
+    /// <summary>The terminal states the interaction row writes between: the two members the row names, in the
+    /// game's own order (`Sleeping` is 0 and `Awake` is 1).</summary>
+    public enum TERM_State
+    {
+        Sleeping = 0,
+        Awake = 1,
+        PlayerInteracting = 2
+    }
+
+    /// <summary>The terminal the interaction row writes. Only the one member the row reaches is mirrored: the
+    /// state it holds and reports, so a case can read back what the row actually set.</summary>
+    public sealed class LG_ComputerTerminal : UnityEngine.MonoBehaviour
+    {
+        /// <summary>Whether reading the state throws, which is what a terminal torn down under a live reference
+        /// looks like from the action layer.</summary>
+        public bool StateThrows { get; set; }
+        private TERM_State state = TERM_State.Sleeping;
+        public TERM_State CurrentStateName
+        {
+            get => StateThrows ? throw new InvalidOperationException("fixture terminal read failure") : state;
+            set => state = value;
+        }
+    }
 }
 
 namespace SNetwork

@@ -217,21 +217,10 @@ public sealed class MapSelectorDispatchTests
     }
 
     [Fact]
-    public void query_dispatch_refuses_a_relation_the_selector_cannot_anchor()
+    public void roster_rejects_injected_implicit_relation_constants()
     {
-        // `recipient_relation` is `self, ally, hostile, neutral, unknown`; only `ally` has no anchor to read.
-        using var s = Start("selq.relation", relation: 0);
-        Spawn(76561198000000001);
-        s.Read();
-        Queue(s, "selq.relation-1");
-        var tick = s.Kernel.Advance(1, true);
-        Require(s.Recorded.Count == 0, "The action ran on a relation the selector refuses: " + string.Join("|", s.Recorded));
-        Require(tick.CommandsExecuted == 0 && tick.Commands.Count == 1 && tick.Commands[0].Result.Status == "rejected",
-            "The refused relation was not reported on the action it stopped: " + Describe(tick));
-        // The selector's own refusal is the reason the framework carries through a step that never read the world.
-        Require(tick.Commands[0].Result.Code == "pure-evaluation-failed"
-            && tick.Commands[0].Result.Detail.Contains("relation-unsupported", StringComparison.Ordinal),
-            "Expected the selector's own relation-unsupported refusal: " + Describe(tick) + " detail=" + tick.Commands[0].Result.Detail);
+        foreach (var relation in new[] { 0, 1, 2, 3, 4 })
+            Assert.Throws<RuntimeContractException>(() => Start("selq.relation", injectedConstant: relation));
     }
 
     [Fact]
@@ -331,7 +320,7 @@ public sealed class MapSelectorDispatchTests
         }
     }
 
-    private static Session Start(string planId, long world = 1, int reads = 0, bool attach = true, int relation = 1)
+    private static Session Start(string planId, long world = 1, int reads = 0, bool attach = true, int? injectedConstant = null)
     {
         var sink = new CaptureSink();
         var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"),
@@ -349,7 +338,7 @@ public sealed class MapSelectorDispatchTests
             worldHandle = kernel.RegisterModule(WorldModule(kernel, recorded), RuntimeLogLevel.Info);
             kernel.StartRuntime(() =>
             {
-                var json = Plan(planId, kernel, reads, relation);
+                var json = Plan(planId, kernel, reads, injectedConstant);
                 var outcome = kernel.LoadPlans(new[] { PlanCandidate.Loaded("pack/plans/" + planId + ".plan.json", json) })[0];
                 if (!outcome.Loaded) throw new RuntimeContractException(outcome.Code!, outcome.Code + ": " + outcome.Detail + " :: " + json);
             });
@@ -378,15 +367,7 @@ public sealed class MapSelectorDispatchTests
             providers = new[] { new { id = ModuleDefinition.ProviderId, kind = "native", version = ModuleDefinition.Version, dependencies = Array.Empty<string>() } },
             capabilities = new object[]
             {
-                new { id = PlayerSelectorContract.CapabilityId, owner = ModuleDefinition.ProviderId, kind = "selector", label = "select players",
-                    version = "1.0.0", parameters = new { description = "Select players by relation and life state." },
-                    graph = new { domains = new[] { Domain }, execution = "query", inputs = Array.Empty<object>(),
-                        outputs = new object[] { new { id = "targets", type = "entity", cardinality = "many" } },
-                        parameters = new object[]
-                        {
-                            new { id = "relation", type = "enum", role = "structural", required = true, set = "recipient_relation" },
-                            new { id = "empty", type = "enum", role = "structural", required = true, set = "empty_policy" }
-                        } } }
+                RuntimeJson.Parse(PlayerSelectorContract.CapabilityRowJson)
             },
             bindings = new object[]
             {
@@ -442,8 +423,8 @@ public sealed class MapSelectorDispatchTests
     /// <summary>The plan file, pinned by index the way the compiler pins it: the closure this entry uses, ordinal sorted.
     /// <paramref name="reads"/> adds the sweep selector as a second `query` step between the player selector and the
     /// recording action, so an exhausted read budget is raised by a step of the plan rather than by the test.
-    /// <paramref name="relation"/> is the compiled index into `recipient_relation` the selector reads.</summary>
-    private static string Plan(string planId, RuntimeKernel kernel, int reads, int relation)
+    /// The optional injected constant deliberately creates an invalid plan for the rejection test.</summary>
+    private static string Plan(string planId, RuntimeKernel kernel, int reads, int? injectedConstant)
     {
         var manifest = RuntimeJson.Parse(kernel.ExportManifest()).GetProperty("registry");
         JsonElement Row(string list, string id) => manifest.GetProperty(list).EnumerateArray().Single(r => r.GetProperty("id").GetString() == id);
@@ -465,9 +446,8 @@ public sealed class MapSelectorDispatchTests
         var select = new
         {
             nodeId = "A_players", nodeKind = "query", binding = Index(PlayerSelectorContract.BindingId),
-            // The selector's two structural enums are compiled as set indices: `empty` is `emit-empty` (0) and
-            // `relation` is the index of the relation this plan asks for into `recipient_relation`.
-            layout = Layout(kernel, PlayerSelectorContract.CapabilityId, new object[] { relation, 0 }),
+            // Rosters have no implicit faction policy. The test may inject a forbidden constant.
+            layout = Layout(kernel, PlayerSelectorContract.CapabilityId, injectedConstant.HasValue ? new object[] { injectedConstant.Value } : Array.Empty<object>()),
             inputs = Array.Empty<object>(), successors = Array.Empty<int?>()
         };
         // The sweep reads the selector's own set, once per declared read, so `targets` reaching the action is exactly

@@ -194,11 +194,15 @@ internal static class EnemyRegistration
     internal static string RegistryJson()
     {
         string nodeCapabilities = string.Join(",\n", EnemyNodeValueContract.ValueRows().Select(RuntimeJson.From))
-            + ",\n" + EnemyNodeEffectContract.CapabilityRowsJson;
+            + ",\n" + EnemyNodeEffectContract.CapabilityRowsJson
+            // The ability-used row: no framework contract declares it, so the row travels with the provider that
+            // observes it, next to the actions of the same family.
+            + ",\n" + EnemyAbilityUsedContract.CapabilityRow;
         string nodeBindings = string.Join(",\n", EnemyNodeValueContract.ValueBindings().Select(RuntimeJson.From))
             + ",\n" + EnemyNodeEffectContract.BindingRowsJson
             + ",\n" + EnemyNodeTriggerContract.SpawnedBindingRowJson
-            + ",\n" + EnemyNodeTriggerContract.BindingRowsJson;
+            + ",\n" + EnemyNodeTriggerContract.BindingRowsJson
+            + ",\n" + EnemyAbilityUsedContract.BindingRowJson;
         string familyCapabilities = string.Join(",\n", EnemyControlContract.CapabilityRows)
             + ",\n" + EnemyCombatContract.CapabilityRows
             // The combat family's observed row travels with it: no framework contract declares the stagger, so
@@ -208,6 +212,9 @@ internal static class EnemyRegistration
             + ",\n" + EnemyBehaviorContract.CapabilityRows
             // The same for the ability interruption the behaviour family's ledger proves.
             + ",\n" + EnemyAbilityInterruptedContract.CapabilityRow
+            // The effect volume is a `forge.action.combat.*` row this provider owns: the native volume is the
+            // game's own, and the anchors it is placed on are the enemies this provider already tracks.
+            + ",\n" + EnemyVolumeContract.CapabilityRow
             + ",\n" + EnemyProfileContract.CapabilityRows;
         string familyBindings = string.Join(",\n", EnemyControlContract.BindingRows)
             + ",\n" + EnemyCombatContract.BindingRows
@@ -215,6 +222,7 @@ internal static class EnemyRegistration
             + ",\n" + GlueContract.BindingRows
             + ",\n" + EnemyBehaviorContract.BindingRows
             + ",\n" + EnemyAbilityInterruptedContract.BindingRowJson
+            + ",\n" + EnemyVolumeContract.BindingRowJson
             + ",\n" + EnemyProfileContract.BindingRows;
         return RegistryHead
             + EnemySelectorContract.CapabilityRowJson
@@ -240,11 +248,14 @@ internal static class EnemyRegistration
         // `AttackInstanceContract`, so the registry and the publication gate cannot name different rows.
         rows.AddRange(AttackInstanceContract.Support());
         // The node-list family's own bindings: the generic spawn row, the six value rows and the tag and glue
-        // rows, each with the permission its own contract declares, plus the three actions' write permissions.
+        // rows, each with the permission its own contract declares, plus the four actions' write permissions and
+        // the ability-used observation's read permission.
         rows.Add(new(EnemyNodeTriggerContract.SpawnedBinding, "implementation-only", Array.Empty<string>()));
         rows.AddRange(EnemyNodeValueContract.ValueSupport());
         rows.AddRange(EnemyNodeTriggerContract.Support());
+        rows.Add(new(EnemyAbilityUsedContract.BindingId, "implementation-only", new[] { EnemyAbilityUsedContract.ReadPermission }));
         rows.Add(new(EnemyNodeEffectContract.KillBinding, "implementation-only", new[] { EnemyNodeEffectContract.KillPermission }));
+        rows.Add(new(EnemyNodeEffectContract.RemoveBinding, "implementation-only", new[] { EnemyNodeEffectContract.RemovePermission }));
         rows.Add(new(EnemyNodeEffectContract.MarkBinding, "implementation-only", new[] { EnemyNodeEffectContract.MarkPermission }));
         rows.Add(new(EnemyNodeEffectContract.TargetBinding, "implementation-only", new[] { EnemyNodeEffectContract.TargetPermission }));
         // The four action families' bindings and the wave trigger rows, each with the permission its own
@@ -257,6 +268,8 @@ internal static class EnemyRegistration
         rows.AddRange(GlueContract.Support);
         rows.AddRange(EnemyBehaviorContract.Support());
         rows.AddRange(EnemyAbilityInterruptedContract.Support());
+        // The effect-volume row this provider owns, with the write permission its own contract declares.
+        rows.AddRange(EnemyVolumeContract.Support());
         // The profile family: one execute binding whose handler writes the boss phase through the game's own
         // replicated setter.
         rows.AddRange(EnemyProfileContract.Support);

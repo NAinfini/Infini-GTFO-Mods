@@ -5,7 +5,8 @@ using HarmonyLib;
 namespace ForgeEnemy.Native;
 
 /// <summary>The enemy-domain observation hooks this batch adds: the spawn of an enemy, the game's own tag
-/// transaction, and the moment foam really lands on an enemy's own glue receiver.
+/// transaction, the moment foam really lands on an enemy's own glue receiver, and the moment an enemy's own
+/// attack state begins an attack.
 ///
 /// Every hook here reads state the native call has already written and publishes a fact; none of them writes the
 /// world. They are separate classes from the existing `EnemyNativeHooks` entries on purpose — that list is a
@@ -15,7 +16,8 @@ internal static class EnemyNodeHooks
 {
     internal static readonly Type[] Types =
     {
-        typeof(EnemyNodeSpawned), typeof(EnemyNodeTagged), typeof(EnemyNodeGlued), typeof(EnemyNodeTagPump)
+        typeof(EnemyNodeSpawned), typeof(EnemyNodeTagged), typeof(EnemyNodeGlued), typeof(EnemyNodeTagPump),
+        typeof(EnemyNodeAbilityUsed)
     };
 }
 
@@ -66,8 +68,9 @@ internal static class EnemyNodeGlued
 
 /// <summary>The tag's falling edge and the marker pump, on the one per-frame hook the behaviour facts already run
 /// on. A tag's native timer runs out on the game's own side and nothing in the tag transaction reports that, so
-/// the state is sampled here; the same call expires every Forge marker whose lifetime ran out, which is why the
-/// two live in one postfix rather than in two.</summary>
+/// the state is sampled here; the same call expires every Forge marker whose lifetime ran out and moves or
+/// releases every effect volume this package holds, which is why the three live in one postfix rather than in
+/// three.</summary>
 [HarmonyPatch(typeof(EnemyDetection), nameof(EnemyDetection.UpdateTargets))]
 internal static class EnemyNodeTagPump
 {
@@ -75,6 +78,24 @@ internal static class EnemyNodeTagPump
     private static void Postfix(EnemyDetection __instance) => Plugin.Session?.Guard(module =>
     {
         module.ExpireMarks();
+        module.PumpVolumes();
         if (__instance.m_ai is { } ai) module.ObserveTagState(ai.m_enemyAgent);
     });
+}
+
+/// <summary>An enemy beginning an attack ability. `RecieveAttackStart` is what `ES_EnemyAttackBase` runs on every
+/// peer when the attack-start packet arrives, and its body (`pES_EnemyAttackData`) is the game's own answer to
+/// "which ability, at whom, for how long": the ability kind and index, the target agent handle and the duration.
+/// The enemy the fact is about is read from the state that received it — a state belongs to exactly one AI, and
+/// the AI's own agent is the public half of that pairing — so a state whose agent does not read publishes
+/// nothing rather than a fact about a different enemy.
+///
+/// The publication gate is the module's own host authority, so the packets every peer receives produce a fact on
+/// the master only, which is where this package's observations are read.</summary>
+[HarmonyPatch(typeof(ES_EnemyAttackBase), "RecieveAttackStart")]
+internal static class EnemyNodeAbilityUsed
+{
+    [HarmonyPostfix]
+    private static void Postfix(ES_EnemyAttackBase __instance, pES_EnemyAttackData attackData)
+        => Plugin.Session?.Guard(module => module.AfterAbilityUsed(__instance.m_enemyAgent, attackData));
 }

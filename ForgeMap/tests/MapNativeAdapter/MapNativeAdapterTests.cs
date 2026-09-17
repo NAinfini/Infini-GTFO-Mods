@@ -261,6 +261,24 @@ public sealed class MapNativeAdapterTests
     }
 
     [Fact]
+    public void session_registers_the_applied_effect_restore()
+    {
+        // The plan loader lets a step carry an `effect` block only where the binding registered a callback that
+        // ends it. The sourced-modifier row's duration belongs to that lifecycle, so the session has to register
+        // the adapter's restore for its own binding — without it every plan asking for a duration is refused at
+        // load with `effect-unsupported`.
+        var kernel = Kernel();
+        using var session = Start(kernel, new(), new());
+        var registry = typeof(RuntimeKernel).GetField("registry", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(kernel)!;
+        var restores = (System.Collections.IDictionary)registry.GetType()
+            .GetField("EffectRestores", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(registry)!;
+        var binding = AgentModifierContract.Binding(AgentModifierContract.ApplyCapabilityId);
+        Require(restores.Contains(binding), "The apply binding has no effect restore registered: " + binding);
+        Require(!restores.Contains(AgentModifierContract.Binding(AgentModifierContract.RemoveCapabilityId)),
+            "The removal row carries no effect block and must register no restore.");
+    }
+
+    [Fact]
     public void identity_host_spawn_records_life_without_gameplay_gate()
     {
         // Elevator spawns happen in the same world before InLevel; the module reads no gameplay gate.

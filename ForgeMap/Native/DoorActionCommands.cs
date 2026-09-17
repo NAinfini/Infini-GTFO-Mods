@@ -10,8 +10,8 @@ using SNetwork;
 
 namespace ForgeMap.Native;
 
-/// <summary>The execute half of the door action rows: `forge.action.map.door_open`,
-/// `forge.action.map.door_close` and `forge.action.map.door_alarm`. All three act on the doors a plan named in
+/// <summary>The execute half of the door action rows: `forge.action.map.door_open` and
+/// `forge.action.map.door_close`. Both act on the doors a plan named in
 /// the one `gtfo.map_object` namespace, through the native entry points the door observation already reads — no
 /// second door table, no plan object, and no handle.
 ///
@@ -20,22 +20,19 @@ namespace ForgeMap.Native;
 /// - The open row asks the door's own interaction entry, or its own force entry when the plan chose `force`.
 ///   The interaction entry toggles, so the door's own status decides first: a door that already reads open is
 ///   left alone and reported as the state it is in, never toggled shut by a second open.
-/// - The close row asks the same toggling entry only for a door that reads open. The entry carries neither an
-///   occupancy decision nor a force flag, so `crush` and `force` are refused rather than run as a plain close
-///   and reported as the requested one.
-/// - The alarm row starts and stops the alarm the door itself owns: the `ChainedPuzzleInstance` its lock
-///   component holds. That instance is the door's alarm/scan — the game creates it in
-///   `LG_SecurityDoor.SetupChainedPuzzleLock` and activating it is what starts its enemy wave — so `start` and
-///   `stop` are its own master-side activation and deactivation, and the door's `m_hasAlarm` flag says whether
-///   its lock is an alarm at all. The catalog's `alarm` resource has no counterpart on that path (the alarm is
-///   the door's own puzzle, not a block a plan picks) and the row's `alarm_handle` is never produced because the
-///   runtime mints no provider handle for a command yet, so both are declared optional by the contract and a
-///   supplied resource is refused here by name.
+/// - The close row asks the same toggling entry only for a door that reads open. It carries no structural
+///   parameter at all: the interaction entry is the one close entry the game has, and the catalog's two close
+///   policies are gone with their ports.
+///
+/// A door's alarm is **not** a row here: the rulings deleted the alarm action, because a door's alarm is the
+/// chained puzzle instance its lock component holds and `forge.action.map.scan_state` already writes that same
+/// instance kind. A plan reads the puzzle reference from `forge.query.map.door_state`'s `puzzle` output and
+/// feeds it to the scan row, so one native write keeps one card.
 ///
 /// Every refusal is a code, never a silent success: a reference that is not a door, a reference the kernel no
 /// longer answers for, an instance the provider's own table no longer maps back to that reference, a door whose
-/// address changed under it, a door the game's own status refuses, and a policy no native entry carries are all
-/// different rows.</summary>
+/// address changed under it, a door the game's own status refuses, and a bypass policy no native entry carries
+/// are all different rows.</summary>
 internal sealed class DoorActionCommands
 {
     /// <summary>The one recipient kind these rows answer for. A reference of any other kind is refused by name
@@ -64,34 +61,19 @@ internal sealed class DoorActionCommands
     /// <summary>The native call threw after it was entered; whether the door's own write had already happened is
     /// not observable from here, so the row is an unknown commit.</summary>
     internal const string CommitExceptionCode = "native-commit-exception";
-    /// <summary>A requested animation duration: the door's own interaction entry takes none, so a request that
-    /// names one is refused rather than asked for and reported as honoured.</summary>
-    internal const string DurationCode = "duration-unsupported";
-    /// <summary>A structural parameter whose member no native path carries — an unknown policy, or a mode that
-    /// is not `start` or `stop`.</summary>
+    /// <summary>A structural parameter whose member no native path carries — an unknown bypass policy.</summary>
     internal const string PolicyCode = "door-unknown-policy";
-    /// <summary>An author-named alarm resource: the door's own chained puzzle is its alarm, so a request that
-    /// names a different one is refused instead of quietly starting the door's own.</summary>
-    internal const string AlarmResourceCode = "door-alarm-resource-unsupported";
 
     /// <summary>The native instance behind one recipient reference, or null when this world cannot resolve it.
     /// It is a delegate so a registration hands over the session's own lookup and a test can hand over a table;
     /// the caller still verifies the answer against the kernel before anything is written.</summary>
     internal delegate LG_SecurityDoor? Resolver(EntityReference reference);
 
-    /// <summary>One row of the close and alarm results, in the row order the catalog declares: the four fixed
-    /// columns and the number of doors the request named.</summary>
+    /// <summary>One row of the open and close results, in the row order the catalog declares: the four fixed
+    /// columns and the number of doors the request named. Both rows carry the same columns, because the open
+    /// row's own `duration` column is gone with the port the native entry never took.</summary>
     private sealed record DoorRow(EntityReference Target, string Status,
         [property: JsonPropertyName("committed")] string CommitState, string Code,
-        [property: JsonPropertyName("target_count")] int TargetCount);
-
-    /// <summary>One row of the open result, which carries one column more: the duration the request named. The
-    /// column is always null because the native entry takes no caller-set duration — the only values this row
-    /// accepts are an absent port or a zero — and reporting the door's own animation time as if it were the
-    /// requested one would be a different claim.</summary>
-    private sealed record DoorOpenRow(EntityReference Target, string Status,
-        [property: JsonPropertyName("committed")] string CommitState, string Code,
-        [property: JsonPropertyName("duration")] int? Duration,
         [property: JsonPropertyName("target_count")] int TargetCount);
 
     private readonly RuntimeKernel _kernel;
@@ -193,50 +175,46 @@ internal sealed class DoorActionCommands
         return true;
     }
 
-    /// <summary>The open row's handler. `duration` and `bypass_policy` are checked once for the whole command,
-    /// because a command that cannot be carried out as asked must not half-apply: the native entry takes no
-    /// duration, and a policy that is neither of the catalog's two members is refused before any door is read.</summary>
+    /// <summary>The open row's handler. `bypass_policy` is checked once for the whole command, because a command
+    /// that cannot be carried out as asked must not half-apply: a policy that is neither of the catalog's two
+    /// members is refused before any door is read.</summary>
     internal CommandResult Open(JsonElement inputs, JsonElement parameters, bool isHost)
     {
         if (!isHost || !Authoritative()) return CommandResult.Rejected(AuthorityCode);
         var doors = Recipients(inputs);
         if (doors.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
         if (doors.Length == 0) return CommandResult.Rejected(NoTargetsCode);
-        if (Duration(inputs) is { } ticks && ticks != 0) return CommandResult.Rejected(DurationCode);
         if (BypassPolicy(parameters) is not { } policy) return CommandResult.Rejected(PolicyCode);
 
-        var rows = new List<DoorOpenRow>(doors.Length);
+        var rows = new List<DoorRow>(doors.Length);
         bool stop = false;
         foreach (var target in doors)
         {
             if (stop)
             {
-                rows.Add(OpenRow(target, "rejected", CommitStates.None, NotAttemptedCode, doors.Length));
+                rows.Add(Row(target, "rejected", CommitStates.None, NotAttemptedCode, doors.Length));
                 continue;
             }
             if (!TryResolve(target, out var door, out var address, out var refusal))
             {
-                rows.Add(OpenRow(target, "rejected", CommitStates.None, refusal, doors.Length));
+                rows.Add(Row(target, "rejected", CommitStates.None, refusal, doors.Length));
                 continue;
             }
             var (status, commit, code) = Run(() => DoorActions.Open(door, address, policy));
             if (commit == CommitStates.Unknown) stop = true;
-            rows.Add(OpenRow(target, status, commit, code, doors.Length));
+            rows.Add(Row(target, status, commit, code, doors.Length));
         }
         return Aggregate(rows, "door-open-all-rejected", "door-open-all-unknown");
     }
 
-    /// <summary>The close row's handler. Both structural policies are checked once for the whole command: the
-    /// door's own interaction entry carries neither, so a `crush` or `force` request is refused rather than run
-    /// as a plain close.</summary>
+    /// <summary>The close row's handler. The request carries no structural parameter at all: the door's own
+    /// interaction entry is the one close entry the game has.</summary>
     internal CommandResult Close(JsonElement inputs, JsonElement parameters, bool isHost)
     {
         if (!isHost || !Authoritative()) return CommandResult.Rejected(AuthorityCode);
         var doors = Recipients(inputs);
         if (doors.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
         if (doors.Length == 0) return CommandResult.Rejected(NoTargetsCode);
-        if (OccupancyPolicy(parameters) is not { } occupancy) return CommandResult.Rejected(PolicyCode);
-        if (ForcePolicy(parameters) is not { } force) return CommandResult.Rejected(PolicyCode);
 
         var rows = new List<DoorRow>(doors.Length);
         bool stop = false;
@@ -252,45 +230,11 @@ internal sealed class DoorActionCommands
                 rows.Add(Row(target, "rejected", CommitStates.None, refusal, doors.Length));
                 continue;
             }
-            var (status, commit, code) = Run(() => DoorActions.Close(door, address, occupancy, force));
+            var (status, commit, code) = Run(() => DoorActions.Close(door, address));
             if (commit == CommitStates.Unknown) stop = true;
             rows.Add(Row(target, status, commit, code, doors.Length));
         }
         return Aggregate(rows, "door-close-all-rejected", "door-close-all-unknown");
-    }
-
-    /// <summary>The alarm row's handler. The required `source` reference is not passed on — the native alarm
-    /// path takes the door's own puzzle and no source — and an author-named `alarm` resource is refused by name,
-    /// because the door's own chained puzzle is the alarm and starting a different one is not something this row
-    /// can carry. `mode` is the plan's structural choice, checked once for the whole command.</summary>
-    internal CommandResult Alarm(JsonElement inputs, JsonElement parameters, bool isHost)
-    {
-        if (!isHost || !Authoritative()) return CommandResult.Rejected(AuthorityCode);
-        var doors = Recipients(inputs);
-        if (doors.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
-        if (doors.Length == 0) return CommandResult.Rejected(NoTargetsCode);
-        if (Present(inputs, "alarm")) return CommandResult.Rejected(AlarmResourceCode);
-        if (Mode(parameters) is not { } mode) return CommandResult.Rejected(PolicyCode);
-
-        var rows = new List<DoorRow>(doors.Length);
-        bool stop = false;
-        foreach (var target in doors)
-        {
-            if (stop)
-            {
-                rows.Add(Row(target, "rejected", CommitStates.None, NotAttemptedCode, doors.Length));
-                continue;
-            }
-            if (!TryResolve(target, out var door, out var address, out var refusal))
-            {
-                rows.Add(Row(target, "rejected", CommitStates.None, refusal, doors.Length));
-                continue;
-            }
-            var (status, commit, code) = Run(() => DoorActions.SetAlarm(door, address, mode));
-            if (commit == CommitStates.Unknown) stop = true;
-            rows.Add(Row(target, status, commit, code, doors.Length));
-        }
-        return Aggregate(rows, "door-alarm-all-rejected", "door-alarm-all-unknown");
     }
 
     /// <summary>Runs one door's own native entry and turns the layer's decision into a result row. An entry
@@ -330,28 +274,10 @@ internal sealed class DoorActionCommands
     internal CommandResult HandleClose(CommandContext context)
         => Close(context.Inputs, context.Parameters, context.IsHost);
 
-    internal CommandResult HandleAlarm(CommandContext context)
-        => Alarm(context.Inputs, context.Parameters, context.IsHost);
-
     /// <summary>The command-level conclusion of a run of doors, by the rule the other native actions use: every
     /// row committed is a success, no committed row is a rejection or an unknown failure, and anything between is
     /// partial with the weaker commit state. `outputs` is the envelope the rows are written into.</summary>
     private static CommandResult Aggregate(IReadOnlyList<DoorRow> rows, string allRejected, string allUnknown)
-    {
-        var outputs = Envelope(rows);
-        int committed = 0, unknown = 0;
-        foreach (var row in rows)
-        {
-            if (row.CommitState == CommitStates.Confirmed) committed++;
-            else if (row.CommitState == CommitStates.Unknown) unknown++;
-        }
-        if (committed == rows.Count) return CommandResult.Succeeded(outputs);
-        if (committed > 0) return CommandResult.Partial(outputs, unknown > 0 ? CommitStates.Unknown : CommitStates.Confirmed);
-        if (unknown == 0) return CommandResult.Create(CommandStatuses.Rejected, CommitStates.None, Single(rows, allRejected), "", outputs);
-        return CommandResult.Create(CommandStatuses.Failed, CommitStates.Unknown, Single(rows, allUnknown), "", outputs);
-    }
-
-    private static CommandResult Aggregate(IReadOnlyList<DoorOpenRow> rows, string allRejected, string allUnknown)
     {
         var outputs = Envelope(rows);
         int committed = 0, unknown = 0;
@@ -374,39 +300,17 @@ internal sealed class DoorActionCommands
         return first;
     }
 
-    private static string Single(IReadOnlyList<DoorOpenRow> rows, string fallback)
-    {
-        if (rows.Count == 1) return rows[0].Code;
-        var first = rows[0].Code;
-        foreach (var row in rows) if (row.Code != first) return fallback;
-        return first;
-    }
-
     /// <summary>The result envelope: one `results` array in the plan's own order, with no dedupe, which is what
     /// the catalog's `forge.result.map.door_*` row sets declare.</summary>
     private static JsonElement Envelope(IReadOnlyList<DoorRow> rows) => RuntimeJson.From(new { results = rows });
 
-    private static JsonElement Envelope(IReadOnlyList<DoorOpenRow> rows) => RuntimeJson.From(new { results = rows });
-
     private static DoorRow Row(EntityReference target, string status, string commit, string code, int count)
         => new(target, status, commit, code, count);
-
-    private static DoorOpenRow OpenRow(EntityReference target, string status, string commit, string code, int count)
-        => new(target, status, commit, code, null, count);
 
     private static EntityReference[] Recipients(JsonElement inputs)
         => inputs.TryGetProperty("doors", out var value) && value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray().Select(RuntimeJson.Entity).ToArray()
             : Array.Empty<EntityReference>();
-
-    /// <summary>An input the plan actually supplied: absent, or a present null, is the same "not asked for".</summary>
-    private static bool Present(JsonElement inputs, string port)
-        => inputs.TryGetProperty(port, out var value)
-           && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
-
-    private static int? Duration(JsonElement inputs)
-        => inputs.TryGetProperty("duration", out var value) && value.ValueKind == JsonValueKind.Number
-            && value.TryGetInt32(out int ticks) ? ticks : null;
 
     private static string? Parameter(JsonElement parameters, string id)
         => parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty(id, out var value)
@@ -418,27 +322,6 @@ internal sealed class DoorActionCommands
     {
         "respect" => DoorBypassPolicy.Respect,
         "force" => DoorBypassPolicy.Force,
-        _ => null
-    };
-
-    internal static DoorOccupancyPolicy? OccupancyPolicy(JsonElement parameters) => Parameter(parameters, "occupancy_policy") switch
-    {
-        "block" => DoorOccupancyPolicy.Block,
-        "crush" => DoorOccupancyPolicy.Crush,
-        _ => null
-    };
-
-    internal static DoorForcePolicy? ForcePolicy(JsonElement parameters) => Parameter(parameters, "force_policy") switch
-    {
-        "normal" => DoorForcePolicy.Normal,
-        "force" => DoorForcePolicy.Force,
-        _ => null
-    };
-
-    internal static DoorAlarmMode? Mode(JsonElement parameters) => Parameter(parameters, "mode") switch
-    {
-        "start" => DoorAlarmMode.Start,
-        "stop" => DoorAlarmMode.Stop,
         _ => null
     };
 }

@@ -25,8 +25,10 @@ namespace ForgeMap;
 ///
 /// The two detailed readings travel beside the coarse state rather than replacing it: `detail` is the native
 /// `door_state` member name and `locked` is the lock component's own answer, so a plan that needs the exact
-/// status is not forced to infer it back from the five-member derivation. Every reading is the door's own
-/// native member — nothing here is a Forge-side state ledger.</summary>
+/// status is not forced to infer it back from the five-member derivation. `glued` and `stuck` name the two
+/// obstructions the game's own status carries (`GluedMax`, `TryOpenStuckInGlue`, `TryOpenStuckBroken`,
+/// dump.cs:688678-688680) and `puzzle` carries the chained puzzle the door's lock holds. Every reading is the
+/// door's own native member — nothing here is a Forge-side state ledger.</summary>
 public static class DoorQueryContract
 {
     public const string CapabilityId = "forge.query.map.door_state";
@@ -50,13 +52,20 @@ public static class DoorQueryContract
     /// is refused instead of being reported as the nearest state.</summary>
     public const string StatusCode = "door-state-status";
 
-    /// <summary>The one shape of this handler: the door the read is about, and the four facts it answers.</summary>
+    /// <summary>The one shape of this handler: the door the read is about, and the seven facts it answers.</summary>
     public static readonly HandlerShape Shape = new HandlerShape()
-        .Inputs("door").Outputs("state", "detail", "locked", "key");
+        .Inputs("door").Outputs("state", "detail", "locked", "key", "puzzle", "glued", "stuck");
 
     /// <summary>The row, spelled the way a registration declares it: kind `state`, which is the value row's own
-    /// kind — an on-demand read about the world — with execution `query`, one entity input and four read-only
-    /// outputs. It declares the world read it performs, exactly as the environment row does.</summary>
+    /// kind — an on-demand read about the world — with execution `query`, one entity input and five read-only
+    /// outputs. It declares the world read it performs, exactly as the environment row does.
+    ///
+    /// The `puzzle` output is the chained puzzle the door's own lock component holds, as the one resource
+    /// reference `forge.action.map.scan_state` takes: the resource id is that instance's own `m_puzzleUID`, the
+    /// same id the scan row's chained-puzzle resource provider publishes (`AlarmWaveActions.FindPuzzle`,
+    /// `EnumerateChainedPuzzles`), so a plan reads the reference here and feeds it to the scan row instead of an
+    /// alarm action that no longer exists. A door whose lock holds no puzzle leaves the port out rather than
+    /// answering with an id no provider resolves.</summary>
     public const string CapabilityRowJson = """
     {
       "id": "forge.query.map.door_state",
@@ -75,7 +84,10 @@ public static class DoorQueryContract
           { "id": "state", "type": "enum", "schema": "door_query_state" },
           { "id": "detail", "type": "enum", "schema": "door_state" },
           { "id": "locked", "type": "boolean" },
-          { "id": "key", "type": "string" }
+          { "id": "key", "type": "string" },
+          { "id": "puzzle", "type": "resource", "resourceKind": "chained-puzzle", "schema": "forge.resource.chained-puzzle" },
+          { "id": "glued", "type": "boolean" },
+          { "id": "stuck", "type": "boolean" }
         ],
         "parameters": [],
         "reads": ["world"]
@@ -140,10 +152,11 @@ public static class DoorQueryContract
         _ => throw new RuntimeContractException(StatusCode, "Unknown door status value: " + status)
     };
 
-    /// <summary>One door as the evaluator reads it: the native status, whether a lock holds the door, and the key
-    /// it currently wants. It is the same three readings the door observation half publishes, handed over as a
-    /// value because the game-independent assembly this contract lives in holds no game type.</summary>
-    public readonly record struct DoorSample(int Status, bool Locked, string? Key);
+    /// <summary>One door as the evaluator reads it: the native status, whether a lock holds the door, the key
+    /// it currently wants, and the chained puzzle its lock holds (`m_puzzleUID`, empty when it holds none). It is
+    /// the same readings the door observation half publishes, handed over as a value because the game-independent
+    /// assembly this contract lives in holds no game type.</summary>
+    public readonly record struct DoorSample(int Status, bool Locked, string? Key, string? Puzzle = null);
 
     /// <summary>The one read this row needs from the world: the door a reference names right now, or null when
     /// this world does not answer for it. The game-bound half supplies it; a registration that carries none
@@ -176,9 +189,17 @@ public static class DoorQueryContract
         {
             ["state"] = state,
             ["detail"] = MapObjectDoorStatus.Name(sample.Status),
-            ["locked"] = sample.Locked
+            ["locked"] = sample.Locked,
+            // The glue and stuck states are the door's own status values, not a second reading: they travel as
+            // named fields so a plan does not have to compare `detail` against a status name.
+            ["glued"] = MapObjectDoorStatus.IsGlued(sample.Status),
+            ["stuck"] = MapObjectDoorStatus.IsStuck(sample.Status)
         };
         if (!string.IsNullOrEmpty(sample.Key)) answer["key"] = sample.Key;
+        // The puzzle reference travels in the same spelling a resource port reads (`resourceKind` plus
+        // `resourceId`), so an author wires this output straight into `scan_state`'s `scan` input.
+        if (!string.IsNullOrEmpty(sample.Puzzle))
+            answer["puzzle"] = new ResourceRef(AlarmWaveContract.ChainedPuzzleKind, sample.Puzzle!);
         return RuntimeJson.From(answer);
     }
 

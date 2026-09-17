@@ -7,7 +7,7 @@ namespace ForgeWeapon.Tests.WeaponOverride;
 /// The declared rows of the instance-override family, checked against the runtime's own contract rules rather
 /// than against a copy of themselves.
 ///
-/// The strongest case here registers the three rows with their bindings exactly the way the integration batch
+/// The strongest case here registers the four rows with their bindings exactly the way the integration batch
 /// will and lets `RuntimeKernel.RegisterModule` validate every port, resource kind, handle kind, result schema,
 /// shape and recipient block: a row that drifted from the framework's vocabulary fails there rather than at a plan
 /// load in the game.
@@ -21,14 +21,15 @@ public sealed class WeaponOverrideContractTests
     {
         WeaponOverrideContract.FireRateCapability,
         WeaponOverrideContract.SpreadCapability,
-        WeaponOverrideContract.RecoilCapability
+        WeaponOverrideContract.RecoilCapability,
+        WeaponOverrideContract.PropertyCapability
     };
 
     [Fact]
     public void the_declared_set_is_the_wired_set()
     {
-        Assert.Equal(3, WeaponOverrideContract.All.Count);
-        Assert.Equal(3, WeaponOverrideContract.Documents.Length);
+        Assert.Equal(4, WeaponOverrideContract.All.Count);
+        Assert.Equal(4, WeaponOverrideContract.Documents.Length);
         Assert.Equal(WeaponOverrideContract.All.OrderBy(id => id, StringComparer.Ordinal),
             WeaponOverrideContract.WiredBindings.Keys.OrderBy(id => id, StringComparer.Ordinal));
     }
@@ -96,7 +97,8 @@ public sealed class WeaponOverrideContractTests
         }).GetRawText();
 
         var handlers = WeaponOverrideContract.Handlers(_ => CommandResult.Rejected("fixture"),
-            _ => CommandResult.Rejected("fixture"), _ => CommandResult.Rejected("fixture"));
+            _ => CommandResult.Rejected("fixture"), _ => CommandResult.Rejected("fixture"),
+            _ => CommandResult.Rejected("fixture"));
 
         var module = new RuntimeModule(RuntimeKernel.ApiVersion, registry, handlers, WeaponOverrideContract.Support())
         {
@@ -108,6 +110,23 @@ public sealed class WeaponOverrideContractTests
         using var registration = kernel.RegisterModule(module, RuntimeLogLevel.Off);
 
         Assert.True(registration.IsRegistered);
+    }
+
+    [Fact]
+    public void the_generic_rows_two_enums_are_the_ledgers_own_vocabulary()
+    {
+        // The generic row advertises the names the applier can write and the operations it can resolve, so the
+        // two lists are read from one place and asserted against the other: a card offering a name the native half
+        // cannot write, or an operation it has no arithmetic for, fails here rather than in the game.
+        var graph = RuntimeJson.Parse(WeaponOverrideContract.Documents
+                .Single(document => RuntimeJson.Parse(document).GetProperty("id").GetString()
+                    == WeaponOverrideContract.PropertyCapability))
+            .GetProperty("graph").GetProperty("parameters").EnumerateArray()
+            .ToDictionary(parameter => parameter.GetProperty("id").GetString()!,
+                parameter => parameter.GetProperty("values").EnumerateArray()
+                    .Select(value => value.GetString()!).ToArray());
+        Assert.Equal(WeaponOverrideLedger.Fields, graph["field"]);
+        Assert.Equal(WeaponOverrideLedger.Operations, graph["operation"]);
     }
 
     [Fact]

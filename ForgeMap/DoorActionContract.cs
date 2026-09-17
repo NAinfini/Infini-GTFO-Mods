@@ -8,8 +8,8 @@ namespace ForgeMap;
 /// declared here — capability shape, binding row, registration support and handler shape — so the
 /// game-independent declaration, the runtime registration and the website catalog cannot describe the same row
 /// three different ways. The capability shapes are the catalog's, port for port, including its `recipients`
-/// contract; a port the native side cannot carry is declared optional here and refused by name when a plan
-/// supplies one anyway.
+/// contract; a catalog port no native entry can carry is deleted on both sides rather than declared and refused,
+/// so an author never sees an option the game ignores.
 ///
 /// Three of the six catalog rows are **not** declared, because no binding here could keep their promise:
 ///
@@ -34,13 +34,11 @@ public static class DoorActionContract
 {
     public const string OpenCapability = "forge.action.map.door_open";
     public const string CloseCapability = "forge.action.map.door_close";
-    public const string AlarmCapability = "forge.action.map.door_alarm";
 
     /// <summary>The permissions the catalog's own recipient contracts name, one per row. They are the whole
     /// permission a plan pinning the binding declares, because no row here depends on another binding.</summary>
     public const string OpenPermission = "door.control";
     public const string ClosePermission = "door.control";
-    public const string AlarmPermission = "door.alarm";
 
     /// <summary>The catalog's domain list for these rows: a door is a map object that rooms and logic graphs
     /// act on, and all three rows name the same set.</summary>
@@ -48,30 +46,23 @@ public static class DoorActionContract
 
     public const string OpenHandlerName = "gtfo.map_object.door_open";
     public const string CloseHandlerName = "gtfo.map_object.door_close";
-    public const string AlarmHandlerName = "gtfo.map_object.door_alarm";
 
     /// <summary>Internal binding ids, by capability: this provider's own namespace plus the capability's own
     /// suffix, so the counterpart of a row is readable from either side.</summary>
     public static string Binding(string capabilityId)
         => ModuleDefinition.ProviderId + ".binding." + capabilityId["forge.".Length..];
 
-    /// <summary>The open row's own ports, in the catalog's order: the recipient collection and the requested
-    /// animation duration. `bypass_policy` is the row's one structural choice and is read from the node's own
-    /// constant bag.</summary>
+    /// <summary>The open row's own ports: the recipient collection. `bypass_policy` is the row's one structural
+    /// choice and is read from the node's own constant bag; a requested `duration` is gone with the catalog port,
+    /// because the native interaction entry takes none.</summary>
     public static readonly HandlerShape OpenShape = new HandlerShape()
-        .Inputs("doors", "duration").Outputs("result").Parameters("bypass_policy");
+        .Inputs("doors").Outputs("result").Parameters("bypass_policy");
 
-    /// <summary>The close row's ports: the same recipient collection and the two structural policies the
-    /// catalog declares.</summary>
+    /// <summary>The close row's ports: the same recipient collection and no structural parameter at all. The two
+    /// policies the catalog used to declare are gone with the catalog ports, because the native interaction entry
+    /// carries neither an occupancy decision nor a force form.</summary>
     public static readonly HandlerShape CloseShape = new HandlerShape()
-        .Inputs("doors").Outputs("result").Parameters("occupancy_policy", "force_policy");
-
-    /// <summary>The alarm row's ports: the recipient collection, the required source reference the native path
-    /// carries nowhere, the author-named alarm resource and the handle the row never produces. Both the alarm
-    /// resource and the handle are declared so an authored plan still compiles — a required port a plan cannot
-    /// satisfy would make every alarm step unloadable — and the handler refuses a supplied resource by name.</summary>
-    public static readonly HandlerShape AlarmShape = new HandlerShape()
-        .Inputs("doors", "source", "alarm").Outputs("result", "alarm_handle").Parameters("mode");
+        .Inputs("doors").Outputs("result");
 
     /// <summary>One action row: the catalog's id, label, description, domains, execution, ports, parameters and
     /// recipient contract. The capability rows below are this provider's own because the catalog is the only
@@ -99,16 +90,10 @@ public static class DoorActionContract
         => new { id = "result", type = "result", schema, fields };
 
     internal static object Port(string id, string type) => new { id, type };
-    internal static object Many(string id, string type) => new { id, type, cardinality = "many" };
-    internal static object Optional(string id, string type) => new { id, type, optional = true };
-    internal static object OptionalTicks(string id) => new { id, type = "integer", unit = "tick", optional = true };
-    internal static object OptionalResource(string id, string resourceKind, string schema)
-        => new { id, type = "resource", resourceKind, schema, optional = true };
-    internal static object OptionalHandle(string id, string handleKind, string lifetime)
-        => new { id, type = "handle", handleKind, lifetime, optional = true };
+    internal static object Many(string id, string type, string[] entityKinds)
+        => new { id, type, cardinality = "many", entityKinds };
     internal static object Field(string id, string type) => new { id, type };
     internal static object EnumField(string id, string schema) => new { id, type = "enum", schema };
-    internal static object UnitField(string id, string type, string unit) => new { id, type, unit };
     internal static object Structural(string id, bool required, params string[] values)
         => new { id, type = "enum", role = "structural", required, values };
 
@@ -119,15 +104,14 @@ public static class DoorActionContract
         EnumField("committed", "commit_state"), Field("code", "string")
     };
 
-    /// <summary>The open row, spelled exactly as the catalog carries it. `duration` is optional because the
-    /// door's own interaction entry takes no caller-set duration: the catalog's required port would otherwise
-    /// demand a value the native path cannot honour, and the handler refuses a non-zero one by name.</summary>
+    /// <summary>The open row, spelled exactly as the catalog carries it: the recipients and the one structural
+    /// bypass policy. The catalog's `duration` port is gone on both sides, because the door's own interaction
+    /// entry takes no caller-set duration.</summary>
     public static object OpenRow() => Row(OpenCapability, "请求打开门", "请求打开门。",
         new object[]
         {
             Port("in", "execution"),
-            Many("doors", "entity"),
-            OptionalTicks("duration")
+            Many("doors", "entity", new[] { MapObjectModule.EntityKind })
         },
         new object[]
         {
@@ -135,19 +119,19 @@ public static class DoorActionContract
             ResultPort("forge.result.map.door_open",
                 Field("target", "entity"), EnumField("status", "execution_outcome"),
                 EnumField("committed", "commit_state"), Field("code", "string"),
-                UnitField("duration", "integer", "tick"), Field("target_count", "integer"))
+                Field("target_count", "integer"))
         },
         new object[] { Structural("bypass_policy", true, "respect", "force") },
         Recipients("doors", OpenPermission));
 
-    /// <summary>The close row, spelled exactly as the catalog carries it. Both structural policies stay
-    /// required: they are the plan's own choice, and the native interaction entry carries neither, so a request
-    /// for `crush` or `force` is refused by name rather than quietly closed as a plain close.</summary>
+    /// <summary>The close row, spelled exactly as the catalog carries it: the recipients and nothing else. Both
+    /// structural policies are gone on both sides, because the native interaction entry carries neither an
+    /// occupancy decision nor a force form.</summary>
     public static object CloseRow() => Row(CloseCapability, "请求关闭门", "请求关上门。",
         new object[]
         {
             Port("in", "execution"),
-            Many("doors", "entity")
+            Many("doors", "entity", new[] { MapObjectModule.EntityKind })
         },
         new object[]
         {
@@ -157,41 +141,15 @@ public static class DoorActionContract
                 EnumField("committed", "commit_state"), Field("code", "string"),
                 Field("target_count", "integer"))
         },
-        new object[]
-        {
-            Structural("occupancy_policy", true, "block", "crush"),
-            Structural("force_policy", true, "normal", "force")
-        },
+        Array.Empty<object>(),
         Recipients("doors", ClosePermission));
 
-    /// <summary>The alarm row, spelled exactly as the catalog carries it, except for the two ports the native
-    /// path cannot carry: the author-named `alarm` resource has no provider in this runtime (the door's own
-    /// chained puzzle is the alarm, not a block a plan names) and `alarm_handle` is never produced because the
-    /// runtime mints no provider handle for a command yet (R-ABI batch C). Both are declared optional — a
-    /// handle that is never produced is declared as the absence it is rather than filled with a placeholder —
-    /// and the handler refuses a supplied resource by name.</summary>
-    public static object AlarmRow() => Row(AlarmCapability, "启动或解除门警报", "启动或解除门上的警报。",
-        new object[]
-        {
-            Port("in", "execution"),
-            Many("doors", "entity"),
-            Port("source", "entity"),
-            OptionalResource("alarm", "encounter", "forge.resource.encounter")
-        },
-        new object[]
-        {
-            Port("next", "execution"),
-            ResultPort("forge.result.map.door_alarm",
-                Field("target", "entity"), EnumField("status", "execution_outcome"),
-                EnumField("committed", "commit_state"), Field("code", "string"),
-                Field("target_count", "integer")),
-            OptionalHandle("alarm_handle", "effect", "encounter")
-        },
-        new object[] { Structural("mode", true, "start", "stop") },
-        Recipients("doors", AlarmPermission, handle: "alarm_handle"));
-
-    /// <summary>The three capability rows in the order this module declares them.</summary>
-    public static object[] Rows() => new object[] { OpenRow(), CloseRow(), AlarmRow() };
+    /// <summary>The two capability rows in the order this module declares them. There is no third: the alarm
+    /// action was deleted, because a door's alarm is the chained puzzle instance its lock component holds and
+    /// `forge.action.map.scan_state` already writes that instance kind. A plan reads the instance from
+    /// `forge.query.map.door_state`'s `puzzle` output, and this contract keeps only the two rows whose recipients
+    /// are doors.</summary>
+    public static object[] Rows() => new object[] { OpenRow(), CloseRow() };
 
     /// <summary>One execute binding row: this provider's own id, the canonical capability, the handler the
     /// native half supplies, and no dependencies — the closure of a plan that pins it is the row itself.</summary>
@@ -207,12 +165,11 @@ public static class DoorActionContract
         requires = Array.Empty<string>()
     };
 
-    /// <summary>The three binding rows in the same order as <see cref="Rows"/>.</summary>
+    /// <summary>The two binding rows in the same order as <see cref="Rows"/>.</summary>
     public static object[] Bindings() => new object[]
     {
         BindingRow(OpenCapability, OpenHandlerName),
-        BindingRow(CloseCapability, CloseHandlerName),
-        BindingRow(AlarmCapability, AlarmHandlerName)
+        BindingRow(CloseCapability, CloseHandlerName)
     };
 
     /// <summary>One binding's registration support: the one permission the catalog's recipient contract names
@@ -221,12 +178,11 @@ public static class DoorActionContract
     public static BindingSupport Support(string capability, string permission)
         => new(Binding(capability), "implementation-only", new[] { permission });
 
-    /// <summary>The three registration support rows, in the same order as <see cref="Bindings"/>.</summary>
+    /// <summary>The two registration support rows, in the same order as <see cref="Bindings"/>.</summary>
     public static BindingSupport[] Supports() => new[]
     {
         Support(OpenCapability, OpenPermission),
-        Support(CloseCapability, ClosePermission),
-        Support(AlarmCapability, AlarmPermission)
+        Support(CloseCapability, ClosePermission)
     };
 
     /// <summary>The handler shapes this provider's native half answers, keyed by handler name. A registration
@@ -234,7 +190,6 @@ public static class DoorActionContract
     public static IReadOnlyDictionary<string, HandlerShape> Shapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
         [OpenHandlerName] = OpenShape,
-        [CloseHandlerName] = CloseShape,
-        [AlarmHandlerName] = AlarmShape
+        [CloseHandlerName] = CloseShape
     };
 }

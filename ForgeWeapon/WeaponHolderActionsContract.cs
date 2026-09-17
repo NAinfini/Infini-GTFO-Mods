@@ -31,14 +31,29 @@ public static class WeaponHolderActionsContract
     /// is the backpack stack and `forge.action.weapon.ammo_*` the reserve pools — so this is a new canonical id of
     /// the weapon domain, named after what it sets.</summary>
     public const string ClipSetCapability = "forge.action.weapon.clip_set";
+    /// <summary>The fire row. Its canonical id is this package's own and its tier is the same `owner` one the
+    /// magazine rows carry, because the same machine owns both: the weapon fires where the inventory that holds
+    /// it lives — the game's own `Fire` writes the clip, the recoil and the replicated shot count of that
+    /// machine's weapon — so a host that fired a client's weapon would be firing the wrong copy.</summary>
+    public const string AutoFireCapability = "forge.action.weapon.auto_fire";
 
     public const string ReloadBinding = WeaponHolderChannelContract.ProviderId + ".binding.weapon_reload";
     public const string ClipSetBinding = WeaponHolderChannelContract.ProviderId + ".binding.weapon_clip_set";
+    public const string AutoFireBinding = WeaponHolderChannelContract.ProviderId + ".binding.weapon_auto_fire";
     public const string ReloadHandler = "gtfo.weapon.holder.reload";
     public const string ClipSetHandler = "gtfo.weapon.holder.clip_set";
+    public const string AutoFireHandler = "gtfo.weapon.holder.auto_fire";
 
-    /// <summary>The permission both rows write under: they change the magazine of one equipment instance.</summary>
+    /// <summary>The permission all three rows write under: they change the magazine of one equipment instance or
+    /// spend one of its rounds.</summary>
     public const string MagazineWritePermission = "gtfo.equipment.magazine.write";
+
+    /// <summary>The three `required_state` members, so a body that checks one and a plan that asks for it spell
+    /// the value once. `none` fires whatever is in hand; `aiming` and `charging` are the game's own weapon states
+    /// and never a re-derivation of them.</summary>
+    public const string StateNone = "none";
+    public const string StateAiming = "aiming";
+    public const string StateCharging = "charging";
 
     /// <summary>What one owner-tier action asks the holder's machine to do. The kind is a structural value of the
     /// step, not a port: one capability is one action, and the channel body switches on this constant rather than
@@ -46,7 +61,8 @@ public static class WeaponHolderActionsContract
     public enum HolderAction
     {
         Reload,
-        ClipSet
+        ClipSet,
+        AutoFire
     }
 
     /// <summary>One declared row and the native entry point its handler calls. The three travel together: a
@@ -54,19 +70,24 @@ public static class WeaponHolderActionsContract
     /// missing is not declared at all.</summary>
     public sealed record Row(string Capability, string Binding, string Handler, string NativeEntry);
 
-    /// <summary>The two rows, in catalog order.</summary>
+    /// <summary>The three rows, in catalog order.</summary>
     public static readonly IReadOnlyList<Row> Rows = new[]
     {
         new Row(ReloadCapability, ReloadBinding, ReloadHandler,
             "PlayerInventoryLocal.TriggerReload"),
         new Row(ClipSetCapability, ClipSetBinding, ClipSetHandler,
-            "BulletWeapon.SetCurrentClip")
+            "BulletWeapon.SetCurrentClip"),
+        new Row(AutoFireCapability, AutoFireBinding, AutoFireHandler,
+            "BulletWeapon.Fire")
     };
 
     /// <summary>The capability rows as parsed documents, one per row, ready for a `capabilities` array.</summary>
     public static IReadOnlyList<JsonElement> Capabilities()
     {
-        var rows = new List<JsonElement>(2) { RuntimeJson.Parse(ReloadRow), RuntimeJson.Parse(ClipSetRow) };
+        var rows = new List<JsonElement>(3)
+        {
+            RuntimeJson.Parse(ReloadRow), RuntimeJson.Parse(ClipSetRow), RuntimeJson.Parse(AutoFireRow)
+        };
         return rows;
     }
 
@@ -75,23 +96,28 @@ public static class WeaponHolderActionsContract
     public static IReadOnlyList<object> Bindings() => new object[]
     {
         Binding(ReloadBinding, ReloadCapability, ReloadHandler),
-        Binding(ClipSetBinding, ClipSetCapability, ClipSetHandler)
+        Binding(ClipSetBinding, ClipSetCapability, ClipSetHandler),
+        Binding(AutoFireBinding, AutoFireCapability, AutoFireHandler)
     };
 
-    /// <summary>The registration support rows, one per binding.</summary>
+    /// <summary>The registration support rows, one per binding. All three write the magazine or fire it, so all
+    /// three carry the same write permission.</summary>
     public static IReadOnlyList<BindingSupport> Support() => new[]
     {
         new BindingSupport(ReloadBinding, "implementation-only", new[] { MagazineWritePermission }),
-        new BindingSupport(ClipSetBinding, "implementation-only", new[] { MagazineWritePermission })
+        new BindingSupport(ClipSetBinding, "implementation-only", new[] { MagazineWritePermission }),
+        new BindingSupport(AutoFireBinding, "implementation-only", new[] { MagazineWritePermission })
     };
 
-    /// <summary>The shape of each handler, resolved at registration against the row below. Both rows read the
-    /// equipment they address, the holder they address it for and the plan's own request fields; the clip row
-    /// additionally reads the amount it was asked for.</summary>
+    /// <summary>The shape of each handler, resolved at registration against the row below. Every row reads the
+    /// equipment it addresses, the holder it addresses it for and the plan's own request fields; the clip row
+    /// additionally reads the amount it was asked for, and the fire row reads nothing else because the state it
+    /// requires is a structural parameter the native check reads out of the weapon itself.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> Shapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
         [ReloadHandler] = new HandlerShape().Inputs("equipment", "holder").Outputs("result").Parameters("chamber_policy", "transfer_policy"),
-        [ClipSetHandler] = new HandlerShape().Inputs("equipment", "holder", "amount").Outputs("result").Parameters("clip_policy")
+        [ClipSetHandler] = new HandlerShape().Inputs("equipment", "holder", "amount").Outputs("result").Parameters("clip_policy"),
+        [AutoFireHandler] = new HandlerShape().Inputs("equipment", "holder").Outputs("result").Parameters("required_state")
     };
 
     /// <summary>Which row one capability id is, or null when this contract does not carry it. The channel's own
@@ -100,6 +126,7 @@ public static class WeaponHolderActionsContract
     {
         if (string.Equals(capabilityId, ReloadCapability, StringComparison.Ordinal)) return HolderAction.Reload;
         if (string.Equals(capabilityId, ClipSetCapability, StringComparison.Ordinal)) return HolderAction.ClipSet;
+        if (string.Equals(capabilityId, AutoFireCapability, StringComparison.Ordinal)) return HolderAction.AutoFire;
         return null;
     }
 
@@ -114,7 +141,7 @@ public static class WeaponHolderActionsContract
     /// declaration-only shape is for. <paramref name="logLevel"/> is passed straight to the kernel by the caller.
     /// </summary>
     public static RuntimeModule Module(Func<EntityReference, string?>? holders, CommandHandler? reload = null,
-        CommandHandler? clipSet = null)
+        CommandHandler? clipSet = null, CommandHandler? autoFire = null)
     {
         var sessions = new Dictionary<string, Func<EntityReference, string?>>(StringComparer.Ordinal);
         if (holders != null)
@@ -122,6 +149,7 @@ public static class WeaponHolderActionsContract
         var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal);
         if (reload != null) handlers[ReloadHandler] = reload;
         if (clipSet != null) handlers[ClipSetHandler] = clipSet;
+        if (autoFire != null) handlers[AutoFireHandler] = autoFire;
         return new RuntimeModule(RuntimeKernel.ApiVersion,
             RuntimeJson.From(new
             {
@@ -154,21 +182,6 @@ public static class WeaponHolderActionsContract
     {
         id, capabilityId, providerId = WeaponHolderChannelContract.ProviderId, handler, role = "execute",
         status = "implemented", dependencies = Array.Empty<string>(), requires = Array.Empty<string>()
-    };
-
-    // The two result rows carry the four fixed columns every action result carries, then this row's own field:
-    // `clip` is the magazine the write left behind, which is the one number a plan can check its request against.
-    private static object Result(string schema) => new
-    {
-        id = "result", type = "result", schema,
-        fields = new object[]
-        {
-            new { id = "target", type = "entity" },
-            new { id = "status", type = "enum", schema = "execution_outcome" },
-            new { id = "committed", type = "enum", schema = "commit_state" },
-            new { id = "code", type = "string" },
-            new { id = "clip", type = "integer" }
-        }
     };
 
     /// <summary>`forge.action.weapon.reload`, port for port the catalog's row, with the one difference the tier
@@ -250,6 +263,52 @@ public static class WeaponHolderActionsContract
         ],
         "parameters": [
           { "id": "clip_policy", "type": "enum", "role": "structural", "required": true, "values": ["set", "fill"] }
+        ],
+        "recipients": {
+          "input": "equipment", "target": "entity", "cardinality": "one",
+          "requires": ["weapon.clip"], "result": "result"
+        }
+      }
+    }
+    """;
+
+    /// <summary>
+    /// The fire row. `required_state` is the one structural parameter: `none` fires whatever is in hand, `aiming`
+    /// and `charging` refuse a shot the weapon is not in the state to take rather than firing anyway. The check
+    /// is the game's own state — the holder's sight trigger and the weapon's charge — and not a re-derivation of
+    /// it, so a plan that asked for an aimed shot is answered by the same flag the game's own firing path reads.
+    /// The shot itself is the native `Fire` body, so the clip, the fire rate, the recoil and the replicated shot
+    /// count all behave exactly as they do for a pressed trigger; this row never bypasses the weapon. The result
+    /// carries the four fixed columns alone: one `Fire` body is one shot, so a count of shots here would be a
+    /// constant and not a reading.
+    /// </summary>
+    private const string AutoFireRow = """
+    {
+      "id": "forge.action.weapon.auto_fire",
+      "owner": "forge.module.gtfo.weapon.holder",
+      "kind": "action",
+      "label": "让武器自动开火",
+      "version": "1.0.0",
+      "parameters": { "description": "由计划让武器开火一次，走武器原生开火路径。" },
+      "graph": {
+        "domains": ["weapon", "tool", "consumable"],
+        "execution": "owner",
+        "inputs": [
+          { "id": "in", "type": "execution" },
+          { "entityKinds": ["gtfo.equipment"], "id": "equipment", "type": "entity" },
+          { "id": "holder", "type": "entity" }
+        ],
+        "outputs": [
+          { "id": "next", "type": "execution" },
+          { "id": "result", "type": "result", "schema": "forge.result.weapon.auto_fire", "fields": [
+            { "id": "target", "type": "entity" },
+            { "id": "status", "type": "enum", "schema": "execution_outcome" },
+            { "id": "committed", "type": "enum", "schema": "commit_state" },
+            { "id": "code", "type": "string" }
+          ] }
+        ],
+        "parameters": [
+          { "id": "required_state", "type": "enum", "role": "structural", "required": true, "values": ["none", "aiming", "charging"] }
         ],
         "recipients": {
           "input": "equipment", "target": "entity", "cardinality": "one",

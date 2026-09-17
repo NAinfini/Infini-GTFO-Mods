@@ -20,6 +20,9 @@ public sealed partial class RuntimeKernel
     public const int MaximumWaits = 256;
 
     private readonly RuntimeVariableStore variables = new();
+    /// <summary>The trigger option state. It sits beside the variable store because both are host state a
+    /// checkpoint carries, and it is a separate table because nothing in it is authored, named or read by a plan.</summary>
+    internal readonly RuntimeTriggerGateStore triggerGates = new();
     /// <summary>The suspended `g-wait` steps, by the binding they are waiting on. A wait is the dispatch's own
     /// resource: it is released by the timeout, by the event that wakes it, by the world ending and by `g-end`
     /// ending the flow that reached it.</summary>
@@ -47,14 +50,20 @@ public sealed partial class RuntimeKernel
     // ---------------------------------------------------------------------------------------------------------
 
     /// <summary>Registers a loaded plan's declarations. Called after the plan parsed, so a conflicting name is a
-    /// rejected plan rather than a half-loaded one.</summary>
-    private void DeclareVariables(ResolvedPlan plan) => variables.Declare(plan.Id, plan.Variables);
+    /// rejected plan rather than a half-loaded one. The entry points' own trigger options are registered in the same
+    /// place and for the same reason: they are a structural property of the plan, proved once at load.</summary>
+    private void DeclareVariables(ResolvedPlan plan)
+    {
+        variables.Declare(plan.Id, plan.Variables);
+        triggerGates.Declare(plan.Id, plan.Entries);
+    }
 
     /// <summary>Forgets a plan's declarations and its module-scope values. Values of the other scopes stay: they
     /// belong to the world, not to the file that declared them.</summary>
     private void ForgetVariables(string planId)
     {
         variables.ForgetPlan(planId);
+        triggerGates.ForgetPlan(planId);
         variables.ClearScopePrefix(VariableScopeKinds.Module, ModuleMount(planId, ""));
         foreach (var key in waits.Keys.ToArray())
         {
@@ -69,10 +78,12 @@ public sealed partial class RuntimeKernel
     private static string ModuleMount(string planId, string entry) => planId + "/" + entry;
 
     /// <summary>Every value and latch the world holds, dropped when the world ends. Declarations stay: the plans
-    /// are still loaded and re-declare the same names in the next world.</summary>
-    private void BeginVariableWorld()
+    /// are still loaded and re-declare the same names in the next world. The gate store is begun with the world's
+    /// die seed for the same reason: the counters belong to the world, and the seed is drawn once per world.</summary>
+    private void BeginVariableWorld(long gateSeed)
     {
         variables.ClearValues();
+        triggerGates.BeginWorld(gateSeed);
         waits.Clear();
         RefreshSubscriptionGates();
     }
@@ -111,8 +122,12 @@ public sealed partial class RuntimeKernel
                 var (declaration, scope) = VariableAddress(item, parameters, inputs);
                 var value = inputs.TryGetProperty("value", out var raw) ? raw : default;
                 RuntimeVariableContract.Validate(value, declaration.Type, declaration.Name);
+                // The old value is read before the write for the same reason the read row reads it: an address
+                // nothing has written yet answers with the declared initial value, so `previous` is never absent for
+                // a value class the declaration itself can hold.
+                var previous = variables.Read(declaration, scope);
                 var written = variables.Set(declaration, scope, value);
-                stepFrames[stepIndex] = RuntimeJson.From(new { written });
+                stepFrames[stepIndex] = RuntimeJson.From(new { written, previous });
                 cursor = Successor(step, 0);
                 return null;
             }
@@ -405,11 +420,32 @@ public sealed partial class RuntimeKernel
         })));
     }
 
-    /// <summary>What a checkpoint has to carry: every value and every `g-once` latch of the world being saved.</summary>
+    /// <summary>What a checkpoint has to carry: every value and every `g-once` latch of the world being saved, and
+    /// the trigger options' own counters — a threshold half reached is progress the level made.</summary>
     public string CaptureCheckpoint()
     {
         ReadThread();
-        return variables.Save(WorldEpoch);
+        return variables.Save(WorldEpoch, triggerGates.Save());
+    }
+
+    /// <summary>How many effect instances this host is currently holding: the counters a caller reporting what a
+    /// checkpoint does not carry — a duration is re-derived from the card — and the readable window onto an effect a
+    /// test or a diagnostic asks about when its module registered no callback worth counting.</summary>
+    public int LiveEffects { get { ReadThread(); return effects.Count; } }
+
+    /// <summary>How many gate rows this host holds, and how many booked sets inside them. A caller that wants to
+    /// know what a checkpoint carries without reading it.</summary>
+    public (int Gates, int Scopes) GateStateCounts() => (triggerGates.Count, triggerGates.ScopeRows);
+
+    /// <summary>What one gated entry point has fired and accumulated for one scope subject, or null where the plan
+    /// declares no gate for it. <paramref name="subject"/> is the entity id a per-player or per-instance gate is
+    /// booked against, and the empty string — the default — is the level's own set. The one readable window onto
+    /// the gate state: an author asking why a card is silent reads these.</summary>
+    public (long Fired, long Accumulated)? GateStateOf(string planId, string nodeId, string subject = "")
+    {
+        ArgumentNullException.ThrowIfNull(planId); ArgumentNullException.ThrowIfNull(nodeId); ArgumentNullException.ThrowIfNull(subject);
+        ReadThread();
+        return triggerGates.StateOf(planId, nodeId, subject);
     }
 
     /// <summary>
@@ -427,11 +463,21 @@ public sealed partial class RuntimeKernel
     {
         Mutable();
         var checkpoint = RuntimeJson.Parse(json);
-        RuntimeJson.Shape(checkpoint, "worldEpoch entries once");
+        RuntimeJson.Shape(checkpoint, "worldEpoch entries once", "gates");
         RuntimeJson.Require(RuntimeJson.Integer(checkpoint.GetProperty("worldEpoch")) == WorldEpoch, "variable-checkpoint",
             "Checkpoint belongs to another world.");
         variables.Restore(json);
         variables.ClearScope(VariableScopeKinds.Enemy);
+        // The gate rows are restored after the values, and only where the loaded plans still declare them: a reload
+        // of a checkpoint re-arms the same plans, so the counters come back to the entry points that own them.
+        triggerGates.Restore(checkpoint.TryGetProperty("gates", out var gates) ? gates.GetRawText() : "null");
+        // The level's own objects were rebuilt by the restore, so a per-instance counter names an entity that is
+        // gone: those sets are dropped after the restore rather than carried back with the checkpoint.
+        var instanceNodes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var loaded in plans.Values)
+            foreach (var entry in loaded.Plan.Entries)
+                if (entry.Gate?.Scope == TriggerGateContract.InstanceScope) instanceNodes.Add(entry.NodeId);
+        triggerGates.PruneInstances(instanceNodes);
         NotifyLifecycle(RuntimeLifecycleKind.CheckpointRestored);
     }
 

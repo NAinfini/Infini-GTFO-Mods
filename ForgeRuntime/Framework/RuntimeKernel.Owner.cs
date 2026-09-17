@@ -151,7 +151,7 @@ public sealed partial class RuntimeKernel
             var parameters = RuntimeJson.ResolveEnumParameters(step.Parameters, registry.Capabilities[step.CapabilityId]);
             var origin = new RuntimeEvent(eventId, step.BindingId, WorldEpoch, simulationTick, scopeId, RuntimeJson.EmptyObject);
             var context = new CommandContext(origin, simulationTick, commandId, planId, plan.Plan.ResourceId,
-                plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(resolved), false);
+                plan.Plan.ResourceRevision, step.NodeId, parameters, RuntimeJson.From(resolved), false, EntityInstance);
             var result = NormalizeInvokedResult(handler!(context));
             if (!CommandResultRules.TryValidate(result, out var violation))
                 return CommandResult.FailedUnknown(result.Outputs, "invalid-owner-result",

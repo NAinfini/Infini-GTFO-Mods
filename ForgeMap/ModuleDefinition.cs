@@ -53,25 +53,7 @@ public static class ModuleDefinition
             providers = new[] { new { id = ProviderId, kind = "native", version = Version, dependencies = Array.Empty<string>() } },
             capabilities = new object[]
             {
-                new {
-                    id = PlayerSelectorContract.CapabilityId,
-                    owner = ProviderId,
-                    kind = "selector",
-                    label = "按队伍与状态选择玩家",
-                    version = "1.0.0",
-                    parameters = new { description = "按队伍和状态挑玩家。" },
-                    graph = new {
-                        domains = new[] { "map", "room", "enemy", "weapon", "tool", "consumable", "player", "logic" },
-                        execution = "query",
-                        inputs = Array.Empty<object>(),
-                        outputs = new object[] { new { id = "targets", type = "entity", cardinality = "many" } },
-                        parameters = new object[]
-                        {
-                            new { id = "relation", type = "enum", role = "structural", required = true, set = "recipient_relation" },
-                            new { id = "empty", type = "enum", role = "structural", required = true, set = "empty_policy" }
-                        }
-                    }
-                },
+                RuntimeJson.Parse(PlayerSelectorContract.CapabilityRowJson),
                 // The zone selector's row is its contract's own JSON, parsed here rather than restated as an
                 // object: the catalog comparison, the manifest and the registry all read one spelling of the shape.
                 RuntimeJson.Parse(ZoneSelectorContract.CapabilityRowJson),

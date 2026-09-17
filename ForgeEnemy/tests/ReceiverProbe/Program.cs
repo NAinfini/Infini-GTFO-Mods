@@ -91,7 +91,7 @@ CommandResult Heal(EnemyModule module, EntityReference target, double amount = 5
     // Source carries no targeting restriction; the probe reuses the target itself (self-source is valid).
     var context = (CommandContext)Activator.CreateInstance(typeof(CommandContext), BindingFlags.Instance | BindingFlags.NonPublic, null,
         new object[] { origin, 0L, "probe.command", "probe.plan", "probe.resource", "1", "probe.node",
-            RuntimeJson.From(new { overheal_policy = "clamp" }), RuntimeJson.From(new { targets = new[] { target }, source = target, amount }), true }, null)!;
+            RuntimeJson.From(new { overheal_policy = "clamp" }), RuntimeJson.From(new { targets = new[] { target }, source = target, amount }), true, (Func<EntityReference, object?>)(reference => throw new InvalidOperationException("Direct receiver probes do not model cross-provider native instance lookups: " + reference.Id)) }, null)!;
     return (CommandResult)typeof(EnemyModule).GetMethod("Heal", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(module, new object[] { context })!;
 }
 JsonElement HealRow(CommandResult result) => result.Outputs.GetProperty("results").EnumerateArray().First();
@@ -629,7 +629,7 @@ CommandResult Strike(EnemyModule module, EntityReference[] targets, double amoun
     if (limb.HasValue) inputs["limb"] = limb.Value;
     var context = (CommandContext)Activator.CreateInstance(typeof(CommandContext), BindingFlags.Instance | BindingFlags.NonPublic, null,
         new object[] { origin, 0L, "probe.command", "probe.plan", "probe.resource", "1", "probe.node",
-            RuntimeJson.From(new { mitigation_policy = policy }), RuntimeJson.From(inputs), true }, null)!;
+            RuntimeJson.From(new { mitigation_policy = policy }), RuntimeJson.From(inputs), true, (Func<EntityReference, object?>)(reference => throw new InvalidOperationException("Direct receiver probes do not model cross-provider native instance lookups: " + reference.Id)) }, null)!;
     return (CommandResult)typeof(EnemyModule).GetMethod("Damage", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(module, new object[] { context })!;
 }
 JsonElement[] HitRows(CommandResult result) => result.Outputs.GetProperty("results").EnumerateArray().ToArray();

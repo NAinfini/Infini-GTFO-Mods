@@ -37,7 +37,10 @@ internal static class MapNativeHooks
         typeof(ExpeditionStartedReadback), typeof(ReactorWaveReadback),
         typeof(HsuSampledReadback), typeof(CheckpointRestoredReadback),
         typeof(ZoneEnteredReadback), typeof(PortalWarpedReadback),
-        typeof(TeammateOverheadRender), typeof(TeammateOverheadRemoved), typeof(TeammateOverheadVisibility)
+        typeof(TeammateOverheadRender), typeof(TeammateOverheadRemoved), typeof(TeammateOverheadVisibility),
+        // The two interaction-prompt readbacks an object's text rule is applied at — the base getter every
+        // interactable inherits, and the timed one a door button answers with.
+        typeof(InteractionTextPromptReadback), typeof(TimedInteractionTextPromptReadback)
     });
 }
 
@@ -50,7 +53,16 @@ internal static class MapNativeHooks
 internal static class PlayerSpawnedReadback
 {
     [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void Postfix(PlayerManager __instance) => Plugin.Session?.Guard(module => module.Reconcile());
+    private static void Postfix(PlayerManager __instance)
+    {
+        var session = Plugin.Session;
+        if (session == null) return;
+        // The first player in a level is this session's signal that the level is there, which is when the
+        // authored wave tuning is applied. It is a per-world step inside the session, so a reconcile that
+        // follows a respawn applies nothing twice.
+        session.ApplyLevelTuning();
+        session.Guard(module => module.Reconcile());
+    }
 }
 
 [HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.OnPlayerDespawned))]

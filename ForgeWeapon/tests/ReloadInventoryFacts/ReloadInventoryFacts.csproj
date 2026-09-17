@@ -29,6 +29,7 @@
     <Compile Include="../../ReloadInventoryContract.cs" />
     <!-- The other three contracts the module registers rows from: it names them, so they compile with it. -->
     <Compile Include="../../AttackInstanceContract.cs" />
+    <Compile Include="../../WeaponStateTriggerContract.cs;../../CombatPrimitiveContract.cs" />
     <Compile Include="../../WeaponDeployableFactsContract.cs" />
     <Compile Include="../../WeaponMeleeHitContract.cs" />
     <Compile Include="../../WeaponPlacementContract.cs" />

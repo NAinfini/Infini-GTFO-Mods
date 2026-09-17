@@ -45,8 +45,13 @@ public static class ModuleDefinition
     /// implemented binding whose handler the registration does not supply, so each row, its capability row and
     /// its shape travel together with that handler or not at all.
     ///
+    /// <paramref name="overrideRestores"/> is the same family's restore table, keyed by handler name like every
+    /// other table here: only the rows named in it may carry a plan's `effect` block, because a duration the
+    /// kernel hands out is a duration something has to be called back for. Only the generic `property` row is in it
+    /// — the three named rows still time themselves from their own `duration` port.
+    ///
     /// <paramref name="overrides"/> is the instance-override family's own handler table
-    /// (<see cref="WeaponOverrideContract.Handlers"/>): its three rows are declared by that contract as one set,
+    /// (<see cref="WeaponOverrideContract.Handlers"/>): its four rows are declared by that contract as one set,
     /// so the table that carries their bodies is what is supplied or not. The inventory pair is the `a-p-item`
     /// half — give and consume. `drop` declares nothing and has no body: the node list has no drop node, so no
     /// binding row is added for it, no capability row is declared (ruling 110.5) and the implementation is gone
@@ -58,7 +63,9 @@ public static class ModuleDefinition
     public static RuntimeModule Create(
         CommandHandler? ammoAdd = null, CommandHandler? ammoConsume = null,
         IReadOnlyDictionary<string, CommandHandler>? overrides = null,
-        CommandHandler? inventoryGive = null, CommandHandler? inventoryConsume = null)
+        CommandHandler? inventoryGive = null, CommandHandler? inventoryConsume = null,
+        IReadOnlyDictionary<string, EffectRestoreHandler>? overrideRestores = null,
+        CommandHandler? projectileLaunch = null)
     {
         // Every capability this provider binds is declared by one contract, never twice: the runtime's own
         // `TriggerContracts` carries the equipment, input and combat rows including the placement pair, and a
@@ -70,8 +77,13 @@ public static class ModuleDefinition
         foreach (var row in WeaponDeployableFactsContract.Capabilities()) capabilities.Add(row);
         capabilities.AddRange(WeaponMeleeHitContract.Capabilities());
         capabilities.AddRange(AttackInstanceContract.Capabilities());
-        // The three action families this provider executes itself: the ammunition pair, the instance-override
-        // trio and the inventory pair. Each is declared by its own contract, only for the bodies really supplied.
+        // The weapon state and combat rows: the charge and aim triggers, the shot-resolution trigger and the
+        // hit-context read. Each contract hands back its rows, bindings and support lines in one shape, so a row
+        // and the body that answers it can never be registered apart.
+        capabilities.AddRange(WeaponStateTriggerContract.Capabilities());
+        capabilities.AddRange(CombatPrimitiveContract.Capabilities());        // The three action families this provider executes itself: the ammunition pair, the instance-override
+        // quartet and the inventory pair. Each is declared by its own contract, only for the bodies really
+        // supplied.
         capabilities.AddRange(WeaponSupplyContract.Rows(ammoAdd, ammoConsume));
         if (overrides != null) capabilities.AddRange(WeaponOverrideContract.Capabilities());
         capabilities.AddRange(InventoryActionContract.Capabilities(inventoryGive, inventoryConsume));
@@ -90,6 +102,8 @@ public static class ModuleDefinition
         bindings.AddRange(WeaponDeployableFactsContract.Bindings());
         bindings.AddRange(WeaponMeleeHitContract.Bindings());
         bindings.AddRange(AttackInstanceContract.Bindings());
+        bindings.AddRange(WeaponStateTriggerContract.Bindings());
+        bindings.AddRange(CombatPrimitiveContract.Bindings(projectileLaunch));
         bindings.AddRange(WeaponSupplyContract.Bindings(ammoAdd, ammoConsume));
         if (overrides != null) bindings.AddRange(WeaponOverrideContract.Bindings());
         bindings.AddRange(InventoryActionContract.Rows(inventoryGive, inventoryConsume));
@@ -108,6 +122,8 @@ public static class ModuleDefinition
         support.AddRange(WeaponDeployableFactsContract.Support());
         support.AddRange(WeaponMeleeHitContract.Support());
         support.AddRange(AttackInstanceContract.Support());
+        support.AddRange(WeaponStateTriggerContract.Support());
+        support.AddRange(CombatPrimitiveContract.Support(projectileLaunch));
         support.AddRange(WeaponSupplyContract.Support(ammoAdd, ammoConsume));
         if (overrides != null) support.AddRange(WeaponOverrideContract.Support());
         support.AddRange(InventoryActionContract.Support(inventoryGive, inventoryConsume));
@@ -126,13 +142,17 @@ public static class ModuleDefinition
             foreach (var entry in overrides) handlers[entry.Key] = entry.Value;
             foreach (var entry in WeaponOverrideContract.Shapes()) shapes[entry.Key] = entry.Value;
         }
-        // The two read rows are evaluated on demand rather than dispatched, so their bodies go in the evaluator
-        // table the registration carries beside the handlers. Each body reads the world through the source the
-        // native half attaches to it, and refuses by name while no source is attached — which is the state every
-        // process that only declares this provider is in.
+        // The two inventory reads are evaluated on demand rather than dispatched, so their bodies go in the
+        // evaluator table the registration carries beside the handlers. Each body reads the world through the
+        // source the native half attaches to it, and refuses by name while no source is attached — which is the
+        // state every process that only declares this provider is in. The launch row's body is supplied by the
+        // native half, so a process that declared this provider without its game half declares neither its binding
+        // nor its shape.
         var evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal);
         foreach (var entry in InventoryQueryContract.Evaluators()) evaluators[entry.Key] = entry.Value;
         foreach (var entry in InventoryQueryContract.Shapes()) shapes[entry.Key] = entry.Value;
+        if (projectileLaunch != null) handlers[CombatPrimitiveContract.ProjectileLaunchHandler] = projectileLaunch;
+        foreach (var entry in CombatPrimitiveContract.Shapes(projectileLaunch)) shapes[entry.Key] = entry.Value;
         return new RuntimeModule(RuntimeKernel.ApiVersion,
             RuntimeJson.From(new
             {
@@ -141,7 +161,7 @@ public static class ModuleDefinition
                 bindings = bindings.ToArray()
             }).GetRawText(),
             handlers, support.ToArray())
-        { Shapes = shapes, Evaluators = evaluators };
+        { Shapes = shapes, Evaluators = evaluators, EffectRestores = overrideRestores };
     }
 
     private static object Binding(string id, string capabilityId, string handler, string role = "observe") => new

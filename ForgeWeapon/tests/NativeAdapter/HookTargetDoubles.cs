@@ -29,6 +29,17 @@ public struct pFullDamageData
     public int limbID;
 }
 
+/// <summary>The holder whose per-frame update the sight state is read from: `WieldedItem` is the item the fact is
+/// about, `ItemAimTrigger` is the state the aim row is published from, and `m_owner` is the player it is published
+/// for. The game declares it in the global namespace, beside the weapon types rather than inside `Gear`.</summary>
+public class FirstPersonItemHolder : UnityObjectDouble
+{
+    public global::ItemEquippable? WieldedItem;
+    public Player.PlayerAgent? m_owner;
+    public bool ItemAimTrigger;
+    public void Update() { }
+}
+
 /// <summary>The enemy damage receiver a replicated melee hit lands on. The health either side of the body is the
 /// damage that really landed, and the owner is the enemy life the hit belongs to.</summary>
 public class Dam_EnemyDamageBase : UnityObjectDouble
@@ -103,6 +114,24 @@ namespace Gear
         public void DoAttackDamage(UnityEngine.GameObject damageGO, float damage) { }
     }
 
+    /// <summary>The melee weapon's own charge state machine: the object whose life is the charge. `m_weapon` is the
+    /// weapon the charge belongs to, `m_elapsed` and `m_maxDamageTime` are the two numbers the charge proportion is
+    /// read from, and the four bodies are the ones the charge hooks are declared on.</summary>
+    public class MWS_Base : UnityObjectDouble
+    {
+        public MeleeWeaponFirstPerson? m_weapon;
+        public float m_elapsed;
+        public float m_maxDamageTime;
+        public virtual void Enter() { }
+        public virtual void Exit() { }
+        public virtual void Update() { }
+    }
+
+    public sealed class MWS_ChargeUp : MWS_Base
+    {
+        public void OnChargeupRelease() { }
+    }
+
     /// <summary>What the first-person damage entry was handed: the object the swing landed on. Only that one
     /// member is read, and the charge is read off the weapon's own state instead.</summary>
     public sealed class MeleeWeaponDamageData
@@ -115,6 +144,11 @@ namespace Gear
     public abstract class FiringArchetypeDouble : UnityObjectDouble
     {
         public BulletWeapon? m_weapon;
+        /// <summary>The ranged charge the archetype's own update runs: the flag the fact is read from and the
+        /// elapsed timer the ratio is measured against.</summary>
+        public bool m_inChargeup;
+        public float m_chargeupTimer;
+        public float ChargeupDelay() => 1f;
         public void OnFireShotEmptyClip() { }
         public void OnStartFiring() { }
         public void OnStopFiring() { }

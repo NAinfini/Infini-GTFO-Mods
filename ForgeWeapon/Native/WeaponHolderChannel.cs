@@ -142,6 +142,46 @@ internal static class WeaponHolderChannel
     }
 
     /// <summary>
+    /// The fire write: the game's own `Fire` body on the instance this inventory is holding, reached only when
+    /// the addressed instance is that item. Nothing here writes the clip, decides the fire rate or resolves a
+    /// hit — the weapon's own body does all three exactly as it does for a pressed trigger, and the shot count it
+    /// registers is what the other machines see.
+    ///
+    /// `required_state` is checked against the game's own state and never re-derived: `aiming` reads the holder's
+    /// sight trigger, which is the flag the state machine sets once the sights are really up, and `charging`
+    /// reads the weapon's own charge. A request whose state does not hold is refused by name rather than fired
+    /// anyway, because a plan that asked for an aimed shot asked for the aiming, not merely for a shot.
+    /// </summary>
+    internal static bool TryFire(EntityReference equipment, string requiredState, out string code)
+    {
+        code = WeaponHolderChannelContract.FireRefusedCode;
+        var agent = LocalAgent();
+        var inventory = agent == null ? null : agent.Inventory;
+        if (inventory == null) return false;
+        var weapon = Wielded(inventory);
+        if (weapon == null || !Matches(weapon, equipment)) return false;
+        var shooter = weapon.TryCast<BulletWeapon>();
+        if (shooter == null) return false;
+        if (!StateHolds(agent, shooter, requiredState)) return false;
+        shooter.Fire();
+        code = "";
+        return true;
+    }
+
+    /// <summary>Whether the weapon is in the state a fire request named. An unknown member is a state this build
+    /// does not have, which is refused rather than treated as `none`.</summary>
+    private static bool StateHolds(PlayerAgent? agent, BulletWeapon weapon, string requiredState)
+    {
+        if (string.Equals(requiredState, WeaponHolderActionsContract.StateNone, StringComparison.Ordinal)) return true;
+        var holder = agent == null ? null : agent.FPItemHolder;
+        if (string.Equals(requiredState, WeaponHolderActionsContract.StateAiming, StringComparison.Ordinal))
+            return holder != null && holder.ItemAimTrigger;
+        if (string.Equals(requiredState, WeaponHolderActionsContract.StateCharging, StringComparison.Ordinal))
+            return weapon.m_archeType != null && weapon.m_archeType.m_inChargeup;
+        return false;
+    }
+
+    /// <summary>
     /// The clip write: the weapon's own setter, on the instance the request names, with the cap the weapon itself
     /// reports. A count above that cap is refused instead of clamped, because a plan that asked for more bullets
     /// than the magazine holds asked for a state the weapon cannot be in; `fill` asks for the cap itself and needs

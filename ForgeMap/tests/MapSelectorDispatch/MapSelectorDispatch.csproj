@@ -13,7 +13,7 @@
          native hook is installed here. -->
     <Compile Include="../../Native/PlayerIdentityModule.cs;../../Native/PlayerObservation.cs;../../Native/PlayerSelector.cs" />
     <!-- Read-only source link: the same doubles MapNativeAdapter builds against, not a second copy. -->
-    <Compile Include="../MapNativeAdapter/GameDoubles.cs" />
+    <Compile Include="../MapNativeAdapter/GameDoubles.cs;../MapNativeAdapter/NativeDoubles.cs;../PlayerActions/LifeWorldDoubles.cs" />
     <Compile Include="MapSelectorDispatchTests.cs;AssemblyAttributes.cs" />
     <ProjectReference Include="../../ForgeMap.csproj" />
     <ProjectReference Include="../../../ForgeRuntime/Framework/ForgeRuntime.Framework.csproj" />

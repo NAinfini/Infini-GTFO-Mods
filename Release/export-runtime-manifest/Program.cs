@@ -24,6 +24,7 @@ catch (Exception error)
 {
     Console.Error.WriteLine("export-runtime-manifest: " + (error is RuntimeContractException contract
         ? contract.Code + ": " + contract.Message : error.Message));
+    Console.Error.WriteLine(error.StackTrace);
     return 1;
 }
 
@@ -75,7 +76,8 @@ static int Export(string releasePath, string outputPath)
                     overrides: ForgeWeapon.WeaponOverrideContract.Handlers(
                         ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.FireRateHandler),
                         ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.SpreadHandler),
-                        ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.RecoilHandler)),
+                        ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.RecoilHandler),
+                        ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.PropertyHandler)),
                     inventoryGive: ExportOnlyHandler(ForgeWeapon.InventoryActionContract.GiveHandler),
                     inventoryConsume: ExportOnlyHandler(ForgeWeapon.InventoryActionContract.ConsumeHandler)),
                     RuntimeLogLevel.Off);
@@ -86,7 +88,8 @@ static int Export(string releasePath, string outputPath)
                 kernel.RegisterModule(ForgeWeapon.WeaponHolderActionsContract.Module(
                     holders: null,
                     reload: ExportOnlyHandler(ForgeWeapon.WeaponHolderActionsContract.ReloadHandler),
-                    clipSet: ExportOnlyHandler(ForgeWeapon.WeaponHolderActionsContract.ClipSetHandler)),
+                    clipSet: ExportOnlyHandler(ForgeWeapon.WeaponHolderActionsContract.ClipSetHandler),
+                    autoFire: ExportOnlyHandler(ForgeWeapon.WeaponHolderActionsContract.AutoFireHandler)),
                     RuntimeLogLevel.Off);
                 break;
             case EnemyRegistration.ProviderId:

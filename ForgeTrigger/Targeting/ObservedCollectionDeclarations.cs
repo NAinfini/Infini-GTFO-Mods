@@ -11,6 +11,11 @@ namespace ForgeTrigger.Targeting;
 /// ports, and the references they answer with are checked by the kernel before a consumer sees them.</summary>
 public static class ObservedCollectionDeclarations
 {
+    /// <summary>The `seed_mode` members, in the catalog's own order: the number the author wrote on the `seed`
+    /// port, or the number this session draws with, so the same pick happens again only when the same run is
+    /// replayed.</summary>
+    internal static readonly string[] SeedModes = { "fixed", "session" };
+
     /// <summary>The declared rows in registration order, in the one table this family owns.</summary>
     public static ObservedFamily Family { get; } = ObservedFamily.Declare(
         ObservedDeclaration.Node("forge.selector.target.distinct", "query", "按稳定实体身份去重", "去掉重复的目标。",
@@ -26,9 +31,12 @@ public static class ObservedCollectionDeclarations
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
             new HandlerShape().Inputs("candidates", "seed").Outputs("targets").Parameters("empty"), Shuffle),
         ObservedDeclaration.Node("forge.selector.target.random", "query", "从候选里随机取 N 个", "随机挑几个，同一个种子结果一样。",
-            ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Integer("count"), ObservedDeclaration.Integer("seed")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
-            new HandlerShape().Inputs("candidates", "count", "seed").Outputs("targets").Parameters("empty"), Random),
+            ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Integer("count"),
+                ObservedDeclaration.Integer("seed")),
+            ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")),
+            ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnumValues("seed_mode", SeedModes),
+                ObservedDeclaration.EmptyPolicyParameter()),
+            new HandlerShape().Inputs("candidates", "count", "seed").Outputs("targets").Parameters("seed_mode", "empty"), Random),
         ObservedDeclaration.Node("forge.selector.target.union", "query", "合并目标集合", "把两组目标合成一组。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Many("a"), ObservedDeclaration.Many("b")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
@@ -54,7 +62,8 @@ public static class ObservedCollectionDeclarations
             ObservedEvaluation.Required(context, "seed").GetInt64()));
     private static JsonElement Random(EvaluationContext context)
         => ObservedEvaluation.Targets(context, ReferenceCollections.Random(ObservedEvaluation.Collection(context, "candidates"),
-            ObservedEvaluation.Required(context, "seed").GetInt64(), ObservedEvaluation.Selection(context, "count")).Selected);
+            ObservedEvaluation.Seed(context, "seed", ObservedEvaluation.ParameterText(context, "seed_mode")),
+            ObservedEvaluation.Selection(context, "count")).Selected);
     private static JsonElement Union(EvaluationContext context)
         => ObservedEvaluation.Targets(context, ReferenceCollections.Union(ObservedEvaluation.Collection(context, "a"),
             ObservedEvaluation.Collection(context, "b")));

@@ -349,7 +349,7 @@ public static class EnvironmentContract
             {
                 Port("in", "execution"),
                 Many("zones", "entity", new[] { "gtfo.zone" }),
-                Optional("transition", "number"),
+                OptionalTicks("transition"),
                 Optional("position", "vector3"),
                 Optional("count", "integer")
             },
@@ -370,11 +370,11 @@ public static class EnvironmentContract
     /// the lighting row's own — `zones` is the places the request names and `expedition` is every zone the level
     /// holds — and the named zones are the request's recipients for the same reason: an action with no target is
     /// not an action. `color` is the three unit-range channels of the game's own colour, `brightness` is a
-    /// multiplier of each light's current intensity, `transition` is the seconds the write is spread over and
+    /// multiplier of each light's current intensity, `transition` is the ticks the write is spread over and
     /// `category` narrows it to one of the seven kinds of light. `viewers` is deliberately not a port: what this
     /// row writes is the light objects of the process it runs in, and it makes no claim about any other one.</summary>
     private static object LightColor() => Capability(LightColorCapability, "action", "设置区域灯颜色与亮度",
-        "把指定区域的灯在若干秒内过渡到新的颜色和亮度倍率，可只改某一类灯。", new
+        "把指定区域的灯在若干 tick 内过渡到新的颜色和亮度倍率，可只改某一类灯。", new
         {
             domains = Domains,
             execution = "host",
@@ -384,7 +384,7 @@ public static class EnvironmentContract
                 Many("zones", "entity", new[] { "gtfo.zone" }),
                 Optional("color", "vector3"),
                 Optional("brightness", "number"),
-                Optional("transition", "number")
+                OptionalTicks("transition")
             },
             outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.light_color") },
             parameters = new object[]
@@ -403,7 +403,7 @@ public static class EnvironmentContract
     /// dimension is the one of the zone the request names, which is exactly the two arguments
     /// `AttemptStartFogTransition` takes beside the duration.</summary>
     private static object Fog() => Capability(FogCapability, "action", "切换雾",
-        "按雾配置块的 id 和过渡秒数切换某个维度当前显示的雾。", new
+        "按雾配置块的 id 和过渡 tick 数切换某个维度当前显示的雾。", new
         {
             domains = Domains,
             execution = "host",
@@ -412,7 +412,7 @@ public static class EnvironmentContract
                 Port("in", "execution"),
                 Port("zone", "entity"),
                 Port("fog", "integer"),
-                Optional("transition", "number")
+                OptionalTicks("transition")
             },
             outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.fog") },
             parameters = Array.Empty<object>(),
@@ -437,9 +437,9 @@ public static class EnvironmentContract
                 Port("in", "execution"),
                 Port("zone", "entity", new[] { "gtfo.zone" }),
                 Optional("fog", "integer"),
-                Optional("transition", "number"),
-                Optional("state_duration", "number"),
-                Optional("start_delay", "number"),
+                OptionalTicks("transition"),
+                OptionalTicks("state_duration"),
+                OptionalTicks("start_delay"),
                 Optional("sound", "integer")
             },
             outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.fog_cycle") },
@@ -610,7 +610,9 @@ public static class EnvironmentContract
     private static object PlayerVoice() => Capability(PlayerVoiceCapability, "action", "玩家说一句台词",
         "让指定玩家播一条语音事件，说话人由计划里的玩家实体给出。", new
         {
-            domains = Domains,
+            // This row's own domain list, not the package's: the catalog places a player line in the map, the
+            // player column and the logic graph only.
+            domains = VoiceDomains,
             execution = "presentation",
             inputs = new object[]
             {
@@ -668,6 +670,10 @@ public static class EnvironmentContract
     private static readonly string[] Domains =
         { "map", "room", "enemy", "weapon", "tool", "consumable", "player" };
 
+    /// <summary>The player voice line's own domain list: the catalog places that row in the map, the player
+    /// column and the logic graph, and the other presentation rows in the wider set above.</summary>
+    private static readonly string[] VoiceDomains = { "map", "player", "logic" };
+
     /// <summary>The result row the catalog declares for an action: the four shared columns in their own order,
     /// and nothing this provider cannot answer.</summary>
     private static object Result(string schema) => new
@@ -684,6 +690,9 @@ public static class EnvironmentContract
 
     private static object Port(string id, string type) => new { id, type };
     private static object Optional(string id, string type) => new { id, type, optional = true };
+    /// <summary>An optional port carrying the runtime's own tick unit: every time an author writes on a row is
+    /// ticks, and the handler converts to the seconds the native field takes.</summary>
+    private static object OptionalTicks(string id) => new { id, type = "number", unit = "tick", optional = true };
     private static object Many(string id, string type) => new { id, type, cardinality = "many" };
     private static object Port(string id, string type, string[] entityKinds) => new { id, type, entityKinds };
     private static object Many(string id, string type, string[] entityKinds) => new { id, type, cardinality = "many", entityKinds };

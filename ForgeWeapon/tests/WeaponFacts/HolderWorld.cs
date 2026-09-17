@@ -55,8 +55,8 @@ internal sealed class HolderWorld : IDisposable
     {
         if (_holder != null) throw new InvalidOperationException("The holder provider is registered once per world.");
         var module = holder == null
-            ? WeaponHolderActionsContract.Module(null, Reload, ClipSet)
-            : WeaponHolderActionsContract.Module(holder, Reload, ClipSet);
+            ? WeaponHolderActionsContract.Module(null, Reload, ClipSet, AutoFire)
+            : WeaponHolderActionsContract.Module(holder, Reload, ClipSet, AutoFire);
         _holder = Kernel.RegisterModule(module, RuntimeLogLevel.Off);
     }
 
@@ -102,11 +102,17 @@ internal sealed class HolderWorld : IDisposable
 
     /// <summary>One handler body. It records that it ran and then answers with the row's own result schema, which
     /// the kernel's result validation accepts: a handler that could not keep the row's promise would fail here
-    /// rather than in the game.</summary>
+    /// rather than in the game. The fire row answers with the four fixed columns alone, exactly as the native body
+    /// does; the kernel validates the field set against the capability's declared row.</summary>
     private CommandResult Body(string handler, CommandContext context)
     {
         Calls[handler] = Calls.TryGetValue(handler, out var count) ? count + 1 : 1;
         var equipment = RuntimeJson.Entity(context.Inputs.GetProperty("equipment"));
+        if (string.Equals(handler, WeaponHolderActionsContract.AutoFireHandler, StringComparison.Ordinal))
+            return CommandResult.Succeeded(RuntimeJson.From(new
+            {
+                rows = new[] { new { target = equipment, status = "succeeded", committed = "confirmed", code = "" } }
+            }));
         return CommandResult.Succeeded(RuntimeJson.From(new
         {
             rows = new[] { new { target = equipment, status = "succeeded", committed = "confirmed", code = "", clip = 7 } }
@@ -116,6 +122,8 @@ internal sealed class HolderWorld : IDisposable
     private CommandResult Reload(CommandContext context) => Body(WeaponHolderActionsContract.ReloadHandler, context);
 
     private CommandResult ClipSet(CommandContext context) => Body(WeaponHolderActionsContract.ClipSetHandler, context);
+
+    private CommandResult AutoFire(CommandContext context) => Body(WeaponHolderActionsContract.AutoFireHandler, context);
 
     /// <summary>One empty provider of the given id. A `forge.` id is reserved for a native provider by the
     /// registry's own rule, which is why the kind is chosen from the id rather than passed in.</summary>

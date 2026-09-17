@@ -234,7 +234,9 @@ internal static class FrameShapeTests
                 "equipment_action", "lifetime_scope", "variable_value_type", "recipient_sort", "recipient_anchor",
                 "recipient_relation", "recipient_life_state", "value_operation", "coordinate_space", "pulse_start",
                 "commit_state", "agent_modifier", "rundown_tier", "door_state", "door_query_state", "door_phase",
-                "equipment_kind", "supply_kind", "pickup_kind", "scan_state", "container_state", "door_lock_cause" };
+                "equipment_kind", "supply_kind", "pickup_kind", "scan_state", "container_state", "door_lock_cause",
+                "enemy_group_state", "charge_phase", "aim_phase", "shot_outcome", "player_movement_state",
+                "enemy_group_type" };
             Check(table.Select(WireIndex).SequenceEqual(Enumerable.Range(0, table.Length)),
                 "every set keeps the position the table declares and nothing is inserted before the end");
             Check(RuntimeGraphContracts.EnumSets.Count == table.Length, "no further enum set is declared beside these");
@@ -245,6 +247,21 @@ internal static class FrameShapeTests
                 "ai_state keeps its ten members and appends patrolling and hibernating");
             Check(committed.SequenceEqual(new[] { "none", "confirmed", "unknown", "partial" }),
                 "commit_state is none, confirmed, unknown and the appended partial");
+            var group = RuntimeGraphContracts.EnumSets["enemy_group_state"];
+            Check(group.Length == 17 && group[0] == "idle" && group[8] == "patrol_spawn" && group[^1] == "debug_idle",
+                "enemy_group_state carries the seventeen native EGS members in the build's own order");
+            // The weapon's own three readings and the two entity-state sets appended beside them: the members are
+            // the ones the rows that publish them already spell, and the native group type keeps the dump's order.
+            Check(RuntimeGraphContracts.EnumSets["charge_phase"].SequenceEqual(new[] { "start", "progress", "end", "swing" })
+                && RuntimeGraphContracts.EnumSets["aim_phase"].SequenceEqual(new[] { "enter", "exit" })
+                && RuntimeGraphContracts.EnumSets["shot_outcome"].SequenceEqual(new[] { "hit", "world", "miss" }),
+                "the weapon's phase and outcome sets carry the members its rows publish");
+            Check(RuntimeGraphContracts.EnumSets["player_movement_state"].Length == 18
+                && RuntimeGraphContracts.EnumSets["player_movement_state"][0] == "stand"
+                && RuntimeGraphContracts.EnumSets["player_movement_state"][^1] == "stand_still"
+                && RuntimeGraphContracts.EnumSets["enemy_group_type"].SequenceEqual(new[]
+                    { "hibernate", "pure_sneak", "detect", "pure_detect", "patrol", "awake", "hunter" }),
+                "the locomotion set keeps the row's eighteen members and the group type keeps the native seven");
             // The two domain vocabularies keep every member a catalog row still spells, and append the new ones.
             Check(RuntimeGraphContracts.ResourceKinds.Contains("chained-puzzle") && RuntimeGraphContracts.ResourceKinds.Contains("zone")
                 && RuntimeGraphContracts.ResourceKinds[^1] == "generator" && RuntimeGraphContracts.ResourceKinds.Contains("room"),

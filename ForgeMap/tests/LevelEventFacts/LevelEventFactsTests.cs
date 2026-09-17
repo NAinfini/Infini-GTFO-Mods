@@ -293,33 +293,97 @@ public sealed class LevelEventFactsTests
     }
 
     [Fact]
-    public void TheDimensionActionPassesTheModeTheIndexAndTheClearFlag()
+    public void TheDimensionActionPassesTheModeAndTheIndex()
     {
         using var world = LevelEventWorld.Start();
-        var moves = new List<(string Mode, int Dimension, bool Clear)>();
+        var moves = new List<(string Mode, int Dimension)>();
 
-        var unknown = world.Module.ExecuteDimension(world.Context(new { dimension = 1 }, new { mode = "hop", clear = false }),
-            (mode, dimension, clear) => moves.Add((mode, dimension, clear)));
+        // The dimension command's two shapes: these cases carry no locations table, so the per-recipient
+
+        // body is the other shape and must not be reached.
+
+        Func<CommandResult> unreachable = () => throw new InvalidOperationException(
+
+            "fixture: this case carries no locations table, so the per-recipient shape is not reached");
+
+        var unknown = world.Module.ExecuteDimension(world.Context(new { dimension = 1 }, new { mode = "hop" }),
+            (mode, dimension) => moves.Add((mode, dimension)), unreachable);
         Assert.Equal(LevelEventModule.ModeUnknownCode, unknown.Code);
 
-        var missingClear = world.Module.ExecuteDimension(world.Context(new { dimension = 1 }, new { mode = "warp" }),
-            (mode, dimension, clear) => moves.Add((mode, dimension, clear)));
-        Assert.Equal(LevelEventModule.ModeUnknownCode, missingClear.Code);
-
-        var missingIndex = world.Module.ExecuteDimension(world.Context(new { }, new { mode = "warp", clear = false }),
-            (mode, dimension, clear) => moves.Add((mode, dimension, clear)));
+        var missingIndex = world.Module.ExecuteDimension(world.Context(new { }, new { mode = "warp" }),
+            (mode, dimension) => moves.Add((mode, dimension)), unreachable);
         Assert.Equal(LevelEventModule.DimensionInvalidCode, missingIndex.Code);
 
-        var flash = world.Module.ExecuteDimension(world.Context(new { dimension = 2 }, new { mode = "flash", clear = false }),
-            (mode, dimension, clear) => moves.Add((mode, dimension, clear)));
+        var flash = world.Module.ExecuteDimension(world.Context(new { dimension = 2 }, new { mode = "flash" }),
+            (mode, dimension) => moves.Add((mode, dimension)), unreachable);
         Assert.Equal(CommandStatuses.Succeeded, flash.Status);
 
-        // `clear` empties a dimension and names no destination, which is what the native event's own field says.
-        var clear = world.Module.ExecuteDimension(world.Context(new { }, new { mode = "clear", clear = true }),
-            (mode, dimension, clearFlag) => moves.Add((mode, dimension, clearFlag)));
+        // `clear` empties a dimension and names no destination: the event type carries that, which is why the
+        // request has no clear flag of its own.
+        var clear = world.Module.ExecuteDimension(world.Context(new { }, new { mode = "clear" }),
+            (mode, dimension) => moves.Add((mode, dimension)), unreachable);
         Assert.Equal(CommandStatuses.Succeeded, clear.Status);
 
-        Assert.Equal(new[] { ("flash", 2, false), ("clear", 0, true) }, moves.ToArray());
+        Assert.Equal(new[] { ("flash", 2), ("clear", 0) }, moves.ToArray());
+    }
+
+    [Fact]
+    public void TheDimensionDestinationTableSelectsThePerRecipientShape()
+    {
+        using var world = LevelEventWorld.Start();
+        var moved = 0;
+
+        // The table is the row's two collections, zipped by index. A request that carries them is the
+        // per-recipient warp, so the team event must not be reached.
+        var table = world.Module.ExecuteDimension(
+            world.Context(new
+            {
+                positions = new[] { new[] { 1.0, 2.0, 3.0 } },
+                look_dirs = new[] { new[] { 0.0, 0.0, 1.0 } }
+            }, new { mode = "warp" }),
+            (mode, dimension) => throw new InvalidOperationException("fixture: the team event must not run"),
+            () => { moved++; return CommandResult.Succeeded(RuntimeJson.EmptyObject); });
+        Assert.Equal(CommandStatuses.Succeeded, table.Status);
+        Assert.Equal(1, moved);
+
+        // The table is warp-only, and a request that names recipients without one is the author error the ruling
+        // names: the team events move everyone and take no subset.
+        var wrongMode = world.Module.ExecuteDimension(
+            world.Context(new { positions = new[] { new[] { 1.0, 2.0, 3.0 } } }, new { mode = "flash" }),
+            (mode, dimension) => { }, () => CommandResult.Succeeded(RuntimeJson.EmptyObject));
+        Assert.Equal(LevelEventModule.ModeUnknownCode, wrongMode.Code);
+
+        var noTable = world.Module.ExecuteDimension(
+            world.Context(new { players = new[] { "gtfo.player:1" } }, new { mode = "flash" }),
+            (mode, dimension) => { }, () => CommandResult.Succeeded(RuntimeJson.EmptyObject));
+        Assert.Equal(LevelEventModule.PlayersNeedLocationsCode, noTable.Code);
+    }
+
+    [Fact]
+    public void TheDimensionRowDeclaresTheTableAsCollectionsAndNoFollowPolicyOrClearFlag()
+    {
+        // The row's ports are the ones the handler resolves against, and the deleted `policy` and `clear`
+        // parameters are gone: an author cannot pin a follow choice this build has no carry for, and the event
+        // type already carries the clear.
+        var row = LevelEventContract.ActionRows()
+            .Select(candidate => RuntimeJson.From(candidate))
+            .Single(candidate => RuntimeJson.Text(candidate, "id") == LevelEventContract.DimensionCapability);
+        var graph = row.GetProperty("graph");
+        Assert.Equal(new[] { "in", "players", "dimension", "positions", "look_dirs" },
+            graph.GetProperty("inputs").EnumerateArray().Select(port => port.GetProperty("id").GetString()).ToArray());
+        var positions = graph.GetProperty("inputs").EnumerateArray()
+            .Single(port => port.GetProperty("id").GetString() == "positions");
+        Assert.Equal("vector3", positions.GetProperty("type").GetString());
+        Assert.Equal("many", positions.GetProperty("cardinality").GetString());
+        Assert.Equal("m", positions.GetProperty("unit").GetString());
+        var lookDirs = graph.GetProperty("inputs").EnumerateArray()
+            .Single(port => port.GetProperty("id").GetString() == "look_dirs");
+        Assert.False(lookDirs.TryGetProperty("unit", out _),
+            "A facing direction is not a length, so `look_dirs` carries no unit.");
+        Assert.Equal(new[] { "mode" },
+            graph.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(new[] { "players", "dimension", "positions", "look_dirs" },
+            LevelEventContract.DimensionShape.InputPorts);
     }
 
     [Fact]

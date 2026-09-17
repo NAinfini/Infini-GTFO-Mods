@@ -4,12 +4,26 @@ using ForgeRuntime.Framework;
 
 namespace ForgeWeapon;
 
+/// <summary>How one named value is changed. The operation travels with the field and not with the request,
+/// because ruling 84 merges field by field: a later writer replaces the whole field, and with it the operation
+/// it asked for. `set` writes the value; `add` and `subtract` resolve against what the instance's own block held
+/// before this package cloned it, so replaying a request onto a rebuilt block means the same thing the first
+/// write meant.</summary>
+public enum WeaponOverrideOperation
+{
+    Set,
+    Add,
+    Subtract
+}
+
 /// <summary>One named value an override asks to change on one equipment instance. The name is from
 /// <see cref="WeaponOverrideLedger.Fields"/> and nothing else: a name outside that set has no native write point
 /// and is refused with <see cref="WeaponOverrideLedger.UnknownFieldCode"/> rather than written somewhere close.
 /// The value is a plain double here because this half is game-independent — the native half is the only place
-/// that knows whether a given field is a float, an int or a nested range.</summary>
-public sealed record WeaponOverrideField(string Name, double Value);
+/// that knows whether a given field is a float, an int or a nested range, and it is also the only place that can
+/// resolve an `add` or a `subtract`, because only it holds the instance's original block.</summary>
+public sealed record WeaponOverrideField(string Name, double Value,
+    WeaponOverrideOperation Operation = WeaponOverrideOperation.Set);
 
 /// <summary>Where one override came from. Ruling 84 merges several overrides on one instance by writer order, and
 /// the order has to be a property of the request rather than of the arrival order, so the identity of the writing
@@ -137,15 +151,33 @@ public sealed class WeaponOverrideLedger
     ///
     /// Three names are additions to the design's own list rather than restatements of it: `burst_count` is the
     /// burst length the applier writes onto the burst archetypes, and the two spread scales are the movement and
-    /// aim multipliers of the `spread` row. Two names from the design's list are deliberately absent: no value
-    /// behind `spread_pattern` or `recoil_recovery` is written by the shipped code, so declaring either would
-    /// advertise a write point the game does not have.
+    /// aim multipliers of the `spread` row. One name from the design's list is deliberately absent: no value
+    /// behind `spread_pattern` is written by the shipped code, so declaring it would advertise a write point the
+    /// game does not have.
     /// </summary>
     public static readonly IReadOnlyList<string> Fields = new[]
     {
         "fire_rate", "burst_count", "spread_cone", "spread_movement_scale", "spread_aim_scale",
         "recoil_horizontal", "recoil_vertical", "recoil_recovery", "recoil_camera_kick"
     };
+
+    /// <summary>The operations one field request may carry, spelled the way the row's structural parameter
+    /// spells them. They are the only three the native write path can honour: it holds the instance's original
+    /// block, so a value can be written, raised or lowered, and nothing else.</summary>
+    public static readonly IReadOnlyList<string> Operations = new[] { "set", "add", "subtract" };
+
+    /// <summary>Whether one operation name is one of <see cref="Operations"/>, and which member it is. A missing
+    /// name and an unknown one are the same answer — the row refuses both by name rather than guessing `set`.</summary>
+    public static bool TryParseOperation(string? name, out WeaponOverrideOperation operation)
+    {
+        switch (name)
+        {
+            case "set": operation = WeaponOverrideOperation.Set; return true;
+            case "add": operation = WeaponOverrideOperation.Add; return true;
+            case "subtract": operation = WeaponOverrideOperation.Subtract; return true;
+            default: operation = WeaponOverrideOperation.Set; return false;
+        }
+    }
 
     private readonly Dictionary<string, WeaponOverrideState> _byEquipment = new(StringComparer.Ordinal);
     private readonly IWeaponOverrideSink? _sink;
@@ -232,6 +264,37 @@ public sealed class WeaponOverrideLedger
         code = "";
         if (equipment == null || !_byEquipment.Remove(equipment.Id ?? "")) return true;
         return _sink == null || _sink.Restore(equipment, out code);
+    }
+
+    /// <summary>
+    /// Ends the fields one writer applied to one instance, which is what a kernel-managed effect's ending means: the
+    /// card that wrote them is over, and whatever another writer set on the same instance stays true. The fields the
+    /// writer set are dropped from the merged set, and the instance is written again from its own original block —
+    /// dropping a field is putting that field back, which only a write starting from the original can do. A writer
+    /// with no field on this instance is a success: an effect the module already undid has nothing left to undo.
+    /// </summary>
+    public bool RevertWriter(EntityReference equipment, string planId, string nodeId, out string code)
+    {
+        code = "";
+        if (equipment == null || !_byEquipment.TryGetValue(equipment.Id ?? "", out var state)) return true;
+        var kept = new List<WeaponOverrideField>(state.mutable.Count);
+        var keptWriters = new Dictionary<string, WeaponOverrideSource>(StringComparer.Ordinal);
+        foreach (var field in state.mutable)
+        {
+            if (state.writers.TryGetValue(field.Name, out var writer) && writer.PlanId == planId && writer.NodeId == nodeId) continue;
+            kept.Add(field);
+            if (state.writers.TryGetValue(field.Name, out var keptWriter)) keptWriters[field.Name] = keptWriter;
+        }
+        if (kept.Count == state.mutable.Count) return true;
+        if (kept.Count == 0) return Revert(equipment, out code);
+        if (_sink == null) return false;
+        if (!_sink.Restore(equipment, out code)) return false;
+        if (!_sink.Apply(equipment, kept, out code)) return false;
+        state.mutable.Clear(); state.mutable.AddRange(kept);
+        state.writers.Clear();
+        foreach (var pair in keptWriters) state.writers[pair.Key] = pair.Value;
+        code = "";
+        return true;
     }
 
     /// <summary>

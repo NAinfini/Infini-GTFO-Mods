@@ -203,7 +203,11 @@ public static class VariableContracts
             Port("in", "execution"), Port("subject", "entity", optional: true, nullable: true),
             Port("slot", "integer", optional: true, nullable: true), Port("value", "number", optional: true, nullable: true, valueTypeParameter: "value_type")
         },
-        outputs = new object[] { Port("next", "execution"), Port("written", "boolean") },
+        // `previous` is the value the address held before this write — the declared initial value for an address
+        // nothing has written yet, the same answer the read row gives — so a comparison behind this step can ask
+        // whether the write crossed a threshold without a second read step and a second address resolution.
+        outputs = new object[] { Port("next", "execution"), Port("written", "boolean"),
+            Port("previous", "number", optional: true, nullable: true, valueTypeParameter: "value_type") },
         parameters = new object[] { NameParameter(), ValueTypeParameter() }
     };
 

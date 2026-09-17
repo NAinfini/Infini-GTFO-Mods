@@ -32,22 +32,21 @@ internal static class LevelEventActions
             () => Execute(Event(eWardenObjectiveEventType.ResetTimer)));
     }
 
-    /// <summary>The dimension row: `flash` and `warp` move the whole team, `clear` empties a dimension. The
-    /// destination is the `DimensionIndex` field and the clear flag is the event's own `ClearDimension`, which is
-    /// the field the vanilla `DimensionWarpTeam` entries use when they empty a dimension before moving into it.</summary>
+    /// <summary>The dimension row: `flash` and `warp` move the whole team, `clear` empties a dimension, and a
+    /// request that carries an authored destination table — the row's `positions` and `look_dirs` collections —
+    /// moves each named player to its own landing through the player half. The destination is the
+    /// `DimensionIndex` field, and the mode alone selects the event type: `ClearDimension` is the event that
+    /// empties a dimension, so the row's own `clear` flag is deleted and read nowhere.</summary>
     internal static CommandResult Dimension(CommandContext context)
     {
         var module = Plugin.Session?.LevelEvents;
         if (module == null) return Unavailable();
-        return module.ExecuteDimension(context, (mode, dimension, clear) => Execute(Event(
+        return module.ExecuteDimension(context, (mode, dimension) => Execute(Event(
             mode == "clear" ? eWardenObjectiveEventType.ClearDimension : mode == "warp"
                 ? eWardenObjectiveEventType.DimensionWarpTeam
                 : eWardenObjectiveEventType.DimensionFlashTeam,
-            data =>
-            {
-                data.DimensionIndex = (eDimensionIndex)dimension;
-                data.ClearDimension = clear;
-            })));
+            data => data.DimensionIndex = (eDimensionIndex)dimension)),
+            () => PlayerActions.DimensionWarp(context));
     }
 
     /// <summary>The expedition-end row: `instant_win` ends the expedition now, `win_on_death` makes the next wipe

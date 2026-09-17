@@ -135,6 +135,32 @@ internal static class RuntimeGraphContracts
         // The weak lock's own cause of opening. A door's identity is the map object's identity, so it travels
         // on the same rows a lock action carries rather than on a namespace of its own.
         ("door_lock_cause", new[] { "unlocked", "hacked", "smashed" }),
+        // Native `Enemies.EGS` — the state a live enemy group publishes in its replicated packet — in the build's
+        // own declaration order, the same seventeen members and the same spelling rule `door_state` uses: a
+        // lower-cased member name with a case boundary becoming an underscore. `forge.query.enemy.group`'s `state`
+        // is a member of this set.
+        ("enemy_group_state", new[] { "idle", "hunters_spawn", "hunters_hunt", "hunters_search", "guards_spawn",
+            "guard_respawn", "guards_idle", "guards_hunting", "patrol_spawn", "patrol_move", "patrol_idle",
+            "patrol_search", "patrol_combat", "survival_spawn", "survival_hunt", "debug_spawn", "debug_idle" }),
+        // The weapon package's own closed readings, in the vocabulary's order: a charge state machine's four
+        // phases, the two ends of aiming down sights, and what a shot ended against. The weapon rows publish
+        // these as strings until the set exists; the members and their order are the ones those rows already
+        // spell (`WeaponStateTriggerContract.ChargePhases` / `AimPhases`, `CombatPrimitiveContract`'s outcomes).
+        ("charge_phase", new[] { "start", "progress", "end", "swing" }),
+        ("aim_phase", new[] { "enter", "exit" }),
+        ("shot_outcome", new[] { "hit", "world", "miss" }),
+        // Native `PlayerLocomotion.m_currentStateEnum`, as `forge.query.player.movement_state` already reads it:
+        // the eighteen members of `PlayerMovementStateContract.States` in that row's own order.
+        ("player_movement_state", new[] { "stand", "crouch", "run", "jump", "fall", "land", "stunned", "downed",
+            "climb_ladder", "on_terminal", "melee", "empty", "grabbed_by_trap", "grabbed_by_tank", "testing",
+            "in_elevator", "grabbed_by_pouncer", "stand_still" }),
+        // Native `GameData.eEnemyGroupType` (dump.cs 623833, TypeDefIndex 14144) in the build's declaration
+        // order: Hibernate, PureSneak, Detect, PureDetect, Patrol, Awake, Hunter — the seven levels the group's
+        // own profile picks from, lower-cased on the same rule the other sets use. This is what the level
+        // data block carries, and it is not `enemy_group_state` above: that one is a live group's state, this
+        // one is the group's authored type.
+        ("enemy_group_type", new[] { "hibernate", "pure_sneak", "detect", "pure_detect", "patrol", "awake",
+            "hunter" }),
     };
     internal static readonly IReadOnlyDictionary<string, string[]> EnumSets =
         EnumSetTable.ToDictionary(x => x.Name, x => x.Members, StringComparer.Ordinal);
@@ -288,15 +314,15 @@ internal static class RuntimeGraphContracts
     /// generic ports universal. Mirrors site/forge/graph-schema.ts assignableGraphPort.</summary>
     internal static bool EntityKindsNarrow(JsonElement output, JsonElement input)
     {
-        var carried = DeclaredEntityKinds(output);
-        if (carried == null) return true;
+        // Unspecified means any known entity kind, never an implicit narrowing cast.
+        var carried = DeclaredEntityKinds(output) ?? EntityKinds;
         var accepted = DeclaredEntityKinds(input);
         return accepted == null || carried.All(kind => accepted.Contains(kind, StringComparer.Ordinal));
     }
 
     internal static void ValidatePort(JsonElement port, string id)
     {
-        RuntimeJson.Shape(port, "id type", "cardinality schema resourceKind handleKind lifetime unit nullable optional codes fields valueTypeParameter schemaParameter entityKinds");
+        RuntimeJson.Shape(port, "id type", "cardinality schema resourceKind handleKind lifetime unit nullable optional codes fields valueTypeParameter schemaParameter entityKinds entityKindsFrom");
         RuntimeJson.Require(IsName(RuntimeJson.Text(port, "id")), "port-name", id);
         var type = RuntimeJson.Text(port, "type");
         RuntimeJson.Require(PortTypes.Contains(type), "port-type", id);
@@ -508,6 +534,20 @@ internal static class RuntimeGraphContracts
     /// <summary>Forge Standard v0.2 metadata plus the capability-kind rules every registry applies.</summary>
     internal static void ValidateCapability(string kind, JsonElement graph, string id)
     {
+        // The row's own id is what every check below reports; the code the check refused with travels in the
+        // message as well so a registration failure names the rule and not only the row.
+        try { ValidateCapabilityChecks(kind, graph, id); }
+        catch (RuntimeContractException error)
+        { throw new RuntimeContractException(error.Code, id + ": " + error.Message + " (" + error.Code + ")"); }
+    }
+
+    private static void ValidateCapabilityChecks(string kind, JsonElement graph, string id)
+    {
+        // Asked before the field-set rule, so a row that writes a permission list of its own is refused by name
+        // rather than as an unknown field: permissions live on the binding, and "the graph carries a second list"
+        // is the mistake the refusal should point at.
+        RuntimeJson.Require(!graph.TryGetProperty("requires", out _), "row-shape",
+            id + ": a row declares no `requires`; its permissions are its binding's.");
         RuntimeJson.Shape(graph, "domains execution inputs outputs parameters", "reads recipients variadic portGroups");
         var domains = RuntimeJson.Strings(graph.GetProperty("domains"));
         RuntimeJson.Require(domains.Length > 0 && domains.All(Domains.Contains), "graph-domain", id);
@@ -527,6 +567,7 @@ internal static class RuntimeGraphContracts
         foreach (var port in inputs.Where(p => RuntimeActorRoles.IsRolePort(RuntimeJson.Text(p, "id"))))
             RuntimeActorRoles.RequireRolePort(port, id);
         if (graph.TryGetProperty("recipients", out var recipients)) ValidateRecipients(recipients, inputs, outputs, id);
+        RuntimeEntityKindFlow.Validate(graph, id);
         var parameters = RuntimeJson.Rows(graph, "parameters");
         RuntimeJson.Require(parameters.Select(p => RuntimeJson.Text(p, "id")).Distinct(StringComparer.Ordinal).Count() == parameters.Length, "duplicate-parameter", id);
         foreach (var parameter in parameters) ValidateParameter(parameter, inputs, id);
@@ -555,10 +596,18 @@ internal static class RuntimeGraphContracts
         if (kind is "trigger" or "action" or "control") RuntimeJson.Require(execution is "host" or "owner" or "presentation", "executable-authority", id);
         if (kind == "trigger") RuntimeJson.Require(!inputs.Any(p => RuntimeJson.Text(p, "type") == "execution"), "trigger-input", id);
         RuntimeJson.Require(kind == "action" || recipients.ValueKind == JsonValueKind.Undefined, "recipient-owner", id);
-        // Every action, not only the ones that happen to take an entity.
-        if (kind == "action") RuntimeJson.Require(recipients.ValueKind != JsonValueKind.Undefined, "recipient-contract", id);
     }
     private static void ValidateRecipients(JsonElement spec, JsonElement[] inputs, JsonElement[] outputs, string id)
+    {
+        // The row's own id is what every check above reports, which is not enough to tell `recipient-port` from
+        // `recipient-cardinality` when a row fails to register; the code the check refused with travels in the
+        // message as well. The checks themselves are unchanged.
+        try { ValidateRecipientChecks(spec, inputs, outputs, id); }
+        catch (RuntimeContractException error)
+        { throw new RuntimeContractException(error.Code, error.Message + " (" + error.Code + ")"); }
+    }
+
+    private static void ValidateRecipientChecks(JsonElement spec, JsonElement[] inputs, JsonElement[] outputs, string id)
     {
         RuntimeJson.Shape(spec, "input target cardinality requires result", "handle");
         var target = RuntimeJson.Text(spec, "target"); var cardinality = RuntimeJson.Text(spec, "cardinality");
@@ -580,6 +629,15 @@ internal static class RuntimeGraphContracts
         RuntimeJson.Require(outputs.Any(p => RuntimeJson.Text(p, "id") == handleName && RuntimeJson.Text(p, "type") == "handle"), "recipient-handle", id);
     }
     private static void ValidateParameter(JsonElement parameter, JsonElement[] inputs, string id)
+    {
+        // The same diagnostic rule the recipient contract follows: the row's own id is not enough to tell which
+        // check refused a parameter, so the code it refused with travels in the message as well.
+        try { ValidateParameterChecks(parameter, inputs, id); }
+        catch (RuntimeContractException error)
+        { throw new RuntimeContractException(error.Code, error.Message + " (" + error.Code + ")"); }
+    }
+
+    private static void ValidateParameterChecks(JsonElement parameter, JsonElement[] inputs, string id)
     {
         RuntimeJson.Shape(parameter, "id type role required", "minimum maximum values set unit resourceKind");
         var name = RuntimeJson.Text(parameter, "id"); var type = RuntimeJson.Text(parameter, "type"); var role = RuntimeJson.Text(parameter, "role");

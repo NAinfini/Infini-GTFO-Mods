@@ -7,21 +7,19 @@
 // Member kinds follow build 20403457 (interop metadata and the dump); behaviour is synthetic and NOT
 // game-verified. Only the members the compiled production sources read are declared, and the suites that own a
 // family keep the fuller double for it: what is here is what compiling the whole package needs, no more.
+// `UnityEngine.Color` lives in `GameDoubles.cs`, the one file every suite that compiles this one also compiles.
 namespace UnityEngine
 {
-    /// <summary>`Color`: the value `NavMarker.SetColor` takes. The mark row builds it from the plan's own
-    /// red/green/blue components plus the opacity, so the four-argument constructor is the whole surface.</summary>
-    public struct Color
-    {
-        public float r, g, b, a;
-        public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; }
-    }
-
     /// <summary>`Vector3`'s three-argument constructor: the move row builds a goal from the plan's own position
     /// port rather than passing one through.</summary>
     public partial struct Vector3
     {
         public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        /// <summary>`GameDoubles.cs` declares the agent's own `Position` as a plain tuple — the shape the suites
+        /// that only read it through the kernel prefer — while the interop type the per-frame suites pass is this
+        /// one. The conversion is what lets one double serve both readings.</summary>
+        public static implicit operator Vector3((float x, float y, float z) value)
+            => new Vector3(value.x, value.y, value.z);
     }
 }
 
@@ -100,6 +98,15 @@ namespace Agents
         public bool TryGet(out Enemies.EnemyAgent? comp) { comp = Value; return Value != null; }
         public void Set(Enemies.EnemyAgent comp) => Value = comp;
     }
+
+    /// <summary>The agent handle an attack-start datum names its target with: the game stores the agent by
+    /// reference and asks the handle for the instance, so the double answers the same way.</summary>
+    public sealed class pAgent
+    {
+        public Agent? Value;
+        public bool TryGet(out Agent? comp) { comp = Value; return Value != null; }
+        public void Set(Agent comp) => Value = comp;
+    }
 }
 
 namespace Enemies
@@ -115,12 +122,51 @@ namespace Enemies
         public virtual bool AbilityIsDone() => Done;
     }
 
+    /// <summary>`EAB_Birthing`: the spawn-children component, carrying the five numbers the real one reads at the
+    /// top of each birth cycle, at the prefab's own defaults. A profile case registers one on the enemy's ability
+    /// list and compares these after the spawn path, so a write that went to a different component or spelled a
+    /// field wrong is visible.</summary>
+    public class EAB_Birthing : EnemyAbility
+    {
+        public EAB_Birthing() { m_abilityType = Agents.AgentAbility.SpawnChildren; }
+        public int m_childrenPerBirth = 1;
+        public int m_childrenPerBirthMin = 1;
+        public int m_childrenMax = 3;
+        public float m_minDelayUntilNextBirth = 5f;
+        public float m_maxDelayUntilNextBirth = 10f;
+    }
+
     /// <summary>One spawned group: `Pointer` is the native identity the wave bookkeeping compares, `Members` is
-    /// the native member list a batch harvests.</summary>
+    /// the native member list a batch harvests, and `Data`, `GroupType` and `PatrolFrustration` are the three
+    /// members the enemy group value row answers from.</summary>
     public sealed class EnemyGroup
     {
         public IntPtr Pointer { get; set; }
         public List<EnemyAgent>? Members { get; set; } = new();
+        public pEnemyGroupData Data { get; set; } = new();
+        public EnemyGroupType GroupType { get; set; } = EnemyGroupType.Patrolling;
+        public float PatrolFrustration { get; set; }
+    }
+
+    /// <summary>The group's replicated packet. The build declares it a value type and its `currentState` an `EGS`
+    /// member, which is the field the group state is read from.</summary>
+    public sealed class pEnemyGroupData
+    {
+        public EGS currentState = EGS.Idle;
+    }
+
+    /// <summary>The group-state vocabulary, in the build's own declaration order (`Enemies.EGS`).</summary>
+    public enum EGS : byte
+    {
+        Idle, HuntersSpawn, HuntersHunt, HuntersSearch, GuardsSpawn, GuardRespawn, GuardsIdle, GuardsHunting,
+        PatrolSpawn, PatrolMove, PatrolIdle, PatrolSearch, PatrolCombat, SurvivalSpawn, SurvivalHunt, DebugSpawn,
+        DebugIdle
+    }
+
+    /// <summary>The group-type vocabulary (`Enemies.EnemyGroupType`).</summary>
+    public enum EnemyGroupType : byte
+    {
+        Hibernating, Patrolling, Hunters, Survival, DebugSpawnUnit
     }
 
     /// <summary>`ES_HitreactBase` (evidence: the stagger and interrupt rows): the enemy's own reaction machine.
@@ -165,6 +211,11 @@ namespace Enemies
         public void PropagateTargetFull(Agents.Agent agent) { FullPropagations++; LastTarget = agent; }
         public bool PropagateTargetLimited(Agents.Agent agent, float chance)
         { LimitedPropagations++; LastTarget = agent; LastChance = chance; return LimitedResult; }
+
+        /// <summary>The agent's own sync half. `EnemyAgent.Sync` is a property of the receiver and not of the
+        /// agent base (interop `Enemies.EnemyAgent`), and its `Replicator` is the game's own despawn entry, which
+        /// is what the remove row submits.</summary>
+        public EnemySync Sync = new();
     }
 
     public sealed partial class AIG_CourseNode
@@ -194,6 +245,10 @@ namespace Enemies
         /// native move behaviour writes: writing it is how the game itself tells an enemy where to walk.</summary>
         public Agents.AgentMode m_mode = Agents.AgentMode.Patrolling;
         public UnityEngine.Vector3 NavmeshAgentGoal;
+
+        /// <summary>The group the life belongs to, which is the member the enemy group value row reads. A life
+        /// the game put in no group leaves it null, which is the refusal the row reports by name.</summary>
+        public EnemyGroup? m_group;
     }
 
     public partial class EnemyBehaviour
@@ -225,6 +280,14 @@ namespace Enemies
         public int UseAbilityCalls;
         public bool UseAbilityAnswer = true;
         public bool UseAbility(Agents.AgentAbility ability, int index) { UseAbilityCalls++; return UseAbilityAnswer; }
+        /// <summary>The receiver's own kind lookup. The enemy profile applier asks for the one kind it owns —
+        /// the spawn-children component — and answers the way the game's own lookup does: the component, never a
+        /// bare kind, and null when the type declares none.</summary>
+        public EnemyAbility? GetAbility(Agents.AgentAbility ability)
+        {
+            foreach (var comp in AllComps) if (comp != null && comp.m_abilityType == ability) return comp;
+            return null;
+        }
     }
 
     public partial class ES_EnemyAttackBase
@@ -236,6 +299,28 @@ namespace Enemies
         public Action? OnAttackStateRead;
         public virtual bool IsPerformingAttack() { OnAttackStateRead?.Invoke(); return Performing; }
         public virtual bool IsChargingAttack() { OnAttackStateRead?.Invoke(); return Charging; }
+
+        /// <summary>The agent the state belongs to and the attack-start body the game hands every peer. The
+        /// observation hook patches `RecieveAttackStart` and reads the enemy off the state, so both members are
+        /// the ones the patch declaration and the fact reader name; the double's own body records the call rather
+        /// than running any state machine.</summary>
+        public EnemyAgent? m_enemyAgent;
+        public pES_EnemyAttackData AttackData;
+        public int AttackStarts;
+        public void RecieveAttackStart(pES_EnemyAttackData attackData) { AttackStarts++; AttackData = attackData; }
+    }
+
+    /// <summary>The attack-start body `ES_EnemyAttackBase` sends: which ability, at whom, for how long. The
+    /// members are the build's own field names, and a case writes them directly.</summary>
+    public struct pES_EnemyAttackData
+    {
+        public UnityEngine.Vector3 Position;
+        public UnityEngine.Vector3 TargetPosition;
+        public Agents.pAgent TargetAgent;
+        public byte AnimIndex;
+        public Agents.AgentAbility AbilityType;
+        public byte AbilityIndex;
+        public float Duration;
     }
 }
 
@@ -397,6 +482,73 @@ namespace SNetwork
     {
         public ulong Lookup;
     }
+}
+
+/// <summary>The effect-volume family's game types, all of them declared in the build's global namespace
+/// (dump `EffectVolume` 581265, `EV_Sphere` 581360, `EffectVolumeManager` 581303, `FogSphereAllocator` 543810).
+/// The manager is the static registry an action's sphere is registered with and the allocator is the visible fog
+/// body drawn for it, so a case can prove both halves of one submission and the release that follows it.</summary>
+public abstract class EffectVolume
+{
+    public float modificationScale;
+    public bool invert;
+    public eEffectVolumeContents contents;
+    public eEffectVolumeModification modification;
+    public int effectOrder;
+}
+
+public sealed class EV_Sphere : EffectVolume
+{
+    public UnityEngine.Vector3 position;
+    public float minRadius;
+    public float maxRadius;
+}
+
+public enum eEffectVolumeContents { All = 0, Health = 1, Infection = 2 }
+public enum eEffectVolumeModification { Inflict = 0, Shield = 1 }
+
+public static class EffectVolumeManager
+{
+    /// <summary>The volumes the manager currently holds: the one list a release has to take a volume out of, and
+    /// the one a case reads to prove what a dispatch left behind.</summary>
+    public static readonly List<EffectVolume> Registered = new();
+    /// <summary>How many volumes were released, which is what a case asserts about a cancel or an expiry that is
+    /// expected to take volumes away even when it is also expected to have removed them all.</summary>
+    public static int Unregistrations;
+    public static bool RefuseRegistration;
+    public static void RegisterVolume(EffectVolume volume)
+    {
+        if (RefuseRegistration) throw new InvalidOperationException("volume refused");
+        Registered.Add(volume);
+    }
+    public static void UnregisterVolume(EffectVolume volume) { Registered.Remove(volume); Unregistrations++; }
+    public static void Reset() { Registered.Clear(); Unregistrations = 0; RefuseRegistration = false; }
+}
+
+public sealed class FogSphereAllocator
+{
+    public UnityEngine.Vector3 Position;
+    public float Range;
+    public float Density;
+    public UnityEngine.Color Radiance;
+    public float Intensity;
+    public bool Allocated;
+    public int Allocations, Deallocations;
+    public static bool RefuseAllocation;
+    /// <summary>The allocator the last `TryAllocate` was asked of, so a case can prove the volume's own visible
+    /// body was really drawn for it — and read the position and range it was drawn at.</summary>
+    public static FogSphereAllocator? LastAllocation;
+    public void SetPositionRange(UnityEngine.Vector3 position, float range) { Position = position; Range = range; }
+    public void SetDensity(float density) => Density = density;
+    public void SetRadiance(UnityEngine.Color radiance, float intensity = 1f) { Radiance = radiance; Intensity = intensity; }
+    public bool TryAllocate()
+    {
+        Allocations++;
+        Allocated = !RefuseAllocation;
+        if (Allocated) LastAllocation = this;
+        return Allocated;
+    }
+    public void Deallocate() { Deallocations++; Allocated = false; }
 }
 
 /// <summary>The game's glue entry points (evidence `ForgeEnemy/evidence/enemy-glue-hooks.json`): the manager's own

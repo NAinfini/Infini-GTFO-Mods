@@ -7,22 +7,22 @@ using ForgeRuntime.Framework;
 /// The focused suite for the three scan and wave actions. Every case runs the production handler the way
 /// the kernel runs it and asserts two things: the result row the plan would read, and whether the native entry
 /// the row claims was really invoked. Native state is the doubles in `GameDoubles.cs` and NOT game-verified.
-/// The ladder a start row walks is one method behind `scan_start`, so its cases are the scan row's — the two
+/// The ladder a start row walks is one method behind the scan row, so its cases are that row's — the two
 /// alarm rows the rulings deleted had no write of their own.
 /// </summary>
 public sealed class AlarmWaveActionsTests
 {
-    // ---- scan_start (`forge.action.map.scan_start`) ---------------------------------------------------
+    // ---- forge.action.map.scan_state (the `start` operation) ------------------------------------------
 
     [Fact]
-    public void scan_start_activates_the_named_scan_through_its_own_interaction_entry()
+    public void scan_state_start_activates_the_named_scan_through_its_own_interaction_entry()
     {
         var manager = Fixture.Level();
         var scan = Fixture.Puzzle("scan-1", "DoorScan-3F");
         manager.m_instances!.Add(scan);
 
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-1"), quorum = 0 });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-1") }, new { operation = "start" });
 
         Assert.Equal(CommandStatuses.Succeeded, result.Status);
         Assert.Equal(CommitStates.Confirmed, result.CommitState);
@@ -33,49 +33,52 @@ public sealed class AlarmWaveActionsTests
         Assert.Equal("succeeded", Fixture.Field(result, "status"));
         Assert.Equal(CommitStates.Confirmed, Fixture.Field(result, "committed"));
         Assert.Equal(JsonValueKind.Null, Fixture.Row(result).GetProperty("target").ValueKind);
-        Assert.Equal(new[] { "target", "status", "committed", "code", "quorum" },
+        Assert.Equal(new[] { "target", "status", "committed", "code" },
             Fixture.Row(result).EnumerateObject().Select(p => p.Name).ToArray());
     }
 
     [Fact]
-    public void scan_start_activates_the_named_scan_and_echoes_the_requested_quorum()
+    public void scan_state_start_carries_only_the_resource_and_the_operation()
     {
+        // The row declares no handle, no anchor, no participants and no quorum: the rulings had every port the
+        // handler could not apply deleted, so a plan cannot ask for one and be ignored.
         var manager = Fixture.Level();
         var scan = Fixture.Puzzle("scan-2");
         manager.m_instances!.Add(scan);
 
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-2"), quorum = 3 });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-2") }, new { operation = "start" });
 
         Assert.Equal(CommandStatuses.Succeeded, result.Status);
         Assert.Equal(AlarmWaveActions.ScanStartedCode, result.Code);
-        Assert.Equal(3, Fixture.Row(result).GetProperty("quorum").GetInt32());
+        Assert.False(result.Outputs.TryGetProperty("scan_handle", out _),
+            "The scan row publishes no handle port.");
         Assert.Equal(new[] { ChainedPuzzles.eChainedPuzzleInteraction.Activate }, scan.Interactions);
     }
 
     [Fact]
-    public void scan_start_accepts_the_author_name_as_the_resource_id()
+    public void scan_state_start_accepts_the_author_name_as_the_resource_id()
     {
         var manager = Fixture.Level();
         var scan = Fixture.Puzzle("scan-3", "PublicScanName");
         manager.m_instances!.Add(scan);
 
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "PublicScanName") });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "PublicScanName") }, new { operation = "start" });
 
         Assert.Equal(CommandStatuses.Succeeded, result.Status);
         Assert.Single(scan.Interactions);
     }
 
     [Fact]
-    public void scan_start_reports_an_already_active_scan_as_the_state_it_asked_for()
+    public void scan_state_start_reports_an_already_active_scan_as_the_state_it_asked_for()
     {
         var manager = Fixture.Level();
         var scan = Fixture.Puzzle("scan-4", active: true);
         manager.m_instances!.Add(scan);
 
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-4") });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-4") }, new { operation = "start" });
 
         Assert.Equal(CommandStatuses.Succeeded, result.Status);
         Assert.Equal(CommitStates.None, result.CommitState);
@@ -84,14 +87,14 @@ public sealed class AlarmWaveActionsTests
     }
 
     [Fact]
-    public void scan_start_rejects_a_solved_scan_without_writing()
+    public void scan_state_start_rejects_a_solved_scan_without_writing()
     {
         var manager = Fixture.Level();
         var scan = Fixture.Puzzle("scan-5", solved: true);
         manager.m_instances!.Add(scan);
 
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-5") });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-5") }, new { operation = "start" });
 
         Assert.Equal(CommandStatuses.Rejected, result.Status);
         Assert.Equal(CommitStates.None, result.CommitState);
@@ -100,24 +103,24 @@ public sealed class AlarmWaveActionsTests
     }
 
     [Fact]
-    public void scan_start_rejects_an_unknown_scan_and_a_missing_level_manager()
+    public void scan_state_start_rejects_an_unknown_scan_and_a_missing_level_manager()
     {
         var manager = Fixture.Level();
         manager.m_instances!.Add(Fixture.Puzzle("scan-6"));
 
-        var unknown = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "nothing-here") });
+        var unknown = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "nothing-here") }, new { operation = "start" });
         Assert.Equal(CommandStatuses.Rejected, unknown.Status);
         Assert.Equal(AlarmWaveActions.AlarmNotFoundCode, unknown.Code);
 
         ChainedPuzzles.ChainedPuzzleManager.Current = null;
-        var noManager = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-6") });
+        var noManager = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-6") }, new { operation = "start" });
         Assert.Equal(AlarmWaveActions.ManagerUnavailableCode, noManager.Code);
     }
 
     [Fact]
-    public void scan_start_rejects_an_unreadable_instance_and_a_puzzle_with_no_core()
+    public void scan_state_start_rejects_an_unreadable_instance_and_a_puzzle_with_no_core()
     {
         var manager = Fixture.Level();
         var destroyed = Fixture.Puzzle("scan-7");
@@ -126,56 +129,48 @@ public sealed class AlarmWaveActionsTests
         var coreless = Fixture.Puzzle("scan-8", cores: 0);
         manager.m_instances.Add(coreless);
 
-        var unavailable = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-7") });
+        var unavailable = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-7") }, new { operation = "start" });
         Assert.Equal(AlarmWaveActions.AlarmNotFoundCode, unavailable.Code);
 
-        var noCore = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-8") });
+        var noCore = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-8") }, new { operation = "start" });
         Assert.Equal(AlarmWaveActions.AlarmNoCoresCode, noCore.Code);
         Assert.Empty(coreless.Interactions);
     }
 
     [Fact]
-    public void scan_start_refuses_a_missing_input_a_foreign_kind_and_an_empty_id()
+    public void scan_state_start_refuses_a_missing_input_a_foreign_kind_and_an_empty_id()
     {
         Fixture.Level();
-        var missing = Fixture.Run(AlarmWaveActions.ExecuteStartScan, new { });
+        var missing = Fixture.Run(AlarmWaveActions.ExecuteScanState, new { }, new { operation = "start" });
         Assert.Equal(AlarmWaveActions.NoScanResourceCode, missing.Code);
 
-        var foreign = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.WaveKind, "1:2") });
+        var foreign = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.WaveKind, "1:2") }, new { operation = "start" });
         Assert.Equal(AlarmWaveActions.ResourceNotChainedPuzzleCode, foreign.Code);
 
-        var empty = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "") });
+        var empty = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "") }, new { operation = "start" });
         Assert.Equal(AlarmWaveActions.ResourceIdEmptyCode, empty.Code);
     }
 
     [Fact]
-    public void scan_start_publishes_the_handle_its_own_port_declares_and_refuses_before_writing_without_one()
+    public void scan_state_start_does_not_need_an_attached_half_to_write()
     {
         var manager = Fixture.Level();
-        manager.m_instances!.Add(Fixture.Puzzle("scan-a"));
+        var scan = Fixture.Puzzle("scan-a");
+        manager.m_instances!.Add(scan);
 
-        // An attached half mints the handle the row declares, and the plan stores it under the port's own name.
-        var started = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-a") });
-        Assert.Equal(CommandStatuses.Succeeded, started.Status);
-        Assert.NotNull(Fixture.Handle(started, AlarmWaveContract.ScanHandlePort));
-
-        // A detached half cannot mint it, so the start refuses by name before writing: a start that wrote the
-        // world and then published no handle would be worse than this refusal.
-        var bare = Fixture.Level();
-        var refused = Fixture.Puzzle("scan-b");
-        bare.m_instances!.Add(refused);
+        // The scan row publishes no handle, so nothing has to be minted before the write and the write does not
+        // depend on the half being attached.
         Fixture.Detach();
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-b") });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-a") }, new { operation = "start" });
 
-        Assert.Equal(CommandStatuses.Rejected, result.Status);
-        Assert.Equal(AlarmWaveActions.HandleUnavailableCode, result.Code);
-        Assert.Empty(refused.Interactions);
+        Assert.Equal(CommandStatuses.Succeeded, result.Status);
+        Assert.Equal(AlarmWaveActions.ScanStartedCode, result.Code);
+        Assert.Equal(new[] { ChainedPuzzles.eChainedPuzzleInteraction.Activate }, scan.Interactions);
     }
 
     [Fact]
@@ -185,8 +180,8 @@ public sealed class AlarmWaveActionsTests
         manager.m_instances!.Add(Fixture.Puzzle("scan-9"));
         Fixture.WavePair();
 
-        var startScan = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-9") }, isHost: false);
+        var startScan = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-9") }, new { operation = "start" }, isHost: false);
         var startWave = Fixture.Run(AlarmWaveActions.ExecuteStartWave,
             new { wave = Fixture.Resource(AlarmWaveContract.WaveKind, "7:9") }, isHost: false);
         var stopWave = Fixture.Run(AlarmWaveActions.ExecuteStopWave,
@@ -207,15 +202,15 @@ public sealed class AlarmWaveActionsTests
     }
 
     [Fact]
-    public void scan_start_refuses_a_command_dispatched_on_a_non_master_peer()
+    public void scan_state_start_refuses_a_command_dispatched_on_a_non_master_peer()
     {
         var manager = Fixture.Level();
         var scan = Fixture.Puzzle("scan-10");
         manager.m_instances!.Add(scan);
         SNetwork.SNet.IsMaster = false;
 
-        var result = Fixture.Run(AlarmWaveActions.ExecuteStartScan,
-            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-10") });
+        var result = Fixture.Run(AlarmWaveActions.ExecuteScanState,
+            new { scan = Fixture.Resource(AlarmWaveContract.ChainedPuzzleKind, "scan-10") }, new { operation = "start" });
 
         Assert.Equal(AlarmWaveActions.AuthorityCode, result.Code);
         Assert.Empty(scan.Interactions);
@@ -420,7 +415,7 @@ public sealed class AlarmWaveActionsTests
         var capabilities = JsonDocument.Parse(AlarmWaveContract.CapabilitiesJson).RootElement;
         Assert.Equal(3, capabilities.GetArrayLength());
         Assert.Equal(
-            new[] { "forge.action.map.scan_start", "forge.action.map.wave_start", "forge.action.map.wave_stop" },
+            new[] { "forge.action.map.scan_state", "forge.action.map.wave_start", "forge.action.map.wave_stop" },
             capabilities.EnumerateArray().Select(c => c.GetProperty("id").GetString()).ToArray());
         foreach (var capability in capabilities.EnumerateArray())
         {
@@ -454,8 +449,9 @@ public sealed class AlarmWaveActionsTests
     [Fact]
     public void every_shape_is_the_capabilitys_own_port_set()
     {
-        Assert.Equal(new[] { "scan", "anchor", "participants", "quorum" }, AlarmWaveContract.ScanStartShape.InputPorts);
-        Assert.Equal(new[] { "result", "scan_handle" }, AlarmWaveContract.ScanStartShape.OutputPorts);
+        Assert.Equal(new[] { "scan" }, AlarmWaveContract.ScanStateShape.InputPorts);
+        Assert.Equal(new[] { "result" }, AlarmWaveContract.ScanStateShape.OutputPorts);
+        Assert.Equal(new[] { "operation" }, AlarmWaveContract.ScanStateShape.ParameterIds);
         Assert.Equal(new[] { "wave", "budget", "count", "seed", "interval" }, AlarmWaveContract.WaveStartShape.InputPorts);
         Assert.Equal(new[] { "result", "wave_handle" }, AlarmWaveContract.WaveStartShape.OutputPorts);
         Assert.Equal(new[] { "waves", "reason" }, AlarmWaveContract.WaveStopShape.InputPorts);

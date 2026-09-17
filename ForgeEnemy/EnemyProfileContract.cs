@@ -14,7 +14,10 @@ namespace ForgeEnemy.Native;
 /// Five rows were surveyed against build 20403457. Only `phase_set` has a native write entry whose effect the
 /// game itself replicates, so only that row has a capability row and a binding here; the other four are absent
 /// from <see cref="CapabilityRows"/> on purpose and their reasons are enumerated in
-/// <see cref="Unimplemented"/> rather than being filled in with a shape the runtime cannot honour.</summary>
+/// <see cref="Unimplemented"/> rather than being filled in with a shape the runtime cannot honour. Two of the
+/// four are nevertheless served by this package without a graph row: `limb_profile` and `perception_profile` are
+/// spawn-time static profiles, written on every peer from one document, which is why their reasons no longer say
+/// the values cannot be delivered at all.</summary>
 internal static class EnemyProfileContract
 {
     /// <summary>The provider every row here belongs to; the same string `EnemyModule.ProviderId` carries.</summary>
@@ -187,10 +190,13 @@ internal static class EnemyProfileContract
             "未实现：缺句柄池与实例台账。native ES_Base.Stop() 在本版本没有任何 override（基类槽位是共享 thunk），"
             + "目录输入是 handle(lease)，运行时没有可用来表达该行的句柄与行为实例台账；本行需要行为账本，超出本片范围。"),
         ("forge.action.enemy.limb_profile",
-            "未实现：缺同步入口。Dam_EnemyDamageLimb 的 m_health/m_healthMax/m_weakspotDamageMulti/m_armorDamageMulti "
-            + "都是可写实例字段但没有一个进入 SNet 复制；原版只复制伤害包，各端在自己本地算部位生命，直接写字段会让主客机数值分叉。"),
+            "未实现：图上不注册这一行——本版本改由生成期静态档案服务，不再按「缺同步入口」处理。"
+            + "Dam_EnemyDamageLimb 的 m_health/m_healthMax/m_weakspotDamageMulti/m_armorDamageMulti 与 SetLimbDamageType "
+            + "都是可写实例字段且没有一个进入 SNet 复制，但档案在每个原生生命的生成点由各端用同一份文档写同样数值 "
+            + "（Profile/EnemyProfiles.cs 的 limbs 段 + EnemyModuleProfiles.ApplyLimbs），因此不需要复制通道。"),
         ("forge.action.enemy.perception_profile",
-            "未实现：缺同步入口。EnemyDetection 的 m_movementDetectionDistance/m_noiseDetectionRange/"
-            + "m_detectionBuildupSpeed 是可写实例字段，但没有任何原生复制通道，改完只有主机自己变。")
+            "未实现：图上不注册这一行——本版本改由生成期静态档案服务。EnemyDetection 的 m_movementDetectionDistance/"
+            + "m_noiseDetectionRange/m_detectionCooldownSpeed/m_detectionBuildupSpeed 没有原生复制通道，"
+            + "档案在生成期应用（Profile/EnemyProfiles.cs 的 detection 段 + EnemyModuleProfiles.ApplyDetection）。")
     };
 }
