@@ -43,7 +43,8 @@ internal sealed partial class EnemyModule
     /// unknown rather than being claimed, and a refusal before the native setter is a rejected row.
     ///
     /// `internal`, not `private`, so the focused suite can dispatch it through a kernel-built command context and
-    /// assert the rows it writes; the registration still only ever reaches it through `EnemyProfileContract`.</summary>
+    /// assert the rows it writes; the registration reaches it by the handler name
+    /// `EnemyProfileContract.PhaseSetHandler` registers in `EnemyActionFamilies`.</summary>
     internal CommandResult PhaseSet(CommandContext context)
     {
         if (!CanExecute) return CommandResult.Rejected("authority-or-phase");

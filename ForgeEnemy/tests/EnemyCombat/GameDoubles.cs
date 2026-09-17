@@ -8,8 +8,8 @@ using ForgeRuntime.Framework;
 
 namespace UnityEngine
 {
-    /// <summary>The one Unity value type these handlers name: the impulse force and the hitreact damage position.
-    /// The suite reads its components and never asks the engine to integrate anything.</summary>
+    /// <summary>The one Unity value type these handlers name: the hitreact damage position. The suite reads its
+    /// components and never asks the engine to integrate anything.</summary>
     public struct Vector3
     {
         public float x, y, z;
@@ -300,24 +300,6 @@ public sealed class ES_ScoutDetection
     public void OnTargetRegistered(Agents.AgentTarget target) { }
 }
 
-/// <summary>The limb's own physics body: the only reachable impulse write in the build. `AddForce` returns void
-/// and queues the force for the applicator's own `FixedUpdate`, which is why a submitted shove is an unknown
-/// commit rather than a confirmed displacement.</summary>
-public sealed class LimbForceApplicator
-{
-    public IntPtr Pointer = new IntPtr(300);
-    public UnityEngine.Vector3? BodyMassScale;
-    public readonly List<(UnityEngine.Vector3 Force, float Duration)> Forces = new();
-    public Action? OnAddForce;
-    public bool ThrowOnAddForce;
-    public void AddForce(UnityEngine.Vector3 force, float duration)
-    {
-        OnAddForce?.Invoke();
-        if (ThrowOnAddForce) throw new InvalidOperationException("fixture native failure");
-        Forces.Add((force, duration));
-    }
-}
-
 public sealed class Dam_EnemyDamageLimb
 {
     public IntPtr Pointer = new IntPtr(210);
@@ -328,7 +310,6 @@ public sealed class Dam_EnemyDamageLimb
     public bool Destroyed;
     public Action? OnDestroyedRead;
     public bool IsDestroyed { get { OnDestroyedRead?.Invoke(); return Destroyed; } set { Destroyed = value; } }
-    public LimbForceApplicator ForceApplicator = null!;
     public void DestroyLimb() { IsDestroyed = true; }
 }
 

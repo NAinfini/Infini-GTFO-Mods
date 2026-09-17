@@ -8,8 +8,9 @@ using static T;
 /// native write behind it is declared at all. What the native write is, and why the four absent rows are absent,
 /// is in `ForgeEnemy/evidence/enemy-profile-actions.json`.
 ///
-/// The handler is registered by the integration patch, not by this slice, so these cases resolve the row the
-/// contract carries rather than reading it back out of a live manifest.</summary>
+/// The handler is registered by the provider's own registration, not by this slice: the scene below builds the
+/// real `EnemyModule`, so these cases resolve the row and the shape the running registration carries instead of
+/// re-declaring them in a kernel of their own.</summary>
 internal static class EvidenceCases
 {
     /// <summary>The catalog's `forge.action.enemy.phase_set` row, read from the website's
@@ -70,12 +71,12 @@ internal static class EvidenceCases
         Case("evidence.handler-shape-resolves-against-the-row", () =>
         {
             // The kernel resolves a handler's declared names against the capability graph it belongs to, once per
-            // binding, at registration: `Scene.RowKernel` registered the real handler with the real shape, so a
-            // name the row does not carry would already have failed there. What is left to check here is that the
-            // resolution is *this* row's layout — the declared value ports in their declared order, the result
-            // output and the structural parameter the handler reads.
-            var kernel = Scene.RowKernel();
-            var contract = kernel.ResolveGraphContract(PhaseSetCases.Capability, "1.0.0",
+            // binding, at registration: the scene's real module registered the real handler with the real shape
+            // through the production registration, so a name the row does not carry would already have failed
+            // there. What is left to check here is that the resolution is *this* row's layout — the declared value
+            // ports in their declared order, the result output and the structural parameter the handler reads.
+            using var scene = new Scene(start: false);
+            var contract = scene.Kernel.ResolveGraphContract(PhaseSetCases.Capability, "1.0.0",
                 RuntimeJson.From(new { reset_policy = 0 }));
             var shape = EnemyProfileContract.PhaseSetShape();
             var graphInputs = Ids(contract.GetProperty("inputs")).Where(id => id != "in").ToArray();

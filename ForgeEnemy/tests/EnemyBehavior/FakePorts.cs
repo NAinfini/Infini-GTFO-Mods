@@ -41,6 +41,13 @@ internal sealed class FakePorts : IBehaviorPorts
     internal bool NoiseNodeFound = true;
     internal Exception? ThrowOnNoise;
 
+    /// <summary>One ability end the decisions reported, with the machine's own answer for the dropped row and the
+    /// reason the end path named. This is the ledger half of the interruption: whether the row is published at all
+    /// is the module's decision, which this suite does not compile.</summary>
+    internal sealed record DroppedAbility(string Key, byte Ability, bool Finished, string Reason);
+
+    internal readonly List<DroppedAbility> Dropped = new();
+
     internal Enemy Track(string key, params byte[] abilities)
     {
         var enemy = new Enemy { Key = key };
@@ -92,6 +99,9 @@ internal sealed class FakePorts : IBehaviorPorts
         done = enemy.Done.Contains(ability);
         return true;
     }
+
+    public void AbilityDropped(RunningBehavior dropped, bool finished, string reason)
+        => Dropped.Add(new DroppedAbility(dropped.EnemyKey, dropped.Ability, finished, reason));
 
     public bool TryEmitNoise(string key, (double X, double Y, double Z) position, double radius)
     {

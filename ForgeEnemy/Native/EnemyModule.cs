@@ -101,8 +101,8 @@ internal sealed partial class EnemyModule : IDisposable
         // three node actions, the six value rows, and the action families whose rows are list rows too.
         foreach (var handler in AllNodeHandlers()) handlers.Add(handler.Key, handler.Value);
         foreach (var shape in AllNodeShapes()) shapes.Add(shape.Key, shape.Value);
-        // The action families the node-list slice left unwired — enemy control, combat, foam and behaviour — and
-        // the wave trigger rows: their rows, handlers, shapes and support rows are declared in their own
+        // The action families the node-list slice left unwired — enemy control, combat, foam, behaviour and the
+        // profile's `phase_set`: their rows, handlers, shapes and support rows are declared in their own
         // contracts, and `EnemyActionFamilies` is the one place they are composed into this registration.
         foreach (var handler in ActionFamilyHandlers()) handlers.Add(handler.Key, handler.Value);
         foreach (var shape in ActionFamilyShapes()) shapes.Add(shape.Key, shape.Value);
@@ -238,10 +238,11 @@ internal sealed partial class EnemyModule : IDisposable
         var entry = Resolve(observation.Target);
         if (entry != null && entry.EnemyPointer == observation.EnemyPointer)
         {
-            _entities.Remove(entry.Enemy.GlobalID);
-            // A life that is gone has no in-flight ability left to interrupt, so the behaviour ledger's row for it
-            // goes with the entity rather than waiting for the world to end.
+            // The ledger row goes first: reporting the ability a despawn cut short needs the entry this call is
+            // about to drop — both to read the component back and to name the enemy — and a despawn is the one end
+            // path where the entity is already on its way out.
             ForgetBehavior(observation.Target);
+            _entities.Remove(entry.Enemy.GlobalID);
             // A retired life owns no variables either: a despawn is the other way an enemy life ends, and a plan
             // that wrote a per-enemy value must not have it survive into whatever takes the instance's place.
             ReleaseEnemyScope(observation.Target);

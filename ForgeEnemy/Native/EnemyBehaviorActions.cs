@@ -147,12 +147,24 @@ internal static class AbilityDecision
                 if (!ports.CanExecute) { rows.Add(Row(BehaviorOutcome.Unseen("authority-or-phase"))); stopCommitting = true; continue; }
                 if (!ports.IsCurrent(target.Id))
                 { rows.Add(Row(BehaviorOutcome.Unseen("receiver-changed-during-commit"))); stopCommitting = true; continue; }
-                // The readback is the machine's own answer about the component the trigger reached; a component
-                // that is already done is not an ability in flight, so no interruption window exists for it.
+                // The readback is the machine's own answer about the component the trigger reached.
                 if (!ports.TryAbilityState(target.Id, (byte)ability, out var component, out bool finished))
                 { rows.Add(Row(BehaviorOutcome.Unseen("ability-disappeared"))); stopCommitting = true; continue; }
-                if (finished) ledger.End(target.Id, worldEpoch);
-                else ledger.Start(new RunningBehavior(target.Id, (byte)ability, component, worldEpoch));
+                // The row this trigger replaces is read back before it goes. The game keeps one active ability
+                // per agent, so a row still held here was ended by this trigger — but only a component the
+                // machine still reports as unfinished was ended before its own lifetime ran out; a finished one
+                // ended normally and publishes nothing, and one that can no longer be read is an unknown the
+                // module is not told about either.
+                var replaced = ledger.Find(target.Id, worldEpoch);
+                if (replaced != null)
+                {
+                    bool readable = ports.TryAbilityState(target.Id, replaced.Ability, out _, out bool replacedFinished);
+                    ledger.End(target.Id, worldEpoch);
+                    if (readable)
+                        ports.AbilityDropped(replaced, replacedFinished,
+                            ForgeEnemy.EnemyAbilityInterruptedContract.ReasonSuperseded);
+                }
+                if (!finished) ledger.Start(new RunningBehavior(target.Id, (byte)ability, component, worldEpoch));
             }
             catch (Exception) { rows.Add(Row(BehaviorOutcome.Unseen("readback-exception"))); stopCommitting = true; continue; }
             rows.Add(Row(BehaviorOutcome.Committed()));

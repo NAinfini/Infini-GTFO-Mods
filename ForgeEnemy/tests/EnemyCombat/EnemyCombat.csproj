@@ -37,10 +37,11 @@
          object, so the two interop modules those types live in are referenced here rather than shadowed. -->
     <Reference Include="UnityEngine.CoreModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.CoreModule.dll" />
     <Reference Include="UnityEngine.AIModule" HintPath="$(GTFOBepInExPath)/interop/UnityEngine.AIModule.dll" />
-    <!-- `Enemies.EnemyAgent`, `Enemies.ES_HitreactBase` and `LimbForceApplicator` are declared in GameDoubles.cs
-         rather than taken from Modules-ASM: the interop assembly's own `ES_HitreactBase` is a sealed wrapper whose
-         class pointer is resolved at first static use, so a suite that bound it would install the interop's own
-         state machine instead of the double's. Every member the production code reads is declared there. -->
+    <!-- `Enemies.EnemyAgent`, `Enemies.ES_HitreactBase`, `Enemies.EnemyLocomotion` and `Dam_EnemyDamageBase` are
+         declared in GameDoubles.cs rather than taken from Modules-ASM: the interop assembly's own `ES_HitreactBase`
+         is a sealed wrapper whose class pointer is resolved at first static use, so a suite that bound it would
+         install the interop's own state machine instead of the double's. Every member the production code reads is
+         declared there. -->
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

@@ -22,9 +22,7 @@ internal static class EnemyCombatRegistration
     internal const string TestProviderId = "forge.test.enemy.combat";
 
     /// <summary>The rows this slice registers, each paired with the binding row it resolves against and the method
-    /// that implements it. The impulse row is absent on purpose: its capability and binding rows live in
-    /// `EnemyCombatContract.ImpulseCapabilityRow`/`ImpulseBindingRow` and are not registered, which is what
-    /// `EnemyCombatContract.Unregistered` records. Its handler is still compiled and exercised directly.</summary>
+    /// that implements it.</summary>
     private static readonly (string Handler, string Capability, string Binding, Func<EnemyModule, CommandHandler> Method)[] Rows =
     {
         (EnemyCombatContract.StaggerHandler, EnemyCombatContract.StaggerCapability, EnemyCombatContract.StaggerBinding,

@@ -173,11 +173,19 @@ internal sealed partial class EnemyModule
     private static readonly string[] AgentKinds = { "gtfo.enemy", "gtfo.player" };
 
     private void PublishBehavior(string binding, EntityReference subject, Dictionary<string, object> ports)
+        => PublishBehavior("gtfo.enemy.behavior", binding, subject, ports);
+
+    /// <summary>The one publish path for every behaviour fact, under the scope of the window that read it: the
+    /// frame pump publishes under the behaviour scope and the ability ledger under the ability scope, so a fact's
+    /// own id says which window observed it. Both count from this module's one event sequence.</summary>
+    private void PublishBehavior(string scope, string binding, EntityReference subject,
+        Dictionary<string, object> ports)
     {
-        // One frame hook covers every behaviour fact, so a fact no plan subscribes to is never submitted.
+        // Each window knows which facts it can produce and asks whether any plan wants them, so a fact no plan
+        // subscribes to is never submitted.
         if (!CanObserveFacts || !_kernel.HasSubscribers(binding) || Resolve(subject) == null) return;
         var result = _registration.Publish(new RuntimeEvent(
-            "gtfo.enemy.behavior:" + _kernel.WorldEpoch + ":" + checked(++_eventSequence), binding,
+            scope + ":" + _kernel.WorldEpoch + ":" + checked(++_eventSequence), binding,
             _kernel.WorldEpoch, Math.Max(0, _kernel.CurrentTick), "gtfo.world:" + _kernel.WorldEpoch,
             RuntimeJson.From(ports)));
         // Runtime owns causal propagation and dispatch. Rejection must never reopen this native observation.

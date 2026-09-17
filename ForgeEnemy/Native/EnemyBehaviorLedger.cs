@@ -46,6 +46,14 @@ internal interface IBehaviorPorts
     /// commit rather than a refusal.</summary>
     bool TryAbilityState(string key, byte ability, out IntPtr component, out bool done);
 
+    /// <summary>Tells the module that the row for one enemy life is being dropped, with the machine's own
+    /// `AbilityIsDone()` answer read back for it at that moment and the end path's reason. Whether the end is the
+    /// interruption the `forge.trigger.enemy.ability_interrupted` row carries — an ability the machine still
+    /// reports as unfinished — is the module's call, because publishing is a kernel fact and this half names no
+    /// kernel type. The reason is one of the members
+    /// <see cref="ForgeEnemy.EnemyAbilityInterruptedContract"/> declares.</summary>
+    void AbilityDropped(RunningBehavior dropped, bool finished, string reason);
+
     /// <summary>Submits the game's own noise event. The node the native struct needs is resolved from the
     /// position inside the bridge, and the answer says whether one was found.</summary>
     bool TryEmitNoise(string key, (double X, double Y, double Z) position, double radius);
@@ -61,16 +69,19 @@ internal sealed record RunningBehavior(string EnemyKey, byte Ability, IntPtr Com
 /// question the native machine answers once.
 ///
 /// The table exists because an in-flight ability is the only enemy behaviour this provider can both observe and
-/// end: `ES_HitreactBase.ActivateState` is the game's own interruption path (`ES_HitreactType{Micro,Light,Heavy}`,
-/// the entry `forge.action.combat.stagger` submits) and `ES_StateEnum.Hitreact` (7) is the locomotion state it
-/// enters, so the combat family's `attack_interrupt` reads this table instead of keeping a second copy of "what
-/// is running".
+/// end: this provider submitted the trigger itself, so it knows which ability is running, and the row is what
+/// tells a later end apart from a normal one. No native member says how an ability ended — the game's own
+/// `EnemyAbility.AbilityIsDone()` is its whole answer, and the hitreact state machine that interrupts an ability
+/// (`ES_HitreactBase.ActivateState`, the entry `forge.action.combat.stagger` and the combat family's
+/// `attack_interrupt` submit) leaves the same answer behind as one that completed. A row still held while the
+/// component reports itself unfinished was therefore ended by something other than the ability's own lifetime,
+/// which is the interruption `forge.trigger.enemy.ability_interrupted` carries; the module publishes it, and a
+/// row the machine reports as finished publishes nothing.
 ///
 /// An entry is never timed. Nothing here counts ticks or expires entries, because no native member gives an
-/// ability a duration: an ability ends when the game says it ended, which is `EnemyAbility.AbilityIsDone()`,
-/// the enemy's `m_activeAbility` returning to `AgentAbility.None`, the enemy dying, or the world ending. An
-/// expiry the provider invented would be a claim the native machine does not make, so the table has none and this
-/// slice does not use the kernel's per-tick module hook.
+/// ability a duration: a row ends when a later trigger replaces it, when the enemy despawns, or when the world
+/// ends. An expiry the provider invented would be a claim the native machine does not make, so the table has none
+/// and this slice does not use the kernel's per-tick module hook.
 ///
 /// The world epoch is part of the key rather than a field to compare: a world change clears the table, and a key
 /// that names an older epoch cannot name a row here at all.</summary>
@@ -86,8 +97,9 @@ internal sealed class EnemyBehaviorLedger
     /// the newest submitted ability is the one that is running.</summary>
     internal void Start(RunningBehavior entry) => _entries[Key(entry.EnemyKey, entry.WorldEpoch)] = entry;
 
-    /// <summary>Drops one enemy life's row. An ability that ended, a death, a despawn and a world change all end
-    /// the interruption window the row described.</summary>
+    /// <summary>Drops one enemy life's row and answers whether one was there. What the end was is the caller's to
+    /// report: the decision half tells the module through <see cref="IBehaviorPorts.AbilityDropped"/>, and the
+    /// despawn path reads its own row back before it drops it.</summary>
     internal bool End(string enemyKey, long worldEpoch) => _entries.Remove(Key(enemyKey, worldEpoch));
 
     internal void Clear() => _entries.Clear();
@@ -152,6 +164,21 @@ internal static class EnemyAbilityResources
             ability = entry.Ability;
             return true;
         }
+        return false;
+    }
+
+    /// <summary>The other direction, for a fact that carries the ability it is about: the reference one native
+    /// member belongs to. A byte outside the table is not a resource this provider owns, and the caller publishes
+    /// nothing rather than inventing an id for it.</summary>
+    internal static bool TryReference(byte ability, out ResourceRef reference)
+    {
+        foreach (var entry in Table)
+        {
+            if (entry.Ability != ability) continue;
+            reference = new ResourceRef(Kind, entry.Id);
+            return true;
+        }
+        reference = null!;
         return false;
     }
 }

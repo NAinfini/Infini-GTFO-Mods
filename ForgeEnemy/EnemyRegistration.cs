@@ -187,7 +187,10 @@ internal static class EnemyRegistration
 
     /// <summary>The whole registry text: the provider head and the base rows above, then every family's
     /// capability and binding rows in the order the native registration appends them — the selector, the
-    /// node-list family, the four action families, the wave trigger rows and the selector's own binding.</summary>
+    /// node-list family, the action families (control, combat, foam, behaviour, profile), the wave trigger rows
+    /// and the selector's own binding. Two of those families carry an observed row the framework declares no
+    /// canonical contract for — the combat family's stagger and the behaviour family's ability interruption —
+    /// and those rows and bindings come from this provider's own contracts, next to the rows above.</summary>
     internal static string RegistryJson()
     {
         string nodeCapabilities = string.Join(",\n", EnemyNodeValueContract.ValueRows().Select(RuntimeJson.From))
@@ -198,12 +201,21 @@ internal static class EnemyRegistration
             + ",\n" + EnemyNodeTriggerContract.BindingRowsJson;
         string familyCapabilities = string.Join(",\n", EnemyControlContract.CapabilityRows)
             + ",\n" + EnemyCombatContract.CapabilityRows
+            // The combat family's observed row travels with it: no framework contract declares the stagger, so
+            // the row and its binding come from this provider's own contract.
+            + ",\n" + EnemyStaggerContract.CapabilityRow
             + ",\n" + GlueContract.CapabilityRows
-            + ",\n" + EnemyBehaviorContract.CapabilityRows;
+            + ",\n" + EnemyBehaviorContract.CapabilityRows
+            // The same for the ability interruption the behaviour family's ledger proves.
+            + ",\n" + EnemyAbilityInterruptedContract.CapabilityRow
+            + ",\n" + EnemyProfileContract.CapabilityRows;
         string familyBindings = string.Join(",\n", EnemyControlContract.BindingRows)
             + ",\n" + EnemyCombatContract.BindingRows
+            + ",\n" + EnemyStaggerContract.BindingRowJson
             + ",\n" + GlueContract.BindingRows
-            + ",\n" + EnemyBehaviorContract.BindingRows;
+            + ",\n" + EnemyBehaviorContract.BindingRows
+            + ",\n" + EnemyAbilityInterruptedContract.BindingRowJson
+            + ",\n" + EnemyProfileContract.BindingRows;
         return RegistryHead
             + EnemySelectorContract.CapabilityRowJson
             + ",\n" + nodeCapabilities
@@ -239,8 +251,15 @@ internal static class EnemyRegistration
         // contract declares.
         rows.AddRange(EnemyControlContract.Support());
         rows.AddRange(EnemyCombatContract.Support);
+        // The two observed rows this module declares itself rather than binding a framework capability: the
+        // stagger the damage window closes on and the ability end the behaviour ledger proves.
+        rows.AddRange(EnemyStaggerContract.Support());
         rows.AddRange(GlueContract.Support);
         rows.AddRange(EnemyBehaviorContract.Support());
+        rows.AddRange(EnemyAbilityInterruptedContract.Support());
+        // The profile family: one execute binding whose handler writes the boss phase through the game's own
+        // replicated setter.
+        rows.AddRange(EnemyProfileContract.Support);
         rows.AddRange(EnemyWaveContract.Support());
         return rows.ToArray();
     }

@@ -5,8 +5,11 @@ using ForgeRuntime.Framework;
 namespace ForgeEnemy.Native;
 
 /// <summary>The game-independent half of `forge.enemy.profile`: the capability rows, binding rows, handler shapes
-/// and support rows this provider's execute handlers are registered with. The integration step picks them up from
-/// here, so the registry spelling lives in one place instead of being repeated inside `EnemyModule`.
+/// and support rows this provider's execute handlers are registered with. `EnemyRegistration` composes them into
+/// the one registry text both the native module and the release export read, so the registry spelling lives in one
+/// place instead of being repeated inside `EnemyModule`. The file sits in the module root beside the other family
+/// contracts — the root sources are what the release export compiles — and keeps the `ForgeEnemy.Native`
+/// namespace the way `EnemyBehaviorContract` does, because the assembly boundary is the csproj, not the folder.
 ///
 /// Five rows were surveyed against build 20403457. Only `phase_set` has a native write entry whose effect the
 /// game itself replicates, so only that row has a capability row and a binding here; the other four are absent

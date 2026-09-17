@@ -52,6 +52,43 @@ internal static class ActionCases
                 "an ability the machine already reports done is not in flight");
         });
 
+        T.Case("ability.a-replaced-row-is-reported-as-superseded", () =>
+        {
+            var ports = new FakePorts();
+            ports.Track("gtfo.enemy:7", Melee, Ranged);
+            var ledger = new EnemyBehaviorLedger();
+            var reference = Scene.Reference();
+            Scene.DispatchAbility(Scene.AbilityContext(new[] { reference }, Scene.Ability("melee")), ports, ledger);
+            var result = Scene.DispatchAbility(
+                Scene.AbilityContext(new[] { reference }, Scene.Ability("ranged")), ports, ledger);
+            T.Equal(CommitStates.Confirmed, T.Committed(result, 0), "the replacing trigger still commits");
+            var dropped = ports.Dropped.Single();
+            T.Equal("gtfo.enemy:7", dropped.Key, "the dropped row names the enemy life it belonged to");
+            T.Equal(Melee, dropped.Ability, "the dropped row names the ability the ledger held");
+            T.Check(!dropped.Finished, "the machine's own answer for the replaced ability was read back unfinished");
+            T.Equal(ForgeEnemy.EnemyAbilityInterruptedContract.ReasonSuperseded, dropped.Reason,
+                "the end path names the replacing trigger");
+            T.Equal(Ranged, ledger.Find(reference.Id, Scene.World)!.Ability, "the new row is the one in flight");
+        });
+
+        T.Case("ability.a-finished-replaced-row-carries-the-finished-answer", () =>
+        {
+            var ports = new FakePorts();
+            var enemy = ports.Track("gtfo.enemy:7", Melee, Ranged);
+            var ledger = new EnemyBehaviorLedger();
+            var reference = Scene.Reference();
+            Scene.DispatchAbility(Scene.AbilityContext(new[] { reference }, Scene.Ability("melee")), ports, ledger);
+            enemy.Done.Add(Melee);
+            Scene.DispatchAbility(Scene.AbilityContext(new[] { reference }, Scene.Ability("ranged")), ports, ledger);
+            // The decision half reports the drop with the machine's own answer; whether that answer is published
+            // as an interruption is the module's filter (`ReportAbilityDropped`), not this half's.
+            var dropped = ports.Dropped.Single();
+            T.Check(dropped.Finished, "the machine's own answer says the replaced ability had finished");
+            T.Equal(ForgeEnemy.EnemyAbilityInterruptedContract.ReasonSuperseded, dropped.Reason,
+                "the end path is still the replacing trigger");
+            T.Equal(Ranged, ledger.Find(reference.Id, Scene.World)!.Ability, "the new row is still in flight");
+        });
+
         T.Case("ability.not-registered-is-refused", () =>
         {
             var ports = new FakePorts();

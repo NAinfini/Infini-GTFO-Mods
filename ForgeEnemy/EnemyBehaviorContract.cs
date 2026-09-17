@@ -22,8 +22,9 @@ namespace ForgeEnemy.Native;
 /// declared here under a second id; see `ForgeEnemy/evidence/enemy-behavior-ledger.json` for the evidence behind
 /// each of those decisions.
 ///
-/// These declarations reach the registry through the slice's integration fragment: the shared registration point
-/// (`EnemyModule.Declare`) and the shared registry string are not this slice's files to edit.</summary>
+/// These declarations reach the registry through `EnemyRegistration.RegistryJson`, the provider's own registry
+/// text, which composes this contract's rows beside the other action families'; `EnemyRegistration.Support`
+/// carries their support rows.</summary>
 internal static class EnemyBehaviorContract
 {
     /// <summary>The provider id every binding row below names, spelled once. It is the same id the enemy module

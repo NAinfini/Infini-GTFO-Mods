@@ -5,7 +5,7 @@ using ForgeEnemy.Native;
 using ForgeRuntime.Framework;
 
 /// <summary>The suite's world: one started kernel with the real `EnemyModule` registered, a tracked enemy whose
-/// hitreact state machine and limb applicators are whatever the case needs, and a way to dispatch one row through
+/// hitreact state machine and attack states are whatever the case needs, and a way to dispatch one row through
 /// a command context built the way the kernel builds one.
 ///
 /// The context is constructed by reflection only because its constructor is internal to the Framework assembly;
@@ -22,7 +22,6 @@ internal sealed class Scene : IDisposable
     internal readonly EnemyAgent Enemy;
     internal readonly EnemyLocomotion Locomotion;
     internal readonly ES_HitreactBase Hitreact;
-    internal readonly LimbForceApplicator Applicator;
     internal readonly EntityReference Reference;
     /// <summary>The acting entity every dispatch carries as the `source` role. It is a tracked life of its own
     /// rather than the recipient, because the role is a required entity reference and the kernel would have
@@ -48,11 +47,9 @@ internal sealed class Scene : IDisposable
         var locomotion = NewLocomotion();
         Locomotion = locomotion;
         Hitreact = locomotion.Hitreact;
-        Applicator = new LimbForceApplicator { Pointer = new(300) };
-        Enemy = NewEnemy(locomotion, Applicator);
+        Enemy = NewEnemy(locomotion);
         Reference = Module.TrackSpawn(Enemy);
-        ActorReference = Module.TrackSpawn(NewEnemy(NewLocomotion(36), new LimbForceApplicator { Pointer = new(330) },
-            id: 9, pointer: 60));
+        ActorReference = Module.TrackSpawn(NewEnemy(NewLocomotion(36), id: 9, pointer: 60));
         if (start) Kernel.StartRuntime(static () => { });
     }
 
@@ -87,9 +84,8 @@ internal sealed class Scene : IDisposable
     }
 
     /// <summary>One enemy wired the way the production read expects: a damage receiver whose owner points back
-    /// at the enemy, two limbs with the ids `m_limbID` declares, and a force applicator on each.</summary>
-    internal static EnemyAgent NewEnemy(EnemyLocomotion locomotion, LimbForceApplicator applicator,
-        ushort id = 7, long pointer = 10)
+    /// at the enemy, and two limbs with the ids `m_limbID` declares.</summary>
+    internal static EnemyAgent NewEnemy(EnemyLocomotion locomotion, ushort id = 7, long pointer = 10)
     {
         var actor = new EnemyAgent { GlobalID = id, Pointer = new(pointer), Locomotion = locomotion };
         actor.Damage = new() { Owner = actor, Pointer = new(pointer + 100) };
@@ -97,8 +93,7 @@ internal sealed class Scene : IDisposable
         {
             m_base = actor.Damage,
             m_limbID = i,
-            Pointer = new(pointer + 200 + i),
-            ForceApplicator = i == 0 ? applicator : new LimbForceApplicator { Pointer = new(pointer + 300 + i) }
+            Pointer = new(pointer + 200 + i)
         }).ToArray();
         locomotion.m_agent = actor;
         return actor;
@@ -108,19 +103,9 @@ internal sealed class Scene : IDisposable
     /// declares: `targets` is a set of entity references, `source` is the attacker role, and the two structural
     /// parameters travel as their member index.</summary>
     internal CommandResult DispatchStagger(int reaction, int immunity, params EntityReference[] targets)
-        => Dispatch(EnemyCombatContract.StaggerHandler, EnemyCombatContract.StaggerBinding,
+        => Module.Stagger(Context(EnemyCombatContract.StaggerBinding,
             RuntimeJson.From(new { targets, source = ActorReference }),
-            RuntimeJson.From(new { reaction, immunity_policy = immunity }));
-
-    /// <summary>One `impulse` dispatch. `force` is the frame's three-number array; `limb` is omitted unless the
-    /// case passes one, which is what an absent optional port looks like on the wire.</summary>
-    internal CommandResult DispatchImpulse(int massPolicy, double[] force, double magnitude, double duration,
-        int? limb = null, params EntityReference[] targets)
-        => Dispatch(EnemyCombatContract.ImpulseHandler, EnemyCombatContract.ImpulseBinding,
-            limb == null
-                ? RuntimeJson.From(new { targets, source = ActorReference, force, magnitude, duration })
-                : RuntimeJson.From(new { targets, source = ActorReference, force, magnitude, duration, limb = limb.Value }),
-            RuntimeJson.From(new { mass_policy = massPolicy }));
+            RuntimeJson.From(new { reaction, immunity_policy = immunity })));
 
     /// <summary>One `attack_interrupt` dispatch over the named enemy recipients. The row carries no structural
     /// parameter, so the dispatch submits an empty parameter object — the same shape a plan step with no structural
@@ -128,13 +113,6 @@ internal sealed class Scene : IDisposable
     internal CommandResult DispatchAttackInterrupt(params EntityReference[] enemies)
         => Module.AttackInterrupt(Context(EnemyCombatContract.AttackInterruptBinding,
             RuntimeJson.From(new { enemies, source = ActorReference }), RuntimeJson.EmptyObject));
-
-    private CommandResult Dispatch(string handler, string binding, System.Text.Json.JsonElement inputs,
-        System.Text.Json.JsonElement parameters)
-    {
-        var context = Context(binding, inputs, parameters);
-        return handler == EnemyCombatContract.StaggerHandler ? Module.Stagger(context) : Module.Impulse(context);
-    }
 
     private CommandContext Context(string binding, System.Text.Json.JsonElement inputs,
         System.Text.Json.JsonElement parameters)

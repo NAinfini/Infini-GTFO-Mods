@@ -96,24 +96,105 @@ internal sealed partial class EnemyModule
     private CommandResult NoiseEmit(CommandContext context)
         => NoiseDecision.Run(context, new NativeBehaviorPorts(this));
 
-    /// <summary>One enemy life's in-flight ability, for the interruption path: the life, the ability kind, and
-    /// the native component the trigger was submitted to. Asked once and answered once — the row is dropped when
-    /// it is handed out, because a second interrupt of the same ability is not a second interruption. Null when
-    /// this enemy has no running ability, when the row belongs to a world that ended, or when the enemy is gone,
-    /// and the caller then has nothing to interrupt rather than a stale native pointer.</summary>
-    internal RunningBehavior? TakeRunningBehavior(EntityReference enemy)
+    /// <summary>Drops one enemy life's in-flight row, reporting the ability the despawn cut short. The readback is
+    /// taken while the entry still resolves — the despawn path drops the row before it drops the entity — because
+    /// a component the game no longer answers for proves nothing: an unreadable component publishes nothing rather
+    /// than being claimed as an interruption, and neither does one the machine reports as finished. A module that
+    /// never started an ability has no table to drop a row from, so the call stays a no-op rather than building
+    /// one. The world's own teardown drops rows through <c>ClearBehaviors</c> and publishes nothing: a world going
+    /// away is not an interruption of one ability.</summary>
+    internal void ForgetBehavior(EntityReference enemy)
     {
         CheckThread();
-        var entry = Behaviors.Find(enemy.Id, enemy.WorldEpoch);
-        if (entry == null) return null;
-        Behaviors.End(enemy.Id, enemy.WorldEpoch);
-        return Resolve(enemy) == null ? null : entry;
+        if (_behaviors == null) return;
+        var running = _behaviors.Find(enemy.Id, enemy.WorldEpoch);
+        if (running == null) return;
+        _behaviors.End(enemy.Id, enemy.WorldEpoch);
+        if (!TryAbilityComponent(Resolve(enemy), running.Ability, out _, out bool done)) return;
+        ReportAbilityDropped(running, done, ForgeEnemy.EnemyAbilityInterruptedContract.ReasonDespawn);
     }
 
-    /// <summary>Drops one enemy life's in-flight row. Death and despawn end the ability window the row described;
-    /// the module's own despawn path and its world cleanup call this. A module that never started an ability has
-    /// no table to drop a row from, so the call stays a no-op rather than building one.</summary>
-    internal void ForgetBehavior(EntityReference enemy) { CheckThread(); _behaviors?.End(enemy.Id, enemy.WorldEpoch); }
+    /// <summary>The tracked life a key names, through the module's one entry table: the key is the entity
+    /// reference's own id, so a reference from another world or another life cannot name an entry here.</summary>
+    private Entry? ResolveKey(string key)
+    {
+        const string prefix = "gtfo.enemy:";
+        if (key == null || !key.StartsWith(prefix, StringComparison.Ordinal)) return null;
+        if (!ushort.TryParse(key.AsSpan(prefix.Length), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out ushort id)) return null;
+        return _entities.TryGetValue(id, out var entry)
+            && entry.Reference.Id == key && Resolve(entry.Reference) != null ? entry : null;
+    }
+
+    /// <summary>The ability table of one tracked life, or null when the enemy cannot be read at all.</summary>
+    private static EnemyAbilities? Abilities(Entry? entry)
+    {
+        if (entry == null) return null;
+        try { return entry.Enemy.Abilities; }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>The index of the requested ability in one enemy's own `AllComps` table. The scan is ordinal and
+    /// takes the first component of that kind, which is the same pair `GetAbilities` reports for the ability, so
+    /// the component the trigger reaches is the one the game enumerated.</summary>
+    private static bool TryAbilityIndex(EnemyAbilities abilities, Agents.AgentAbility ability, out int index)
+    {
+        index = -1;
+        var comps = abilities.AllComps;
+        if (comps == null) return false;
+        for (int i = 0; i < comps.Length; i++)
+        {
+            var component = comps[i];
+            if (component == null || (byte)component.m_abilityType != (byte)ability) continue;
+            index = i;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>The component one tracked life's own table holds for the requested ability, and the machine's
+    /// `AbilityIsDone()` answer for it. False when the entry is gone, the ability is not registered on it, or the
+    /// component cannot be reached, which is an unknown rather than an answer.</summary>
+    private static bool TryAbilityComponent(Entry? entry, byte ability, out IntPtr component, out bool done)
+    {
+        component = IntPtr.Zero;
+        done = false;
+        var abilities = Abilities(entry);
+        if (abilities == null) return false;
+        try
+        {
+            if (!TryAbilityIndex(abilities, (Agents.AgentAbility)ability, out int index)) return false;
+            var comps = abilities.AllComps;
+            if (comps == null || index < 0 || index >= comps.Length) return false;
+            var abilityComponent = comps[index];
+            if (abilityComponent == null) return false;
+            component = abilityComponent.Pointer;
+            done = abilityComponent.AbilityIsDone();
+            return true;
+        }
+        catch (Exception) { component = IntPtr.Zero; done = false; return false; }
+    }
+
+    /// <summary>Reports one ability end the ledger proved: the row is dropped while the machine's own
+    /// `AbilityIsDone()` answer still says the ability is running. A row the machine reports as finished ended
+    /// normally and publishes nothing, an ability whose native member is not one this provider owns is never
+    /// published as an invented reference, and a component that could not be read was already dropped by the
+    /// caller. Nothing here writes the world: the whole fact is a reading of a submission this provider already
+    /// made.</summary>
+    private void ReportAbilityDropped(RunningBehavior dropped, bool finished, string reason)
+    {
+        if (finished) return;
+        if (!EnemyAbilityResources.TryReference(dropped.Ability, out var ability)) return;
+        var entry = ResolveKey(dropped.EnemyKey);
+        if (entry == null) return;
+        PublishBehavior("gtfo.enemy.ability", ForgeEnemy.EnemyAbilityInterruptedContract.BindingId, entry.Reference,
+            new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["enemy"] = entry.Reference,
+                ["ability"] = ability,
+                ["reason"] = reason
+            });
+    }
 
     /// <summary>Drops every in-flight row. The world epoch is part of every key, so this is the explicit end for
     /// a world that is being torn down rather than a comparison every later read would have to repeat. A module
@@ -129,11 +210,11 @@ internal sealed partial class EnemyModule
 
         public bool CanExecute => _module.CanExecute;
 
-        public bool IsCurrent(string key) => ResolveKey(key) != null;
+        public bool IsCurrent(string key) => _module.ResolveKey(key) != null;
 
         public bool IsAlive(string key)
         {
-            var entry = ResolveKey(key);
+            var entry = _module.ResolveKey(key);
             if (entry == null) return false;
             try { return entry.Enemy.Alive; }
             catch (Exception) { return false; }
@@ -141,7 +222,7 @@ internal sealed partial class EnemyModule
 
         public bool CanTrigger(string key)
         {
-            var abilities = Abilities(ResolveKey(key));
+            var abilities = Abilities(_module.ResolveKey(key));
             if (abilities == null) return false;
             try { return abilities.CanTriggerAbilities; }
             catch (Exception) { return false; }
@@ -150,16 +231,16 @@ internal sealed partial class EnemyModule
         public bool TryAbilityIndex(string key, byte ability, out int index)
         {
             index = -1;
-            var abilities = Abilities(ResolveKey(key));
+            var abilities = Abilities(_module.ResolveKey(key));
             if (abilities == null) return false;
-            try { return TryAbilityIndex(abilities, (Agents.AgentAbility)ability, out index); }
+            try { return EnemyModule.TryAbilityIndex(abilities, (Agents.AgentAbility)ability, out index); }
             catch (Exception) { index = -1; return false; }
         }
 
         public bool TryUseAbility(string key, byte ability, int index, out bool triggered)
         {
             triggered = false;
-            var entry = ResolveKey(key);
+            var entry = _module.ResolveKey(key);
             var abilities = Abilities(entry);
             if (entry == null || abilities == null) return false;
             try { triggered = abilities.UseAbility((Agents.AgentAbility)ability, index); }
@@ -168,28 +249,14 @@ internal sealed partial class EnemyModule
         }
 
         public bool TryAbilityState(string key, byte ability, out IntPtr component, out bool done)
-        {
-            component = IntPtr.Zero;
-            done = false;
-            var abilities = Abilities(ResolveKey(key));
-            if (abilities == null) return false;
-            try
-            {
-                if (!TryAbilityIndex(abilities, (Agents.AgentAbility)ability, out int index)) return false;
-                var comps = abilities.AllComps;
-                if (comps == null || index < 0 || index >= comps.Length) return false;
-                var abilityComponent = comps[index];
-                if (abilityComponent == null) return false;
-                component = abilityComponent.Pointer;
-                done = abilityComponent.AbilityIsDone();
-                return true;
-            }
-            catch (Exception) { component = IntPtr.Zero; done = false; return false; }
-        }
+            => TryAbilityComponent(_module.ResolveKey(key), ability, out component, out done);
+
+        public void AbilityDropped(RunningBehavior dropped, bool finished, string reason)
+            => _module.ReportAbilityDropped(dropped, finished, reason);
 
         public bool TryEmitNoise(string key, (double X, double Y, double Z) position, double radius)
         {
-            if (ResolveKey(key) == null) return false;
+            if (_module.ResolveKey(key) == null) return false;
             var point = new Vector3((float)position.X, (float)position.Y, (float)position.Z);
             if (!float.IsFinite(point.x) || !float.IsFinite(point.y) || !float.IsFinite(point.z)) return false;
             AIG_CourseNode? node;
@@ -203,43 +270,6 @@ internal sealed partial class EnemyModule
                 EmittedNoiseType, NoiseIncludesNeighbourAreas, NoiseRaycastsFirstNode);
             NoiseManager.MakeNoise(data);
             return true;
-        }
-
-        /// <summary>The tracked life a key names, through the module's one resolver: the key is the entity
-        /// reference's own id, so a reference from another world or another life cannot name an entry here.</summary>
-        private Entry? ResolveKey(string key)
-        {
-            const string prefix = "gtfo.enemy:";
-            if (key == null || !key.StartsWith(prefix, StringComparison.Ordinal)) return null;
-            if (!ushort.TryParse(key.AsSpan(prefix.Length), System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out ushort id)) return null;
-            return _module._entities.TryGetValue(id, out var entry)
-                && entry.Reference.Id == key && _module.Resolve(entry.Reference) != null ? entry : null;
-        }
-
-        private static EnemyAbilities? Abilities(Entry? entry)
-        {
-            if (entry == null) return null;
-            try { return entry.Enemy.Abilities; }
-            catch (Exception) { return null; }
-        }
-
-        /// <summary>The index of the requested ability in one enemy's own `AllComps` table. The scan is ordinal
-        /// and takes the first component of that kind, which is the same pair `GetAbilities` reports for the
-        /// ability, so the component the trigger reaches is the one the game enumerated.</summary>
-        private static bool TryAbilityIndex(EnemyAbilities abilities, Agents.AgentAbility ability, out int index)
-        {
-            index = -1;
-            var comps = abilities.AllComps;
-            if (comps == null) return false;
-            for (int i = 0; i < comps.Length; i++)
-            {
-                var component = comps[i];
-                if (component == null || (byte)component.m_abilityType != (byte)ability) continue;
-                index = i;
-                return true;
-            }
-            return false;
         }
     }
 }

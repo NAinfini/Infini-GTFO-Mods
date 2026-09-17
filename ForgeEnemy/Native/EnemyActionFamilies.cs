@@ -8,8 +8,8 @@ using SNetwork;
 namespace ForgeEnemy.Native;
 
 /// <summary>The composition half of the action families this package carries beside the node-list family: the
-/// enemy control actions, the combat actions, the foam action and the behaviour actions, plus the wave trigger
-/// rows and the one presentation audience this provider answers for.
+/// enemy control actions, the combat actions, the foam action, the behaviour actions and the profile's
+/// `phase_set`, plus the one presentation audience this provider answers for.
 ///
 /// Each family declares its own rows, handlers, shapes and support rows next to the code that answers them. This
 /// file is the one place those declarations are composed into the provider's registration, so a family cannot be
@@ -46,6 +46,9 @@ internal sealed partial class EnemyModule
         handlers[EnemyCombatContract.AttackInterruptHandler] = AttackInterrupt;
         handlers[GlueContract.FoamingHandler] = context => Glue.Foaming(context);
         foreach (var handler in BehaviorHandlers(this)) handlers[handler.Key] = handler.Value;
+        // The profile family is one execute handler; its row and binding are declared in the root contract the
+        // registration composes, so the two halves cannot drift.
+        handlers[EnemyProfileContract.PhaseSetHandler] = PhaseSet;
         return handlers;
     }
 
@@ -57,33 +60,9 @@ internal sealed partial class EnemyModule
         foreach (var shape in EnemyCombatContract.Shapes()) shapes[shape.Key] = shape.Value;
         foreach (var shape in GlueContract.Shapes()) shapes[shape.Key] = shape.Value;
         foreach (var shape in EnemyBehaviorContract.Shapes()) shapes[shape.Key] = shape.Value;
+        foreach (var shape in EnemyProfileContract.Shapes()) shapes[shape.Key] = shape.Value;
         return shapes;
     }
-
-    /// <summary>The support row of every binding those families register, each carrying the permission its own
-    /// write path needs.</summary>
-    internal static IEnumerable<BindingSupport> ActionFamilySupport()
-    {
-        foreach (var row in EnemyControlContract.Support()) yield return row;
-        foreach (var row in EnemyCombatContract.Support) yield return row;
-        foreach (var row in GlueContract.Support) yield return row;
-        foreach (var row in EnemyBehaviorContract.Support()) yield return row;
-    }
-
-    /// <summary>The capability rows those families declare, in the same order as
-    /// <see cref="ActionFamilyHandlers"/>.</summary>
-    internal static string ActionFamilyCapabilityRowsJson
-        => string.Join(",\n", EnemyControlContract.CapabilityRows)
-            + ",\n" + EnemyCombatContract.CapabilityRows
-            + ",\n" + GlueContract.CapabilityRows
-            + ",\n" + EnemyBehaviorContract.CapabilityRows;
-
-    /// <summary>The binding rows those families declare, in the same order as the capabilities above.</summary>
-    internal static string ActionFamilyBindingRowsJson
-        => string.Join(",\n", EnemyControlContract.BindingRows)
-            + ",\n" + EnemyCombatContract.BindingRows
-            + ",\n" + GlueContract.BindingRows
-            + ",\n" + EnemyBehaviorContract.BindingRows;
 
     /// <summary>The sessions one `presentation` step of this provider is addressed to. The package's one
     /// presentation row is `forge.action.enemy.mark`, whose audience is the whole realm (ruling 122.3): every

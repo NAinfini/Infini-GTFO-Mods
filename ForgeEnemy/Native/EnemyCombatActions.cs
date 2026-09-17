@@ -9,8 +9,7 @@ using UnityEngine;
 
 namespace ForgeEnemy.Native;
 
-/// <summary>Host authority gate and native write paths for the two registered `C-enemy-combat` rows, plus the
-/// impulse row this provider implements but does not register.
+/// <summary>Host authority gate and native write paths for the two registered `C-enemy-combat` rows.
 ///
 /// `forge.action.combat.stagger` writes through the game's one hitreact entry point,
 /// `ES_HitreactBase.CanHitreact(ES_HitreactType, bool)` followed by
@@ -25,13 +24,7 @@ namespace ForgeEnemy.Native;
 /// locomotion's own attack states (`ES_EnemyAttackBase.IsPerformingAttack`/`IsChargingAttack`) and the interruption
 /// itself is the same hitreact state machine `stagger` uses, because an attack state is left only by the state
 /// machine that owns it. An enemy that is not mid-attack is refused with `enemy-not-attacking` and a `none` commit
-/// state, before any native call: nothing there was interrupted and nothing may be claimed.
-///
-/// `forge.action.combat.impulse` writes through `LimbForceApplicator.AddForce(Vector3 force, float duration)`, the
-/// limb's own physics body. It is the only reachable impulse entry in build 20403457: the `IForceApplyer` interface
-/// is implemented by the flyer hitreact and shooter-attack-flyer states only, and neither `Agent` nor `EnemyAgent`
-/// exposes any writable velocity or impulse member. The row is implemented and tested but deliberately not
-/// registered — see `EnemyCombatContract.Unregistered`.</summary>
+/// state, before any native call: nothing there was interrupted and nothing may be claimed.</summary>
 internal sealed partial class EnemyModule
 {
     /// <summary>The declared `reaction` enum set's members, in the catalog's own order, as the `ES_HitreactType`
@@ -43,38 +36,30 @@ internal sealed partial class EnemyModule
     };
     private const int StaggerReactionCount = 3;
 
+    /// <summary>Whether one reaction is a member of the declared set above. The incoming damage window reads the
+    /// same three when it answers whether a received hit staggered its target, so the row that submits a stagger
+    /// and the row that reports one cannot disagree about which reactions are stagger-class.</summary>
+    internal static bool IsStaggerReaction(ES_HitreactType reaction)
+    {
+        foreach (var member in StaggerReactions) if (member == reaction) return true;
+        return false;
+    }
+
     /// <summary>The declared `immunity_policy` members, in the catalog's own order.</summary>
     private const int ImmunityPolicyRespect = 0;
     private const int ImmunityPolicyIgnore = 1;
     private const int ImmunityPolicyCount = 2;
-
-    /// <summary>The declared `mass_policy` members, in the catalog's own order.</summary>
-    private const int MassPolicyScaled = 0;
-    private const int MassPolicyAbsolute = 1;
-    private const int MassPolicyCount = 2;
 
     /// <summary>The one reaction an interruption is submitted with. The interrupt row has no reaction parameter:
     /// a caller interrupting an attack is not choosing how hard to hit, and `Light` is the member the game's own
     /// attack interruption leaves behind. The readback of `CurrentReactionType` is what proves the write landed.</summary>
     private const ES_HitreactType InterruptReaction = ES_HitreactType.Light;
 
-    /// <summary>The impulse force bounds. The native applicator takes a `float` and multiplies it by a duration
-    /// the game itself chose when the game applies an explosion, so the domain is bounded here rather than left to
-    /// the physics step: a magnitude no finite the engine can integrate is refused instead of submitted.</summary>
-    internal const double ImpulseMinimumMagnitude = 0.000001;
-    internal const double ImpulseMaximumMagnitude = 1000000;
-    internal const double ImpulseMinimumDuration = 0.000001;
-    internal const double ImpulseMaximumDuration = 60;
-
     /// <summary>One row of the multi-target stagger result. Field names are the wire contract's, not this
     /// assembly's: `forge.result.combat.stagger` declares target, status, committed, code, reaction and
     /// target_count, so each is spelled here exactly as the contract spells it.</summary>
     private sealed record StaggerRow(EntityReference Target, string Status, string Committed, string Code,
         string Reaction, [property: JsonPropertyName("target_count")] int TargetCount);
-
-    /// <summary>One row of the multi-target impulse result, in the same field order the contract declares.</summary>
-    private sealed record ImpulseRow(EntityReference Target, string Status, string Committed, string Code,
-        [property: JsonPropertyName("target_count")] int TargetCount);
 
     /// <summary>One row of the multi-target attack-interrupt result. `forge.result.combat.attack_interrupt`
     /// declares the four shared columns and `target_count`, and nothing else: the interrupt carries no reaction
@@ -271,92 +256,6 @@ internal sealed partial class EnemyModule
         return CommandResult.FailedUnknown(outputs, rows.Count == 1 ? rows[0].Code : "attack-interrupt-all-unknown");
     }
 
-    /// <summary>Multi-target limb impulse. One row is written per recipient in the plan's own order. The native
-    /// applicator returns void and the shove is integrated later by the physics step, so a submission the engine
-    /// accepted is an unknown commit here — this side can prove the call was made and cannot prove the limb moved.
-    /// The row is implemented and tested but not registered; see `EnemyCombatContract.Unregistered`.</summary>
-    internal CommandResult Impulse(CommandContext context)
-    {
-        if (!CanExecute) return CommandResult.Rejected("authority-or-phase");
-        int massPolicy = context.Parameters.GetProperty("mass_policy").GetInt32();
-        if (massPolicy < 0 || massPolicy >= MassPolicyCount) return CommandResult.Rejected("mass-policy-unsupported");
-        _ = context.GetEntityInput("source");
-        if (!TryReadForce(context, out var force)) return CommandResult.Rejected("invalid-force");
-        double magnitude = context.Inputs.GetProperty("magnitude").GetDouble();
-        if (!double.IsFinite(magnitude) || magnitude < ImpulseMinimumMagnitude || magnitude > ImpulseMaximumMagnitude)
-            return CommandResult.Rejected("magnitude-out-of-range");
-        double duration = context.Inputs.GetProperty("duration").GetDouble();
-        if (!double.IsFinite(duration) || duration < ImpulseMinimumDuration || duration > ImpulseMaximumDuration)
-            return CommandResult.Rejected("duration-out-of-range");
-        int limb = -1;
-        if (context.Inputs.TryGetProperty("limb", out var limbElement))
-        {
-            // An omitted optional port arrives as null; only a number can name a limb.
-            if (limbElement.ValueKind != JsonValueKind.Number || !limbElement.TryGetInt32(out limb) || limb < -1)
-                return CommandResult.Rejected("invalid-limb");
-        }
-        var targets = context.Inputs.GetProperty("targets").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
-        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected("too-many-targets");
-
-        var rows = new List<ImpulseRow>(targets.Length);
-        int rejected = 0, unknown = 0;
-        foreach (var target in targets)
-        {
-            ImpulseRow Row(string status, string code)
-                => new(target, status, status switch
-                {
-                    "committed" => CommitStates.Confirmed,
-                    "rejected" => CommitStates.None,
-                    _ => CommitStates.Unknown
-                }, code, targets.Length);
-
-            var entry = Resolve(target);
-            if (entry == null) { rows.Add(Row("rejected", "stale-or-unsupported-recipient")); rejected++; continue; }
-            var enemy = entry.Enemy;
-            var damage = enemy.Damage;
-            if (damage == null || !damage.IsSetup || damage.Pointer == IntPtr.Zero)
-            { rows.Add(Row("rejected", "missing-health-receiver")); rejected++; continue; }
-            if (damage.Owner == null || damage.Owner.Pointer != entry.EnemyPointer)
-            { rows.Add(Row("rejected", "health-receiver-owner-mismatch")); rejected++; continue; }
-            if (!enemy.Alive || !(damage.Health > 0)) { rows.Add(Row("rejected", "not-alive")); rejected++; continue; }
-            if (!EnemyNativeWrite.TryNameLimb(damage, limb, out int limbIndex))
-            { rows.Add(Row("rejected", "invalid-limb")); rejected++; continue; }
-            if (!EnemyCombatWrite.TryForceApplicator(damage, limbIndex, out var applicator))
-            { rows.Add(Row("rejected", "no-force-applicator")); rejected++; continue; }
-
-            var applicatorPointer = applicator.Pointer;
-            try
-            {
-                EnemyCombatWrite.ApplyForce(applicator, force, (float)magnitude, (float)duration,
-                    massPolicy == MassPolicyScaled);
-            }
-            catch (Exception) { rows.Add(Row("unknown", "native-commit-exception")); unknown++; continue; }
-            try
-            {
-                if (!CanExecute) { rows.Add(Row("unknown", "authority-or-phase")); unknown++; continue; }
-                var current = Resolve(target);
-                if (current == null || !ReferenceEquals(current, entry) || enemy.Damage == null
-                    || enemy.Damage.Pointer != damage.Pointer || !enemy.Damage.IsSetup
-                    || !EnemyCombatWrite.TryForceApplicator(damage, limbIndex, out var recheck)
-                    || recheck.Pointer != applicatorPointer)
-                { rows.Add(Row("unknown", "receiver-changed-during-commit")); unknown++; continue; }
-            }
-            catch (Exception) { rows.Add(Row("unknown", "readback-exception")); unknown++; continue; }
-            // The shove was submitted and the receiver is still the one it was submitted to. The displacement the
-            // physics step produces is not readable from here, so the commit is reported as unknown, never as a
-            // confirmed displacement.
-            rows.Add(Row("unknown", "submitted-unverified"));
-            unknown++;
-        }
-
-        var outputs = RuntimeJson.From(new { results = rows });
-        if (unknown == 0 && rejected == 0) return CommandResult.Succeeded(outputs);
-        if (unknown > 0) return CommandResult.FailedUnknown(outputs, rows.Count == 1 ? rows[0].Code : "impulse-all-unknown");
-        string rejectedCode = rows.Count == 1 ? rows[0].Code
-            : rows.Select(r => r.Code).Distinct().Count() == 1 ? rows[0].Code : "impulse-all-rejected";
-        return CommandResult.Create(CommandStatuses.Rejected, CommitStates.None, rejectedCode, "", outputs);
-    }
-
     /// <summary>The declared `reaction` member's own name, for the result row. The catalog spells the members in
     /// lower case; the native enum is the storage, and the row reports the member the caller chose.</summary>
     private static string StaggerReactionName(int index) => index switch
@@ -366,33 +265,10 @@ internal sealed partial class EnemyModule
         _ => "heavy"
     };
 
-    /// <summary>Reads the declared `force` vector port, which the frame carries as a three-number array. A vector
-    /// whose components are not all finite is not a direction this provider submits.</summary>
-    private static bool TryReadForce(CommandContext context, out Vector3 force)
-    {
-        force = Vector3.zero;
-        if (!context.Inputs.TryGetProperty("force", out var element) || element.ValueKind != JsonValueKind.Array
-            || element.GetArrayLength() != 3) return false;
-        var values = new double[3];
-        int index = 0;
-        foreach (var component in element.EnumerateArray())
-        {
-            if (component.ValueKind != JsonValueKind.Number || !component.TryGetDouble(out values[index])
-                || !double.IsFinite(values[index])) return false;
-            index++;
-        }
-        force = new Vector3 { x = (float)values[0], y = (float)values[1], z = (float)values[2] };
-        return true;
-    }
 }
 
 /// <summary>The native state questions and the one native write path this family owns, kept in its own type so the
 /// game assembly is reached from exactly one audited member and the handlers stay readable without it.
-///
-/// `LimbForceApplicator.AddForce` returns void: the force is queued on the applicator's own list and integrated by
-/// its `FixedUpdate`, so there is no return value and no readback that could prove a displacement. The public
-/// surface is exactly `AddForce(Vector3, float)`, `CopyFromOther` and the `Forces` list, which is why the impulse
-/// row carries a force and a duration and nothing else.
 ///
 /// `EnemyLocomotion` owns the enemy's attack states, one field per attack archetype, all derived from
 /// `ES_EnemyAttackBase`. That is the only route from an enemy to its own attack: the attack state names its owner
@@ -417,40 +293,4 @@ internal static class EnemyCombatWrite
         locomotion.StrikerAttack, locomotion.TankAttack, locomotion.TankMultiTargetAttack, locomotion.ShooterAttack
     };
 
-    /// <summary>The limb's own force applicator, or false when the limb has none. `-1` names no limb and needs no
-    /// array at all: an impulse on a whole enemy still goes through the primary limb, because the applicator lives
-    /// on the limb and nowhere else.</summary>
-    internal static bool TryForceApplicator(Dam_EnemyDamageBase damage, int limbIndex, out LimbForceApplicator applicator)
-    {
-        applicator = null!;
-        if (damage == null) return false;
-        try
-        {
-            var limbs = damage.DamageLimbs;
-            if (limbs == null || limbs.Length == 0) return false;
-            if (limbIndex < 0) limbIndex = 0;
-            if (limbIndex >= limbs.Length) return false;
-            var limb = limbs[limbIndex];
-            if (limb == null || limb.IsDestroyed) return false;
-            var found = limb.ForceApplicator;
-            if (found == null || found.Pointer == IntPtr.Zero) return false;
-            applicator = found;
-            return true;
-        }
-        catch (Exception) { applicator = null!; return false; }
-    }
-
-    /// <summary>One force submission with the exact argument list the frozen interop declares. The direction and
-    /// the magnitude travel as one vector because that is the one shape the native call takes; the duration is how
-    /// long the applicator keeps the force queued, which the game itself fixes when it applies an explosion.
-    ///
-    /// The two `mass_policy` members differ in exactly one multiply: `scaled` submits the authored direction scaled
-    /// by the magnitude the plan asked for, and `absolute` submits the vector's own length as-is, with the
-    /// magnitude only bounded and reported. Neither asks this side to read a mass the game never exposes on the
-    /// agent; the applicator's own `FixedUpdate` is what turns the queued force into motion.</summary>
-    internal static void ApplyForce(LimbForceApplicator applicator, Vector3 force, float magnitude, float duration,
-        bool scaled)
-        => applicator.AddForce(scaled
-            ? new Vector3 { x = force.x * magnitude, y = force.y * magnitude, z = force.z * magnitude }
-            : force, duration);
 }

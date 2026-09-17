@@ -8,10 +8,10 @@ using ForgeRuntime.Framework;
 /// behaviour machine is whatever the case needs, and a way to dispatch one `phase_set` command through a command
 /// context built the way the kernel builds one.
 ///
-/// The handler is dispatched directly rather than through a loaded plan. A plan would have to reach the row
-/// through `EnemyModule`'s registry, and the row is not in it yet — putting it there is the integration patch
-/// this slice reports. The capability row's own resolution against the handler's shape is checked separately, in
-/// `EvidenceCases`, through the kernel's contract resolver.
+/// The handler is dispatched directly rather than through a loaded plan: a plan would have to be authored and
+/// loaded to reach the row, which this slice does not do. The row itself is in the provider's registry — the real
+/// `EnemyModule` in this scene registers it through `EnemyRegistration`, which composes the contract — so
+/// `EvidenceCases` resolves the layout of the row this running module was registered with.
 ///
 /// The context is constructed by reflection only because its constructor is internal to the Framework assembly;
 /// every value handed to it (the entity set, the parameter object, the world epoch, the tick) is built with the
@@ -41,34 +41,6 @@ internal sealed class Scene : IDisposable
         Enemy = NewEnemy();
         Reference = Module.TrackSpawn(Enemy);
         if (start) Kernel.StartRuntime(static () => { });
-    }
-
-    /// <summary>One kernel whose only registered row is this slice's, so the kernel's own contract resolver can be
-    /// asked what layout the declared row has. The handler table is the real handler under a `null!` module: the
-    /// registration only checks that every registered handler has a shape, and nothing here dispatches.</summary>
-    internal static RuntimeKernel RowKernel()
-    {
-        var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
-        kernel.BeginWorld(1);
-        kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, """
-        {
-          "providers": [
-            {
-              "id": "forge.module.gtfo.enemy",
-              "kind": "native",
-              "version": "1.0.0",
-              "dependencies": []
-            }
-          ],
-          "capabilities": [
-        """ + "\n" + EnemyProfileContract.CapabilityRows + "\n  ],\n  \"bindings\": [\n"
-            + EnemyProfileContract.BindingRows + "\n  ]\n}",
-            new Dictionary<string, CommandHandler>
-                { [EnemyProfileContract.PhaseSetHandler] = _ => CommandResult.Rejected("not-dispatched") },
-            new[] { new BindingSupport(EnemyProfileContract.PhaseSetBinding, "implementation-only",
-                new[] { "gtfo.enemy.behavior.write" }) })
-        { Shapes = EnemyProfileContract.Shapes() }, RuntimeLogLevel.Off);
-        return kernel;
     }
 
     internal static EnemyAgent NewEnemy(ushort id = 7, long pointer = 10)

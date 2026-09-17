@@ -26,6 +26,8 @@
          belong to the native assembly, which the package build compiles. -->
     <Compile Include="../../Native/EnemyBehaviorLedger.cs;../../Native/EnemyBehaviorActions.cs" />
     <Compile Include="../../EnemyBehaviorContract.cs" />
+    <Compile Include="../../EnemyAbilityInterruptedContract.cs" />
+    <Compile Include="../../ModuleDefinition.cs" Link="ModuleDefinition.cs" />
     <Compile Include="FakePorts.cs;Scene.cs;LedgerCases.cs;ActionCases.cs;Program.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
   </ItemGroup>

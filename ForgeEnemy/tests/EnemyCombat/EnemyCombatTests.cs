@@ -10,9 +10,7 @@ namespace ForgeEnemy.Tests.EnemyCombat;
 /// and reads what they did through the native state machine they write to; no GTFO assembly is loaded and no hook
 /// is installed, so these cases prove the handlers' decisions, not the game's own attack path.
 ///
-/// The two registered rows are dispatched through the provider the kernel knows; the third method, `Impulse`, is
-/// called directly because its row is deliberately unregistered — the audit judged the effect unreachable in game,
-/// which the cases about it record alongside its own semantics.</summary>
+/// Both registered rows are dispatched through the provider the kernel knows.</summary>
 [Trait("Category", "EnemyCombat")]
 public sealed class EnemyCombatTests
 {
@@ -86,26 +84,6 @@ public sealed class EnemyCombatTests
         Assert.Equal(new[] { "attack.interrupt" }, recipients.GetProperty("requires").EnumerateArray()
             .Select(r => r.GetString()));
         Assert.Contains("enemy-not-attacking", Codes(registry, EnemyCombatRegistration.TestAttackInterruptCapability));
-    }
-
-    [Fact]
-    public void the_impulse_row_is_implemented_but_not_registered()
-    {
-        ResetGame();
-        using var world = new Scene();
-        var registry = RuntimeJson.Parse(world.Kernel.ExportManifest()).GetProperty("registry");
-
-        Assert.DoesNotContain(registry.GetProperty("capabilities").EnumerateArray(),
-            c => c.GetProperty("id").GetString()!.Contains("impulse", StringComparison.Ordinal));
-        Assert.DoesNotContain(registry.GetProperty("bindings").EnumerateArray(),
-            b => b.GetProperty("id").GetString() == EnemyCombatContract.ImpulseBinding);
-        // The row is still spelled out in full, so registering it after review is a one-line wiring job.
-        var row = RuntimeJson.Parse(EnemyCombatContract.ImpulseCapabilityRow);
-        Assert.Equal(new[] { "in", "targets", "source", "force", "magnitude", "duration", "limb" }, Ports(row, "inputs"));
-        Assert.Equal(new[] { "scaled", "absolute" }, Values(row, "mass_policy"));
-        Assert.Equal("targets", row.GetProperty("graph").GetProperty("recipients").GetProperty("input").GetString());
-        Assert.Single(EnemyCombatContract.Unregistered,
-            entry => entry.Capability == EnemyCombatContract.ImpulseCapability);
     }
 
     [Fact]
@@ -262,7 +240,7 @@ public sealed class EnemyCombatTests
     {
         ResetGame();
         using var world = new Scene();
-        var second = Scene.NewEnemy(world.Locomotion, world.Applicator, id: 8, pointer: 40);
+        var second = Scene.NewEnemy(world.Locomotion, id: 8, pointer: 40);
         var secondReference = world.Module.TrackSpawn(second);
 
         var result = world.DispatchStagger(reaction: 1, immunity: 0, world.Reference, secondReference, world.Reference);
@@ -277,126 +255,6 @@ public sealed class EnemyCombatTests
         Assert.Equal(3, world.Hitreact.Activations.Count);
     }
 
-    // ---------------------------------------------------------------- impulse
-
-    [Fact]
-    public void impulse_scales_the_authored_force_and_submits_it_as_an_unknown_commit()
-    {
-        ResetGame();
-        using var world = new Scene();
-
-        var result = world.DispatchImpulse(massPolicy: 0, force: new[] { 1.0, 2.0, 3.0 }, magnitude: 5, duration: 0.25,
-            targets: world.Reference);
-
-        Assert.Equal(CommandStatuses.Failed, result.Status);
-        Assert.Equal(CommitStates.Unknown, result.CommitState);
-        var force = Assert.Single(world.Applicator.Forces);
-        Assert.Equal(5f, force.Force.x, 3);
-        Assert.Equal(10f, force.Force.y, 3);
-        Assert.Equal(15f, force.Force.z, 3);
-        Assert.Equal(0.25f, force.Duration, 3);
-
-        // The applicator returns void and integrates later, so a submitted shove is an unknown commit, never a
-        // confirmed displacement.
-        var row = Row(result, 0);
-        Assert.Equal(world.Reference, RuntimeJson.Entity(row.GetProperty("target")));
-        Assert.Equal("unknown", row.GetProperty("status").GetString());
-        Assert.Equal(CommitStates.Unknown, row.GetProperty("committed").GetString());
-        Assert.Equal("submitted-unverified", row.GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public void impulse_absolute_submits_the_authored_vector_unchanged()
-    {
-        ResetGame();
-        using var world = new Scene();
-
-        var result = world.DispatchImpulse(massPolicy: 1, force: new[] { 2.0, 0.0, 0.0 }, magnitude: 5, duration: 1,
-            targets: world.Reference);
-
-        Assert.Equal("submitted-unverified", result.Code);
-        var force = Assert.Single(world.Applicator.Forces);
-        Assert.Equal(2f, force.Force.x, 3);
-        Assert.Equal(1f, force.Duration, 3);
-    }
-
-    [Fact]
-    public void impulse_without_a_limb_uses_the_receivers_first_limb_applicator()
-    {
-        ResetGame();
-        using var world = new Scene();
-
-        var result = world.DispatchImpulse(massPolicy: 0, force: new[] { 1.0, 0.0, 0.0 }, magnitude: 1, duration: 0.5,
-            targets: world.Reference);
-
-        Assert.Equal("submitted-unverified", result.Code);
-        Assert.Single(world.Applicator.Forces);
-        // The second limb's applicator is a different object and was not touched.
-        Assert.Empty(world.Enemy.Damage.DamageLimbs[1].ForceApplicator.Forces);
-    }
-
-    [Fact]
-    public void impulse_names_a_limb_by_its_declared_id_and_refuses_one_no_limb_carries()
-    {
-        ResetGame();
-        using var world = new Scene();
-
-        var named = world.DispatchImpulse(massPolicy: 0, force: new[] { 1.0, 0.0, 0.0 }, magnitude: 1, duration: 0.5,
-            limb: 1, targets: world.Reference);
-        Assert.Equal("submitted-unverified", named.Code);
-        Assert.Empty(world.Applicator.Forces);
-        Assert.Single(world.Enemy.Damage.DamageLimbs[1].ForceApplicator.Forces);
-
-        var missing = world.DispatchImpulse(massPolicy: 0, force: new[] { 1.0, 0.0, 0.0 }, magnitude: 1, duration: 0.5,
-            limb: 9, targets: world.Reference);
-        Assert.Equal(CommandStatuses.Rejected, missing.Status);
-        Assert.Equal("invalid-limb", missing.Code);
-    }
-
-    [Fact]
-    public void impulse_refuses_a_limb_whose_applicator_is_gone()
-    {
-        ResetGame();
-        using var world = new Scene();
-        world.Enemy.Damage.DamageLimbs[0].ForceApplicator = null!;
-
-        var result = world.DispatchImpulse(massPolicy: 0, force: new[] { 1.0, 0.0, 0.0 }, magnitude: 1, duration: 0.5,
-            targets: world.Reference);
-
-        Assert.Equal("no-force-applicator", result.Code);
-        Assert.Empty(world.Applicator.Forces);
-    }
-
-    [Fact]
-    public void impulse_refuses_a_force_magnitude_duration_or_policy_outside_the_declared_domain()
-    {
-        ResetGame();
-        using var world = new Scene();
-
-        Assert.Equal("mass-policy-unsupported", world.DispatchImpulse(2, new[] { 1.0, 0.0, 0.0 }, 1, 1, null, world.Reference).Code);
-        // A force vector is three numbers or it is nothing: a shorter array is refused, never padded.
-        Assert.Equal("invalid-force", world.DispatchImpulse(0, new[] { 1.0, 0.0 }, 1, 1, null, world.Reference).Code);
-        Assert.Equal("magnitude-out-of-range", world.DispatchImpulse(0, new[] { 1.0, 0.0, 0.0 }, 0, 1, null, world.Reference).Code);
-        Assert.Equal("duration-out-of-range", world.DispatchImpulse(0, new[] { 1.0, 0.0, 0.0 }, 1, 0, null, world.Reference).Code);
-        Assert.Equal("invalid-limb", world.DispatchImpulse(0, new[] { 1.0, 0.0, 0.0 }, 1, 1, -2, world.Reference).Code);
-        Assert.Empty(world.Applicator.Forces);
-    }
-
-    [Fact]
-    public void impulse_native_failure_is_an_unknown_commit()
-    {
-        ResetGame();
-        using var world = new Scene();
-        world.Applicator.ThrowOnAddForce = true;
-
-        var result = world.DispatchImpulse(massPolicy: 0, force: new[] { 1.0, 0.0, 0.0 }, magnitude: 1, duration: 1,
-            targets: world.Reference);
-
-        Assert.Equal(CommandStatuses.Failed, result.Status);
-        Assert.Equal(CommitStates.Unknown, result.CommitState);
-        Assert.Equal("native-commit-exception", result.Code);
-        Assert.Empty(world.Applicator.Forces);
-    }
 
     [Fact]
     public void every_row_refuses_more_targets_than_the_result_budget_allows()
@@ -406,11 +264,8 @@ public sealed class EnemyCombatTests
         var tooMany = Enumerable.Range(0, CommandResult.MaximumFacts + 1).Select(_ => world.Reference).ToArray();
 
         Assert.Equal("too-many-targets", world.DispatchStagger(1, 0, tooMany).Code);
-        Assert.Equal("too-many-targets",
-            world.DispatchImpulse(0, new[] { 1.0, 0.0, 0.0 }, 1, 1, null, tooMany).Code);
         Assert.Equal("too-many-targets", world.DispatchAttackInterrupt(tooMany).Code);
         Assert.Empty(world.Hitreact.Activations);
-        Assert.Empty(world.Applicator.Forces);
     }
 
     // ---------------------------------------------------------------- attack interrupt
@@ -556,7 +411,7 @@ public sealed class EnemyCombatTests
         // A second enemy with its own locomotion: only the first one is attacking, so the answer is one committed
         // row and one refusal, in the order the plan named them.
         var otherLocomotion = Scene.NewLocomotion(26);
-        var second = Scene.NewEnemy(otherLocomotion, new LimbForceApplicator { Pointer = new(320) }, id: 8, pointer: 40);
+        var second = Scene.NewEnemy(otherLocomotion, id: 8, pointer: 40);
         var secondReference = world.Module.TrackSpawn(second);
 
         var result = world.DispatchAttackInterrupt(secondReference, world.Reference, secondReference);

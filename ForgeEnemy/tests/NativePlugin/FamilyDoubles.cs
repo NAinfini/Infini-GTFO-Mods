@@ -239,13 +239,6 @@ namespace Enemies
     }
 }
 
-public sealed partial class Dam_EnemyDamageLimb
-{
-    /// <summary>The limb's own physics body: the only reachable impulse write in the build, and the reason an
-    /// impulse on a whole enemy still goes through the primary limb.</summary>
-    public LimbForceApplicator ForceApplicator = null!;
-}
-
 public sealed partial class Dam_EnemyDamageBase
 {
     /// <summary>The foam family's write entries and the game's own unconditional end-of-life entry
@@ -292,16 +285,6 @@ public enum ES_HitreactType : byte { Unspecified, None, Micro, Light, Heavy, ToD
 public enum ImpactDirection : byte { Unspecified, Front, Back, Right, Left }
 
 public enum DamageNoiseLevel : byte { Normal, Low }
-
-/// <summary>The limb's own physics body. `AddForce` returns void and queues the force for the applicator's own
-/// `FixedUpdate`, which is why a submitted shove is an unknown commit rather than a confirmed displacement.</summary>
-public sealed class LimbForceApplicator
-{
-    public IntPtr Pointer = new IntPtr(300);
-    public readonly List<(UnityEngine.Vector3 Force, float Duration)> Forces = new();
-    public int AddForceCalls;
-    public void AddForce(UnityEngine.Vector3 force, float duration) { AddForceCalls++; Forces.Add((force, duration)); }
-}
 
 /// <summary>The marker a Forge mark builds. The double records the colour it was set to, which is the one reading
 /// the mark row has: the build exposes no colour getter on `NavMarker`.</summary>

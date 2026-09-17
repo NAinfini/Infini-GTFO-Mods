@@ -41,18 +41,23 @@ internal static class EnemyDespawned
 // `damage_applied` and `health_changed` facts; the instance window
 // (`BeforeDamageInstance`/`AfterDamageInstance`) publishes `forge.trigger.combat.killed` and
 // `forge.trigger.combat.limb_damaged`. Both close in the order they opened, and each consumes its own token
-// exactly once, so a replayed callback cannot publish twice.
+// exactly once, so a replayed callback cannot publish twice. The closing half also reports
+// `forge.trigger.combat.staggered`, the one fact of this call that opens no window: the reaction the hit asked
+// for and the receiver's own applied answer are arguments the postfix already carries, and the reaction the enemy
+// actually stands on is read back from it.
 //
-// `limbID` is a parameter of the receiver's own declaration (build 20403457:
+// `hitreact` and `limbID` are parameters of the receiver's own declaration (build 20403457:
 // `ProcessReceivedDamage(float, Agent, Vector3, Vector3, ES_HitreactType, bool, int limbID, float,
-// DamageNoiseLevel, uint)`), recorded by Harmony by name off the interop signature. It is the array position the
-// caller named, not an `m_limbID`.
+// DamageNoiseLevel, uint)`, returning `bool`), recorded by Harmony by name off the interop signature. `limbID` is
+// the array position the caller named, not an `m_limbID`; the returned `bool` is the receiver's answer that the
+// damage landed, which the receiving methods branch on, so an applied hit is distinguishable from a refused one.
 [HarmonyPatch(typeof(Dam_EnemyDamageBase), nameof(Dam_EnemyDamageBase.ProcessReceivedDamage))]
 internal static class EnemyDamage
 {
-    /// <summary>The four facts this window can publish. The prefix is entered only while something subscribes
-    /// to at least one of them, so a build with no plan for enemy combat pays a four-key lookup and nothing
-    /// else.</summary>
+    /// <summary>The four facts the window's own observations publish. The prefix is entered only while something
+    /// subscribes to at least one of them, so a build with no plan for enemy combat pays a four-key lookup and
+    /// nothing else. The stagger is not a member: it opens no observation, so its own binding is tested where it
+    /// is read, in the closing half.</summary>
     private static readonly string[] ObservedBindings =
     {
         EnemyModule.DamageBinding, EnemyModule.HealthChangedBinding,
@@ -73,11 +78,15 @@ internal static class EnemyDamage
     }
 
     [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void Postfix(Dam_EnemyDamageBase __instance, State __state)
+    private static void Postfix(Dam_EnemyDamageBase __instance, ES_HitreactType hitreact, bool __result, State __state)
         => Plugin.Session?.Guard(module =>
         {
             module.AfterDamage(__instance, __state.Health);
             module.AfterDamageInstance(__instance, __state.Instance);
+            // The stagger is the one fact of this window that needs no observation of its own: the reaction asked
+            // for and the receiver's applied answer are both arguments of the call being closed, and the reaction
+            // the enemy actually stands on is read back here.
+            module.AfterDamageStaggered(__instance, hitreact, __result);
         });
 
     /// <summary>Whether any of the four facts has a plan. A window nothing subscribes to is never opened, so
