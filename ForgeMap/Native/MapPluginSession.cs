@@ -243,10 +243,11 @@ internal sealed partial class MapPluginSession : IDisposable
             [PlayerActionContract.InfectionHandlerName] = PlayerActions.Infection,
             // The movement preset writes the one native modification table through the one adapter this session
             // created: a handler table is built before the half that owns the state, so it is a static facade over
-            // that half. The two sourced-modifier rows answer through the same adapter, but their capability rows
-            // belong to `forge.contract.combat` and that provider does not declare them yet, so this registration
-            // has no binding for them and asks for no body here.
+            // that half. The two sourced-modifier rows answer through the same adapter: their capabilities are
+            // declared by `forge.contract.combat`, and this registration binds them here.
             [MovementProfileContract.HandlerName] = AgentModifierAdapter.ProfileHandler,
+            [AgentModifierContract.ApplyHandlerName] = AgentModifierAdapter.ApplyHandler,
+            [AgentModifierContract.RemoveHandlerName] = AgentModifierAdapter.RemoveHandler,
             [EnvironmentContract.LightingHandler] = environment.HandleLighting,
             [EnvironmentContract.LightColorHandler] = environment.HandleLightColor,
             [EnvironmentContract.FogHandler] = environment.HandleFog,

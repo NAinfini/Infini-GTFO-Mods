@@ -66,12 +66,9 @@ public static class ModuleRegistration
         .Concat(DoorTerminalActionContract.Rows())
         .Concat(NativeCapabilities)
         // The two native families whose bodies this provider answers but whose contract text another owner wrote:
-        // the two player actions and the three door actions. The two sourced-modifier rows are not here: their
-        // owner is `forge.contract.combat`, a row may only be declared by the provider that owns it, and the
-        // combat contract does not declare them yet — the kernel refuses such a row with `capability-owner`, and
-        // refuses a binding nothing declares with `missing-capability`. Their text stays in
-        // `AgentModifierContract` for the host insertion, and this provider's binding for them is added back in
-        // the same change that declares them (see that file's own note).
+        // the two player actions and the three door actions. The two sourced-modifier rows are not here either:
+        // their owner is `forge.contract.combat`, which declares them (`CombatContracts`), and this provider only
+        // binds them below — a row may only be declared by the provider that owns it.
         .Concat(PlayerActionContract.Rows())
         .Concat(DoorActionContract.Rows())
         .Concat(new object[] { MovementProfileContract.Row() })
@@ -89,6 +86,7 @@ public static class ModuleRegistration
         .Concat(PlayerActionContract.Bindings())
         .Concat(DoorActionContract.Bindings())
         .Concat(new object[] { MovementProfileContract.BindingRow() })
+        .Concat(AgentModifierContract.Bindings())
         .Concat(new object[] { RuntimeJson.Parse(DoorQueryContract.BindingRowJson) })
         .Concat(EnvironmentContract.Bindings())
         .Concat(new object[] { HudContract.BindingRow() })
@@ -114,6 +112,7 @@ public static class ModuleRegistration
         .Concat(PlayerActionContract.Support())
         .Concat(DoorActionContract.Supports())
         .Concat(new[] { MovementProfileContract.Support() })
+        .Concat(AgentModifierContract.Support())
         .Concat(new[] { new BindingSupport(DoorQueryContract.BindingId, "implementation-only", new[] { MapObjectContract.MapObjectReadPermission }) })
         .Concat(EnvironmentContract.Supports())
         .Concat(new[] { HudContract.Support() })
@@ -155,6 +154,7 @@ public static class ModuleRegistration
         foreach (var (name, shape) in PlayerActionContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in DoorActionContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in MovementProfileContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in AgentModifierContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in HudContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in PlayerCommandContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in PlayerStateContract.ValueShapes()) shapes[name] = shape;

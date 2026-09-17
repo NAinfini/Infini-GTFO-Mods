@@ -13,15 +13,16 @@ namespace ForgeMap.Tests.AgentModifierFacts;
 internal sealed record PlayerFixture(SNet_Player Player, PlayerAgent Agent, EntityReference Reference);
 
 /// <summary>One case's world: a kernel holding the two registrations the real startup performs — the combat
-/// contract module that owns `forge.action.combat.attribute_apply`/`attribute_remove`, and the Map provider that
-/// binds them to this package's handlers — plus the player identity and the attribute-modifier adapter on that
-/// registration. There is no loader, no session and no hook: the handlers are driven directly with a real
-/// `CommandContext`, so a shape that does not resolve against its own capability fails here exactly as it would
-/// at startup.
+/// contract module that declares and owns `forge.action.combat.attribute_apply`/`attribute_remove`, and the Map
+/// provider that binds them to this package's handlers — plus the player identity and the attribute-modifier
+/// adapter on that registration. There is no loader, no session and no hook: the handlers are driven directly with
+/// a real `CommandContext`, so a shape that does not resolve against its own capability fails here exactly as it
+/// would at startup.
 ///
-/// The registration is built the way the session builds it: the claim rows and the capability rows come from
-/// `AgentModifierContract`, the handler table holds the adapter's static entry points, and the adapter itself is
-/// created after `RegisterModule` returned, because it mints its handles on the registration handle.</summary>
+/// The registration is built the way the session builds it: the capability rows come from the contract that owns
+/// them, this provider's binding rows from `AgentModifierContract`, the handler table holds the adapter's static
+/// entry points, and the adapter itself is created after `RegisterModule` returned, because it mints its handles
+/// on the registration handle.</summary>
 internal sealed class ModifierWorld : IDisposable
 {
     private static readonly ConstructorInfo ContextConstructor = typeof(CommandContext)
@@ -52,8 +53,7 @@ internal sealed class ModifierWorld : IDisposable
         // A world of its own per case: a reference carries the epoch it was recorded in, and a case that reused an
         // earlier epoch would keep answering for an earlier world's lives.
         Kernel.BeginWorld(++_world);
-        _contract = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, ContractRegistry(),
-            new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>()), RuntimeLogLevel.Off);
+        _contract = Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
         _registration = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, MapRegistry(),
             new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
             {
@@ -86,26 +86,6 @@ internal sealed class ModifierWorld : IDisposable
         Adapter = new AgentModifierAdapter(_registration, Reports.Add);
         Kernel.StartRuntime(() => { });
         Kernel.Advance(0, true);
-    }
-
-    /// <summary>The contract module's own declaration: the canonical combat rows the framework already ships,
-    /// plus the two capability rows this slice publishes for the integration to splice into that same array. A
-    /// contract module only declares shapes and owns both ids, so the rows belong in this one declaration — which
-    /// is why the fixture composes them from the canonical module's own text instead of restating heal and damage.
-    /// The rows are the exact JSON text `AgentModifierContract` publishes for the integration.</summary>
-    private static string ContractRegistry()
-    {
-        var canonical = RuntimeJson.Parse(CombatContracts.Module().RegistryJson);
-        var capabilities = canonical.GetProperty("capabilities").EnumerateArray()
-            .Append(AgentModifierContract.ApplyCapability)
-            .Append(AgentModifierContract.RemoveCapability)
-            .ToArray();
-        return RuntimeJson.From(new
-        {
-            providers = canonical.GetProperty("providers").EnumerateArray().ToArray(),
-            capabilities,
-            bindings = Array.Empty<object>()
-        }).GetRawText();
     }
 
     /// <summary>The Map provider's declaration: this provider's id, the binding rows the native half answers, and

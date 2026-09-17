@@ -1750,9 +1750,9 @@ public static class TriggerContracts
       "label": "装备补给完成",
       "version": "1.0.0",
       "parameters": {
-        "description": "补给完成。",
-        "summary": "补给完成。",
-        "summaryEn": "Fires when a refill completes.",
+        "description": "补了弹药。",
+        "summary": "补了弹药。",
+        "summaryEn": "Fires when ammo is refilled.",
         "labelEn": "Refilled",
         "support": "authoring-contract-only"
       },
@@ -1794,9 +1794,9 @@ public static class TriggerContracts
       "label": "堆叠数量变化",
       "version": "1.0.0",
       "parameters": {
-        "description": "消耗品的数量变了。",
-        "summary": "消耗品的数量变了。",
-        "summaryEn": "Fires when a consumable's stack count changes.",
+        "description": "物品数量。",
+        "summary": "物品数量。",
+        "summaryEn": "Fires when an item's count changes.",
         "labelEn": "Stack changed",
         "support": "authoring-contract-only"
       },

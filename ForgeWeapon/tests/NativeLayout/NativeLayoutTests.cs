@@ -94,29 +94,35 @@ public sealed class NativeLayoutTests
             && !calls.Any(m => m.Name is "set_EntityResolvers" or "set_EntityInstanceResolvers" or "set_EntityObservers"));
         // The only identity this package reads out of the session layer is a player's own session id, which is
         // what the holder tier routes a command by: no account key, no injected player identity and no cached
-        // player table is read anywhere.
-        var lookups = calls.Where(m => m.Name == "get_Lookup").Select(Member).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+        // player table is read anywhere. The id is the slot index the current build answers as a method,
+        // `SNet_Player::PlayerSlotIndex`; the older `get_Lookup` name stays in the filter so a build that brings
+        // that accessor back cannot add a second identity read unnoticed.
+        var lookups = calls.Where(m => m.Name is "get_Lookup" or "PlayerSlotIndex").Select(Member).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         Check("native.session-only-lookup",
-            lookups.SequenceEqual(new[] { "SNetwork.SNet_Player::get_Lookup" }, StringComparer.Ordinal), string.Join(", ", lookups));
+            lookups.SequenceEqual(new[] { "SNetwork.SNet_Player::PlayerSlotIndex" }, StringComparer.Ordinal), string.Join(", ", lookups));
 
-        // Native state is read, never written: every game member used is a getter or a named pure query, pinned exactly.
+        // Native state is read, never written, outside four exact whitelists: every other game member used is a
+        // getter or a named pure query. The whitelists are the presentation write, the owner-tier commands, the
+        // loadout pool's own lists and the override applier's private copy, and each one has a `*-writes-exact`
+        // check below, so an entry nobody writes fails as a loosened whitelist rather than passing quietly.
         var gameCalls = calls.Where(m => GameAssembly(Scope(m)) && !Scope(m).StartsWith("BepInEx", StringComparison.Ordinal)
                 && !Scope(m).Contains("Harmony", StringComparison.Ordinal))
             .Select(Member).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         // `GetBaseAgent` and `GetComponentInParent` are the two named pure queries the hit path adds: the first is
         // the game's own damage-limb owner accessor, the second is Unity's hierarchy lookup, and neither writes.
         // `Find` is Unity's own child lookup and `Vector3::.ctor` builds the value the pose is written as; a value
-        // type's constructor changes nothing that outlives the call, so neither is a write. `GetAgent` is the tag
-        // action's read of the game's own agent index: it answers with the agent an id names and writes nothing.
-        // `GetCurrentClip`, `GetMaxClip`, `GetInventorySlotAmmo`, `pAgent::TryGet` and the reload gate's own
-        // `CanReloadCurrent` are the reload, device and holder families' named pure queries: each answers a value
-        // and writes nothing.
+        // type's constructor changes nothing that outlives the call, so neither is a write. `GetBlock` and
+        // `get_ItemDataBlock` are the supply catalog resolving an ammo item's block by id, `CountPocketItem`,
+        // `GetAmmoMaxCap` and `GetBulletsInPack` are the backpack readbacks a supply or give command is decided on,
+        // and `PlayerSlotIndex` names the session id. `GetCurrentClip`, `GetMaxClip`, `GetInventorySlotAmmo`,
+        // `pAgent::TryGet` and the reload gate's own `CanReloadCurrent` are the reload, device and holder families'
+        // named pure queries: each answers a value and writes nothing.
         string[] queries = { "TryGetBackpack", "IsDeployed", "GetChecksum", "GetCompID", "TryCast", "GetBaseAgent", "GetComponentInParent",
-            "Find", "GetAgent", ".ctor", "op_Equality", "op_Inequality", "op_Implicit",
-            "GetCurrentClip", "GetMaxClip", "GetInventorySlotAmmo", "TryGet", "CanReloadCurrent" };
+            "Find", ".ctor", "op_Equality", "op_Inequality", "op_Implicit", "GetBlock", "CountPocketItem", "GetAmmoMaxCap",
+            "GetBulletsInPack", "PlayerSlotIndex", "GetCurrentClip", "GetMaxClip", "GetInventorySlotAmmo", "TryGet", "CanReloadCurrent" };
         // The one presentation write whitelist: a gear part's absolute local pose and whether that part is shown.
-        // Nothing else in the package may write native state, and an unexpected setter is still a failure below.
-        // Each member here is exercised by tests/NativeAdapter, which asserts the written values.
+        // Nothing outside the whitelists in this file may write native state, and an unexpected setter still fails
+        // below. Each member here is exercised by tests/NativeAdapter, which asserts the written values.
         string[] presentationWrites =
         {
             "UnityEngine.GameObject::SetActive",
@@ -124,22 +130,121 @@ public sealed class NativeLayoutTests
             "UnityEngine.Transform::set_localPosition",
             "UnityEngine.Transform::set_localScale"
         };
-        // The one commanded write: the tag action submits the game's own tag through the entry point the vanilla
-        // BioTracker uses, and that call is the whole action. It is not a presentation write — nothing in this
-        // package draws the marker — so it gets its own exact whitelist rather than being folded into that one.
-        // The holder tier's two commanded writes, alongside the tag action: a reload the holder's own machine
-        // starts through the very body the player's reload key reaches, and the magazine the clip-set action
-        // writes. Both are the executed half of an owner-tier request, and `tests/WeaponFacts` and
-        // `tests/ReloadInventoryFacts` assert what each answers.
-        string[] commandWrites = { "ItemEquippable::SetCurrentClip", "PlayerInventoryBase::TriggerReload", "ToolSyncManager::WantToTagEnemy" };
-        // The loadout policy's own write, and the only native state this package changes: the three covered lists of
+        // The commanded writes: the executed half of an owner-tier request, each submitted through the game's own
+        // entry point. A reload the holder's own machine starts through the very body the player's reload key
+        // reaches, and the magazine the clip-set action writes (`tests/WeaponFacts`, `tests/ReloadInventoryFacts`);
+        // the bullets the supply action moves in the recipient's own pack, and the item the give and consume
+        // actions add and remove through the host's backpack entries, reading the slot back before a commit is
+        // reported (`tests/SupplyFacts`, `tests/InventoryActions`). The tag command left this package with the
+        // enemy domain that now owns it. `pPlayer::SetPlayer` fills the give command's own `pItemData_WithOwner`
+        // copy before the submission and writes nothing that outlives the call.
+        string[] commandWrites =
+        {
+            "ItemEquippable::SetCurrentClip",
+            "Player.PlayerAmmoStorage::UpdateBulletsInPack",
+            "Player.PlayerBackpackManager::GiveAmmoToPlayer",
+            "Player.PlayerBackpackManager::MasterAddItem",
+            "Player.PlayerBackpackManager::TryMasterRemovePocketItemWithID",
+            "PlayerInventoryBase::TriggerReload",
+            "SNetwork.SNetStructs/pPlayer::SetPlayer"
+        };
+        // The loadout policy's own write: the three covered lists of
         // `GearManager.m_gearPerSlot`, emptied and refilled one item at a time through the list instances the game
         // itself built. `tests/NativeAdapter` asserts the resulting contents, the order and the restore.
         string[] poolWrites = { "Il2CppSystem.Collections.Generic.List`1::Add", "Il2CppSystem.Collections.Generic.List`1::Clear" };
+        // The override applier's own copy, and the only place this package writes a game data block: the interop
+        // helpers below look up the block's constructor, allocate one and invoke it, then the reviewed fields are
+        // filled in one at a time, and the archetype setters swap that private copy onto the weapon the player is
+        // holding. Nothing else may be written; `tests/WeaponOverride` asserts every applied value and the restore.
+        string[] overrideWrites =
+        {
+            "GameData.ArchetypeDataBlock::set_AimSpread",
+            "GameData.ArchetypeDataBlock::set_AimTransitionTime",
+            "GameData.ArchetypeDataBlock::set_BurstDelay",
+            "GameData.ArchetypeDataBlock::set_BurstShotCount",
+            "GameData.ArchetypeDataBlock::set_CostOfBullet",
+            "GameData.ArchetypeDataBlock::set_Damage",
+            "GameData.ArchetypeDataBlock::set_DamageBoosterEffect",
+            "GameData.ArchetypeDataBlock::set_DamageFalloff",
+            "GameData.ArchetypeDataBlock::set_DefaultClipSize",
+            "GameData.ArchetypeDataBlock::set_DefaultReloadTime",
+            "GameData.ArchetypeDataBlock::set_EquipTransitionTime",
+            "GameData.ArchetypeDataBlock::set_FireMode",
+            "GameData.ArchetypeDataBlock::set_HipFireSpread",
+            "GameData.ArchetypeDataBlock::set_PiercingBullets",
+            "GameData.ArchetypeDataBlock::set_PiercingDamageCountLimit",
+            "GameData.ArchetypeDataBlock::set_PrecisionDamageMulti",
+            "GameData.ArchetypeDataBlock::set_RecoilDataID",
+            "GameData.ArchetypeDataBlock::set_Sentry_CostOfBulletTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_DamageTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_DetectionMaxAngle",
+            "GameData.ArchetypeDataBlock::set_Sentry_DetectionMaxRange",
+            "GameData.ArchetypeDataBlock::set_Sentry_FireTagOnly",
+            "GameData.ArchetypeDataBlock::set_Sentry_FireTowardsTargetInsteadOfForward",
+            "GameData.ArchetypeDataBlock::set_Sentry_ForceAimTowardsBody",
+            "GameData.ArchetypeDataBlock::set_Sentry_LegacyEnemyDetection",
+            "GameData.ArchetypeDataBlock::set_Sentry_LongRangeThreshold",
+            "GameData.ArchetypeDataBlock::set_Sentry_PrioTag",
+            "GameData.ArchetypeDataBlock::set_Sentry_RotationSpeed",
+            "GameData.ArchetypeDataBlock::set_Sentry_RotationSpeedTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_ShortRangeThreshold",
+            "GameData.ArchetypeDataBlock::set_Sentry_ShotDelayTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_StaggerDamageTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_StartFireDelay",
+            "GameData.ArchetypeDataBlock::set_Sentry_StartFireDelayTagMulti",
+            "GameData.ArchetypeDataBlock::set_ShellCasingSize",
+            "GameData.ArchetypeDataBlock::set_ShellCasingSpeedRange",
+            "GameData.ArchetypeDataBlock::set_ShotDelay",
+            "GameData.ArchetypeDataBlock::set_ShotgunBulletCount",
+            "GameData.ArchetypeDataBlock::set_ShotgunBulletSpread",
+            "GameData.ArchetypeDataBlock::set_ShotgunConeSize",
+            "GameData.ArchetypeDataBlock::set_SpecialChargetupTime",
+            "GameData.ArchetypeDataBlock::set_SpecialCooldownTime",
+            "GameData.ArchetypeDataBlock::set_SpecialSemiBurstCountTimeout",
+            "GameData.ArchetypeDataBlock::set_StaggerDamageMulti",
+            "GameData.MinMaxValue::set_Max",
+            "GameData.MinMaxValue::set_Min",
+            "GameData.RecoilDataBlock::set_concussionDuration",
+            "GameData.RecoilDataBlock::set_concussionFrequency",
+            "GameData.RecoilDataBlock::set_concussionIntensity",
+            "GameData.RecoilDataBlock::set_dampening",
+            "GameData.RecoilDataBlock::set_directionalSimilarity",
+            "GameData.RecoilDataBlock::set_hipFireCrosshairRecoilPop",
+            "GameData.RecoilDataBlock::set_hipFireCrosshairSizeDefault",
+            "GameData.RecoilDataBlock::set_hipFireCrosshairSizeMax",
+            "GameData.RecoilDataBlock::set_horizontalScale",
+            "GameData.RecoilDataBlock::set_power",
+            "GameData.RecoilDataBlock::set_recoilAimingWeight",
+            "GameData.RecoilDataBlock::set_recoilCameraPosWeight",
+            "GameData.RecoilDataBlock::set_recoilCameraRotWeight",
+            "GameData.RecoilDataBlock::set_recoilPosDamping",
+            "GameData.RecoilDataBlock::set_recoilPosImpulse",
+            "GameData.RecoilDataBlock::set_recoilPosImpulseWeight",
+            "GameData.RecoilDataBlock::set_recoilPosShift",
+            "GameData.RecoilDataBlock::set_recoilPosShiftWeight",
+            "GameData.RecoilDataBlock::set_recoilPosStiffness",
+            "GameData.RecoilDataBlock::set_recoilRotDamping",
+            "GameData.RecoilDataBlock::set_recoilRotImpulse",
+            "GameData.RecoilDataBlock::set_recoilRotImpulseWeight",
+            "GameData.RecoilDataBlock::set_recoilRotStiffness",
+            "GameData.RecoilDataBlock::set_spring",
+            "GameData.RecoilDataBlock::set_verticalScale",
+            "GameData.RecoilDataBlock::set_worldToViewSpaceBlendHorizontal",
+            "GameData.RecoilDataBlock::set_worldToViewSpaceBlendVertical",
+            "Gear.BWA_Burst::set_m_burstMax",
+            "Gear.BWA_SemiBurst::set_m_burstMax",
+            "Gear.BulletWeapon::set_m_burstMax",
+            "Gear.BulletWeapon::set_m_clip",
+            "Gear.BulletWeaponArchetype::set_m_archetypeData",
+            "Gear.BulletWeaponArchetype::set_m_recoilData",
+            "Il2CppInterop.Runtime.IL2CPP::GetIl2CppMethod",
+            "Il2CppInterop.Runtime.IL2CPP::il2cpp_object_new",
+            "Il2CppInterop.Runtime.IL2CPP::il2cpp_runtime_invoke"
+        };
         var writes = gameCalls.Where(c => { var name = c[(c.LastIndexOf("::", StringComparison.Ordinal) + 2)..];
             return !name.StartsWith("get_", StringComparison.Ordinal) && !queries.Contains(name)
                 && !presentationWrites.Contains(c, StringComparer.Ordinal) && !commandWrites.Contains(c, StringComparer.Ordinal)
-                && !poolWrites.Contains(c, StringComparer.Ordinal); }).ToArray();
+                && !poolWrites.Contains(c, StringComparer.Ordinal) && !overrideWrites.Contains(c, StringComparer.Ordinal); }).ToArray();
         Check("native.read-only-game-access", gameCalls.Length > 0 && writes.Length == 0, writes.Length == 0 ? string.Join(", ", gameCalls) : string.Join(", ", writes));
         // Every whitelisted write has to be used: a member nobody writes is a loosened whitelist, not a feature.
         var usedWrites = gameCalls.Where(c => presentationWrites.Contains(c, StringComparer.Ordinal)).ToArray();
@@ -148,22 +253,183 @@ public sealed class NativeLayoutTests
         Check("native.command-writes-exact", usedCommands.SequenceEqual(commandWrites, StringComparer.Ordinal), string.Join(", ", usedCommands));
         var usedPoolWrites = gameCalls.Where(c => poolWrites.Contains(c, StringComparer.Ordinal)).ToArray();
         Check("native.pool-writes-exact", usedPoolWrites.SequenceEqual(poolWrites, StringComparer.Ordinal), string.Join(", ", usedPoolWrites));
+        var usedOverrides = gameCalls.Where(c => overrideWrites.Contains(c, StringComparer.Ordinal)).ToArray();
+        Check("native.override-writes-exact", usedOverrides.SequenceEqual(overrideWrites, StringComparer.Ordinal), string.Join(", ", usedOverrides));
         // Pinned from the reviewed build: any new native member, read or written, must be reviewed here first.
         string[] expectedReads =
         {
-            "Agents.Agent::get_Alive",
-            "Agents.AgentManager::GetAgent",
             "Agents.pAgent::TryGet",
             "Dam_EnemyDamageBase::get_Owner",
             "Dam_EnemyDamageLimb::GetBaseAgent",
             "Dam_EnemyDamageLimb::get_m_limbID",
             "Dam_PlayerDamageLimb::GetBaseAgent",
             "Dam_SyncedDamageBase::get_Health",
-            "Enemies.EnemyAgent::get_IsTagged",
+            // The override applier reads the published archetype and recoil blocks one field at a time, as the
+            // vanilla values every override is measured against, before writing the reviewed result into its own
+            // copy. `GetBlock` and the item block accessors are the supply catalog resolving an ammo item by id.
+            "GameData.ArchetypeDataBlock::get_AimSpread",
+            "GameData.ArchetypeDataBlock::get_AimTransitionTime",
+            "GameData.ArchetypeDataBlock::get_BurstDelay",
+            "GameData.ArchetypeDataBlock::get_BurstShotCount",
+            "GameData.ArchetypeDataBlock::get_CostOfBullet",
+            "GameData.ArchetypeDataBlock::get_Damage",
+            "GameData.ArchetypeDataBlock::get_DamageBoosterEffect",
+            "GameData.ArchetypeDataBlock::get_DamageFalloff",
+            "GameData.ArchetypeDataBlock::get_DefaultClipSize",
+            "GameData.ArchetypeDataBlock::get_DefaultReloadTime",
+            "GameData.ArchetypeDataBlock::get_EquipTransitionTime",
+            "GameData.ArchetypeDataBlock::get_FireMode",
+            "GameData.ArchetypeDataBlock::get_HipFireSpread",
+            "GameData.ArchetypeDataBlock::get_PiercingBullets",
+            "GameData.ArchetypeDataBlock::get_PiercingDamageCountLimit",
+            "GameData.ArchetypeDataBlock::get_PrecisionDamageMulti",
+            "GameData.ArchetypeDataBlock::get_RecoilDataID",
+            "GameData.ArchetypeDataBlock::get_Sentry_CostOfBulletTagMulti",
+            "GameData.ArchetypeDataBlock::get_Sentry_DamageTagMulti",
+            "GameData.ArchetypeDataBlock::get_Sentry_DetectionMaxAngle",
+            "GameData.ArchetypeDataBlock::get_Sentry_DetectionMaxRange",
+            "GameData.ArchetypeDataBlock::get_Sentry_FireTagOnly",
+            "GameData.ArchetypeDataBlock::get_Sentry_FireTowardsTargetInsteadOfForward",
+            "GameData.ArchetypeDataBlock::get_Sentry_ForceAimTowardsBody",
+            "GameData.ArchetypeDataBlock::get_Sentry_LegacyEnemyDetection",
+            "GameData.ArchetypeDataBlock::get_Sentry_LongRangeThreshold",
+            "GameData.ArchetypeDataBlock::get_Sentry_PrioTag",
+            "GameData.ArchetypeDataBlock::get_Sentry_RotationSpeed",
+            "GameData.ArchetypeDataBlock::get_Sentry_RotationSpeedTagMulti",
+            "GameData.ArchetypeDataBlock::get_Sentry_ShortRangeThreshold",
+            "GameData.ArchetypeDataBlock::get_Sentry_ShotDelayTagMulti",
+            "GameData.ArchetypeDataBlock::get_Sentry_StaggerDamageTagMulti",
+            "GameData.ArchetypeDataBlock::get_Sentry_StartFireDelay",
+            "GameData.ArchetypeDataBlock::get_Sentry_StartFireDelayTagMulti",
+            "GameData.ArchetypeDataBlock::get_ShellCasingSize",
+            "GameData.ArchetypeDataBlock::get_ShellCasingSpeedRange",
+            "GameData.ArchetypeDataBlock::get_ShotDelay",
+            "GameData.ArchetypeDataBlock::get_ShotgunBulletCount",
+            "GameData.ArchetypeDataBlock::get_ShotgunBulletSpread",
+            "GameData.ArchetypeDataBlock::get_ShotgunConeSize",
+            "GameData.ArchetypeDataBlock::get_SpecialChargetupTime",
+            "GameData.ArchetypeDataBlock::get_SpecialCooldownTime",
+            "GameData.ArchetypeDataBlock::get_SpecialSemiBurstCountTimeout",
+            "GameData.ArchetypeDataBlock::get_StaggerDamageMulti",
+            "GameData.ArchetypeDataBlock::set_AimSpread",
+            "GameData.ArchetypeDataBlock::set_AimTransitionTime",
+            "GameData.ArchetypeDataBlock::set_BurstDelay",
+            "GameData.ArchetypeDataBlock::set_BurstShotCount",
+            "GameData.ArchetypeDataBlock::set_CostOfBullet",
+            "GameData.ArchetypeDataBlock::set_Damage",
+            "GameData.ArchetypeDataBlock::set_DamageBoosterEffect",
+            "GameData.ArchetypeDataBlock::set_DamageFalloff",
+            "GameData.ArchetypeDataBlock::set_DefaultClipSize",
+            "GameData.ArchetypeDataBlock::set_DefaultReloadTime",
+            "GameData.ArchetypeDataBlock::set_EquipTransitionTime",
+            "GameData.ArchetypeDataBlock::set_FireMode",
+            "GameData.ArchetypeDataBlock::set_HipFireSpread",
+            "GameData.ArchetypeDataBlock::set_PiercingBullets",
+            "GameData.ArchetypeDataBlock::set_PiercingDamageCountLimit",
+            "GameData.ArchetypeDataBlock::set_PrecisionDamageMulti",
+            "GameData.ArchetypeDataBlock::set_RecoilDataID",
+            "GameData.ArchetypeDataBlock::set_Sentry_CostOfBulletTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_DamageTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_DetectionMaxAngle",
+            "GameData.ArchetypeDataBlock::set_Sentry_DetectionMaxRange",
+            "GameData.ArchetypeDataBlock::set_Sentry_FireTagOnly",
+            "GameData.ArchetypeDataBlock::set_Sentry_FireTowardsTargetInsteadOfForward",
+            "GameData.ArchetypeDataBlock::set_Sentry_ForceAimTowardsBody",
+            "GameData.ArchetypeDataBlock::set_Sentry_LegacyEnemyDetection",
+            "GameData.ArchetypeDataBlock::set_Sentry_LongRangeThreshold",
+            "GameData.ArchetypeDataBlock::set_Sentry_PrioTag",
+            "GameData.ArchetypeDataBlock::set_Sentry_RotationSpeed",
+            "GameData.ArchetypeDataBlock::set_Sentry_RotationSpeedTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_ShortRangeThreshold",
+            "GameData.ArchetypeDataBlock::set_Sentry_ShotDelayTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_StaggerDamageTagMulti",
+            "GameData.ArchetypeDataBlock::set_Sentry_StartFireDelay",
+            "GameData.ArchetypeDataBlock::set_Sentry_StartFireDelayTagMulti",
+            "GameData.ArchetypeDataBlock::set_ShellCasingSize",
+            "GameData.ArchetypeDataBlock::set_ShellCasingSpeedRange",
+            "GameData.ArchetypeDataBlock::set_ShotDelay",
+            "GameData.ArchetypeDataBlock::set_ShotgunBulletCount",
+            "GameData.ArchetypeDataBlock::set_ShotgunBulletSpread",
+            "GameData.ArchetypeDataBlock::set_ShotgunConeSize",
+            "GameData.ArchetypeDataBlock::set_SpecialChargetupTime",
+            "GameData.ArchetypeDataBlock::set_SpecialCooldownTime",
+            "GameData.ArchetypeDataBlock::set_SpecialSemiBurstCountTimeout",
+            "GameData.ArchetypeDataBlock::set_StaggerDamageMulti",
+            "GameData.GameDataBlockBase`1::GetBlock",
+            "GameData.GameDataBlockBase`1::get_persistentID",
+            "GameData.ItemDataBlock::get_inventorySlot",
+            "GameData.MinMaxValue::get_Max",
+            "GameData.MinMaxValue::get_Min",
+            "GameData.MinMaxValue::set_Max",
+            "GameData.MinMaxValue::set_Min",
+            "GameData.RecoilDataBlock::get_concussionDuration",
+            "GameData.RecoilDataBlock::get_concussionFrequency",
+            "GameData.RecoilDataBlock::get_concussionIntensity",
+            "GameData.RecoilDataBlock::get_dampening",
+            "GameData.RecoilDataBlock::get_directionalSimilarity",
+            "GameData.RecoilDataBlock::get_hipFireCrosshairRecoilPop",
+            "GameData.RecoilDataBlock::get_hipFireCrosshairSizeDefault",
+            "GameData.RecoilDataBlock::get_hipFireCrosshairSizeMax",
+            "GameData.RecoilDataBlock::get_horizontalScale",
+            "GameData.RecoilDataBlock::get_power",
+            "GameData.RecoilDataBlock::get_recoilAimingWeight",
+            "GameData.RecoilDataBlock::get_recoilCameraPosWeight",
+            "GameData.RecoilDataBlock::get_recoilCameraRotWeight",
+            "GameData.RecoilDataBlock::get_recoilPosDamping",
+            "GameData.RecoilDataBlock::get_recoilPosImpulse",
+            "GameData.RecoilDataBlock::get_recoilPosImpulseWeight",
+            "GameData.RecoilDataBlock::get_recoilPosShift",
+            "GameData.RecoilDataBlock::get_recoilPosShiftWeight",
+            "GameData.RecoilDataBlock::get_recoilPosStiffness",
+            "GameData.RecoilDataBlock::get_recoilRotDamping",
+            "GameData.RecoilDataBlock::get_recoilRotImpulse",
+            "GameData.RecoilDataBlock::get_recoilRotImpulseWeight",
+            "GameData.RecoilDataBlock::get_recoilRotStiffness",
+            "GameData.RecoilDataBlock::get_spring",
+            "GameData.RecoilDataBlock::get_verticalScale",
+            "GameData.RecoilDataBlock::get_worldToViewSpaceBlendHorizontal",
+            "GameData.RecoilDataBlock::get_worldToViewSpaceBlendVertical",
+            "GameData.RecoilDataBlock::set_concussionDuration",
+            "GameData.RecoilDataBlock::set_concussionFrequency",
+            "GameData.RecoilDataBlock::set_concussionIntensity",
+            "GameData.RecoilDataBlock::set_dampening",
+            "GameData.RecoilDataBlock::set_directionalSimilarity",
+            "GameData.RecoilDataBlock::set_hipFireCrosshairRecoilPop",
+            "GameData.RecoilDataBlock::set_hipFireCrosshairSizeDefault",
+            "GameData.RecoilDataBlock::set_hipFireCrosshairSizeMax",
+            "GameData.RecoilDataBlock::set_horizontalScale",
+            "GameData.RecoilDataBlock::set_power",
+            "GameData.RecoilDataBlock::set_recoilAimingWeight",
+            "GameData.RecoilDataBlock::set_recoilCameraPosWeight",
+            "GameData.RecoilDataBlock::set_recoilCameraRotWeight",
+            "GameData.RecoilDataBlock::set_recoilPosDamping",
+            "GameData.RecoilDataBlock::set_recoilPosImpulse",
+            "GameData.RecoilDataBlock::set_recoilPosImpulseWeight",
+            "GameData.RecoilDataBlock::set_recoilPosShift",
+            "GameData.RecoilDataBlock::set_recoilPosShiftWeight",
+            "GameData.RecoilDataBlock::set_recoilPosStiffness",
+            "GameData.RecoilDataBlock::set_recoilRotDamping",
+            "GameData.RecoilDataBlock::set_recoilRotImpulse",
+            "GameData.RecoilDataBlock::set_recoilRotImpulseWeight",
+            "GameData.RecoilDataBlock::set_recoilRotStiffness",
+            "GameData.RecoilDataBlock::set_spring",
+            "GameData.RecoilDataBlock::set_verticalScale",
+            "GameData.RecoilDataBlock::set_worldToViewSpaceBlendHorizontal",
+            "GameData.RecoilDataBlock::set_worldToViewSpaceBlendVertical",
             // The expedition gate the projection reads: no gear can be chosen inside a level.
             "GameStateManager::get_IsInExpedition",
+            "Gear.BWA_Burst::set_m_burstMax",
+            "Gear.BWA_SemiBurst::set_m_burstMax",
+            "Gear.BulletWeapon::get_m_archeType",
             "Gear.BulletWeapon::get_m_burstMax",
+            "Gear.BulletWeapon::get_m_clip",
+            "Gear.BulletWeapon::set_m_burstMax",
+            "Gear.BulletWeapon::set_m_clip",
+            "Gear.BulletWeaponArchetype::get_m_archetypeData",
+            "Gear.BulletWeaponArchetype::get_m_recoilData",
             "Gear.BulletWeaponArchetype::get_m_weapon",
+            "Gear.BulletWeaponArchetype::set_m_archetypeData",
+            "Gear.BulletWeaponArchetype::set_m_recoilData",
             "Gear.GearIDRange::GetChecksum",
             "Gear.GearIDRange::GetCompID",
             "Gear.GearIDRange::get_PlayfabItemInstanceId",
@@ -198,6 +464,11 @@ public sealed class NativeLayoutTests
             "Gear.MeleeWeaponFirstPerson::get_CurrentStateName",
             "Gear.MeleeWeaponFirstPerson::get_m_damageToDeal",
             "Globals.Global::get_RundownIdToLoad",
+            // The interop's own constructor lookup, allocation and invoke, used only to build the private block
+            // `overrideWrites` fills in; they touch no shared game state.
+            "Il2CppInterop.Runtime.IL2CPP::GetIl2CppMethod",
+            "Il2CppInterop.Runtime.IL2CPP::il2cpp_object_new",
+            "Il2CppInterop.Runtime.IL2CPP::il2cpp_runtime_invoke",
             "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase`1::get_Item",
             "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppArrayBase`1::get_Length",
             "Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray`1::op_Implicit",
@@ -207,6 +478,7 @@ public sealed class NativeLayoutTests
             "Il2CppSystem.Collections.Generic.List`1::Clear",
             "Il2CppSystem.Collections.Generic.List`1::get_Count",
             "Il2CppSystem.Collections.Generic.List`1::get_Item",
+            "Item::get_ItemDataBlock",
             "Item::get_Owner",
             "ItemEquippable::GetCurrentClip",
             "ItemEquippable::GetMaxClip",
@@ -221,12 +493,23 @@ public sealed class NativeLayoutTests
             "Player.PlayerAgent::get_Inventory",
             "Player.PlayerAgent::get_Owner",
             "Player.PlayerAmmoStorage::GetInventorySlotAmmo",
+            // The supply, give and consume commands read a recipient's own ammo and backpack state: the pack
+            // count, the caps and the slot they read back after a submission, so a refused or partial change is
+            // reported rather than assumed.
+            "Player.PlayerAmmoStorage::UpdateBulletsInPack",
             "Player.PlayerAmmoStorage::get_m_playerBackpack",
+            "Player.PlayerBackpack::CountPocketItem",
             "Player.PlayerBackpack::IsDeployed",
             "Player.PlayerBackpack::get_AmmoStorage",
             "Player.PlayerBackpack::get_Owner",
             "Player.PlayerBackpack::get_Slots",
+            "Player.PlayerBackpackManager::GetAmmoMaxCap",
+            "Player.PlayerBackpackManager::GetBulletsInPack",
+            "Player.PlayerBackpackManager::GiveAmmoToPlayer",
+            "Player.PlayerBackpackManager::MasterAddItem",
             "Player.PlayerBackpackManager::TryGetBackpack",
+            "Player.PlayerBackpackManager::TryMasterRemovePocketItemWithID",
+            "Player.PlayerManager::get_PlayerAgentsInLevel",
             "PlayerInventoryBase::CanReloadCurrent",
             "PlayerInventoryBase::TriggerReload",
             "PlayerInventoryBase::get_Owner",
@@ -235,13 +518,15 @@ public sealed class NativeLayoutTests
             "SNetwork.SNet::get_HasLocalPlayer",
             "SNetwork.SNet::get_IsMaster",
             "SNetwork.SNet::get_LocalPlayer",
+            "SNetwork.SNetStructs/pPlayer::SetPlayer",
+            // The session id the holder tier routes by, and the local struct write that fills the give command's
+            // own `pItemData_WithOwner` copy before it is submitted.
+            "SNetwork.SNet_Player::PlayerSlotIndex",
             "SNetwork.SNet_Player::get_HasPlayerAgent",
             "SNetwork.SNet_Player::get_IsBot",
             "SNetwork.SNet_Player::get_IsLocal",
-            "SNetwork.SNet_Player::get_Lookup",
             "SNetwork.SNet_Player::get_PlayerAgent",
             "SentryGunInstance_Firing_Bullets::get_m_core",
-            "ToolSyncManager::WantToTagEnemy",
             "UnityEngine.Component::GetComponentInParent",
             "UnityEngine.Component::get_gameObject",
             "UnityEngine.Component::get_transform",
@@ -271,8 +556,12 @@ public sealed class NativeLayoutTests
             && nativeTypes.SelectMany(t => t.Methods).Where(m => m.HasBody).SelectMany(m => m.Body.Instructions)
                 .Any(i => i.OpCode == OpCodes.Ldstr && (string)i.Operand! == "OfflineGear_ID_"),
             "The gear-block matcher does not read the offline gear record.");
+        // The session layer is read through getters, with two reviewed exceptions: the slot-index read that names
+        // the local player, and the write that fills the give command's own struct copy. Neither reaches an
+        // account key or a cached player table.
         var snetReads = gameCalls.Where(c => c.StartsWith("SNetwork.", StringComparison.Ordinal)).ToArray();
-        Check("native.snet-read-only", snetReads.Length > 0 && snetReads.All(c => c.Contains("::get_", StringComparison.Ordinal)), string.Join(", ", snetReads));
+        Check("native.snet-read-only", snetReads.Length > 0 && snetReads.All(c => c.Contains("::get_", StringComparison.Ordinal)
+            || c is "SNetwork.SNet_Player::PlayerSlotIndex" or "SNetwork.SNetStructs/pPlayer::SetPlayer"), string.Join(", ", snetReads));
         var harmonyCalls = calls.Where(m => Scope(m).Contains("Harmony", StringComparison.Ordinal)).Select(Member).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         Check("native.harmony-install-and-unpatch-only", harmonyCalls.All(c => c is "HarmonyLib.Harmony::.ctor" or "HarmonyLib.Harmony::CreateClassProcessor"
             or "HarmonyLib.PatchClassProcessor::Patch" or "HarmonyLib.Harmony::UnpatchSelf"), string.Join(", ", harmonyCalls));

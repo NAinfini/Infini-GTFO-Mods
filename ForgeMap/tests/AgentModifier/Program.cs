@@ -142,18 +142,18 @@ internal static class Program
         Check(Codes(preset).Contains(AgentModifierAdapter.GravityCode),
             "the preset declares the refusal the native table forces on it");
 
-        // Where the integration puts the two rows: the canonical combat contract module, which owns both ids and
-        // already declares heal and damage beside them. The fixture registers exactly that composition, so this
-        // case fails if the ids the fragment adds ever collide with a row the framework ships.
+        // The integration's own composition: the combat contract module declares both rows and this provider only
+        // binds them. The fixture registers exactly that composition, so this case fails if either id stops being
+        // declared by the provider that owns it.
         var canonical = RuntimeJson.Parse(CombatContracts.Module().RegistryJson);
         var declared = canonical.GetProperty("capabilities").EnumerateArray()
             .Select(capability => capability.GetProperty("id").GetString()).ToArray();
         Check(canonical.GetProperty("providers").EnumerateArray()
                 .Single().GetProperty("id").GetString() == AgentModifierContract.OwnerProviderId,
             "the capability owner is the provider the canonical combat rows belong to");
-        Check(!declared.Contains(AgentModifierContract.ApplyCapabilityId)
-            && !declared.Contains(AgentModifierContract.RemoveCapabilityId),
-            "the two rows are not declared yet, so the integrated fragment is the only place they come from");
+        Check(declared.Contains(AgentModifierContract.ApplyCapabilityId)
+            && declared.Contains(AgentModifierContract.RemoveCapabilityId),
+            "both sourced-modifier rows are declared by the combat contract provider");
     }
 
     /// <summary>The explicit table: every native member with its own value, the shared set fully covered, and a
