@@ -8,10 +8,12 @@ using ForgeRuntime.Framework;
 
 namespace ForgeMap.Native;
 
-/// <summary>The two `forge.action.combat.attribute_*` handlers for `gtfo.player`: one native modification written
-/// per recipient through `AgentModifierManager.AddSyncedModifierValue`, and the revoke that names what was
-/// written. The provider owns the `AgentModifier` table, so this adapter is the one place that writes it and the
-/// one place that keeps the modification ids it must later release.
+/// <summary>The two `forge.action.combat.attribute_*` handlers for `gtfo.player` and the
+/// `forge.action.player.movement_profile` preset that writes the same table: native modifications written per
+/// recipient through `AgentModifierManager.AddSyncedModifierValue`, and the revoke that names what was written.
+/// The provider owns the `AgentModifier` table, so this adapter is the one place that writes it and the one place
+/// that keeps the modification ids it must later release. One movement preset is two members of that table under
+/// one effect handle, never a second write path beside this one.
 ///
 /// What the native entry can and cannot say is why the shape is what it is. `AddSyncedModifierValue(Agent,
 /// AgentModifier, float value, float deltaPerSec)` takes one signed contribution and a decay rate and returns the
@@ -55,6 +57,10 @@ internal sealed class AgentModifierAdapter : IDisposable
     internal const string NoOpAttributeCode = "attribute-no-op";
     internal const string OperationCode = "operation-unsupported";
     internal const string AmountCode = "amount-out-of-range";
+    /// <summary>The movement preset's own refusal: `jump_gravity` has no member in the native modification table,
+    /// so a request that carries it cannot be served as asked and is refused by name rather than served without
+    /// it.</summary>
+    internal const string GravityCode = "jump-gravity-unsupported";
     internal const string DurationCode = "duration-out-of-range";
     internal const string TargetsCode = "too-many-targets";
     internal const string WriteBudgetCode = "modifier-budget";
@@ -72,14 +78,20 @@ internal sealed class AgentModifierAdapter : IDisposable
 
     /// <summary>Every code this adapter can answer a row with besides `committed`, gathered in one place so the
     /// capability's own `codes` list and the handler cannot drift apart: the focused suite checks this set against
-    /// the two declared rows.</summary>
+    /// the three declared rows.</summary>
     internal static readonly string[] RefusalCodes =
     {
         AuthorityCode, KindCode, StaleCode, AttributeCode, NoOpAttributeCode, OperationCode, AmountCode,
         DurationCode, TargetsCode, WriteBudgetCode, HandleBudgetCode, IdExhaustedCode, CommitExceptionCode,
         ClearExceptionCode, AfterUnknownCode, HandleMissingCode, HandleStaleCode, AttributeMismatchCode,
-        AllRejectedCode, AllUnknownCode
+        AllRejectedCode, AllUnknownCode, GravityCode
     };
+
+    /// <summary>The attribute a movement preset's group answers with. A preset is two native modifiers, so a
+    /// `remove` narrowed to one `agent_modifier` member never covers it — the name is deliberately outside the
+    /// table those requests are validated against, and the whole preset is released by an unnarrowed remove, its
+    /// own cancel or its expiry.</summary>
+    private const string ProfileAttribute = "movement-profile";
 
     /// <summary>One row of the apply result, in the canonical row's own columns: the four fixed columns first,
     /// then this row's `amount` and the command's `target_count`. `amount` is the signed contribution the entry
@@ -88,6 +100,13 @@ internal sealed class AgentModifierAdapter : IDisposable
     internal sealed record ApplyRow(EntityReference Target, string Status,
         [property: JsonPropertyName("committed")] string CommitState, string Code,
         [property: JsonPropertyName("amount")] double Amount,
+        [property: JsonPropertyName("target_count")] int TargetCount);
+
+    /// <summary>One row of the movement preset result, in its own row's columns: the four fixed columns first,
+    /// then the speed multiplier the command asked for and the command's `target_count`.</summary>
+    internal sealed record ProfileRow(EntityReference Target, string Status,
+        [property: JsonPropertyName("committed")] string CommitState, string Code,
+        [property: JsonPropertyName("speed")] double Speed,
         [property: JsonPropertyName("target_count")] int TargetCount);
 
     /// <summary>One row of the remove result: the same fixed columns, the life the modification belonged to as
@@ -131,7 +150,9 @@ internal sealed class AgentModifierAdapter : IDisposable
         internal bool Reported;
     }
 
-    /// <summary>The modifications one apply command wrote, under the effect handle that command returned.</summary>
+    /// <summary>The modifications one command wrote, under the effect handle that command returned. A single
+    /// attribute row groups one member; a movement preset groups the two members it wrote, under the name no
+    /// single-attribute request can name.</summary>
     private sealed class Group
     {
         internal HandleKey Key;
@@ -169,6 +190,12 @@ internal sealed class AgentModifierAdapter : IDisposable
     /// <summary>The `attribute_remove` entry point the registration's handler table holds.</summary>
     internal static CommandResult RemoveHandler(CommandContext context)
         => Current is { } adapter ? adapter.Remove(context) : CommandResult.Rejected(AuthorityCode);
+
+    /// <summary>The `forge.action.player.movement_profile` entry point the registration's handler table holds. The
+    /// preset writes the same native table the two sourced-modifier rows above write, so it is the same adapter
+    /// that answers it and not a second write path.</summary>
+    internal static CommandResult ProfileHandler(CommandContext context)
+        => Current is { } adapter ? adapter.Profile(context) : CommandResult.Rejected(AuthorityCode);
 
     /// <summary>The adapter subscribes on the registration it is handed, because a lifecycle observer is the one
     /// per-tick and per-world notification a provider gets without the kernel calling into it. The subscription
@@ -299,6 +326,132 @@ internal sealed class AgentModifierAdapter : IDisposable
         if (written.Count != 0)
         {
             var group = new Group { Key = key, Attribute = attribute! };
+            foreach (var entry in written) group.Ids.Add(entry.Id);
+            _groups.Add(key, group);
+        }
+        return Aggregate(committed, rejected, unknown, rows.Select(row => row.Code).ToArray(), outputs);
+    }
+
+    /// <summary>The `forge.action.player.movement_profile` handler. The two modifiers the native table carries for
+    /// movement are written as one preset under one effect handle, because a command that set only half a profile
+    /// is not the state the plan asked for: both amounts and the lifetime are checked once, before the first
+    /// recipient, the handle is minted before the first write, and a recipient whose second write the native entry
+    /// refuses has its first one revoked through the same clear the expiry path uses. `jump_gravity` is refused by
+    /// name before any of that, because the table has no member for it.</summary>
+    internal CommandResult Profile(CommandContext context)
+    {
+        CheckThread();
+        // The identity half owns the readiness, authority and fault gate, for the same reason the two rows above
+        // route through it: a preset written where the same half refuses to read is a write nothing can observe.
+        if (PlayerIdentityModule.Current is not { } players || !players.CanCommit)
+            return CommandResult.Rejected(AuthorityCode);
+        // `source` carries no faction or targeting restriction on this row either; it is still a required,
+        // kernel-validated entity reference.
+        _ = context.GetEntityInput("source");
+        if (context.Inputs.TryGetProperty("jump_gravity", out var gravity)
+            && gravity.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
+            return CommandResult.Rejected(GravityCode);
+        if (!Multiplier(context, "speed", out double speed)
+            || !Multiplier(context, "acceleration", out double acceleration))
+            return CommandResult.Rejected(AmountCode);
+        long? expiry = null;
+        if (context.Inputs.TryGetProperty("duration", out var durationValue) && durationValue.ValueKind != JsonValueKind.Null)
+        {
+            if (durationValue.ValueKind != JsonValueKind.Number || !durationValue.TryGetInt64(out var ticks)
+                || ticks < 0 || context.SimulationTick > long.MaxValue - ticks)
+                return CommandResult.Rejected(DurationCode);
+            // Zero is no duration, the way the two rows above read the same port: a preset with no caller-set
+            // lifetime lasts until it is removed, its life ends or the world does.
+            if (ticks > 0) expiry = context.SimulationTick + ticks;
+        }
+        var targets = context.Inputs.GetProperty("targets").EnumerateArray().Select(RuntimeJson.Entity).ToArray();
+        if (targets.Length > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
+
+        // The effect handle is minted before the first write so a command that cannot name its effect writes
+        // nothing: the handle is what a later remove or cancel holds, and an unnamed preset would only be
+        // reachable by expiry.
+        JsonElement handle;
+        try { handle = _registration.CreateEffectHandle("entity_life"); }
+        catch (RuntimeContractException) { return CommandResult.Rejected(HandleBudgetCode); }
+        if (!HandleKey.TryRead(handle, out var key)) return CommandResult.Rejected(HandleBudgetCode);
+        _registration.RegisterCancel(handle, () => CancelGroup(key));
+
+        var rows = new List<ProfileRow>(targets.Length);
+        var written = new List<Applied>(targets.Length * 2);
+        int committed = 0, rejected = 0, unknown = 0;
+        bool stopCommitting = false;
+        foreach (var target in targets)
+        {
+            ProfileRow Row(string status, string state, string code)
+                => new(target, status, state, code, speed, targets.Length);
+
+            if (stopCommitting) { rows.Add(Row("rejected", CommitStates.None, AfterUnknownCode)); rejected++; continue; }
+            if (!players.CanCommit) { rows.Add(Row("rejected", CommitStates.None, AuthorityCode)); rejected++; continue; }
+            if (!IsKind(target, PlayerKind)) { rows.Add(Row("rejected", CommitStates.None, KindCode)); rejected++; continue; }
+            var agent = players.CurrentAgent(target);
+            if (agent == null) { rows.Add(Row("rejected", CommitStates.None, StaleCode)); rejected++; continue; }
+            // A preset is two native modifications wherever the single-attribute row spends one, so the budget is
+            // asked for twice and a recipient that finds it short writes neither.
+            if (!TryReserveWrite(context.SimulationTick) || !TryReserveWrite(context.SimulationTick))
+            { rows.Add(Row("rejected", CommitStates.None, WriteBudgetCode)); rejected++; continue; }
+
+            var pair = new List<Applied>(2);
+            string? failure = null;
+            foreach (var (modifier, amount) in Preset(speed, acceleration))
+            {
+                uint id;
+                try { id = AgentModifierManager.AddSyncedModifierValue(agent, modifier, (float)amount, 0f); }
+                catch (Exception error)
+                {
+                    // The call entered the native modification path; whether it had already registered an id is
+                    // not observable from here, so the commit stays unknown, whatever the pair already wrote stays
+                    // in the ledger, and the remaining recipients are not retried.
+                    _report("map.movement-profile-commit-exception: " + error.GetType().Name);
+                    failure = CommitExceptionCode;
+                    break;
+                }
+                // A zero answer is the native entry registering nothing. A preset the second write refuses is not
+                // a preset, so the write that did land is revoked and the row reports the refusal.
+                if (id == 0)
+                {
+                    if (pair.Count != 0) Clear(pair.Select(entry => entry.Id).ToList(), "movement-profile-pair-refused");
+                    pair.Clear();
+                    failure = IdExhaustedCode;
+                    break;
+                }
+                var entry = new Applied { Id = id, Target = target, ExpiryTick = expiry ?? -1, Handle = key };
+                _entries.Add(id, entry);
+                pair.Add(entry);
+            }
+            if (failure == null)
+            {
+                written.AddRange(pair);
+                rows.Add(Row("committed", CommitStates.Confirmed, CommittedCode));
+                committed++;
+                continue;
+            }
+            if (pair.Count == 0)
+            {
+                rows.Add(Row("rejected", CommitStates.None, failure));
+                rejected++;
+                continue;
+            }
+            // Half a preset the native entry stopped on: the pair stays in the ledger and the handle's group, so
+            // a remove, a cancel, the expiry or the world's end still releases what did land.
+            written.AddRange(pair);
+            unknown++;
+            stopCommitting = true;
+            rows.Add(Row("unknown", CommitStates.Unknown, failure));
+        }
+
+        // Only a command that wrote something has an effect to name: the handle of a fully refused command is
+        // left out of the frame instead of naming an empty group.
+        JsonElement outputs = written.Count == 0
+            ? RuntimeJson.From(new { results = rows })
+            : RuntimeJson.From(new { results = rows, profile_handle = handle });
+        if (written.Count != 0)
+        {
+            var group = new Group { Key = key, Attribute = ProfileAttribute };
             foreach (var entry in written) group.Ids.Add(entry.Id);
             _groups.Add(key, group);
         }
@@ -514,6 +667,22 @@ internal sealed class AgentModifierAdapter : IDisposable
 
     private static bool IsKind(EntityReference reference, string kind)
         => reference.Id != null && reference.Id.StartsWith(kind + ":", StringComparison.Ordinal);
+
+    /// <summary>The two native writes one movement preset is: the speed and the acceleration multiplier, in the
+    /// order the row names them. The table carries no third member for the row's `jump_gravity` input.</summary>
+    private static (AgentModifier Modifier, double Amount)[] Preset(double speed, double acceleration)
+        => new[] { (AgentModifier.MovementSpeed, speed), (AgentModifier.MovementAcceleration, acceleration) };
+
+    /// <summary>One of the preset's two multiplier inputs: a finite, non-zero number within the magnitude the
+    /// native entry can carry. A port that is absent or not a number is refused the same way an out-of-range one
+    /// is, because a preset with one of its two values missing is not the profile the row declares.</summary>
+    private static bool Multiplier(CommandContext context, string port, out double amount)
+    {
+        amount = 0;
+        if (!context.Inputs.TryGetProperty(port, out var value) || value.ValueKind != JsonValueKind.Number) return false;
+        amount = value.GetDouble();
+        return double.IsFinite(amount) && amount != 0 && Math.Abs(amount) <= MaximumAmount;
+    }
 
     /// <summary>The command-level conclusion of a run of rows, by the same rule the other combat actions use:
     /// everything confirmed is a success, nothing confirmed is a rejection or an unknown failure, and anything in

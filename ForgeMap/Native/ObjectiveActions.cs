@@ -47,9 +47,9 @@ internal enum ObjectivePhaseKind : byte
     CompleteChain = 255
 }
 
-/// <summary>The interaction families the sibling catalog rows own. They reach the same native entry through the
-/// same struct, but they are not this row's: `objective_progress` owns the item-solve family. A request for one
-/// of them here is refused by name rather than carried out under a row that does not describe it.</summary>
+/// <summary>The interaction families this row does not carry. They reach the same native entry through the same
+/// struct, but they are not this row's: the item-solve family has no row of its own in the catalog. A request for
+/// one of them here is refused by name rather than carried out under a row that does not describe it.</summary>
 internal enum ObjectiveForeignKind : byte
 {
     SolveItem = 2,

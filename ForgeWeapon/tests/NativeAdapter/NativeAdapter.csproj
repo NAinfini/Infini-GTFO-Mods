@@ -29,7 +29,7 @@
     <!-- The families the package's own hook list names: every hook class a list carries has to be compiled here or
          the installation this suite pins cannot be built. The device, holder, melee, attack-instance and
          reload/inventory sources come with the observers their hooks reach. -->
-    <Compile Include="../../Native/AttackInstanceHooks.cs;../../Native/AttackInstanceModule.cs;../../Native/FactRouter.cs;../../Native/WeaponDeployableFacts.cs;../../Native/WeaponHolderChannel.cs;../../Native/WeaponHolderModule.cs;../../Native/WeaponMeleeHitFacts.cs;../../Native/WeaponMeleeRemoteFacts.cs;../../Native/WeaponMeleeRemoteLedger.cs;../../Native/ReloadFacts.cs;../../Native/InventoryFacts.cs;../../Native/ReloadInventoryHooks.cs" />
+    <Compile Include="../../Native/AttackInstanceHooks.cs;../../Native/AttackInstanceModule.cs;../../Native/FactRouter.cs;../../Native/WeaponDeployableFacts.cs;../../Native/WeaponHolderChannel.cs;../../Native/WeaponHolderModule.cs;../../Native/WeaponMeleeHitFacts.cs;../../Native/WeaponMeleeRemoteFacts.cs;../../Native/WeaponMeleeRemoteLedger.cs;../../Native/ReloadFacts.cs;../../Native/InventoryFacts.cs;../../Native/ReloadInventoryHooks.cs;../../Native/InventoryQuerySource.cs" />
     <!-- The bodies the one registration carries: the ammunition pair, the instance-override family and the
          inventory pair. `WeaponNativeSession` constructs all of them, so a file missing here is the session
          failing to build rather than a row the registry did not receive. -->

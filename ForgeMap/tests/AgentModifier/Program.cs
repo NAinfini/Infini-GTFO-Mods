@@ -6,11 +6,11 @@ using ForgeRuntime.Framework;
 
 namespace ForgeMap.Tests.AgentModifierFacts;
 
-/// <summary>The focused suite for the two player attribute-modifier rows. Every case drives the production handler
-/// through a real `CommandContext`, asserts the result row's own columns, and then reads what reached the native
-/// double and what the adapter's own ledger still holds. A case that claims a world-level cleanup also advances
-/// the kernel, because a provider learns about a tick, a world change and a stop from the lifecycle and from
-/// nowhere else.</summary>
+/// <summary>The focused suite for the three rows this adapter answers — the two player attribute-modifier rows and
+/// the movement preset that writes the same native table. Every case drives the production handler through a real
+/// `CommandContext`, asserts the result row's own columns, and then reads what reached the native double and what
+/// the adapter's own ledger still holds. A case that claims a world-level cleanup also advances the kernel, because
+/// a provider learns about a tick, a world change and a stop from the lifecycle and from nowhere else.</summary>
 internal static class Program
 {
     private const string Attribute = "movement-speed";
@@ -32,6 +32,8 @@ internal static class Program
         ValueTable();
         ApplySuccess();
         ApplyRefusals();
+        MovementProfile();
+        MovementProfileRefusals();
         HandleCancel();
         Remove();
         Lifetimes();
@@ -86,11 +88,16 @@ internal static class Program
             && Port(removeGraph, "inputs", "attribute").GetProperty("schema").GetString() == AgentModifierContract.AttributeSet,
             "remove takes the handle collection and the same attribute member");
 
+        // The movement preset is this provider's own row, not the combat contract's: it declares its own binding,
+        // its own support, its own shape, and the one refusal the native table forces on it.
+        var preset = RuntimeJson.From(MovementProfileContract.Row());
+        var presetGraph = preset.GetProperty("graph");
+
         // Every code the adapter can answer with is declared on a row of this slice, so a refusal is part of the
         // published contract instead of a string the handler invented after the shape was frozen.
         var applyCodes = Codes(apply);
         var removeCodes = Codes(remove);
-        var declaredCodes = applyCodes.Concat(removeCodes).ToHashSet(StringComparer.Ordinal);
+        var declaredCodes = applyCodes.Concat(removeCodes).Concat(Codes(preset)).ToHashSet(StringComparer.Ordinal);
         foreach (var code in AgentModifierAdapter.RefusalCodes)
             Check(declaredCodes.Contains(code), "declared code: " + code);
         Check(applyCodes.Contains("attribute-no-op") && applyCodes.Contains("modifier-id-exhausted")
@@ -106,6 +113,34 @@ internal static class Program
         Check(AgentModifierContract.Shapes().Keys.OrderBy(k => k, StringComparer.Ordinal).SequenceEqual(
             new[] { AgentModifierContract.ApplyHandlerName, AgentModifierContract.RemoveHandlerName }.OrderBy(k => k, StringComparer.Ordinal)),
             "the handler shapes cover both rows");
+
+        // The movement preset's own shape and binding.
+        Check(preset.GetProperty("id").GetString() == MovementProfileContract.CapabilityId
+            && preset.GetProperty("owner").GetString() == ModuleDefinition.ProviderId,
+            "the preset is this provider's own capability");
+        Check(Ports(presetGraph, "inputs").SequenceEqual(
+                new[] { "in", "targets", "source", "speed", "acceleration", "jump_gravity", "duration" }),
+            "the preset declares the catalog's ports in the catalog's order");
+        Check(Port(presetGraph, "inputs", "jump_gravity").GetProperty("optional").GetBoolean(),
+            "jump_gravity is declared and optional, because no native member carries it");
+        Check(Port(presetGraph, "inputs", "source").GetProperty("entityKinds").EnumerateArray()
+                .Select(kind => kind.GetString()).SequenceEqual(new[] { "gtfo.player" }),
+            "the preset's source is the player namespace");
+        Check(Ports(presetGraph, "outputs").SequenceEqual(new[] { "next", "result", "profile_handle" })
+            && Port(presetGraph, "outputs", "profile_handle").GetProperty("handleKind").GetString() == "effect"
+            && Port(presetGraph, "outputs", "profile_handle").GetProperty("lifetime").GetString() == "entity_life",
+            "the preset returns the effect handle a remove or a cancel names");
+        var presetRecipients = presetGraph.GetProperty("recipients");
+        Check(presetRecipients.GetProperty("handle").GetString() == "profile_handle"
+            && presetRecipients.GetProperty("requires").EnumerateArray().Select(p => p.GetString())
+                .SequenceEqual(new[] { MovementProfileContract.Permission }),
+            "the recipient contract names the preset's permission and its handle");
+        Check(MovementProfileContract.BindingId == ModuleDefinition.ProviderId + ".binding.player.movement_profile"
+            && MovementProfileContract.Support().RequiredPermissions.SequenceEqual(new[] { MovementProfileContract.Permission })
+            && MovementProfileContract.Shapes().Keys.SequenceEqual(new[] { MovementProfileContract.HandlerName }),
+            "the preset's binding, support and shape are this provider's own");
+        Check(Codes(preset).Contains(AgentModifierAdapter.GravityCode),
+            "the preset declares the refusal the native table forces on it");
 
         // Where the integration puts the two rows: the canonical combat contract module, which owns both ids and
         // already declares heal and damage beside them. The fixture registers exactly that composition, so this
@@ -413,6 +448,112 @@ internal static class Program
             Check(AgentModifierManager.Clears.Count == 3 && world.Adapter.LiveModifiers == 0,
                 "the world-end pass releases what a failing clear left behind");
         }
+    }
+
+    /// <summary>One preset is two native writes per recipient under one handle: both members in the row's own order,
+    /// the first recipient before the second, and the row carrying the speed the command asked for. The handle
+    /// releases the whole preset, which is what makes the profile reversible.</summary>
+    private static void MovementProfile()
+    {
+        using (var world = new ModifierWorld())
+        {
+            var a = world.Spawn(1);
+            var b = world.Spawn(2);
+            var result = world.Profile(new
+            {
+                targets = new[] { a.Reference, b.Reference }, source = a.Reference,
+                speed = 1.5, acceleration = 0.5, duration = 0
+            });
+            Check(result.Status == CommandStatuses.Succeeded && result.CommitState == CommitStates.Confirmed,
+                "both recipients commit the preset");
+            Check(AgentModifierManager.Adds.Count == 4
+                && AgentModifierManager.Adds[0].Modifier == AgentModifier.MovementSpeed
+                && AgentModifierManager.Adds[0].Value == 1.5f
+                && AgentModifierManager.Adds[1].Modifier == AgentModifier.MovementAcceleration
+                && AgentModifierManager.Adds[1].Value == 0.5f
+                && ReferenceEquals(AgentModifierManager.Adds[2].Agent, b.Agent),
+                "each recipient's own agent took both movement members in the row's order");
+            Check(world.Adapter.LiveModifiers == 4, "the ledger holds one id per write of the preset");
+            var rows = Rows(result);
+            Check(rows.Length == 2 && Row(rows, 0).GetProperty("speed").GetDouble() == 1.5
+                && Row(rows, 0).GetProperty("target_count").GetInt32() == 2
+                && Row(rows, 0).GetProperty("code").GetString() == "committed"
+                && RuntimeJson.Entity(Row(rows, 0).GetProperty("target")) == a.Reference,
+                "the row carries the target, the committed state, the speed and the command's count");
+            Check(result.Outputs.TryGetProperty("profile_handle", out var handle)
+                && handle.GetProperty("local").GetInt32() >= 0,
+                "the preset returned the one effect handle its writes hang on");
+
+            var removed = world.Remove(new { modifiers = new object[] { handle } });
+            Check(removed.Status == CommandStatuses.Succeeded && AgentModifierManager.Clears.Count == 4
+                && world.Adapter.LiveModifiers == 0,
+                "the preset's own handle releases both members of every recipient");
+        }
+    }
+
+    /// <summary>The preset's lifetime, its cancel hook and every input it cannot carry. A refusal happens before the
+    /// first write of the whole command, the per-tick budget is spent two writes at a time, and a preset the native
+    /// entry stops half way is revoked rather than left applied.</summary>
+    private static void MovementProfileRefusals()
+    {
+        using var world = new ModifierWorld();
+        var a = world.Spawn(1);
+        object Frame(object? speed = null, object? acceleration = null, object? jumpGravity = null,
+            object? duration = null, object? targets = null) => new
+        {
+            targets = targets ?? new[] { a.Reference }, source = a.Reference,
+            speed = speed ?? 1.5, acceleration = acceleration ?? 0.5,
+            jump_gravity = jumpGravity, duration = duration ?? 0
+        };
+
+        Check(Code(world.Profile(Frame(jumpGravity: 1.0))) == AgentModifierAdapter.GravityCode,
+            "the input the native table cannot carry is refused by name");
+        Check(Code(world.Profile(Frame(speed: 0))) == "amount-out-of-range"
+            && Code(world.Profile(Frame(acceleration: 2000000))) == "amount-out-of-range",
+            "a preset multiplier outside the native entry's range is refused, either member");
+        Check(Code(world.Profile(Frame(duration: -1))) == "duration-out-of-range",
+            "a lifetime that is not a non-negative tick count is refused");
+        Check(Code(world.Profile(Frame(targets: new[] { new EntityReference("gtfo.enemy:1", world.Kernel.WorldEpoch, 1) })))
+                == "modifier-target-kind",
+            "a target of another kind is refused by name");
+        Check(AgentModifierManager.Adds.Count == 0 && world.Adapter.LiveModifiers == 0,
+            "no refused preset reached the native entry");
+
+        world.CanObserve = false;
+        Check(Code(world.Profile(Frame())) == "authority-or-phase", "a non-authoritative session is refused before the write");
+        world.CanObserve = true;
+
+        var none = world.Profile(Frame(targets: Array.Empty<EntityReference>()));
+        Check(none.Status == CommandStatuses.Succeeded && Rows(none).Length == 0
+            && !none.Outputs.TryGetProperty("profile_handle", out _),
+            "an empty recipient set commits nothing and names no effect");
+
+        // The per-tick budget is spent one preset at a time: the 17th recipient of a tick needs two writes the
+        // budget no longer has, and finds neither.
+        var many = Enumerable.Range(0, 17).Select(i => world.Spawn((ulong)(100 + i))).ToArray();
+        var over = world.Profile(new
+        {
+            targets = many.Select(m => m.Reference).ToArray(), source = a.Reference,
+            speed = 1.5, acceleration = 0.5, duration = 0
+        });
+        Check(over.Status == CommandStatuses.Partial
+            && Row(Rows(over), 16).GetProperty("code").GetString() == "modifier-budget"
+            && AgentModifierManager.Adds.Count == 32 && world.Adapter.LiveModifiers == 32,
+            "the 17th preset of a tick is refused with the budget code");
+        world.Advance(1);
+        world.Profile(new { targets = new[] { many[0].Reference }, source = a.Reference, speed = 1.5, acceleration = 0.5, duration = 0 });
+        Check(AgentModifierManager.Adds.Count == 34, "a new tick reopens the write budget");
+
+        // A zero answer on the second write of a recipient: the first one landed and is revoked, so the command
+        // reports the refusal instead of leaving half a preset behind.
+        world.Adapter.BeginWorld();
+        AgentModifierManager.Adds.Clear();
+        AgentModifierManager.Clears.Clear();
+        AgentModifierManager.Add = (_, modifier, _, _) => modifier == AgentModifier.MovementAcceleration ? 0u : 7u;
+        Check(Code(world.Profile(Frame())) == "modifier-id-exhausted"
+            && AgentModifierManager.Clears.SequenceEqual(new[] { 7u }) && world.Adapter.LiveModifiers == 0,
+            "a preset the second write refuses is revoked, not left half applied");
+        AgentModifierManager.Add = null;
     }
 
     private static int Value(string name) => AgentModifierValues.TryParse(name, out var modifier) ? (int)modifier : -1;

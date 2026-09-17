@@ -214,23 +214,6 @@
         ],
         "consequence": "the row's reset_policy (replace/extend/ignore) is a decision about an existing key, which nothing can answer, and its `entity_life` cooldown handle would name a deadline no consumer can read."
       }
-    },
-    {
-      "capability": "forge.action.weapon.property_profile",
-      "binding": "forge.module.gtfo.weapon.binding.weapon_property_profile",
-      "handler": "gtfo.weapon.property_profile",
-      "status": "not-implemented",
-      "gap": "missing equipment-instance-override: no runtime clone of the shared ArchetypeDataBlock/RecoilDataBlock and no WeaponOverrides entry point",
-      "instanceLevelBlockReplacement": {
-        "requiredBy": "ruling 84: clone the block for this one instance, change the clone's fields, assign it to BulletWeaponArchetype.m_archetypeData (and the matching recoil reference), restore the original on expiry",
-        "missing": [
-          "a runtime clone path for GameData.ArchetypeDataBlock / GameData.RecoilDataBlock — both are GameDataBlockBase-derived global blocks (ArchetypeDataBlock dump, 52 fields); IL2CPP interop exposes fields and members but no cloning entry.",
-          "the package's own `ForgeWeapon/WeaponOverrides.cs` unified entry point named by this slice's row note; it does not exist in the working tree.",
-          "the recoil reference refresh that ruling 84 requires alongside the archetype swap (the constructor resolves the block's recoil data into m_recoilData, so swapping only the archetype leaves the two out of step)."
-        ]
-      },
-      "reachedButNotEnough": "the provider does reach the equipment instance: EquipmentNativeAdapter already maps a `gtfo.equipment` reference to its native Item through the backpack readback, and the archetype is reachable from there. Reaching the instance is not the gap; being able to mint a per-instance block is.",
-      "rejectedAlternative": "a Forge-only override layer is rejected by the same ruling: it would leave the player's manual fire on the original values, which is a profile that changes nothing that matters."
     }
   ],
   "frameworkSurfacesChecked": [

@@ -97,12 +97,7 @@ internal sealed class DoorActionWorld : IDisposable
                 ? Doors.FirstOrDefault(pair => ReferenceEquals(pair.Value, door)).Key
                 : null
         },
-        Shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
-        {
-            [DoorActionContract.OpenHandlerName] = DoorActionContract.OpenShape,
-            [DoorActionContract.CloseHandlerName] = DoorActionContract.CloseShape,
-            [DoorActionContract.AlarmHandlerName] = DoorActionContract.AlarmShape
-        }
+        Shapes = DoorActionContract.Shapes()
     };
 
     private static string Registry(string provider) => RuntimeJson.From(new

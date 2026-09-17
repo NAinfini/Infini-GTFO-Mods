@@ -12,9 +12,8 @@ namespace ForgeWeapon;
 /// The three rows are new canonical ids, and each one is here because the existing catalog rows answer a
 /// different question. `forge.trigger.equipment.expired` is a life ending, which a mine's detonation is not: a
 /// glue or explosive mine detonates and the instance is destroyed as a consequence, and an author who reads
-/// `expired` learns "it is gone", not "it went off here". `forge.trigger.equipment.fuse_elapsed` is a timer
-/// running out, which is the explosive mine's own trigger but not the glue mine's, and not the sentry's depletion
-/// either.
+/// `expired` learns "it is gone", not "it went off here". A timer running out is the explosive mine's own trigger
+/// but not the glue mine's, and not the sentry's depletion either.
 ///
 /// The glue-gun half of the same question is `fired` as well: the node list's `e-glue` is "the glue gun fired",
 /// and the enemy that ends up glued is the enemy domain's fact, not this one. The `equipment_kind` port is what

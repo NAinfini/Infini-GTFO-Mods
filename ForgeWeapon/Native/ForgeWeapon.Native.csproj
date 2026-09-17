@@ -25,7 +25,7 @@
     <Compile Include="WeaponHolderChannel.cs;WeaponHolderModule.cs;WeaponDeployableFacts.cs;FactRouter.cs;WeaponMeleeHitFacts.cs;WeaponMeleeRemoteFacts.cs;WeaponMeleeRemoteLedger.cs" />
     <!-- The reload and inventory family: its two observers and the hooks that call them. Until this item the file
          was compiled nowhere, which is why the rules its facts publish under were never installed. -->
-    <Compile Include="ReloadFacts.cs;InventoryFacts.cs;ReloadInventoryHooks.cs" />
+    <Compile Include="ReloadFacts.cs;InventoryFacts.cs;ReloadInventoryHooks.cs;InventoryQuerySource.cs" />
     <!-- nl-deploy: the placement family's hooks. The device facts nl-weapon wrote (WeaponHolderChannel,
          WeaponHolderModule, WeaponDeployableFacts, FactRouter) are wired in the item above. -->
     <Compile Include="WeaponPlacementHooks.cs" />

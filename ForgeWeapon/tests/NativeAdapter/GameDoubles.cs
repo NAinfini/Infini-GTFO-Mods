@@ -31,6 +31,10 @@ public class Item : UnityObjectDouble
 {
     public Player.PlayerAgent? Owner;
     public Transform transform = new();
+    /// <summary>The block the game set this instance up with, which is the member an item's own id is read out of
+    /// (`ItemDataBlock.persistentID`). The game declares it as a property beside the sync id, and a fixture that
+    /// leaves it unset is an item whose id no read can answer.</summary>
+    public GameData.ItemDataBlock? ItemDataBlock { get; set; }
 }
 public class ItemEquippable : Item
 {

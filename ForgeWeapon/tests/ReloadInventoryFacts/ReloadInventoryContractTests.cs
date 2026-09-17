@@ -4,14 +4,20 @@ using ForgeWeapon.Native;
 
 namespace ForgeWeapon.Tests.ReloadInventoryFacts;
 
-/// <summary>The declarative half of this family: the nine capability ids, the binding rows that name them and the
-/// shipped rows the runtime's own trigger contract declares for them. These cases are the ones that fail if a row
-/// is renamed, a binding loses its capability, or a shipped row drifts from the port list the observers actually
-/// fill.</summary>
+/// <summary>The declarative half of this family: the nine capability ids the runtime's own trigger contract ships
+/// for it, the carried-item row this package declares itself, the binding rows that name them and the shipped rows
+/// behind the nine. These cases are the ones that fail if a row is renamed, a binding loses its capability, or a
+/// shipped row drifts from the port list the observers actually fill.</summary>
 [Trait("Category", "ReloadInventoryFacts")]
 public sealed class ReloadInventoryContractTests
 {
     private static readonly IReadOnlyList<string> Capabilities = ReloadInventoryContract.CapabilityIds;
+
+    /// <summary>The rows this family declares in full: the nine the runtime's own trigger contract ships for it, and
+    /// the carried-item row this package declares itself. Every one of them carries a binding and a support line;
+    /// only the nine have a shipped row to hold to the catalog's ports.</summary>
+    private static readonly IReadOnlyList<string> Declared =
+        Capabilities.Concat(new[] { ReloadInventoryContract.CarriedItemChangedCapability }).ToArray();
 
     /// <summary>Each row's output ports, as the catalog declares them and as the fragment is asserted against. A
     /// produced fact may carry fewer of these than the list, because a port the machine cannot read is left out; it
@@ -26,7 +32,8 @@ public sealed class ReloadInventoryContractTests
         [ReloadInventoryContract.PickedUpCapability] = new[] { "next", "actor", "item" },
         [ReloadInventoryContract.DroppedCapability] = new[] { "next", "actor", "item", "position" },
         [ReloadInventoryContract.UseStartedCapability] = new[] { "next", "actor", "equipment" },
-        [ReloadInventoryContract.UseFailedCapability] = new[] { "next", "actor", "equipment", "outcome", "reason" }
+        [ReloadInventoryContract.UseFailedCapability] = new[] { "next", "actor", "equipment", "outcome", "reason" },
+        [ReloadInventoryContract.CarriedItemChangedCapability] = new[] { "player", "item" }
     };
 
     /// <summary>The dry-fire row the catalog pairs with this family's refused-use row. They are two different facts
@@ -53,9 +60,9 @@ public sealed class ReloadInventoryContractTests
         var bindings = ReloadInventoryContract.Bindings();
         var support = ReloadInventoryContract.Support();
 
-        Assert.Equal(Capabilities.Count, bindings.Count);
-        Assert.Equal(Capabilities.Count, support.Count);
-        foreach (var capability in Capabilities)
+        Assert.Equal(Declared.Count, bindings.Count);
+        Assert.Equal(Declared.Count, support.Count);
+        foreach (var capability in Declared)
         {
             var declared = bindings.Where(row => Capability(row) == capability).ToList();
             Assert.Single(declared);
@@ -132,10 +139,13 @@ public sealed class ReloadInventoryContractTests
         var world = new FactsWorld();
         world.Start();
         var (owner, _) = world.Player();
-        var item = new FakeItem { Clip = 30 };
+        var item = new FakeItem { Clip = 30, ItemId = FactsWorld.ArmedItemId };
         world.Life(item, owner);
         var backpack = world.Backpack(owner, FactsWorld.PooledSlots);
         using var _ = world;
+        // The count row reads the backpack's own pocket count, so this case's backpack answers one for the item it
+        // holds and the stack fact appears in the flow the ports are checked over.
+        backpack.Stacks[FactsWorld.ArmedItemId] = 1;
         backpack.Empty("GearStandard");
         world.Inventory.Reconcile(backpack);
         backpack.Hold("GearStandard", FactsWorld.Item(item));

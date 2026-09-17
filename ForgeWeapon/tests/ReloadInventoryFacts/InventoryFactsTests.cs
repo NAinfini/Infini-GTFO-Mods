@@ -25,9 +25,10 @@ public sealed class InventoryFactsTests
         var world = new FactsWorld();
         world.Start();
         var (owner, ownerReference) = world.Player();
-        var item = new FakeItem { Clip = 30 };
+        var item = new FakeItem { Clip = 30, ItemId = FactsWorld.ArmedItemId };
         world.Life(item, owner);
         var backpack = world.Backpack(owner, FactsWorld.PooledSlots);
+        backpack.Stacks[FactsWorld.ArmedItemId] = 1;
         return (world, owner, ownerReference, item, backpack);
     }
 
@@ -96,6 +97,9 @@ public sealed class InventoryFactsTests
         world.Inventory.Reconcile(backpack);
         var equipment = world.ByItem[item.Id];
 
+        // The pocket count moves with the item, the way the game's own table does: the slot is emptied and the
+        // group of that id is one shorter.
+        backpack.Stacks[FactsWorld.ArmedItemId] = 0;
         backpack.Clear(Standard);
         world.Inventory.Reconcile(backpack);
 
@@ -154,7 +158,7 @@ public sealed class InventoryFactsTests
         using var _ = world;
         backpack.Hold(Standard, FactsWorld.Item(item, instance: (IntPtr)9001));
         world.Inventory.Reconcile(backpack);
-        var replacement = new FakeItem { Clip = 5 };
+        var replacement = new FakeItem { Clip = 5, ItemId = FactsWorld.ArmedItemId };
         world.Life(replacement, owner);
 
         backpack.Hold(Standard, FactsWorld.Item(replacement, instance: (IntPtr)9002));

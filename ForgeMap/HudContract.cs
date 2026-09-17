@@ -34,13 +34,13 @@ public static class HudContract
     /// it may present to that player's HUD before it can draw.</summary>
     public const string HudPermission = "presentation.hud";
 
-    /// <summary>The three placements the checklist names, in its own order. `status_bar` is the local player's
-    /// own status readout, `screen` is this provider's own text line, `teammate_overhead` is the extra
-    /// information line above a teammate's head.</summary>
-    public static readonly string[] Placements = { "status_bar", "screen", "teammate_overhead" };
+    /// <summary>The two placements the checklist names, in its own order. `status_bar` is the local player's own
+    /// status readout, `teammate_overhead` is the extra information line above a teammate's head. Both are the
+    /// game's own readouts; a value drawn at a position this provider chose itself is not one this row offers.</summary>
+    public static readonly string[] Placements = { "status_bar", "teammate_overhead" };
 
     /// <summary>The four forms the checklist names. `bar` writes the game's own bar and no text — only the status
-    /// bar has a sprite to write, which the handler refuses for the other two placements; the other three render
+    /// bar has a sprite to write, which the handler refuses for the teammate overhead; the other three render
     /// text, so the same value can be read as a number, as number-of-maximum or as a percentage.</summary>
     public static readonly string[] Forms = { "number", "number_of_max", "percent", "bar" };
 
@@ -49,10 +49,10 @@ public static class HudContract
     public static readonly string[] Audiences = { "team", "self" };
 
     /// <summary>The one shape of this handler: the recipients the request declares, the value and its optional
-    /// maximum and label, the visibility flag, and the five structural parameters the checklist asks for.</summary>
+    /// maximum and label, the visibility flag, and the four structural parameters the checklist asks for.</summary>
     public static readonly HandlerShape ValueShape = new HandlerShape()
         .Inputs("viewers", "value", "maximum", "label", "visible").Outputs("result")
-        .Parameters("placement", "form", "audience", "color", "key");
+        .Parameters("placement", "form", "audience", "color");
 
     public static string ValueCapabilityJson => RuntimeJson.From(CapabilityRow()).GetRawText();
 
@@ -108,8 +108,7 @@ public static class HudContract
                 new { id = "placement", type = "enum", role = "structural", required = true, values = Placements },
                 new { id = "form", type = "enum", role = "structural", required = true, values = Forms },
                 new { id = "audience", type = "enum", role = "structural", required = true, values = Audiences },
-                new { id = "color", type = "string", role = "structural", required = false },
-                new { id = "key", type = "string", role = "structural", required = false }
+                new { id = "color", type = "string", role = "structural", required = false }
             },
             recipients = new
             {

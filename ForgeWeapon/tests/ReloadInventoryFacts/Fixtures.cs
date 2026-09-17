@@ -15,6 +15,9 @@ internal sealed class FakeItem
     internal FakeItem() => Id = (IntPtr)Interlocked.Increment(ref _next);
 
     internal IntPtr Id { get; }
+    /// <summary>The game's own block id of this item. Two slots holding the same id are one stack to the count row,
+    /// which is why the fixture's backpack keys its counts by this value.</summary>
+    internal uint ItemId { get; set; }
     /// <summary>The magazine for a weapon, or the charge for a tool.</summary>
     internal int Clip { get; set; }
     internal bool Reloading { get; set; }
@@ -42,6 +45,10 @@ internal sealed class FakeBackpack
 
     internal FakePlayer Owner { get; }
     internal Dictionary<string, long> Pool { get; } = new(StringComparer.Ordinal);
+    /// <summary>The counts the game's own pocket count would answer, keyed by block id. An id this table does not
+    /// name is not a pocket item and has no count at all — a weapon or a pack is one item in its own slot — which is
+    /// what makes the count row stay silent for it instead of publishing a zero.</summary>
+    internal Dictionary<uint, int> Stacks { get; } = new();
     internal List<string> Names { get; } = new();
     internal Dictionary<string, FakeBackpackItem?> Slots { get; } = new(StringComparer.Ordinal);
 

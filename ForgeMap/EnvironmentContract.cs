@@ -142,10 +142,10 @@ public static class EnvironmentContract
     /// slot. They are one author node because the slot, not the mode, is what the two entries share.</summary>
     public static readonly string[] FogCycleModes = { "start", "stop" };
 
-    /// <summary>`placement` members: the three places the checklist names. `status_bar` writes the game's own
-    /// local player shield readout, `screen` draws this provider's own text line, `teammate_overhead` writes the
-    /// extra line under a teammate's name marker.</summary>
-    public static readonly string[] HudPlacements = { "status_bar", "screen", "teammate_overhead" };
+    /// <summary>`placement` members: the two places the checklist names. `status_bar` writes the game's own
+    /// local player shield readout, `teammate_overhead` writes the extra line under a teammate's name marker.
+    /// Both are readouts the game already draws; this provider adds no placement of its own.</summary>
+    public static readonly string[] HudPlacements = { "status_bar", "teammate_overhead" };
 
     /// <summary>`form` members: how one value is rendered. `bar` writes the game's own bar without text, so only
     /// the status bar has a sprite to write; the other three render text into whichever readout the placement

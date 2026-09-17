@@ -696,6 +696,25 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
         return item?.Instance?.TryCast<BulletWeapon>();
     }
 
+    /// <summary>The live equippable one equipment life currently points at, with the backpack and slot it sits in,
+    /// or null. This is the same current-check `WeaponOf` makes — the reference's world, this machine's recorded
+    /// handle for it, and the backpack's own slot table — with two differences: no authority gate, because a
+    /// read-only row may answer on a machine that must not write, and no weapon cast, because a magazine read has
+    /// to see the item before it can say whether that item is one. The backpack and the slot travel back with the
+    /// item because the pool a magazine draws from belongs to the slot, and looking the slot up again would be a
+    /// second read of the same table with a second chance to disagree.</summary>
+    internal (ItemEquippable Item, PlayerBackpack Backpack, int SlotIndex)? EquippableOf(EntityReference reference)
+    {
+        if (reference == null || reference.WorldEpoch != _world
+            || !_byEntity.TryGetValue(reference.Id, out var handle) || handle.Entity != reference) return null;
+        var backpack = handle.Backpack;
+        if (backpack.Pointer != handle.BackpackPointer || !Matches(handle, backpack)) return null;
+        var slots = backpack.Slots;
+        if (slots == null || handle.SlotIndex < 0 || handle.SlotIndex >= slots.Length) return null;
+        var item = slots[handle.SlotIndex]?.Instance?.TryCast<ItemEquippable>();
+        return item == null ? null : (item, backpack, handle.SlotIndex);
+    }
+
     /// <summary>The Forge reference of the object a shot hit, chosen by that object's own native type: the damage
     /// limb the bullet was resolved against names its base agent, and the agent's own type decides whether the
     /// enemy domain or the player domain is asked. Each kind is asked with the instance its own domain records —

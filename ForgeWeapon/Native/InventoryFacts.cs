@@ -36,24 +36,37 @@ internal interface IInventoryNativeReads
     /// <summary>A finite world position of a native item, or null when the instance is destroyed or its transform
     /// does not read as a finite point.</summary>
     double[]? Position(object item);
+    /// <summary>The game's own block id of a native item, or null when this machine cannot read one. The block id
+    /// is what makes two slots hold the same item, which is what a stack count is a count of.</summary>
+    uint? ItemId(object item);
+    /// <summary>How many of one item id the backpack's pockets hold right now, or null when that item's own block
+    /// is not carried in a pocket at all. A weapon, a pack or a piece of gear is one item in its own slot and has
+    /// no stack, and answering null for it is what keeps the count row from reporting a zero instead.
+    /// </summary>
+    int? StackCount(object backpack, uint itemId);
 }
 
 /// <summary>What one slot held at one moment. The item and instance identities are what a slot change is measured
-/// against; the equipment reference and the world position are resolved while the native object is still there,
-/// because a clear destroys the instance and nothing about the item is readable afterwards.</summary>
-internal sealed record SlotState(IntPtr Item, IntPtr Instance, EntityReference? Equipment, double[]? Position);
+/// against; the equipment reference, the world position and the block id are resolved while the native object is
+/// still there, because a clear destroys the instance and nothing about the item is readable afterwards — and the
+/// count row needs the block id of a slot that is empty by the time the change is published.</summary>
+internal sealed record SlotState(IntPtr Item, IntPtr Instance, EntityReference? Equipment, double[]? Position,
+    uint? ItemId);
 
-/// <summary>The six equipment rows, decided from one readback of a player's slot table and pool after a native
-/// body returned:
+/// <summary>The seven rows decided from one readback of a player's slot table and pool after a native body
+/// returned:
 ///
 /// `picked_up` and `dropped` are one slot's occupancy becoming and ceasing to be, so a single slot change produces
 /// at most one of them. The drop reports the item the slot no longer holds, from the identity and the position this
 /// machine resolved while that item was still readable; evidence `evidence/inventory-facts.json` records why the
 /// row is defined as "left the backpack" and why its position port is optional.
 ///
-/// `stack_changed` is published with either. This build's slot holds one item instance and exposes no count, so the
-/// count is the slot's occupancy — 1 while an item is there, 0 once it is gone — which is the slot's own count
-/// rather than a second reading of something else.
+/// `stack_changed` is published with either. The count is the game's own count of that item id — one number for the
+/// whole stack the pockets group together — and the delta is what this readback moved the slot by; an item whose
+/// block is not carried in a pocket has no stack and publishes no count row.
+///
+/// `carried_item_changed` is the carry slot's own row: the large item a player hauls through the level changing.
+/// Its `item` port is the family's one nullable port, so the slot emptying is answered with a null item.
 ///
 /// `refilled` is a slot's pool gaining rounds, published only for a pool-backed slot with a live equipment
 /// identity, because the catalog row names the equipment the refill happened to. A pool that grew while a reload
@@ -71,6 +84,10 @@ internal sealed class InventoryObserver
 {
     /// <summary>The reason a refused reload carries: the game's own reload gate answered false.</summary>
     internal const string NotReloadableReason = "not-reloadable";
+    /// <summary>The one slot a large item is carried in, spelled the way the slot read spells every slot name. The
+    /// name is the only handle this game-independent half has on that slot: which game value it is stays in the
+    /// native read, which enumerates the game's own slot values.</summary>
+    internal const string CarriedSlotName = "InLevelCarry";
     /// <summary>The outcome a refused use is published with: the catalog's own `execution_outcome` member for a
     /// request the game declined before doing anything.</summary>
     internal const string RejectedOutcome = "rejected";
@@ -129,16 +146,16 @@ internal sealed class InventoryObserver
         if (!_players.TryGetValue(owner.Id, out var state))
         {
             _players[owner.Id] = state = new Player(owner);
-            Record(slots, state, first: true);
+            Record(backpack, slots, state, first: true);
         }
         else
         {
-            Record(slots, state, first: false);
+            Record(backpack, slots, state, first: false);
         }
         Pools(backpack, state);
     }
 
-    private void Record(IReadOnlyList<NativeSlot> slots, Player state, bool first)
+    private void Record(object backpack, IReadOnlyList<NativeSlot> slots, Player state, bool first)
     {
         foreach (var slot in slots)
         {
@@ -146,17 +163,20 @@ internal sealed class InventoryObserver
             var now = slot.Item == null
                 ? (SlotState?)null
                 : new SlotState(slot.ItemIdentity, slot.InstanceIdentity, slot.Equipment,
-                    _native.Position(slot.Item));
+                    _native.Position(slot.Item), _native.ItemId(slot.Item));
             if (now == null) state.Slots.Remove(slot.Name); else state.Slots[slot.Name] = now;
-            if (!first) Slot(slot.Name, before, now, state);
+            if (!first) Slot(backpack, slot.Name, before, now, state);
         }
     }
 
     /// <summary>One slot's change. An occupancy that appeared is a pickup, one that disappeared is a drop, and
     /// either also moves the slot's count; a slot whose instance was replaced under the same occupancy is the count
-    /// row's alone.</summary>
-    private void Slot(string name, SlotState? before, SlotState? now, Player player)
+    /// row's alone. The carry slot's own row is decided here too, from the same two readings.</summary>
+    private void Slot(object backpack, string name, SlotState? before, SlotState? now, Player player)
     {
+        // The carry slot's own row is decided before the occupancy branches below, which return: a large item that
+        // entered or left that slot is still both a pickup fact and a carried-item fact.
+        if (name == CarriedSlotName) Carried(player, before, now);
         if (before == null && now != null)
         {
             if (now.Equipment == null)
@@ -169,7 +189,7 @@ internal sealed class InventoryObserver
                 () => new RuntimeEvent(Id(), ReloadInventoryContract.PickedUpBinding, _epoch, Tick(),
                     "gtfo.equipment:" + now.Equipment.Id,
                     RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = now.Equipment })));
-            Count(player, now.Equipment, 1, 1);
+            Count(backpack, player, now.Equipment, now.ItemId, 1);
             return;
         }
         if (before != null && now == null)
@@ -187,20 +207,45 @@ internal sealed class InventoryObserver
                         ? RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = before.Equipment })
                         : RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = before.Equipment,
                             position = before.Position })));
-            Count(player, before.Equipment, 0, -1);
+            Count(backpack, player, before.Equipment, before.ItemId, -1);
             return;
         }
         if (before != null && now != null && before.Instance != now.Instance)
-            Count(player, now.Equipment, 1, 0);
+            Count(backpack, player, now.Equipment, now.ItemId, 0);
     }
 
-    /// <summary>The stack row for a slot's count. This build's slot holds one instance and no count member, so the
-    /// count is the occupancy and the delta is what this readback moved it by. The row's `actor` and `item` ports
-    /// are both required entities, so a change this machine cannot name is reported and not published: a fact the
-    /// runtime would refuse for a null port is not a fact worth publishing.</summary>
-    private void Count(Player player, EntityReference? equipment, int count, int delta)
+    /// <summary>The carried-item row: the one slot a player hauls a large item in, published when the item that
+    /// slot holds changes. The row's `item` port is the one nullable port in this family, so a slot that emptied is
+    /// an answer with a null item rather than a refusal; a slot that gained an item this machine cannot name
+    /// publishes nothing and reports it, exactly like a pickup. A change of instance under the same reference is
+    /// not a change of item and publishes nothing.</summary>
+    private void Carried(Player player, SlotState? before, SlotState? now)
     {
-        if (equipment == null) return;
+        var from = before?.Equipment;
+        var to = now?.Equipment;
+        if (from == to) return;
+        if (now != null && to == null)
+        {
+            _report("weapon.carried-item-unresolved: the carry slot holds an item with no live equipment identity;"
+                + " no carried-item fact published.");
+            return;
+        }
+        Publish("carried_item_changed", to?.Id ?? player.Owner.Id,
+            ReloadInventoryContract.CarriedItemChangedBinding,
+            () => new RuntimeEvent(Id(), ReloadInventoryContract.CarriedItemChangedBinding, _epoch, Tick(),
+                "gtfo.player:" + player.Owner.Id,
+                RuntimeJson.From(new { player = player.Owner, item = to })));
+    }
+
+    /// <summary>The stack row for a slot's count. The count is the game's own count of that item id, which is what
+    /// groups the same item across the pocket slots into one stack, and the delta is what this readback moved the
+    /// slot by. An item whose block is not carried in a pocket has no count at all, so the row is not published for
+    /// it and nothing is reported either: a slot that holds no stack did not lose one. The row's `actor` and `item`
+    /// ports are both required entities, so a change this machine cannot name is reported and not published.</summary>
+    private void Count(object backpack, Player player, EntityReference? equipment, uint? itemId, int delta)
+    {
+        if (equipment == null || itemId == null) return;
+        if (_native.StackCount(backpack, itemId.Value) is not { } count) return;
         Publish("stack_changed", equipment.Id, ReloadInventoryContract.StackChangedBinding,
             () => new RuntimeEvent(Id(), ReloadInventoryContract.StackChangedBinding, _epoch, Tick(),
                 "gtfo.equipment:" + equipment.Id,

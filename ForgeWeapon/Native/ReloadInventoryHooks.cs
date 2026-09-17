@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ForgeRuntime.Framework;
+using GameData;
 using Gear;
 using HarmonyLib;
 using Player;
@@ -120,6 +121,26 @@ internal sealed class ReloadNativeReads : IReloadNativeReads, IInventoryNativeRe
     public EntityReference? OwnerOfItem(object item) => OwnerOf(item);
     public int? ItemCharge(object item) => Clip(item);
     public bool ItemIsReloading(object item) => IsReloading(item);
+
+    /// <summary>The game's own block id of a native item, read from the block the instance itself was set up with:
+    /// `ItemDataBlock.persistentID`, which is the number an authored resource id resolves to. A native `Item` has
+    /// no id member of its own — `ItemID` belongs to the slot's `BackpackItem` — and its own block is the game's
+    /// declaration of what the instance is, so a block that cannot be read answers null rather than a number.
+    /// The identity session's table is keyed by the instance, so nothing else in this package needs the block id.</summary>
+    public uint? ItemId(object item)
+        => item is Item value ? Safe<uint?>(() => value.ItemDataBlock?.persistentID, null) : null;
+
+    /// <summary>How many of one item the backpack's pockets hold, or null when the item's block is not carried in
+    /// a pocket at all. The block's own `inventorySlot` decides that, read exactly as the pocket-item resolver
+    /// reads it, so the count row and the give/consume rows agree about which items are pocket items. A weapon, a
+    /// pack or a piece of gear answers null here rather than a zero the game never reported.</summary>
+    public int? StackCount(object backpack, uint itemId)
+    {
+        if (backpack is not PlayerBackpack value) return null;
+        var block = Safe<ItemDataBlock?>(() => ItemDataBlock.GetBlock(itemId), null);
+        if (block == null || block.inventorySlot != InventorySlot.InPocket) return null;
+        return Safe<int?>(() => value.CountPocketItem(itemId), null);
+    }
 
     /// <summary>The player reference behind a native backpack. The backpack itself names its owning player, so the
     /// read goes through the same domain lookup the equipment adapter already uses for an item's owner — the chain

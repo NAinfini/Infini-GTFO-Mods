@@ -118,55 +118,6 @@ public sealed class EnvironmentHudTests
     }
 
     [Fact]
-    public void TheScreenPlacementClonesOneTextAndHidesItAgain()
-    {
-        using var world = EnvironmentWorld.Start();
-        var show = Contexts.Command(HudContract.ValueCapability, Inputs(12, visible: true, maximum: 20),
-            new { placement = 1, form = 1, audience = 0, key = "shield" }, isHost: false);
-        var hide = Contexts.Command(HudContract.ValueCapability, Inputs(12, visible: false),
-            new { placement = 1, form = 1, audience = 0, key = "shield" }, isHost: false);
-
-        Assert.Equal("succeeded", world.Hud.HandleValue(show).Status);
-        Assert.Single(UnityEngine.Object.Created);
-        Assert.Equal("12 / 20", UnityEngine.Object.Created[0].GetComponent<TMPro.TextMeshPro>()!.text);
-
-        Assert.Equal("succeeded", world.Hud.HandleValue(hide).Status);
-        Assert.Contains(UnityEngine.Object.Created[0], UnityEngine.Object.Destroyed);
-    }
-
-    [Fact]
-    public void DrawingTheSameKeyTwiceReusesTheOneTextObject()
-    {
-        using var world = EnvironmentWorld.Start();
-        for (int value = 1; value <= 2; value++)
-        {
-            var context = Contexts.Command(HudContract.ValueCapability, Inputs(value, visible: true),
-                new { placement = 1, form = 0, audience = 0, key = "shield" }, isHost: false);
-            Assert.Equal("succeeded", world.Hud.HandleValue(context).Status);
-        }
-
-        Assert.Single(UnityEngine.Object.Created);
-        Assert.Equal("2", UnityEngine.Object.Created[0].GetComponent<TMPro.TextMeshPro>()!.text);
-    }
-
-    [Fact]
-    public void ANewWorldDestroysTheReadoutsOfTheOneBeforeIt()
-    {
-        using var world = EnvironmentWorld.Start();
-        var first = Contexts.Command(HudContract.ValueCapability, Inputs(1, visible: true),
-            new { placement = 1, form = 0, audience = 0, key = "shield" }, isHost: false, worldEpoch: 1);
-        Assert.Equal("succeeded", world.Hud.HandleValue(first).Status);
-        var readout = UnityEngine.Object.Created[0];
-
-        var second = Contexts.Command(HudContract.ValueCapability, Inputs(2, visible: true),
-            new { placement = 1, form = 0, audience = 0, key = "shield" }, isHost: false, worldEpoch: 2);
-        Assert.Equal("succeeded", world.Hud.HandleValue(second).Status);
-
-        Assert.Contains(readout, UnityEngine.Object.Destroyed);
-        Assert.Equal(2, UnityEngine.Object.Created.Count);
-    }
-
-    [Fact]
     public void TheSelfAudienceWithoutASessionIsRefusedRatherThanDrawnForEveryone()
     {
         using var world = EnvironmentWorld.Start();
@@ -182,7 +133,7 @@ public sealed class EnvironmentHudTests
     {
         using var world = EnvironmentWorld.Start();
         var context = Contexts.Command(HudContract.ValueCapability, Inputs(1, visible: true),
-            new { placement = 2, form = 0, audience = 1 }, isHost: false);
+            new { placement = 1, form = 0, audience = 1 }, isHost: false);
 
         // The local player has no overhead marker, so the two members cannot be true of the same row and the
         // refusal names the reason rather than drawing the line on a teammate's head.

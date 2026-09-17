@@ -33,6 +33,10 @@ internal sealed class WeaponNativeSession : IDisposable
     internal WeaponHolderModule Holder { get; private set; } = null!;
     /// <summary>The melee hits two native bodies report, deduped per target in the one observer.</summary>
     internal WeaponMeleeHitFacts Melee { get; private set; } = null!;
+    /// <summary>The two read rows' native source, attached for as long as this session is the live one: a plan
+    /// evaluating an equipment-ammunition query or a held-item condition reads this machine's own tables, and a
+    /// process with no session refuses both rows by code.</summary>
+    internal InventoryQueryReads? Reads { get; private set; }
     /// <summary>The ammunition pair's two bodies: one write on a player's own pool with the readback that proves
     /// it, and the refusal a pool this machine does not own gets. Built before the registration for the same
     /// reason the mark row is.</summary>
@@ -99,6 +103,10 @@ internal sealed class WeaponNativeSession : IDisposable
                     inventoryGive: session.Inventory.HandleGive, inventoryConsume: session.Inventory.HandleConsume),
                 observe: value => ObserveOverrides(session.Overrides.Ledger, value));
             session.Adapter.Attach(session.Identity);
+            // The read rows' source goes on with the identity table they read through: a life is only nameable
+            // while that table answers for it, so attaching the two together is what keeps a query from reading a
+            // slot this session no longer follows.
+            session.Reads = InventoryQueryReads.Attach(new InventoryQuerySource(session.Adapter));
             session.Combat = new WeaponCombatObserver(session.Adapter, () => kernel, report, info);
             // The attack-instance rows name the shot observer's own equipment life for their actor and equipment
             // ports; the module keeps no tally of shots and no ledger of hits of its own.
@@ -159,6 +167,7 @@ internal sealed class WeaponNativeSession : IDisposable
             if (session.Facts != null) Cleanup(session.Facts.Dispose, errors);
             if (session.Holder != null) Cleanup(session.Holder.Dispose, errors);
             if (session.Identity != null) Cleanup(session.Identity.Dispose, errors);
+            if (session.Reads is { } reads) Cleanup(() => InventoryQueryReads.Detach(reads), errors);
             if (ReferenceEquals(Current, session)) Current = null;
             session._disposed = true;
             if (errors.Count != 0) PreserveCleanupFailure(original, "ForgeWeapon.CleanupFailures", new AggregateException(errors), report);
@@ -240,6 +249,9 @@ internal sealed class WeaponNativeSession : IDisposable
         // The reload and inventory observers answer nothing once the session is going away, and the hooks that
         // reach them are removed last, so a hook firing in that window finds no observer rather than a half-dead one.
         ReloadInventoryHooks.Clear();
+        // The read rows' source is detached with the observers and before the adapter is cleared, so a plan
+        // evaluating after this point refuses by code instead of reading a half-disposed adapter.
+        if (Reads is { } reads) InventoryQueryReads.Detach(reads);
         Melee.Dispose();
         Facts.Dispose();
         // The narrowed gear pool is the game's own state, so it is put back before the hooks that could narrow it

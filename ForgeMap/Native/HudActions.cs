@@ -16,12 +16,10 @@ namespace ForgeMap.Native;
 /// (`GuiManager.m_playerLayer`), and a teammate's overhead line is built by each machine for itself — so this
 /// class writes no world state, publishes no fact and answers with the tier's own non-committing result.
 ///
-/// All three placements are implemented. `status_bar` writes the game's own local player shield readout, which is
-/// the readout the checklist's own example ("护盾 45 / 100" beside the health bar) asks for. `screen` draws this
-/// provider's own line: one text object cloned from the status readout's own text, so the font, material and
-/// canvas come from the game rather than from a second UI stack. `teammate_overhead` writes the extra line
-/// <see cref="TeammateOverhead"/> keeps under a teammate's name marker, which the game re-renders from
-/// <see cref="TeammateOverheadHooks"/>.
+/// Both placements are the game's own readouts. `status_bar` writes the game's own local player shield readout,
+/// which is the readout the checklist's own example ("护盾 45 / 100" beside the health bar) asks for.
+/// `teammate_overhead` writes the extra line <see cref="TeammateOverhead"/> keeps under a teammate's name marker,
+/// which the game re-renders from <see cref="TeammateOverheadHooks"/>. Nothing here invents a readout of its own.
 ///
 /// `audience=self` means "the player this value belongs to, and nobody else", so the value's own owner travels
 /// with the command as its session and this machine draws only when that session is the one sitting here. That is
@@ -30,9 +28,9 @@ namespace ForgeMap.Native;
 /// on this screen is this player's own. The combination `self` with `teammate_overhead` is refused by name — the
 /// local player has no overhead marker — rather than drawn on somebody else's head.
 ///
-/// Every object this class creates is owned by it: a readout is destroyed when the plan hides it, when the same
-/// key is drawn again and when the world the readout belonged to is replaced. The world epoch is the identity
-/// that decides the last case, read from every command the kernel dispatches.
+/// Every object this class creates is owned by it: a readout is hidden when the plan hides it and released when
+/// the world the readout belonged to is replaced. The world epoch is the identity that decides the last case, read
+/// from every command the kernel dispatches.
 /// </summary>
 internal sealed class HudActions
 {
@@ -52,7 +50,6 @@ internal sealed class HudActions
     internal const int MaximumLabelLength = 64;
 
     private readonly Action<string> _report;
-    private readonly Dictionary<string, GameObject> _readouts = new(StringComparer.Ordinal);
     private long _epoch;
     private bool _epochKnown;
 
@@ -89,7 +86,7 @@ internal sealed class HudActions
         double maximum = EnvironmentActions.Number(context.Inputs, "maximum", 0);
 
         string? placement = EnvironmentActions.Text(context.Parameters, "placement");
-        if (placement != "status_bar" && placement != "screen" && placement != "teammate_overhead")
+        if (placement != "status_bar" && placement != "teammate_overhead")
             return CommandResult.Rejected(PlacementCode);
         string? form = EnvironmentActions.Text(context.Parameters, "form");
         if (form == null || Array.IndexOf(HudContract.Forms, form) < 0) return CommandResult.Rejected(FormCode);
@@ -116,7 +113,7 @@ internal sealed class HudActions
         try
         {
             if (placement == "teammate_overhead") Overhead(viewers, line, color, visible);
-            else Apply(status, placement!, form, Key(context), value, maximum, label, color, visible);
+            else Status(status, form, value, maximum, label, color, visible);
             return Presented();
         }
         catch (Exception error)
@@ -127,29 +124,17 @@ internal sealed class HudActions
         }
     }
 
-    /// <summary>One readout write. The status bar's own bar is always given the value — that is the game's own
-    /// normalisation and it is what makes `bar` a form — and the text forms additionally write the one string
-    /// that reads the value the way the author asked for.</summary>
-    private void Apply(PUI_LocalPlayerStatus status, string placement, string form, string key, double value,
-        double maximum, string? label, Color? color, bool visible)
+    /// <summary>The status bar's own readout, which is the game's. Its bar is always given the value — that is the
+    /// game's own normalisation and it is what makes `bar` a form — and the text forms additionally write the one
+    /// string that reads the value the way the author asked for.</summary>
+    private static void Status(PUI_LocalPlayerStatus status, string form, double value, double maximum,
+        string? label, Color? color, bool visible)
     {
-        if (placement == "status_bar")
-        {
-            if (status.m_shieldUIParent != null) status.m_shieldUIParent.SetActive(visible);
-            if (!visible) return;
-            status.UpdateShield((float)value);
-            if (form == "bar") return;
-            SetText(status.m_shieldText, Text(form, value, maximum, label), color);
-            return;
-        }
-
-        if (!visible)
-        {
-            Hide(key);
-            return;
-        }
-        var readout = Readout(key, status);
-        SetText(readout.GetComponent<TextMeshPro>(), Text(form, value, maximum, label), color);
+        if (status.m_shieldUIParent != null) status.m_shieldUIParent.SetActive(visible);
+        if (!visible) return;
+        status.UpdateShield((float)value);
+        if (form == "bar") return;
+        SetText(status.m_shieldText, Text(form, value, maximum, label), color);
     }
 
     /// <summary>The overhead placement: one line under the named teammates' own name markers. The teammates are
@@ -209,56 +194,15 @@ internal sealed class HudActions
         if (color is { } value) text.color = value;
     }
 
-    /// <summary>The one text object this client draws for a readout key. It is cloned from the status readout's
-    /// own health text so font, material and canvas come from the game, is parented to that text's own parent so
-    /// it inherits the same layer transform, and is offset above it so the two lines do not overlap.</summary>
-    private GameObject Readout(string key, PUI_LocalPlayerStatus status)
-    {
-        if (_readouts.TryGetValue(key, out var existing) && existing != null) return existing;
-        var source = status.m_healthText;
-        if (source == null) throw new InvalidOperationException("The local player status readout carries no text to clone.");
-        // The source's own parent is the row the readout sits in; a source that has no parent is cloned at the
-        // root rather than refused, because the text itself is what carries the font and material.
-        var clone = UnityEngine.Object.Instantiate(source.gameObject, source.transform.parent ?? source.transform);
-        clone.name = "ForgeHudValue_" + key;
-        if (clone.GetComponent<RectTransform>() is { } rect)
-        {
-            rect.anchorMin = new Vector2(rect.anchorMin.x, 1f);
-            rect.anchorMax = new Vector2(rect.anchorMax.x, 1f);
-            rect.anchoredPosition = new Vector2(0f, 22f);
-        }
-        _readouts[key] = clone;
-        return clone;
-    }
-
-    private void Hide(string key)
-    {
-        if (!_readouts.TryGetValue(key, out var existing)) return;
-        _readouts.Remove(key);
-        if (existing != null) UnityEngine.Object.Destroy(existing);
-    }
-
-    /// <summary>Every readout belongs to the world that created it: a world epoch the kernel has moved past
-    /// leaves objects whose plan and step no longer exist, so they are destroyed rather than left on screen. The
-    /// overhead lines are the one shape this class does not own alone — each of them holds the game's own
-    /// extra-information row — so they are released through the model that saved that row's visibility.</summary>
+    /// <summary>The overhead lines are the one shape this class does not own alone — each of them holds the
+    /// game's own extra-information row — so a world the kernel has moved past releases them through the model
+    /// that saved that row's visibility.</summary>
     private void DropForNewWorld(long epoch)
     {
         if (_epochKnown && _epoch == epoch) return;
         _epoch = epoch;
         _epochKnown = true;
-        foreach (var readout in _readouts.Values) if (readout != null) UnityEngine.Object.Destroy(readout);
-        _readouts.Clear();
         TeammateOverhead.Clear();
-    }
-
-    /// <summary>The readout's own identity: the plan and the plan's `key` when it named one, so two readouts of
-    /// one plan replace each other and two plans never collide.</summary>
-    private static string Key(CommandContext context)
-    {
-        string? key = EnvironmentActions.Text(context.Parameters, "key");
-        string scope = string.IsNullOrEmpty(context.PlanId) ? context.NodeId : context.PlanId;
-        return string.IsNullOrEmpty(key) ? scope : scope + "." + key;
     }
 
     /// <summary>The address of the player sitting at this machine, or null while the game has no local player. It

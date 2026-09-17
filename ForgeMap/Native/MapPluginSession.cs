@@ -47,6 +47,10 @@ internal sealed partial class MapPluginSession : IDisposable
     /// <summary>The door and terminal observation half. The two door execute rows and the door value row answer
     /// from the tables it fills, which is why the session owns it and not the hook list.</summary>
     private DoorTerminalFacts? _doorTerminal;
+    /// <summary>The attribute-modifier half: the one adapter the two sourced-modifier rows write through. It holds
+    /// a lifecycle subscription on the registration, so the session owns it and releases it with the other
+    /// halves.</summary>
+    private AgentModifierAdapter? _agentModifiers;
     /// <summary>The native player value source and the three halves the player hooks publish through. A hook
     /// reads the installed half rather than a session, so a session that failed before attaching them publishes
     /// nothing.</summary>
@@ -135,6 +139,10 @@ internal sealed partial class MapPluginSession : IDisposable
             // kernel, so this is the one line that hands them their registration; it runs on the thread the kernel
             // was built on, which is the thread every half of this session is created on.
             session._alarmWave = AlarmWaveActions.Attach(kernel, session.MapObjects.Registration);
+            // The one adapter both sourced-modifier rows write through, and the row the movement preset writes
+            // through beside them: one write path onto the native synced-modifier table, never two. It is created
+            // after `RegisterModule` returned because its lifecycle subscription needs a registration that exists.
+            session._agentModifiers = new AgentModifierAdapter(session.MapObjects.Registration, report);
             session.Module = new PlayerIdentityModule(session.MapObjects.Registration, kernel, () => !session._faulted, log, report);
             session._vitals = new NativePlayerVitals();
             session.State = PlayerStateFacts.Attach(session.MapObjects.Registration, kernel, session._vitals, log, report);
@@ -187,6 +195,10 @@ internal sealed partial class MapPluginSession : IDisposable
         var alarmWave = _alarmWave; _alarmWave = null;
         if (alarmWave != null) Cleanup(() => AlarmWaveActions.Detach(alarmWave), errors);
         if (PlayerValueReads.Installed is { } reads) Cleanup(() => PlayerValueReads.Detach(reads), errors);
+        // The movement preset and the two attribute rows are one adapter, so it goes last of the halves that
+        // write: releasing it revokes every modification this provider still holds an id for.
+        var agentModifiers = _agentModifiers; _agentModifiers = null;
+        if (agentModifiers != null) Cleanup(agentModifiers.Dispose, errors);
     }
 
     /// <summary>The one Map provider definition: the rows, the support lines and the shape table
@@ -205,6 +217,9 @@ internal sealed partial class MapPluginSession : IDisposable
         var actions = new TerminalObjectActions(_kernel, () => !_faulted, TerminalFor, _report);
         var objectives = ObjectiveActionHandler.For(() => !_faulted, _report);
         var doors = new DoorTerminalActions(_kernel, () => !_faulted, DoorFor, _report);
+        // The three door execute rows' own half: it resolves a recipient through the same address grammar the
+        // observation half records doors by, so a door a plan names is the door that was observed.
+        var doorActions = new DoorActionCommands(_kernel, () => !_faulted, DoorActionCommands.ResolveByAddress, _report);
         var environment = EnvironmentActions.For(() => !_faulted, _report);
         var presented = EnvironmentPresentation.For(_report);
         var hud = new HudActions(_report);
@@ -219,6 +234,19 @@ internal sealed partial class MapPluginSession : IDisposable
             [ObjectiveActionContract.ExtractionHandlerName] = objectives.HandleExtraction,
             [DoorTerminalActionContract.LockHandlerName] = doors.HandleLock,
             [DoorTerminalActionContract.UnlockHandlerName] = doors.HandleUnlock,
+            // The three door rows and the two player rows: the contract's own handler names, so the declaration
+            // and its body are one fact.
+            [DoorActionContract.OpenHandlerName] = doorActions.HandleOpen,
+            [DoorActionContract.CloseHandlerName] = doorActions.HandleClose,
+            [DoorActionContract.AlarmHandlerName] = doorActions.HandleAlarm,
+            [PlayerActionContract.TeleportHandlerName] = PlayerActions.Teleport,
+            [PlayerActionContract.InfectionHandlerName] = PlayerActions.Infection,
+            // The movement preset writes the one native modification table through the one adapter this session
+            // created: a handler table is built before the half that owns the state, so it is a static facade over
+            // that half. The two sourced-modifier rows answer through the same adapter, but their capability rows
+            // belong to `forge.contract.combat` and that provider does not declare them yet, so this registration
+            // has no binding for them and asks for no body here.
+            [MovementProfileContract.HandlerName] = AgentModifierAdapter.ProfileHandler,
             [EnvironmentContract.LightingHandler] = environment.HandleLighting,
             [EnvironmentContract.LightColorHandler] = environment.HandleLightColor,
             [EnvironmentContract.FogHandler] = environment.HandleFog,

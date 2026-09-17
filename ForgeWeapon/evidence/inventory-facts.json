@@ -85,7 +85,7 @@
         { "name": "Reset", "signature": "System.Void PlayerBackpack::Reset()", "rva": "0x1760850", "callEdges": "reaches TryClearSlot (w1-native-hooks.json: reset.clears-slot)" },
         { "name": "AddBackpackItem", "signature": "System.Void PlayerBackpack::AddBackpackItem(Player.InventorySlot, Player.BackpackItem)", "rva": "0x175E7F0" },
         { "name": "SetupAmmoStorageForItem", "signature": "System.Void PlayerBackpack::SetupAmmoStorageForItem(Player.Item, Player.InventorySlot)", "access": "private" },
-        { "name": "CountPocketItem", "signature": "System.Int32 PlayerBackpack::CountPocketItem(System.UInt32)", "access": "public", "usedFor": "NOT used: a pocket item count is a separate table from a slot, and the stack row is defined over the slot table only, so the two can never be conflated" },
+        { "name": "CountPocketItem", "signature": "System.Int32 PlayerBackpack::CountPocketItem(System.UInt32)", "access": "public", "usedFor": "stack_changed: the count the game answers for one item id, which is the group the pocket slots holding that id form" },
         { "name": "IsDeployed", "signature": "System.Boolean PlayerBackpack::IsDeployed(Player.InventorySlot)", "access": "public", "note": "a deployed slot stays occupied; the existing adapter already tags it deployed, and this family publishes no drop for it" }
       ]
     },
@@ -94,8 +94,8 @@
       "assembly": "Modules-ASM.dll",
       "role": "one occupied slot",
       "properties": ["Name", "ItemID (uint)", "GearIDRange", "Instance (Player.Item)", "IsLoaded (bool)", "Status (Player.eInventoryItemStatus)"],
-      "finding": "A slot entry holds no stack count. This build's slot table is one item instance per slot, so the stack row is defined as the slot's occupancy and identity rather than as a count read from a member that does not exist.",
-      "unverified": "Whether any item in this build carries an internal stack greater than one; no count member is exposed on BackpackItem, so the row publishes one per occupied slot."
+      "finding": "A slot entry holds no stack count, so the slot table alone can only say whether an item is there. The count the stack row publishes is the backpack's own pocket count for that item id, which is what groups the pocket slots holding the same id into one stack; a slot whose block is not carried in a pocket has no count at all and publishes no count row.",
+      "unverified": "Whether any item in this build carries a stack greater than one inside a single slot; the count is the game's own per-id answer over the pocket table either way, so a single slot holding five rounds of one id reads as five."
     },
     {
       "type": "Gear.ResourcePackPickup",

@@ -116,6 +116,15 @@ namespace UnityEngine
         public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; }
         public float r, g, b, a;
         public static Color white => new(1f, 1f, 1f, 1f);
+        public static Color Lerp(Color from, Color to, float progress) => new(
+            from.r + (to.r - from.r) * progress, from.g + (to.g - from.g) * progress,
+            from.b + (to.b - from.b) * progress, from.a + (to.a - from.a) * progress);
+    }
+
+    /// <summary>The frame's own delta: the one reading the session hands its clock, which the light fade steps by.</summary>
+    public static class Time
+    {
+        public static float deltaTime { get; set; } = 1f / 60f;
     }
 
     /// <summary>The one Unity object the HUD placements touch: object creation and destruction are recorded so a
@@ -1292,8 +1301,24 @@ namespace LevelGeneration
         public List<LG_Light>? m_lightsInZone { get; set; } = new();
     }
 
-    /// <summary>One native light of a zone. Only the object identity matters to the count.</summary>
-    public sealed class LG_Light : UnityObjectDouble { }
+    /// <summary>One native light of a zone: its object identity is the count of the zone's own list, and the
+    /// three writes and two reads the light-colour row makes are the game's own `LG_Light` members.</summary>
+    public sealed class LG_Light : UnityObjectDouble
+    {
+        public LightCategory m_category { get; set; }
+        public UnityEngine.Color m_color { get; set; } = UnityEngine.Color.white;
+        public float Intensity { get; private set; } = 1f;
+
+        public float GetIntensity() => Intensity;
+        public void ChangeIntensity(float intensity) => Intensity = intensity;
+        public void ChangeColor(UnityEngine.Color color) => m_color = color;
+
+        /// <summary>The game's own seven light categories, in the order the interop enum declares them.</summary>
+        public enum LightCategory
+        {
+            General = 0, Special = 1, Emergency = 2, Independent = 3, Door = 4, Sign = 5, DoorImportant = 6
+        }
+    }
 
     /// <summary>The floor of the level: its own zone list is the one table every address is read from.</summary>
     public sealed class LG_Floor : UnityObjectDouble

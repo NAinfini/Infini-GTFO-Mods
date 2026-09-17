@@ -988,7 +988,7 @@ public sealed class MapNativeAdapterTests
             // asserted where a plan consumes them, in the managed observation suite.
             Hook(typeof(DoorStateReadback), locks, default(pDoorState));
             Hook(typeof(DoorStateReadback), locks, default(pDoorState));
-            Hook(typeof(TerminalCommandReadbackFixed), terminal.SyncID, TERM_Command.ViewSecurityLog, "", "", "");
+            Hook(typeof(TerminalCommandReadbackFixed), terminal.SyncID, TERM_Command.ViewSecurityLog, "");
             terminal.CurrentStateName = TERM_State.DataMining; Hook(typeof(TerminalStateReadback), terminal);
             terminal.CurrentStateName = TERM_State.Hacked; Hook(typeof(TerminalStateReadback), terminal);
             door.LastStatus = eDoorStatus.Unlocked; Hook(typeof(DoorStateReadback), locks, default(pDoorState));
@@ -999,7 +999,7 @@ public sealed class MapNativeAdapterTests
             SNet.IsMaster = false;
             world.Forget(upper); Hook(typeof(DoorStateReadback), locks, default(pDoorState));
             terminal.CurrentStateName = TERM_State.PlayerInteracting; Hook(typeof(TerminalStateReadback), terminal);
-            Hook(typeof(TerminalCommandReadbackFixed), terminal.SyncID, TERM_Command.Open, "", "", "");
+            Hook(typeof(TerminalCommandReadbackFixed), terminal.SyncID, TERM_Command.Open, "");
             Require(session.LastFault == null && plugin.Log.Warnings.Count == 0 && session.MapObjects!.PublishedFacts == 0,
                 "A client read or published map-object state. warnings=" + string.Join(" | ", plugin.Log.Warnings));
         }

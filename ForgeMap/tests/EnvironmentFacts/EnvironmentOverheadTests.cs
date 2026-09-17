@@ -39,8 +39,8 @@ public sealed class EnvironmentOverheadTests
         // The colour is a structural parameter, not an input port: the value travels per dispatch, the form of
         // the readout is part of the row.
         object parameters = color == null
-            ? new { placement = 2, form = 1, audience }
-            : new { placement = 2, form = 1, audience, color };
+            ? new { placement = 1, form = 1, audience }
+            : new { placement = 1, form = 1, audience, color };
         return Contexts.Command(HudContract.ValueCapability, new { viewers, value, visible, maximum }, parameters,
             isHost: false);
     }
@@ -183,7 +183,7 @@ public sealed class EnvironmentOverheadTests
         EnvironmentWorld.Local(1);
         var context = Contexts.Command(HudContract.ValueCapability,
             new { viewers = new[] { teammate }, value = 1d, visible = true, maximum = 100d },
-            new { placement = 2, form = 3, audience = 0 }, isHost: false);
+            new { placement = 1, form = 3, audience = 0 }, isHost: false);
 
         Assert.Equal(HudActions.FormCode, world.Hud.HandleValue(context).Code);
         Assert.Empty(UnityEngine.Object.Created);

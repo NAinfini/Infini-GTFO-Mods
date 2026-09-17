@@ -29,6 +29,12 @@ internal sealed class FactsWorld : IDisposable
     internal static readonly string[] PooledSlots =
         { "GearStandard", "GearSpecial", "GearClass", "ResourcePack", "Consumable", "ConsumableHeavy" };
 
+    /// <summary>The block id the armed cases' item carries, and the pocket count a case's backpack answers for it
+    /// unless the case says otherwise. One, because such a case's slot table holds that item: the count row reads
+    /// the backpack's own pocket count, so a case that moves an item moves that table with it, the way the game
+    /// does. A case that wants a stack of another size writes the count it wants.</summary>
+    internal const uint ArmedItemId = 5501;
+
     private readonly RuntimeModuleHandle _equipment;
     private readonly List<RuntimeEvent> _published = new();
     private readonly List<FakePlayer> _players = new();
@@ -55,9 +61,15 @@ internal sealed class FactsWorld : IDisposable
         // payload arrives as a whole frame, so the runtime asks for none of them — and the support rows are the
         // contract's own, because the registry requires one per implemented binding.
         _equipment = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, Registry(),
-            new Dictionary<string, CommandHandler>(), ReloadInventoryContract.Support(),
-            new Dictionary<string, Func<EntityReference, bool>> { [kind] = reference => Live.Contains(reference) }),
-            RuntimeLogLevel.Off);
+            new Dictionary<string, CommandHandler>(), ReadsSupport(),
+            new Dictionary<string, Func<EntityReference, bool>> { [kind] = reference => Live.Contains(reference) })
+        {
+            // The two read rows are evaluated on demand rather than dispatched, so their bodies and shapes travel
+            // with the registration exactly as the package registers them: the registry refuses an observe row over
+            // a state or a condition capability that carries neither.
+            Shapes = InventoryQueryContract.Shapes(),
+            Evaluators = InventoryQueryContract.Evaluators()
+        }, RuntimeLogLevel.Off);
         Native = new Reads(this);
         // The fixture publishes every row it drives unless a case closes one: no plan is mounted here, so the
         // subscription gate this observer asks is answered "subscribed" rather than standing a plan up behind
@@ -151,6 +163,13 @@ internal sealed class FactsWorld : IDisposable
         if (result.Status == "rejected") throw new InvalidOperationException("fixture publish rejected: " + result.Code);
     }
 
+    /// <summary>The support rows the registration carries: the fact family's own from
+    /// <see cref="ReloadInventoryContract"/>, plus the two read rows' from <see cref="InventoryQueryContract"/>.
+    /// Both are the contracts' own lines, so a binding with no support line is refused here rather than in a game.
+    /// </summary>
+    private static BindingSupport[] ReadsSupport()
+        => ReloadInventoryContract.Support().Concat(InventoryQueryContract.Support()).ToArray();
+
     /// <summary>The fixture's registration: one module, one provider, and the shapes and binding rows taken from
     /// the contract itself. The rows the runtime's own trigger contract carries have their owner restamped for
     /// this fixture, because a module may only declare capabilities of its own and the shipped rows deliberately
@@ -165,8 +184,17 @@ internal sealed class FactsWorld : IDisposable
             owned["owner"] = ModuleDefinition.ProviderId;
             capabilities.Add(owned);
         }
+        // The rows this provider declares on its own — the carried-item trigger row and the two read rows — name
+        // this provider as their owner already, so they travel exactly as their contract declares them, description
+        // and all.
+        foreach (var row in ReloadInventoryContract.Capabilities())
+            capabilities.Add(JsonNode.Parse(((JsonElement)row).GetRawText()));
+        foreach (var row in InventoryQueryContract.Capabilities())
+            capabilities.Add(JsonNode.Parse(((JsonElement)row).GetRawText()));
         var bindings = new JsonArray();
         foreach (var row in ReloadInventoryContract.Bindings())
+            bindings.Add(JsonNode.Parse(RuntimeJson.From(row).GetRawText()));
+        foreach (var row in InventoryQueryContract.Bindings())
             bindings.Add(JsonNode.Parse(RuntimeJson.From(row).GetRawText()));
         var registry = new JsonObject
         {
@@ -240,6 +268,11 @@ internal sealed class FactsWorld : IDisposable
         public int? ItemCharge(object item) => Clip(item);
 
         public bool ItemIsReloading(object item) => IsReloading(item);
+
+        public uint? ItemId(object item) => item is FakeItem value ? value.ItemId : null;
+
+        public int? StackCount(object backpack, uint itemId)
+            => backpack is FakeBackpack value && value.Stacks.TryGetValue(itemId, out var count) ? count : null;
 
         public IReadOnlyList<NativeSlot>? Slots(object backpack)
         {

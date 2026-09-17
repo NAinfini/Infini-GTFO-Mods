@@ -119,6 +119,16 @@ public sealed class NativeAdapterTests
             WeaponDeployableFactsContract.DetonatedBinding, WeaponMeleeHitContract.MeleeHitBinding,
             AttackInstanceContract.BurstStartedBinding, AttackInstanceContract.BurstEndedBinding,
             AttackInstanceContract.DryFireBinding,
+            // The reload and inventory observation families: ten rows whose shapes the runtime's own trigger
+            // contract owns, appended by `ReloadInventoryContract.Bindings`.
+            ReloadInventoryContract.ReloadStartedBinding, ReloadInventoryContract.ReloadCompletedBinding,
+            ReloadInventoryContract.ReloadTransferredBinding, ReloadInventoryContract.RefilledBinding,
+            ReloadInventoryContract.StackChangedBinding, ReloadInventoryContract.PickedUpBinding,
+            ReloadInventoryContract.DroppedBinding, ReloadInventoryContract.UseStartedBinding,
+            ReloadInventoryContract.UseFailedBinding, ReloadInventoryContract.CarriedItemChangedBinding,
+            // The two evaluator-answered reads: `observe` rows like the ones above, answered on demand instead of
+            // by a dispatched body, so neither appears in the executed list below.
+            InventoryQueryContract.EquipmentAmmoBinding, InventoryQueryContract.InventoryItemBinding,
             // The action rows the session's own registration carries beside the observations: the ammunition
             // pair, the three instance overrides and the inventory give/consume pair. `drop` declares no row and
             // has no body, so nothing here names it.

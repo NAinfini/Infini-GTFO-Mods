@@ -152,8 +152,11 @@ namespace Player
         public PlayerAgent? Agent;
     }
 
+    /// <summary>The location a warp names: the production reader reads `goodPosition` as a field, exactly the
+    /// interop member build 20403457 carries.</summary>
     public struct pPlayerLocationData
     {
+        public Vector3 goodPosition;
         public Vector3 position;
     }
 

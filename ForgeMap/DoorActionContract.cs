@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ForgeRuntime.Framework;
 
 namespace ForgeMap;
@@ -226,5 +227,14 @@ public static class DoorActionContract
         Support(OpenCapability, OpenPermission),
         Support(CloseCapability, ClosePermission),
         Support(AlarmCapability, AlarmPermission)
+    };
+
+    /// <summary>The handler shapes this provider's native half answers, keyed by handler name. A registration
+    /// composes them into its own shape table; the native half never declares a second layout.</summary>
+    public static IReadOnlyDictionary<string, HandlerShape> Shapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
+    {
+        [OpenHandlerName] = OpenShape,
+        [CloseHandlerName] = CloseShape,
+        [AlarmHandlerName] = AlarmShape
     };
 }

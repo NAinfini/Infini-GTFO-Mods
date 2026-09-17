@@ -58,14 +58,16 @@ internal sealed class ModifierWorld : IDisposable
             new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
             {
                 [AgentModifierContract.ApplyHandlerName] = AgentModifierAdapter.ApplyHandler,
-                [AgentModifierContract.RemoveHandlerName] = AgentModifierAdapter.RemoveHandler
-            }, AgentModifierContract.Support(),
+                [AgentModifierContract.RemoveHandlerName] = AgentModifierAdapter.RemoveHandler,
+                [MovementProfileContract.HandlerName] = AgentModifierAdapter.ProfileHandler
+            }, AgentModifierContract.Support().Concat(new[] { MovementProfileContract.Support() }).ToArray(),
             new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
             {
                 [PlayerIdentityModule.EntityKind] = reference => PlayerIdentityModule.Current is { } half && half.IsCurrent(reference)
             })
         {
-            Shapes = AgentModifierContract.Shapes(),
+            Shapes = AgentModifierContract.Shapes().Concat(MovementProfileContract.Shapes())
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
             EntityInstanceResolvers = new Dictionary<string, Func<object, EntityReference?>>(StringComparer.Ordinal)
             {
                 [PlayerIdentityModule.EntityKind] = instance => PlayerIdentityModule.Current?.ResolveInstance(instance)
@@ -106,16 +108,17 @@ internal sealed class ModifierWorld : IDisposable
         }).GetRawText();
     }
 
-    /// <summary>The Map provider's declaration: this provider's id, the two binding rows the native half answers
-    /// and no capability of its own — the capabilities are the combat contract's.</summary>
+    /// <summary>The Map provider's declaration: this provider's id, the binding rows the native half answers, and
+    /// the one capability row this provider owns — the movement preset, whose owner is this provider and not the
+    /// combat contract's. The row is the production contract's own text.</summary>
     private static string MapRegistry() => RuntimeJson.From(new
     {
         providers = new[]
         {
             new { id = ModuleDefinition.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() }
         },
-        capabilities = Array.Empty<object>(),
-        bindings = AgentModifierContract.Bindings()
+        capabilities = new object[] { MovementProfileContract.Row() },
+        bindings = AgentModifierContract.Bindings().Concat(new object[] { MovementProfileContract.BindingRow() }).ToArray()
     }).GetRawText();
 
     /// <summary>One command context over a row of this slice, as a dispatch would hand it to the handler: the
@@ -142,6 +145,10 @@ internal sealed class ModifierWorld : IDisposable
     /// <summary>One remove request over the handles a case collected.</summary>
     internal CommandResult Remove(object? inputs)
         => Adapter.Remove(Context(AgentModifierContract.RemoveCapabilityId, inputs, null));
+
+    /// <summary>One movement preset request, over the production row's own id.</summary>
+    internal CommandResult Profile(object? inputs)
+        => Adapter.Profile(Context(MovementProfileContract.CapabilityId, inputs, null));
 
     internal TickResult Advance(long tick) => Kernel.Advance(tick, true);
 

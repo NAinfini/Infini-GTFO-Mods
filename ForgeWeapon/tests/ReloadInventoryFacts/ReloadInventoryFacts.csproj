@@ -36,8 +36,10 @@
     <Compile Include="../../WeaponSupplyContract.cs" />
     <Compile Include="../../WeaponOverrideContract.cs" />
     <Compile Include="../../InventoryActionContract.cs" />
+    <Compile Include="../../InventoryQueryContract.cs" />
+    <Compile Include="../../InventoryQueryReads.cs" />
     <Compile Include="../../ModuleDefinition.cs" />
-    <Compile Include="FactsWorld.cs;ReloadFactsTests.cs;InventoryFactsTests.cs;ReloadInventoryContractTests.cs;Fixtures.cs" />
+    <Compile Include="FactsWorld.cs;ReloadFactsTests.cs;InventoryFactsTests.cs;InventoryQueryFactsTests.cs;ReloadInventoryContractTests.cs;Fixtures.cs" />
     <Reference Include="ForgeRuntime.Framework" HintPath="$(ForgeRuntimeFrameworkAssembly)" />
     <Reference Include="Il2Cppmscorlib" HintPath="$(GTFOBepInExPath)/interop/Il2Cppmscorlib.dll" />
     <!-- Referenced for its metadata only: `Utils-ASM` and `SNet_ASM` are what `Modules-ASM`'s own base types live

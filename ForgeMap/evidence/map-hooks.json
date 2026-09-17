@@ -1738,13 +1738,6 @@
       "signature": "System.Boolean PLOC_Downed::get_m_isRevived()"
     },
     {
-      "id": "pui-localplayerstatus-get-m-healthtext",
-      "assembly": "Modules-ASM.dll",
-      "type": "PUI_LocalPlayerStatus",
-      "isStatic": false,
-      "signature": "TMPro.TextMeshPro PUI_LocalPlayerStatus::get_m_healthText()"
-    },
-    {
       "id": "pui-localplayerstatus-get-m-shieldtext",
       "assembly": "Modules-ASM.dll",
       "type": "PUI_LocalPlayerStatus",

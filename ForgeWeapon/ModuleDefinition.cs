@@ -50,7 +50,11 @@ public static class ModuleDefinition
     /// so the table that carries their bodies is what is supplied or not. The inventory pair is the `a-p-item`
     /// half — give and consume. `drop` declares nothing and has no body: the node list has no drop node, so no
     /// binding row is added for it, no capability row is declared (ruling 110.5) and the implementation is gone
-    /// with them (ruling 133.3).</summary>
+    /// with them (ruling 133.3). The reload and inventory family travels with its own contract:
+    /// <see cref="ReloadInventoryContract"/> hands back the nine rows the runtime's trigger contract declares and
+    /// the one carried-item row whose id this provider owns, and <see cref="InventoryQueryContract"/> hands back
+    /// the two read rows it evaluates on demand, each with the evaluator body and the shape that body answers
+    /// through.</summary>
     public static RuntimeModule Create(
         CommandHandler? ammoAdd = null, CommandHandler? ammoConsume = null,
         IReadOnlyDictionary<string, CommandHandler>? overrides = null,
@@ -71,6 +75,8 @@ public static class ModuleDefinition
         capabilities.AddRange(WeaponSupplyContract.Rows(ammoAdd, ammoConsume));
         if (overrides != null) capabilities.AddRange(WeaponOverrideContract.Capabilities());
         capabilities.AddRange(InventoryActionContract.Capabilities(inventoryGive, inventoryConsume));
+        capabilities.AddRange(ReloadInventoryContract.Capabilities());
+        capabilities.AddRange(InventoryQueryContract.Capabilities());
         var bindings = new List<object>
         {
             Binding(EquippedBinding, EquippedCapability, "gtfo.equipment.equipped"),
@@ -87,6 +93,8 @@ public static class ModuleDefinition
         bindings.AddRange(WeaponSupplyContract.Bindings(ammoAdd, ammoConsume));
         if (overrides != null) bindings.AddRange(WeaponOverrideContract.Bindings());
         bindings.AddRange(InventoryActionContract.Rows(inventoryGive, inventoryConsume));
+        bindings.AddRange(ReloadInventoryContract.Bindings());
+        bindings.AddRange(InventoryQueryContract.Bindings());
         var support = new List<BindingSupport>
         {
             new(EquippedBinding, "implementation-only", new[] { WieldReadPermission }),
@@ -103,6 +111,8 @@ public static class ModuleDefinition
         support.AddRange(WeaponSupplyContract.Support(ammoAdd, ammoConsume));
         if (overrides != null) support.AddRange(WeaponOverrideContract.Support());
         support.AddRange(InventoryActionContract.Support(inventoryGive, inventoryConsume));
+        support.AddRange(ReloadInventoryContract.Support());
+        support.AddRange(InventoryQueryContract.Support());
         var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal);
         var shapes = new Dictionary<string, HandlerShape>(StringComparer.Ordinal);
         // One body and one shape per declared row. A handler the registration carries but no binding names is
@@ -116,6 +126,13 @@ public static class ModuleDefinition
             foreach (var entry in overrides) handlers[entry.Key] = entry.Value;
             foreach (var entry in WeaponOverrideContract.Shapes()) shapes[entry.Key] = entry.Value;
         }
+        // The two read rows are evaluated on demand rather than dispatched, so their bodies go in the evaluator
+        // table the registration carries beside the handlers. Each body reads the world through the source the
+        // native half attaches to it, and refuses by name while no source is attached — which is the state every
+        // process that only declares this provider is in.
+        var evaluators = new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal);
+        foreach (var entry in InventoryQueryContract.Evaluators()) evaluators[entry.Key] = entry.Value;
+        foreach (var entry in InventoryQueryContract.Shapes()) shapes[entry.Key] = entry.Value;
         return new RuntimeModule(RuntimeKernel.ApiVersion,
             RuntimeJson.From(new
             {
@@ -124,7 +141,7 @@ public static class ModuleDefinition
                 bindings = bindings.ToArray()
             }).GetRawText(),
             handlers, support.ToArray())
-        { Shapes = shapes };
+        { Shapes = shapes, Evaluators = evaluators };
     }
 
     private static object Binding(string id, string capabilityId, string handler, string role = "observe") => new

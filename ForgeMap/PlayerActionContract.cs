@@ -13,17 +13,18 @@ namespace ForgeMap;
 /// unchanged; the catalog is the authority for the shape and this module only implements it. The rows live in
 /// the game-independent assembly because the runtime module, the manifest and the website read them there.
 ///
-/// The remaining four player rows of the catalog are deliberately not declared here, because no binding of this
+/// The remaining three player rows of the catalog are deliberately not declared here, because no binding of this
 /// build could answer them end to end:
 /// - `forge.action.player.respawn` has no native request path at all (`PlayerAgent.Alive` is a flag, not a life
 ///   allocation, and nothing spawns or replicates a replacement `PlayerAgent`);
 /// - `forge.action.player.input_restrict` declares an `effect` handle and a per-action gate, while the only
 ///   native entry (`PlayerAgent.RequestToggleControlsEnabled`) toggles every control at once and mints nothing;
-/// - `forge.action.player.movement_profile` declares an `effect` handle and a `jump_gravity` input, while the
-///   native synced-modifier entry can express neither;
 /// - `forge.action.player.checkpoint_inventory` consumes a `transaction` snapshot handle, which is the
 ///   transaction/reservation store the runtime does not have yet.
-/// `ForgeMap/evidence/player-actions.json` carries the native basis for each conclusion.</summary>
+/// `ForgeMap/evidence/player-actions.json` carries the native basis for each conclusion. The
+/// `forge.action.player.movement_profile` row was on that list until the synced-modifier adapter landed the effect
+/// handle it needed; it now lives in <see cref="MovementProfileContract"/>, which states the one input the native
+/// table still cannot carry.</summary>
 public static class PlayerActionContract
 {
     public const string TeleportCapabilityId = "forge.action.player.teleport";
