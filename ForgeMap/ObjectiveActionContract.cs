@@ -191,7 +191,7 @@ public static class ObjectiveActionContract
                 // stay optional and are refused by name when a plan supplies one.
                 Many("extractions", "entity"),
                 Port("enabled", "boolean"),
-                OptionalMany("participants", "entity")
+                OptionalMany("participants", "entity", new[] { "gtfo.player" })
             },
             outputs = new object[] { Port("next", "execution"), Result("forge.result.map.extraction_enable") },
             parameters = new object[] { Enum("layer", Layers, required: true) },
@@ -234,6 +234,7 @@ public static class ObjectiveActionContract
     private static object Optional(string id, string type) => new { id, type, optional = true };
     private static object Many(string id, string type) => new { id, type, cardinality = "many" };
     private static object OptionalMany(string id, string type) => new { id, type, cardinality = "many", optional = true };
+    private static object OptionalMany(string id, string type, string[] entityKinds) => new { id, type, cardinality = "many", optional = true, entityKinds };
     /// <summary>One resource input port. The catalog declares the objective rows' `objectives` as a `many`
     /// collection; this build declares it as the one reference the row can be handed, because a collection of
     /// resources has no frame layout (`RuntimeGraphContracts.FramePort` refuses it), exactly as the level-event

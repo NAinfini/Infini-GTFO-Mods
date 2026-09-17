@@ -18,7 +18,7 @@ internal sealed class AuditScene
     private ushort _nextGlobalId = 8;
     internal AuditScene(bool subscribe = false)
     {
-        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
+        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
         Kernel.BeginWorld(1); Kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
         Kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         LocalPlan.OwnMounts(Kernel);

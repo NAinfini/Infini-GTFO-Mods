@@ -42,7 +42,7 @@ internal sealed class LevelObjectWorld : IDisposable
     /// <summary>One live world at epoch 1 with the level-object rows registered and the module attached.</summary>
     internal static LevelObjectWorld Start()
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.test.levelobject", "0.1.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.test.levelobject", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         // The control vocabulary is the kernel's own module, the way the host registers it: the one step of the
         // plan this fixture mounts below is the kernel's own `branch`.
         kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
@@ -110,7 +110,7 @@ internal sealed class LevelObjectWorld : IDisposable
         var capabilities = JsonDocument.Parse(LevelObjectContract.CapabilitiesJson).RootElement;
         var registry = RuntimeJson.From(new
         {
-            providers = new[] { new { id = LevelObjectContract.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() } },
+            providers = new[] { new { id = LevelObjectContract.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities,
             bindings = LevelObjectContract.BindingRows()
         });

@@ -48,7 +48,7 @@ internal sealed class ModifierWorld : IDisposable
         PlayerAgent.ResetStatics();
         AgentModifierManager.Reset();
         SNet.IsMaster = true;
-        Kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        Kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         // A world of its own per case: a reference carries the epoch it was recorded in, and a case that reused an
         // earlier epoch would keep answering for an earlier world's lives.
         Kernel.BeginWorld(++_world);
@@ -112,7 +112,7 @@ internal sealed class ModifierWorld : IDisposable
     {
         providers = new[]
         {
-            new { id = ModuleDefinition.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() }
+            new { id = ModuleDefinition.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() }
         },
         capabilities = Array.Empty<object>(),
         bindings = AgentModifierContract.Bindings()

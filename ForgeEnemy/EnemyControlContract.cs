@@ -73,6 +73,7 @@ internal static class EnemyControlContract
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemies",
                 "type": "entity",
                 "cardinality": "many"
@@ -182,6 +183,7 @@ internal static class EnemyControlContract
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemies",
                 "type": "entity",
                 "cardinality": "many"
@@ -295,6 +297,7 @@ internal static class EnemyControlContract
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemies",
                 "type": "entity",
                 "cardinality": "many"

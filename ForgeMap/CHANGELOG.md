@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0
+## 1.0.0
 
 - First release candidate of `NAinfini-ForgeMap`: the game-independent provider definition (`forge.module.gtfo.map`) plus the native plugin that registers it with the player entity resolver and reacts to host world changes. No capability, binding or observer is published, and `ForgeMap.dll` ships for that provider definition.
 - The `gtfo.map_object` instance lookup also answers for the object a bullet was resolved against: a hit collider climbs to the door or terminal it belongs to, and that object is then classified and addressed exactly as one handed over directly. A hit object with no map object above it resolves to nothing.

@@ -90,7 +90,7 @@ public sealed class WeaponOverrideContractTests
         var owner = RuntimeJson.Parse(WeaponOverrideContract.Documents[0]).GetProperty("owner").GetString()!;
         var registry = RuntimeJson.From(new
         {
-            providers = new[] { new { id = owner, kind = "native", version = "0.2.0", dependencies = Array.Empty<string>() } },
+            providers = new[] { new { id = owner, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = WeaponOverrideContract.Rows().Select(row => (object)row).ToArray(),
             bindings = WeaponOverrideContract.Bindings().ToArray()
         }).GetRawText();
@@ -103,7 +103,7 @@ public sealed class WeaponOverrideContractTests
             Shapes = WeaponOverrideContract.Shapes()
         };
 
-        var kernel = new RuntimeKernel(new RuntimeIdentity(owner, "0.2.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity(owner, "1.0.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
         kernel.BeginWorld(3);
         using var registration = kernel.RegisterModule(module, RuntimeLogLevel.Off);
 

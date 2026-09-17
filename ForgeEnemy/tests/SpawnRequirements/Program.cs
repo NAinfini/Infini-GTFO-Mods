@@ -156,7 +156,7 @@ using (var fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "tes
 }
 
 // Dependencies follow actual references; Enemy bindings are read from the real provider registry.
-var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
+var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
 kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
 kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
 using var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });

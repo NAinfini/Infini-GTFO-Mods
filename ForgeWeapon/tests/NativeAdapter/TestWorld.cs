@@ -200,7 +200,7 @@ namespace ForgeWeapon.Tests.NativeAdapter;
             var dispatchable = rows.Where(id => Wiring(sink, GraphOf(id)).ContainsKey(Slot(sink.GetProperty("inputs"), "target"))).ToArray();
             var plans = dispatchable.Select(id => (object)new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId = "fixture.weapon.gate." + id,
+                schemaVersion = 1, kind = "forge-runtime-plan", planId = "fixture.weapon.gate." + id,
                 resource = new { id = "fixture.resource", revision = "r1" },
                 runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = support[SinkBinding].Concat(support[id]).Distinct(StringComparer.Ordinal).OrderBy(p => p, StringComparer.Ordinal).ToArray(),
@@ -481,7 +481,7 @@ namespace ForgeWeapon.Tests.NativeAdapter;
             var sink = Graph(Sink_);
             object Binding(string bindingId, string capabilityId, string providerId, string providerVersion, string handler)
                 => new { bindingId, capabilityId, capabilityVersion = CapabilityVersion(capabilityId), providerId, providerVersion, handler };
-            // schemaVersion 4 (Runtime API 2.0.0): the plan declares its mount targets, the entry names its first
+            // schemaVersion 1 (Runtime API 1.0.0): the plan declares its mount targets, the entry names its first
             // step, and the sink step has no execution output, so its successor list is empty.
             object Entry(string name, int binding, JsonElement trigger) => new
             {
@@ -494,7 +494,7 @@ namespace ForgeWeapon.Tests.NativeAdapter;
             };
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId = "fixture.weapon.plan", resource = new { id = "fixture.resource", revision = "r1" },
+                schemaVersion = 1, kind = "forge-runtime-plan", planId = "fixture.weapon.plan", resource = new { id = "fixture.resource", revision = "r1" },
                 runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = new[] { RecordPermission, ModuleDefinition.WieldReadPermission }, dependencies = Array.Empty<string>(), // ordinal-sorted
                 // The fixture plan mounts on the one level this world owns the mount kind for unless a case asks

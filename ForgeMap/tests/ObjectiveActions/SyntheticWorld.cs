@@ -30,7 +30,7 @@ internal sealed class SyntheticWorld : IDisposable
     /// and the three singletons the game keeps, each standing in for the one instance the process has.</summary>
     internal static SyntheticWorld Start(long worldEpoch = 1, bool host = true)
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         kernel.BeginWorld(worldEpoch);
         // The host flag is published by the first tick, which is what the handler's authority gate reads
         // through the lifecycle snapshot.

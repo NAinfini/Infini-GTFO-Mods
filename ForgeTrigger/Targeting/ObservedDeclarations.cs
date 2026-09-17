@@ -90,18 +90,20 @@ internal static class ObservedDeclaration
 
     /// <summary>One row. The capability id is the row's identity, and its last segment names the binding and the
     /// handler; its second segment is the catalog kind (`condition`, `selector`), which every id of these tables
-    /// spells the same way. A row whose ports cannot express the read it performs declares it through
-    /// <paramref name="reads"/>, exactly as the catalog row does (`reads: ["world"]`).</summary>
+    /// spells the same way — a row whose catalog kind differs states it through <paramref name="kind"/>, because
+    /// the released row's `kind` is compared with the catalog's `category` field for field. A row whose ports
+    /// cannot express the read it performs declares it through <paramref name="reads"/>, exactly as the catalog
+    /// row does (`reads: ["world"]`).</summary>
     internal static ObservedNode Node(string capabilityId, string execution, string label, string description,
         JsonElement[] inputs, JsonElement[] outputs, JsonElement[] parameters, HandlerShape shape, EvaluatorHandler evaluate,
-        string[]? reads = null)
+        string[]? reads = null, string? kind = null)
     {
         var segments = capabilityId.Split('.');
-        var kind = segments[1];
+        var rowKind = kind ?? segments[1];
         var name = segments[^1];
-        return new ObservedNode(capabilityId, kind, execution, execution == "query" ? "observe" : "evaluate",
+        return new ObservedNode(capabilityId, rowKind, execution, execution == "query" ? "observe" : "evaluate",
             label, description, Graph(execution, inputs, outputs, parameters, reads),
-            ModuleDefinition.ProviderId + ".binding." + name, "trigger." + kind + "." + name, shape, evaluate);
+            ModuleDefinition.ProviderId + ".binding." + name, "trigger." + rowKind + "." + name, shape, evaluate);
     }
 
     // Every piece below is built as a JsonElement rather than as an `object`, so a collection keeps its JSON type

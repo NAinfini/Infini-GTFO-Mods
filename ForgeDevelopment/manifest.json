@@ -5,6 +5,7 @@
   "description": "Forge Development: optional authoring diagnostics (generation, world, performance and run evidence) for the Forge Runtime in Authoring mode. Author-only package; registers no provider and is not a player dependency.",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.2",
-    "NAinfini-ForgeRuntime-1.2.0"
+    "NAinfini-ForgeMap-1.0.0",
+    "NAinfini-ForgeRuntime-1.0.0"
   ]
 }

@@ -27,7 +27,7 @@
 | `node ForgeTrigger/tools/spatial-vectors.mjs` / `recipient-filter-vectors.mjs` | exit 0：360 断言 / 117 组、628 断言 / 164 组 |
 | `dotnet … ForgeTrigger.ContractTests.dll export <ForgeTrigger> <输出> <网站仓>` | exit 0，**124 断言全部 PASS**：39 行逐行有 capability/binding/evaluator/shape/support，且 kind、label、description、graph 与网站目录逐字段一致（`collection-vectors.mjs` 的档位断言与既有向量期望未改） |
 | `dotnet … ForgeTrigger.R3ConsumerTests.dll <结果> <spatial-reference> <recipient-filter-reference>` | exit 0，**1992 断言 0 失败**（含 exists 三态、count 边界、集合有序/去重、random/shuffle 种子确定性、五个角色各有与缺席） |
-| `dotnet … export-runtime-manifest.dll --release Release/release.json --output $env:TEMP\trigobs\runtime-manifest.json` | exit 0：`5 player packages, runtime 1.2.0 on game build 20403457` |
+| `dotnet … export-runtime-manifest.dll --release Release/release.json --output $env:TEMP\trigobs\runtime-manifest.json` | exit 0：`5 player packages, runtime 1.0.0 on game build 20403457` |
 | `node --import ./Tools/register-typescript.ts %TEMP%\trigobs\compare-catalog.mjs <网站仓> $env:TEMP\trigobs\runtime-manifest.json` | exit 0，`status passed`：可授权行（按 id）33 → 73，可运行行（按目录档位对应的 binding role）2 → 40，形状不符 0 处 |
 | `python ForgeTrigger/tools/validate-t1.py --site <网站仓> --out $env:TEMP\trigobs\t1` | **exit 1**：C# `export` 段通过；TypeScript 段仍在 `SDK canonical must equal the locked website definition: forge.action.combat.damage` 失败（C# `1.0.0` / 网站 `2.0.0`，该契约在 `ForgeRuntime/Framework/CombatContracts.cs`，属伤害任务，本批未改），因此 `check` 段与 29 条 wire 断言本轮仍未执行 |
 

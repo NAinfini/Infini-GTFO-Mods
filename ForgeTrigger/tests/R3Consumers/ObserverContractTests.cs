@@ -45,7 +45,7 @@ internal static class ObserverContractTests
     }
     private static void Registration(Action<bool, string> check)
     {
-        var k = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "registration-tests"));
+        var k = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "registration-tests"));
         var entity = ObservationWorld.At("test.owner:one");
         var resolvers = new Dictionary<string, Func<EntityReference, bool>> { ["test.owner"] = r => r == entity.Ref };
         var observers = new Dictionary<string, Func<EntityReference, RuntimeEntitySnapshot?>> { ["test.owner"] = _ => entity };
@@ -68,7 +68,7 @@ internal static class ObserverContractTests
         k.StartRuntime(() => k.BeginWorld(1)); k.Advance(0, true);
         check(k.InspectEntities(new[] { entity.Ref }).RequireComplete().Single().Ref == entity.Ref, "observer copy and namespace reuse after unload");
         k.StopRuntime();
-        var budgetKernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "observer-budget"));
+        var budgetKernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "observer-budget"));
         var manyResolvers = Enumerable.Range(0, 257).ToDictionary(i => "test.n" + i, i => (Func<EntityReference, bool>)(_ => true));
         var manyObservers = manyResolvers.Keys.ToDictionary(id => id, id => (Func<EntityReference, RuntimeEntitySnapshot?>)(_ => null));
         var baseline = budgetKernel.ExportManifest();

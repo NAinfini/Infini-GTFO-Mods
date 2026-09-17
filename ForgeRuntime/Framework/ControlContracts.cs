@@ -14,10 +14,12 @@ namespace ForgeRuntime.Framework;
 /// The declared port shapes are the contract the plan loader re-derives every control step against: `next` is the
 /// exit, `pulse`/`body` is the region the next activation starts from, and the value outputs are what a later step
 /// reads through `fromStepSlot`. The vocabulary is the authoring node list's own flow nodes: branch, sequence,
-/// parallel, delay, repeat and its periodic form (`interval`), and for-each, plus `cancel`, which the end-of-flow
+/// parallel, delay, repeat and its periodic form (`interval`), for-each and its position form
+/// (`for_each_position`), the enum fan-out (`enum_switch`), plus `cancel`, which the end-of-flow
 /// node is the landing point for, and `present`, the when-present guard of rule 142.3 whose one value port is the
-/// author's own class rather than one this table pins. The two branch fan-outs declare their exits as `branch_1`..`branch_N` then `next`
-/// and take no seed: the host draws the branch when the step runs. `forge.control.flow.cancel_scope` and everything
+/// author's own class rather than one this table pins. The two branch fan-outs declare their exits as `branch_1`..`branch_N` then `next`,
+/// `enum_switch` declares them as `case_1`..`case_N` then `otherwise`, and both take no seed: the host draws the
+/// branch when the step runs, and one row covers every shared enum set. `forge.control.flow.cancel_scope` and everything
 /// else in the catalog stay second step: a control outside this table is refused by id with `control-unsupported`.</summary>
 public static class ControlContracts
 {
@@ -35,7 +37,9 @@ public static class ControlContracts
         ("for_each", "forge.control.flow.for_each", "forge.contract.control.binding.for_each"),
         ("cancel", "forge.control.flow.cancel", "forge.contract.control.binding.cancel"),
         ("restart", "forge.control.flow.restart", "forge.contract.control.binding.restart"),
-        ("present", "forge.control.flow.present", "forge.contract.control.binding.present")
+        ("present", "forge.control.flow.present", "forge.contract.control.binding.present"),
+        ("enum_switch", "forge.control.flow.enum_switch", "forge.contract.control.binding.enum_switch"),
+        ("for_each_position", "forge.control.flow.for_each_position", "forge.contract.control.binding.for_each_position")
     };
 
     public static RuntimeModule Module() => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
@@ -77,7 +81,9 @@ public static class ControlContracts
         ["for_each"] = "对列表里每一个执行",
         ["cancel"] = "结束流程",
         ["restart"] = "重启计时器（滚动窗口）",
-        ["present"] = "有值时"
+        ["present"] = "有值时",
+        ["enum_switch"] = "按枚举分支",
+        ["for_each_position"] = "逐个处理位置"
     };
     private static readonly Dictionary<string, string> Descriptions = new(StringComparer.Ordinal)
     {
@@ -91,7 +97,9 @@ public static class ControlContracts
         ["for_each"] = "对集合里的每个目标各跑一遍，带预算上限。",
         ["cancel"] = "取消一个正在跑的任务和它的后代。",
         ["restart"] = "把一个还在跑的计时器从现在重新开始，用来做滚动窗口。",
-        ["present"] = "只有当这个值真的存在时才走这条路；不存在时走另一条。"
+        ["present"] = "只有当这个值真的存在时才走这条路；不存在时走另一条。",
+        ["enum_switch"] = "按枚举值走对应分支，其余取值走「其他」出口。",
+        ["for_each_position"] = "依次把列表里的每个位置交给后续步骤。"
     };
 
     /// <summary>One control's declared graph, port order included: the plan's successor table is indexed by the
@@ -204,6 +212,46 @@ public static class ControlContracts
                 execution = "host",
                 inputs = Inputs(new { id = "task", type = "handle", handleKind = "timer", lifetime = "encounter" }),
                 outputs = new object[] { execution, new { id = "restarted", type = "boolean" } },
+                parameters = Array.Empty<object>()
+            },
+            // The enum fan-out: `case_1`..`case_N` name the first N members of the chosen set in the set's own
+            // declaration order, and `otherwise` — always the last output — is the one exit a value that is
+            // absent, unknown to the set or past the authored count leaves through. The set itself is the node's
+            // structural constant, so one row covers every shared set the way the pure enum rows do, and the
+            // member list is read from the runtime's own table rather than copied into this file.
+            "enum_switch" => new
+            {
+                domains = Domains,
+                execution = "host",
+                inputs = Inputs(new { id = "value", type = "enum", schemaParameter = "enum_set", nullable = true }),
+                outputs = new object[]
+                {
+                    new { id = "case_1", type = "execution" }, new { id = "case_2", type = "execution" },
+                    new { id = "otherwise", type = "execution" }
+                },
+                parameters = new object[]
+                {
+                    new { id = "enum_set", type = "enum", role = "structural", required = true, values = RuntimeEnumSets.Names.ToArray() },
+                    new { id = "case_count", type = "integer", role = "structural", required = false, minimum = 2, maximum = 32 }
+                },
+                portGroups = new object[]
+                {
+                    new { id = "cases", side = "outputs", parameter = "case_count", minimum = 2, maximum = 32,
+                        slots = new object[] { new { id = "case", type = "execution" } } }
+                }
+            },
+            // The position walk: `for_each`'s shape over a list of positions rather than candidate entities, so
+            // the same frame publishes `item` — the position in metres — and `index` on every round.
+            "for_each_position" => new
+            {
+                domains = Domains,
+                execution = "host",
+                inputs = Inputs(new { id = "positions", type = "vector3", cardinality = "many" }, new { id = "budget", type = "integer" }),
+                outputs = new object[]
+                {
+                    execution, new { id = "body", type = "execution" },
+                    new { id = "item", type = "vector3", unit = "m" }, new { id = "index", type = "integer" }
+                },
                 parameters = Array.Empty<object>()
             },
             // The glue rule 142.3 adds: one possibly-absent value, the two ways out, and the value itself

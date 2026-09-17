@@ -69,7 +69,7 @@ public static class DoorQueryContract
         "domains": ["map", "room", "logic"],
         "execution": "query",
         "inputs": [
-          { "id": "door", "type": "entity" }
+          { "entityKinds": ["gtfo.map_object"], "id": "door", "type": "entity" }
         ],
         "outputs": [
           { "id": "state", "type": "enum", "schema": "door_query_state" },

@@ -300,7 +300,7 @@ internal static class QueryPresenceTests
             };
             Kernel.LoadPlan(RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
+                schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
                 runtime = Kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = Fixture.Permissions, dependencies = Array.Empty<string>(),
                 limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth },

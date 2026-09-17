@@ -64,13 +64,13 @@ internal sealed record PlanAttachment(string Kind, string? Category, string Refe
 internal sealed record PlanIdentity(string Id, string ResourceId, string ResourceRevision);
 
 /// <summary>
-/// schemaVersion 4 plan (Runtime API 2.0.0): a graph of `action`/`control`/`query`/`pure` steps per entrypoint,
+/// schemaVersion 1 plan (Runtime API 1.0.0): a graph of `action`/`control`/`query`/`pure` steps per entrypoint,
 /// walked from `start` along explicit `successors`, plus the required non-empty `attachments[]` that says which
 /// world objects the plan is mounted on. `pure` and `query` steps are read on demand by consumers via
 /// `fromStepSlot` and evaluated at most once per activation; `query` may read the world through the kernel's
 /// budgeted interface, `pure` may not touch it at all. Every layout, successor, attachment and slot reference is
 /// re-derived from the registered contract and must match exactly; nothing in the file is trusted. There is no v3
-/// fallback: a file whose `schemaVersion` is not 4 is rejected outright (`plan-version`).
+/// fallback: a file whose `schemaVersion` is not 1 is rejected outright (`plan-version`).
 /// </summary>
 internal static class RuntimePlan
 {
@@ -90,6 +90,14 @@ internal static class RuntimePlan
         if (shape.Exits.Length != 0) return execIds.SequenceEqual(shape.Exits);
         if (capabilityId == "forge.control.flow.sequence")
             return execIds.Length >= 1 && execIds.Select((id, index) => id == "step_" + (index + 1)).All(match => match);
+        if (capabilityId == "forge.control.flow.enum_switch")
+        {
+            // `case_1`..`case_N` in declaration order, then the single `otherwise` the unmatched value leaves through.
+            if (execIds.Length < 3 || execIds[^1] != "otherwise") return false;
+            for (var index = 0; index < execIds.Length - 1; index++)
+                if (execIds[index] != "case_" + (index + 1)) return false;
+            return true;
+        }
         if (capabilityId is "forge.control.flow.parallel_all" or "forge.control.flow.random_branch")
         {
             // `branch_1`..`branch_N` in declaration order, then the single `next` the step continues from.
@@ -117,6 +125,15 @@ internal static class RuntimePlan
         ["forge.control.flow.for_each"] = new(new[] { "next", "body" },
             new[] { new ControlPort("candidates", "entity", Many: true), new ControlPort("budget", "integer") },
             new[] { new ControlPort("item", "entity"), new ControlPort("index", "integer") }),
+        // The same walk over positions instead of entities: `item` is the position the round is about, in metres.
+        ["forge.control.flow.for_each_position"] = new(new[] { "next", "body" },
+            new[] { new ControlPort("positions", "vector3", Many: true), new ControlPort("budget", "integer") },
+            new[] { new ControlPort("item", "vector3", "m"), new ControlPort("index", "integer") }),
+        // The enum fan-out: the exits are `case_1`..`case_N` then `otherwise`, so the pattern carries them and this
+        // row pins only the value port the branch is drawn from. Its `schema` — the set the node chose — is resolved
+        // from the node's own contract, which is where the kernel reads the member order the case exits follow.
+        ["forge.control.flow.enum_switch"] = new(Array.Empty<string>(),
+            new[] { new ControlPort("value", "enum") }, Array.Empty<ControlPort>()),
         ["forge.control.flow.cancel"] = new(new[] { "next" },
             new[] { new ControlPort("task", "handle", HandleKind: "timer", Lifetime: "encounter") },
             new[] { new ControlPort("cancelled", "integer") }),
@@ -201,7 +218,7 @@ internal static class RuntimePlan
         var plan = RuntimeJson.Parse(json);
         RuntimeJson.Shape(plan, "schemaVersion kind planId resource runtime domain authority failurePolicy permissions dependencies limits bindings entrypoints attachments",
             "variables objects");
-        RuntimeJson.Require(RuntimeJson.Integer(plan.GetProperty("schemaVersion")) == 4 && RuntimeJson.Text(plan, "kind") == "forge-runtime-plan", "plan-version", "Unsupported plan version.");
+        RuntimeJson.Require(RuntimeJson.Integer(plan.GetProperty("schemaVersion")) == 1 && RuntimeJson.Text(plan, "kind") == "forge-runtime-plan", "plan-version", "Unsupported plan version.");
         RuntimeJson.Require(RuntimeJson.StableText(plan.GetProperty("runtime")) == RuntimeJson.StableText(RuntimeJson.From(identity)), "runtime-lock", "Runtime/API/game build lock mismatch.");
         RuntimeJson.Require(RuntimeJson.Text(plan, "authority") == "host" && RuntimeJson.Text(plan, "failurePolicy") == "stop-entrypoint", "execution-policy", "Plans require host and stop-entrypoint.");
         var id = RuntimeJson.Text(plan, "planId"); var resource = plan.GetProperty("resource");
@@ -280,9 +297,11 @@ internal static class RuntimePlan
                 "control" => new[] { "control" },
                 "pure" => new[] { "selector", "condition", "modifier" },
                 // A query node is the on-demand read tier: a selector picks entities, a condition answers about
-                // them and a value row (`kind: state`) answers a fact nobody publishes. `modifier` is the pure
-                // layer's producing kind and is not a value row's kind, so it is not accepted here.
-                "query" => new[] { "selector", "condition", "state" },
+                // them and a value row (`kind: state`) answers a fact nobody publishes. A `modifier` whose graph
+                // reads the world is a value row the catalog categorizes `modifier`, and it is answered here like
+                // a state row; the authority check below still refuses a pure modifier, because a pure row's
+                // execution is not the query this tier requires.
+                "query" => new[] { "selector", "condition", "state", "modifier" },
                 _ => Array.Empty<string>()
             };
             RuntimeJson.Require(expectedCapabilityKinds.Contains(capabilityKind) && capability.TryGetProperty("graph", out _), "node-kind", nodeId);
@@ -367,8 +386,9 @@ internal static class RuntimePlan
                     var shape = declaredShape!;
                     RuntimeJson.Require(inputExecution.Length == 1 && !RuntimeJson.Flag(inputExecution[0], "optional"), RuntimeAbiCodes.ControlShape, nodeId);
                     var execIds = outputExecution.Select(p => RuntimeJson.Text(p, "id")).ToArray();
-                    // A control's exits are judged three ways: a sequence and the two branch fan-outs are variadic
-                    // (`step_N`, or `branch_1`..`branch_N` then `next`) and are checked by pattern; a control whose
+                    // A control's exits are judged three ways: a sequence, the two branch fan-outs and the enum
+                    // fan-out are variadic (`step_N`, or `branch_1`..`branch_N` then `next`, or `case_1`..`case_N`
+                    // then `otherwise`) and are checked by pattern; a control whose
                     // table entry declares no exits at all is a flow that ends, so it declares no execution output;
                     // every other kind declares its exits by id, in declaration order, with the region output —
                     // when it has one — last.
@@ -391,7 +411,8 @@ internal static class RuntimePlan
                             RuntimeAbiCodes.ControlShape, nodeId + "." + required.Id);
                     }
                     control = RuntimeJson.Text(capability, "id");
-                    bodyOutput = control is "forge.control.flow.interval" or "forge.control.flow.repeat" or "forge.control.flow.for_each" ? 1 : -1;
+                    bodyOutput = control is "forge.control.flow.interval" or "forge.control.flow.repeat"
+                        or "forge.control.flow.for_each" or "forge.control.flow.for_each_position" ? 1 : -1;
                     if (control == PresentControl) valuePort = PresentValuePort(inputs, outputs, nodeId);
                     break;
                 case "pure":

@@ -147,6 +147,12 @@ internal static class LightColorFades
     /// and it is the whole state this package keeps between frames.</summary>
     internal static int Count => Active.Count;
 
+    /// <summary>Announced when this table goes from empty to holding a transition. The table has no clock of its
+    /// own — the session's <see cref="MapClock"/> drives it — and it is that clock's registration which has to be
+    /// taken when the first transition appears, so this is how a schedule reaches it. Unset means nobody drives
+    /// this table, which is what the tests that advance it by hand want.</summary>
+    internal static Action? WorkScheduled { get; set; }
+
     /// <summary>Puts one transition under its key, replacing whatever the key already held — which is exactly the
     /// "the same request again" case: the new transition already sampled the lights' current values, so the one it
     /// replaces would only drag them back. A transition over no light is not scheduled at all.
@@ -157,6 +163,7 @@ internal static class LightColorFades
         if (fade == null) return;
         if (world != _world) { Active.Clear(); _world = world; }
         Active[key] = fade;
+        WorkScheduled?.Invoke();
     }
 
     /// <summary>One frame for every transition of the given world. A tick from another world is the level teardown
@@ -178,8 +185,8 @@ internal static class LightColorFades
         foreach (var key in finished) Active.Remove(key);
     }
 
-    /// <summary>Drops every transition. The session calls it when it goes away, so a patch that still runs for a
-    /// frame after teardown has nothing to write into.</summary>
+    /// <summary>Drops every transition. The session calls it when it goes away, so a clock that is somehow still
+    /// registered for a frame after teardown finds nothing to write into.</summary>
     internal static void Clear()
     {
         Active.Clear();

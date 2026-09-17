@@ -1,6 +1,6 @@
 # 公开宿主生命周期合同
 
-对应 SDK API 2.0.0 与未发布的 Runtime 1.2.0。这是宿主与模块之间的 API 合同，**不是新发行版，也不是原生玩法验证**。实际执行结果见 [VALIDATION.md](../VALIDATION.md)。
+对应 SDK API 1.0.0 与未发布的 Runtime 1.0.0。这是宿主与模块之间的 API 合同，**不是新发行版，也不是原生玩法验证**。实际执行结果见 [VALIDATION.md](../VALIDATION.md)。
 
 ## 启动配置输入
 

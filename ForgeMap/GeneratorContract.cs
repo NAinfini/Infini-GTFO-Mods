@@ -118,10 +118,10 @@ public static class GeneratorContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "generator", "type": "entity" },
+          { "entityKinds": ["gtfo.map_object"], "id": "generator", "type": "entity" },
           { "id": "cell", "type": "string", "optional": true },
           { "id": "inserted", "type": "boolean" },
-          { "id": "actor", "type": "entity", "optional": true },
+          { "entityKinds": ["gtfo.player"], "id": "actor", "type": "entity", "optional": true },
           { "id": "connected", "type": "integer" },
           { "id": "total", "type": "integer" }
         ],
@@ -150,7 +150,7 @@ public static class GeneratorContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "cluster", "type": "entity" },
+          { "entityKinds": ["gtfo.map_object"], "id": "cluster", "type": "entity" },
           { "id": "connected", "type": "integer" },
           { "id": "total", "type": "integer" }
         ],

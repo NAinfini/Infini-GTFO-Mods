@@ -139,7 +139,7 @@ public static class AlarmWaveContract
           { "id": "in", "type": "execution" },
           { "id": "scan", "type": "resource", "resourceKind": "chained-puzzle", "schema": "forge.resource.chained-puzzle" },
           { "id": "anchor", "type": "vector3", "unit": "m" },
-          { "id": "participants", "type": "entity", "cardinality": "many" },
+          { "entityKinds": ["gtfo.player"], "id": "participants", "type": "entity", "cardinality": "many" },
           { "id": "quorum", "type": "integer" }
         ],
         "outputs": [

@@ -21,7 +21,7 @@ internal sealed class VariableFixture
 
     internal VariableFixture()
     {
-        Kernel = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "test-no-game"));
+        Kernel = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "test-no-game"));
         Kernel.BeginWorld(1);
         Kernel.RegisterModule(LevelMount(), RuntimeLogLevel.Off);
         Owner = Kernel.RegisterModule(TestProvider(), RuntimeLogLevel.Off);
@@ -228,7 +228,7 @@ internal sealed class PlanBuilder
         var trigger = RuntimeGraphContracts.Resolve(triggerCapability.GetProperty("graph"), RuntimeJson.From(triggerParameters));
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
             runtime = fixture.Kernel.Identity, domain = "logic", authority = "host", failurePolicy = "stop-entrypoint",
             permissions, dependencies = Array.Empty<string>(),
             limits = new

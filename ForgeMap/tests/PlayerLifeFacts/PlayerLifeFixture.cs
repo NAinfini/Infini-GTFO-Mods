@@ -73,7 +73,7 @@ internal sealed class PlayerLifeFixture : IDisposable
         Kernel.RegisterModule(PlayerLifeContracts(), RuntimeLogLevel.Off);
         var registration = Kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, RuntimeJson.From(new
         {
-            providers = new[] { new { id = PlayerLifeContract.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() } },
+            providers = new[] { new { id = PlayerLifeContract.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = Array.Empty<object>(),
             bindings = PlayerLifeRows()
         }).GetRawText(), new Dictionary<string, CommandHandler>(), PlayerLifeSupport(), EntityResolvers()), RuntimeLogLevel.Off);
@@ -223,7 +223,7 @@ internal sealed class PlayerLifeFixture : IDisposable
         var branchContract = Kernel.ResolveGraphContract("forge.control.flow.branch", capabilities["forge.control.flow.branch"], RuntimeJson.EmptyObject);
         string json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId,
             resource = new { id = "author.resource", revision = "revision-1" },
             runtime = Kernel.Identity, domain = "map", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = used.SelectMany(id => support[id]).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray(),

@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable><ImplicitUsings>disable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>ForgeTrigger.Native</AssemblyName><RootNamespace>ForgeTrigger.Native</RootNamespace>
-    <Version>0.1.0</Version><IsPackable>false</IsPackable>
+    <Version>1.0.0</Version><IsPackable>false</IsPackable>
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">

@@ -175,12 +175,12 @@ internal sealed class ReloadObserver
         if (amount <= 0 || !Live(life)) return;
         life.Transferred += amount;
         life.Baseline += checked((int)amount);
-        var fact = new RuntimeEvent(
-            "gtfo.weapon.reload:" + Number(_epoch) + ":" + Number(checked(++_sequence)),
-            ReloadInventoryContract.ReloadTransferredBinding, _epoch, Tick(), "gtfo.equipment:" + life.Equipment.Id,
-            RuntimeJson.From(new { actor = (EntityReference?)life.Actor, equipment = life.Equipment,
-                amount = checked((int)amount) }));
-        Publish("reload_transferred", life, fact, source);
+        Publish("reload_transferred", life, ReloadInventoryContract.ReloadTransferredBinding, source,
+            () => new RuntimeEvent(
+                "gtfo.weapon.reload:" + Number(_epoch) + ":" + Number(checked(++_sequence)),
+                ReloadInventoryContract.ReloadTransferredBinding, _epoch, Tick(), "gtfo.equipment:" + life.Equipment.Id,
+                RuntimeJson.From(new { actor = (EntityReference?)life.Actor, equipment = life.Equipment,
+                    amount = checked((int)amount) })));
     }
 
     /// <summary>Opens the life, or confirms the one already open: the flag's setter and the inventory's entry point
@@ -195,11 +195,11 @@ internal sealed class ReloadObserver
         if (baseline == null || actor == null) return;
         var life = new Life(equipment, actor, baseline.Value) { Confirmed = true };
         _open[equipment.Id] = life;
-        var fact = new RuntimeEvent(
-            "gtfo.weapon.reload:" + Number(_epoch) + ":" + Number(checked(++_sequence)),
-            ReloadInventoryContract.ReloadStartedBinding, _epoch, Tick(), "gtfo.equipment:" + equipment.Id,
-            RuntimeJson.From(new { actor = (EntityReference?)life.Actor, equipment = life.Equipment }));
-        Publish("reload_started", life, fact, null);
+        Publish("reload_started", life, ReloadInventoryContract.ReloadStartedBinding, null,
+            () => new RuntimeEvent(
+                "gtfo.weapon.reload:" + Number(_epoch) + ":" + Number(checked(++_sequence)),
+                ReloadInventoryContract.ReloadStartedBinding, _epoch, Tick(), "gtfo.equipment:" + equipment.Id,
+                RuntimeJson.From(new { actor = (EntityReference?)life.Actor, equipment = life.Equipment })));
     }
 
     /// <summary>Closes one life. A life this machine never saw the item's own flag confirm is dropped without a
@@ -210,12 +210,12 @@ internal sealed class ReloadObserver
         if (!_open.TryGetValue(equipment.Id, out var life)) return;
         _open.Remove(equipment.Id);
         if (!life.Confirmed || life.Transferred <= 0) return;
-        var fact = new RuntimeEvent(
-            "gtfo.weapon.reload:" + Number(_epoch) + ":" + Number(checked(++_sequence)),
-            ReloadInventoryContract.ReloadCompletedBinding,
-            _epoch, Tick(), "gtfo.equipment:" + equipment.Id,
-            RuntimeJson.From(new { actor = (EntityReference?)life.Actor, equipment = life.Equipment }));
-        Publish("reload_completed", life, fact, null);
+        Publish("reload_completed", life, ReloadInventoryContract.ReloadCompletedBinding, null,
+            () => new RuntimeEvent(
+                "gtfo.weapon.reload:" + Number(_epoch) + ":" + Number(checked(++_sequence)),
+                ReloadInventoryContract.ReloadCompletedBinding,
+                _epoch, Tick(), "gtfo.equipment:" + equipment.Id,
+                RuntimeJson.From(new { actor = (EntityReference?)life.Actor, equipment = life.Equipment })));
     }
 
     /// <summary>Every observation enters through here: the world epoch and the authority gate are read once, and a
@@ -259,12 +259,16 @@ internal sealed class ReloadObserver
     /// which is the same answer the runtime gives a plan about that reference.</summary>
     private bool Live(Life life) => life.Equipment.WorldEpoch == _epoch && _isCurrent(life.Equipment);
 
-    private void Publish(string kind, Life life, RuntimeEvent fact, ReloadAmountSource? source)
+    /// <summary>Publishes one row's fact, and builds it only when somebody subscribes to the row. Nothing is
+    /// listening on a closed binding: the kernel would answer `no-consumer` for the event, so it is never reached
+    /// and the fact is not reported — and the event value itself, its id, its ports and its payload, is work no
+    /// consumer would ever read. Reading the gate here rather than at the call site is what keeps every publish
+    /// point from having to remember the order.</summary>
+    private void Publish(string kind, Life life, string binding, ReloadAmountSource? source, Func<RuntimeEvent> fact)
     {
-        // Nothing is listening on this row's binding: the kernel would answer `no-consumer` for the event this call
-        // was handed, so the kernel is never reached and the fact is not reported.
-        if (_unsubscribed(fact.BindingId)) return;
-        try { _publish(fact); }
+        if (_unsubscribed(binding)) return;
+        var built = fact();
+        try { _publish(built); }
         catch (RuntimeContractException error)
         { _report("weapon.reload-fact-rejected: " + kind + " " + error.Code); return; }
         _info("weapon.reload-fact kind=" + kind + " equipment=" + life.Equipment.Id

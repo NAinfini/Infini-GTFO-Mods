@@ -108,7 +108,7 @@ internal sealed class TriggerZoneWorld : IDisposable
     /// <summary>Starts one world with the map-object provider registered on one zone table.</summary>
     internal static TriggerZoneWorld Start(TriggerZoneSource? zones = null, bool authority = true)
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         // The control vocabulary is the kernel's own module, exactly as the host registers it: a mounted plan in
         // these cases needs one step that executes. The trigger rows are the production contract's own and this
         // provider declares them here, which is what a provider does for the two rows it implements.
@@ -306,7 +306,7 @@ internal static class ZoneDefinition
     internal static RuntimeModule Create() => new(RuntimeKernel.ApiVersion,
         RuntimeJson.From(new
         {
-            providers = new[] { new { id = ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() } },
+            providers = new[] { new { id = ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = TriggerZoneContract.CapabilityRows(),
             bindings = TriggerZoneContract.BindingRows()
         }).GetRawText(),

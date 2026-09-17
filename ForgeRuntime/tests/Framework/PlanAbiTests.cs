@@ -376,6 +376,110 @@ internal static class PlanAbiTests
                 "a candidate set above its budget is refused");
             Check(h.Applied.Count == 0, "no round runs off a partially read candidate set");
         }
+        // for_each_position: one round per position, in list order, with `index` published for the body.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("for-each-position", new[]
+            {
+                h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
+                    new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, Array.Empty<object>(),
+                    new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
+                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 4 } }, new int?[] { 2, 3 }),
+                h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 },
+                    h.ActionInput(FromStep(h.Port(h.ActionContract, "inputs", "steps"), 1, h.Port(h.ForEachPositionContract, "outputs", "index"))), new int?[] { null })
+            }, start: 1));
+            h.Publish("for-each-position", targets: new[] { Entity(1), Entity(2) });
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[] { "S3_body:" + Entity(1) + ":0", "S3_body:" + Entity(1) + ":1", "S2_next:" + Entity(1) + ":-" }),
+                "for_each_position runs one body per position and then enters next [" + string.Join("|", h.Applied) + "]");
+        }
+        // for_each_position: a position list larger than the declared budget is refused, never truncated.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("for-each-position-budget", new[]
+            {
+                h.Step("S0_observe", "query", h.ObserveBinding, h.ObserveContract, Array.Empty<object>(),
+                    new object[] { FromEvent(h.Port(h.ObserveContract, "inputs", "targets"), h.TriggerPort("outputs", "targets")) }, Array.Empty<int?>()),
+                h.Step("S1_positions", "control", h.ForEachPositionBinding, h.ForEachPositionContract, Array.Empty<object>(),
+                    new object[] { FromStep(h.Port(h.ForEachPositionContract, "inputs", "positions"), 0, h.Port(h.ObserveContract, "outputs", "points")),
+                                   new { slot = h.Port(h.ForEachPositionContract, "inputs", "budget"), value = 1 } }, new int?[] { 2, 3 }),
+                h.Step("S2_next", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_body", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null })
+            }, start: 1));
+            h.Publish("for-each-position-budget", targets: new[] { Entity(1), Entity(2) });
+            var tick = h.Kernel.Advance(1, true);
+            Check(tick.Events.Any(e => e.Status == "rejected" && e.Code == RuntimeAbiCodes.IterationBudget) && h.Applied.Count == 0,
+                "a position list above its budget is refused whole, not truncated");
+        }
+        // enum_switch: the member the set lists at index i is the exit `case_(i+1)`, and only that exit runs.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("enum-switch", new[]
+            {
+                h.Step("S0_switch", "control", h.EnumSwitchBinding, h.EnumSwitchContract, new object[] { Harness.EnumSetIndex("execution_outcome"), 3 },
+                    new object[] { new { slot = h.Port(h.EnumSwitchContract, "inputs", "value"), value = 2 } }, new int?[] { 1, 2, 3, 4 }),
+                h.Step("S1_case_1", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S2_case_2", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_case_3", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S4_otherwise", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null })
+            }));
+            h.Publish("enum-switch");
+            var tick = h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[] { "S3_case_3:" + Entity(1) + ":-" }),
+                "enum_switch enters case_(index+1) for the member the set lists at that position [" + string.Join("|", h.Applied) + "]"
+                    + string.Join("|", tick.Events.Select(e => e.Status + ":" + e.Code)));
+        }
+        // enum_switch: a member past the authored case count leaves `otherwise`.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("enum-switch-narrow", new[]
+            {
+                h.Step("S0_switch", "control", h.EnumSwitchBinding, h.EnumSwitchNarrowContract, new object[] { Harness.EnumSetIndex("execution_outcome"), 2 },
+                    new object[] { new { slot = h.Port(h.EnumSwitchNarrowContract, "inputs", "value"), value = 5 } }, new int?[] { 1, 2, 3 }),
+                h.Step("S1_case_1", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S2_case_2", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_otherwise", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null })
+            }));
+            h.Publish("enum-switch-narrow");
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[] { "S3_otherwise:" + Entity(1) + ":-" }),
+                "enum_switch sends a member past the authored case count through otherwise [" + string.Join("|", h.Applied) + "]");
+        }
+        // enum_switch: an absent value is not a failure, it leaves `otherwise` like a member the set does not name.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("enum-switch-absent", new[]
+            {
+                h.Step("S0_switch", "control", h.EnumSwitchBinding, h.EnumSwitchNarrowContract, new object[] { Harness.EnumSetIndex("execution_outcome"), 2 },
+                    new object[] { FromEvent(h.Port(h.EnumSwitchNarrowContract, "inputs", "value"), h.TriggerPort("outputs", "maybe_enum")) }, new int?[] { 1, 2, 3 }),
+                h.Step("S1_case_1", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S2_case_2", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_otherwise", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null })
+            }));
+            h.Publish("enum-switch-absent");
+            var tick = h.Kernel.Advance(1, true);
+            Check(tick.Events.All(e => e.Status != "rejected") && h.Applied.SequenceEqual(new[] { "S3_otherwise:" + Entity(1) + ":-" }),
+                "an absent enum value leaves otherwise instead of rejecting the event [" + string.Join("|", h.Applied) + "]"
+                    + string.Join("|", tick.Events.Select(e => e.Status + ":" + e.Code)));
+        }
+        // enum_switch: a value the event carries reaches the same exit its compiled member index names.
+        {
+            var h = new Harness();
+            h.Load(h.Plan("enum-switch-event", new[]
+            {
+                h.Step("S0_switch", "control", h.EnumSwitchBinding, h.EnumSwitchNarrowContract, new object[] { Harness.EnumSetIndex("execution_outcome"), 2 },
+                    new object[] { FromEvent(h.Port(h.EnumSwitchNarrowContract, "inputs", "value"), h.TriggerPort("outputs", "maybe_enum")) }, new int?[] { 1, 2, 3 }),
+                h.Step("S1_case_1", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S2_case_2", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null }),
+                h.Step("S3_otherwise", "action", h.ApplyBinding, h.ActionContract, new object[] { 5 }, h.ActionInput(), new int?[] { null })
+            }));
+            h.Publish("enum-switch-event", maybeEnum: 1);
+            h.Kernel.Advance(1, true);
+            Check(h.Applied.SequenceEqual(new[] { "S2_case_2:" + Entity(1) + ":-" }),
+                "enum_switch routes an event-carried value to the case its member index names [" + string.Join("|", h.Applied) + "]");
+        }
         // cancel: the count is what actually happened, and the cancelled pulse never fires.
         {
             var h = new Harness();
@@ -655,12 +759,18 @@ internal static class PlanAbiTests
         internal readonly string IntervalBinding = "forge.contract.control.binding.interval";
         internal readonly string RepeatBinding = "forge.contract.control.binding.repeat";
         internal readonly string ForEachBinding = "forge.contract.control.binding.for_each";
+        internal readonly string ForEachPositionBinding = "forge.contract.control.binding.for_each_position";
+        internal readonly string EnumSwitchBinding = "forge.contract.control.binding.enum_switch";
         internal readonly string CancelBinding = "forge.contract.control.binding.cancel";
         internal readonly string RestartBinding = "forge.contract.control.binding.restart";
         internal readonly string ReadBinding = VariableContracts.ReadBinding;
         internal readonly string PresentBinding = "forge.contract.control.binding.present";
         internal readonly JsonElement TriggerContract, WorldTriggerContract, ActionContract, ObserveContract;
-        internal readonly JsonElement BranchContract, SequenceContract, DelayContract, IntervalContract, RepeatContract, ForEachContract, CancelContract, RestartContract;
+        internal readonly JsonElement BranchContract, SequenceContract, DelayContract, IntervalContract, RepeatContract, ForEachContract, ForEachPositionContract, CancelContract, RestartContract;
+        /// <summary>The enum fan-out resolved for one shared set: three cases and the one `otherwise`, so a case can
+        /// prove both the member-order exit and the fallback. The narrow form declares fewer cases than the set has
+        /// members, which is the shape a value past the authored count leaves through `otherwise`.</summary>
+        internal readonly JsonElement EnumSwitchContract, EnumSwitchNarrowContract;
         /// <summary>The kernel's own variable read, resolved for one declared boolean variable — the one read whose
         /// value port lets a case prove the row answers non-null.</summary>
         internal readonly JsonElement ReadFlagContract;
@@ -694,7 +804,7 @@ internal static class PlanAbiTests
             });
             var seed = JsonNode.Parse(module.RegistryJson)!;
             seed["capabilities"]!.AsArray()[0]!["graph"]!["outputs"] = JsonNode.Parse(
-                "[{\"id\":\"next\",\"type\":\"execution\"},{\"id\":\"target\",\"type\":\"entity\"},{\"id\":\"targets\",\"type\":\"entity\",\"cardinality\":\"many\"},{\"id\":\"amount\",\"type\":\"number\"},{\"id\":\"maybe\",\"type\":\"integer\",\"nullable\":true}]");
+                "[{\"id\":\"next\",\"type\":\"execution\"},{\"id\":\"target\",\"type\":\"entity\"},{\"id\":\"targets\",\"type\":\"entity\",\"cardinality\":\"many\"},{\"id\":\"amount\",\"type\":\"number\"},{\"id\":\"maybe\",\"type\":\"integer\",\"nullable\":true},{\"id\":\"maybe_enum\",\"type\":\"enum\",\"schema\":\"execution_outcome\",\"nullable\":true}]");
             // The action's declared outputs: the result row it publishes (a row is not a value a step hands on),
             // plus one movable integer a later step reads through `fromStepSlot`.
             seed["capabilities"]!.AsArray()[1]!["graph"]!["outputs"]!.AsArray().Add(JsonNode.Parse("{\"id\":\"count\",\"type\":\"integer\"}"));
@@ -723,7 +833,8 @@ internal static class PlanAbiTests
                 id = Id + ".observe", owner = Id, kind = "selector", label = "Observed entities", version = "1.0.0", parameters = new { },
                 graph = new { domains = new[] { "enemy" }, execution = "query",
                     inputs = new object[] { new { id = "targets", type = "entity", cardinality = "many" } },
-                    outputs = new object[] { new { id = "seen", type = "entity" }, new { id = "seen_many", type = "entity", cardinality = "many" }, new { id = "hits", type = "integer" } },
+                    outputs = new object[] { new { id = "seen", type = "entity" }, new { id = "seen_many", type = "entity", cardinality = "many" }, new { id = "hits", type = "integer" },
+                        new { id = "points", type = "vector3", cardinality = "many" } },
                     parameters = Array.Empty<object>() }
             }).GetRawText())!);
             seed["bindings"]!.AsArray().Add(JsonNode.Parse(RuntimeJson.From(new
@@ -736,7 +847,7 @@ internal static class PlanAbiTests
                 RegistryJson = seed.ToJsonString(),
                 Evaluators = new Dictionary<string, EvaluatorHandler> { [Id + ".handler.observe"] = Observe },
                 Shapes = new Dictionary<string, HandlerShape> { [Fixture.Handler(Id)] = Fixture.Shape(Id, new[] { "target", "steps" }),
-                    [Id + ".handler.observe"] = new HandlerShape().Inputs("targets").Outputs("seen", "seen_many", "hits") },
+                    [Id + ".handler.observe"] = new HandlerShape().Inputs("targets").Outputs("seen", "seen_many", "hits", "points") },
                 BindingSupport = new[] { Fixture.Support(Id)[0], Fixture.Support(Id)[1],
                     new BindingSupport(WorldTriggerBinding, "implementation-only", NoPermissions),
                     new BindingSupport(ObserveBinding, "implementation-only", NoPermissions) },
@@ -756,6 +867,9 @@ internal static class PlanAbiTests
             IntervalContract = Contract("forge.control.flow.interval", RuntimeJson.From(new { first_pulse = 0 }));
             RepeatContract = Contract("forge.control.flow.repeat", RuntimeJson.EmptyObject);
             ForEachContract = Contract("forge.control.flow.for_each", RuntimeJson.EmptyObject);
+            ForEachPositionContract = Contract("forge.control.flow.for_each_position", RuntimeJson.EmptyObject);
+            EnumSwitchContract = Contract("forge.control.flow.enum_switch", RuntimeJson.From(new { enum_set = "execution_outcome", case_count = 3 }));
+            EnumSwitchNarrowContract = Contract("forge.control.flow.enum_switch", RuntimeJson.From(new { enum_set = "execution_outcome", case_count = 2 }));
             CancelContract = Contract("forge.control.flow.cancel", RuntimeJson.EmptyObject);
             RestartContract = Contract("forge.control.flow.restart", RuntimeJson.EmptyObject);
             // The kernel's variable module: `value_type` is a compiled member index, so the read is resolved the way
@@ -793,7 +907,22 @@ internal static class PlanAbiTests
                 if (!context.Query.TrySnapshot(target, out var snapshot, out var code)) throw new RuntimeContractException(code, code);
                 seen.Add(snapshot!.Ref);
             }
-            return RuntimeJson.From(new { seen = seen[0], seen_many = seen.ToArray(), hits = seen.Count });
+            return RuntimeJson.From(new
+            {
+                seen = seen[0], seen_many = seen.ToArray(), hits = seen.Count,
+                // The fixture's one position list: `for_each_position` walks what a step published, so the list a
+                // case checks is produced by a query step exactly the way the candidate set is.
+                points = new[] { new[] { 1d, 2d, 3d }, new[] { 4d, 5d, 6d } }
+            });
+        }
+
+        /// <summary>The compiled member index of a shared enum set name: a plan writes an `enum_set` constant the
+        /// way the website compiles it, as the position in the runtime's own set-name list.</summary>
+        internal static int EnumSetIndex(string set)
+        {
+            var index = RuntimeEnumSets.Names.ToList().IndexOf(set);
+            if (index < 0) throw new RuntimeContractException("port-enum-set", "Unknown enum set: " + set);
+            return index;
         }
 
         internal int Port(JsonElement contract, string side, string port)
@@ -843,7 +972,7 @@ internal static class PlanAbiTests
             var rows = steps.Select(s => (object)new { nodeId = s.NodeId, nodeKind = s.NodeKind, binding = Pin(s.BindingId), layout = s.Layout, inputs = s.Inputs, successors = s.Successors }).ToArray();
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
+                schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
                 runtime = Kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions, dependencies = Array.Empty<string>(),
                 limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth },
@@ -877,19 +1006,21 @@ internal static class PlanAbiTests
             catch (RuntimeContractException error) { throw new RuntimeContractException(error.Code, error.Code + ": " + error.Message); }
         }
 
-        internal DispatchResult Publish(string eventId, long tick = 1, string[]? targets = null, long? maybe = null)
+        internal DispatchResult Publish(string eventId, long tick = 1, string[]? targets = null, long? maybe = null, int? maybeEnum = null)
         {
             // The event's subject is the first of its targets: an event about another object must carry that
             // object in `target` too, or a mount matcher could never tell the two apart. `maybe` is the one
             // possibly-absent payload value the when-present cases test, so it is always present in the payload and
-            // null when the case means "no value".
+            // null when the case means "no value"; `maybe_enum` is the same for the enum fan-out, whose absent case
+            // is a null of its own set rather than an unwired port.
             var all = targets ?? new[] { Id + ":1" };
             return Kernel.Publish(Module, new RuntimeEvent(eventId, TriggerBinding, World, tick, "shared-scope", RuntimeJson.From(new
             {
                 target = new EntityReference(all[0], World, 1),
                 targets = all.Select(id => new EntityReference(id, World, 1)).ToArray(),
                 amount = 5d,
-                maybe
+                maybe,
+                maybe_enum = maybeEnum
             })));
         }
 

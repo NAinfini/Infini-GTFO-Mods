@@ -87,6 +87,7 @@ internal static class GlueContract
                 "cardinality": "many"
               },
               {
+                "entityKinds": ["gtfo.player", "gtfo.enemy", "gtfo.equipment"],
                 "id": "source",
                 "type": "entity"
               },

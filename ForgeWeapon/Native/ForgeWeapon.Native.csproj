@@ -8,7 +8,7 @@
          is `unsafe`. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ForgeWeapon.Native</AssemblyName><RootNamespace>ForgeWeapon.Native</RootNamespace>
-    <Version>0.2.0</Version><IsPackable>false</IsPackable>
+    <Version>1.0.0</Version><IsPackable>false</IsPackable>
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">

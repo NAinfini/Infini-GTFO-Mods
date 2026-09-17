@@ -348,7 +348,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("zones", "entity"),
+                Many("zones", "entity", new[] { "gtfo.zone" }),
                 Optional("transition", "number"),
                 Optional("position", "vector3"),
                 Optional("count", "integer")
@@ -381,7 +381,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("zones", "entity"),
+                Many("zones", "entity", new[] { "gtfo.zone" }),
                 Optional("color", "vector3"),
                 Optional("brightness", "number"),
                 Optional("transition", "number")
@@ -435,7 +435,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Port("zone", "entity"),
+                Port("zone", "entity", new[] { "gtfo.zone" }),
                 Optional("fog", "integer"),
                 Optional("transition", "number"),
                 Optional("state_duration", "number"),
@@ -467,7 +467,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("viewers", "entity"),
+                Many("viewers", "entity", new[] { "gtfo.player" }),
                 Port("sound", "integer"),
                 Optional("subtitle", "string"),
                 Optional("filter", "string")
@@ -493,7 +493,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("viewers", "entity"),
+                Many("viewers", "entity", new[] { "gtfo.player" }),
                 Port("sound", "integer"),
                 Optional("filter", "string")
             },
@@ -517,7 +517,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("viewers", "entity"),
+                Many("viewers", "entity", new[] { "gtfo.player" }),
                 Port("text", "string")
             },
             outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.hud_message") },
@@ -540,7 +540,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("viewers", "entity"),
+                Many("viewers", "entity", new[] { "gtfo.player" }),
                 Port("dialogue", "integer"),
                 Optional("filter", "string")
             },
@@ -589,7 +589,7 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Port("zone", "entity"),
+                Port("zone", "entity", new[] { "gtfo.zone" }),
                 Port("filter", "string"),
                 Port("enabled", "boolean")
             },
@@ -615,8 +615,8 @@ public static class EnvironmentContract
             inputs = new object[]
             {
                 Port("in", "execution"),
-                Many("viewers", "entity"),
-                Port("speaker", "entity"),
+                Many("viewers", "entity", new[] { "gtfo.player" }),
+                Port("speaker", "entity", new[] { "gtfo.player" }),
                 Port("voice", "integer")
             },
             outputs = new object[] { Port("next", "execution"), Result("forge.result.player.voice") },
@@ -658,7 +658,7 @@ public static class EnvironmentContract
         {
             domains = Domains,
             execution = "query",
-            inputs = new object[] { Port("zone", "entity") },
+            inputs = new object[] { Port("zone", "entity", new[] { "gtfo.zone" }) },
             outputs = new object[] { Port("on", "boolean"), Port("count", "integer") },
             parameters = Array.Empty<object>(),
             reads = new[] { "world" }
@@ -685,6 +685,8 @@ public static class EnvironmentContract
     private static object Port(string id, string type) => new { id, type };
     private static object Optional(string id, string type) => new { id, type, optional = true };
     private static object Many(string id, string type) => new { id, type, cardinality = "many" };
+    private static object Port(string id, string type, string[] entityKinds) => new { id, type, entityKinds };
+    private static object Many(string id, string type, string[] entityKinds) => new { id, type, cardinality = "many", entityKinds };
 
     /// <summary>A structural enum that inlines its own members: the runtime accepts a structural enum with no
     /// shared set, which is what these vocabularies are — no shared set spells them.</summary>

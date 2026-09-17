@@ -55,7 +55,7 @@ internal static class PresentationBridgeTests
     /// presentation tier is the only variable a case here turns on.</summary>
     private sealed class Scene
     {
-        internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         internal readonly RuntimeModuleHandle Module;
         internal int Applied;
         /// <summary>What the last dispatched command reported as <see cref="CommandContext.IsHost"/>, or null when
@@ -183,7 +183,7 @@ internal static class PresentationBridgeTests
                 .EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == port).i;
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId = "test.presentation.plan",
+                schemaVersion = 1, kind = "forge-runtime-plan", planId = "test.presentation.plan",
                 resource = new { id = "test.presentation.resource", revision = "1" }, runtime = kernel.Identity,
                 domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = Array.Empty<string>(), dependencies = Array.Empty<string>(),

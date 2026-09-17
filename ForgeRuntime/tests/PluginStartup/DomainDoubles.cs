@@ -15,7 +15,7 @@ namespace ForgeRuntime.GameBindings
         internal static void Initialize(RuntimeLogLevel logLevel)
         {
             LogLevel = logLevel;
-            Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "bootstrap-double"));
+            Kernel = new(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "bootstrap-double"));
             Probe.Call("host:init");
             // A suspended host starts neither the world nor the network binding: no game event may be claimed for a
             // binary this host does not support.

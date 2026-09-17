@@ -46,9 +46,10 @@ public static class WeaponSupplyContract
     /// write this provider performs on a player's state that is not equipment.</summary>
     public const string AmmoWritePermission = "gtfo.weapon.ammo.write";
 
-    /// <summary>The catalog's `ammo_type` members in their declared order. The order is pinned here because the
-    /// native `Player.AmmoType` enum has the same six members in the same order, which is what lets the parameter
-    /// travel as the native value without a second mapping table.</summary>
+    /// <summary>The native `Player.AmmoType` members in their declared order. The order is what lets an
+    /// `ammo_type` name travel as the native value without a second mapping table. `none` stays in this table
+    /// because it is the native spelling of "no pool"; no row offers it, since adding to or reading back from no
+    /// pool is refused by name.</summary>
     public static readonly IReadOnlyList<string> AmmoTypes = Array.AsReadOnly(new[]
     {
         "standard", "special", "class", "resource_pack_rel", "none", "current_consumable"
@@ -91,7 +92,7 @@ public static class WeaponSupplyContract
         "execution": "host",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "player", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "player", "type": "entity" },
           { "id": "amount", "type": "integer" },
           { "id": "cap", "type": "integer", "optional": true },
           { "id": "provenance", "type": "string", "optional": true }
@@ -109,7 +110,7 @@ public static class WeaponSupplyContract
         ],
         "parameters": [
           { "id": "ammo_type", "type": "enum", "role": "structural", "required": true,
-            "values": ["standard", "special", "class", "resource_pack_rel", "none", "current_consumable"] },
+            "values": ["standard", "special", "class", "resource_pack_rel", "current_consumable"] },
           { "id": "overflow_policy", "type": "enum", "role": "structural", "required": true,
             "values": ["discard", "clamp", "reject"] }
         ],
@@ -132,7 +133,7 @@ public static class WeaponSupplyContract
         "execution": "host",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "player", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "player", "type": "entity" },
           { "id": "amount", "type": "integer" }
         ],
         "outputs": [
@@ -148,7 +149,7 @@ public static class WeaponSupplyContract
         ],
         "parameters": [
           { "id": "ammo_type", "type": "enum", "role": "structural", "required": true,
-            "values": ["standard", "special", "class", "resource_pack_rel", "none", "current_consumable"] },
+            "values": ["standard", "special", "class", "resource_pack_rel", "current_consumable"] },
           { "id": "failure_policy", "type": "enum", "role": "structural", "required": true,
             "values": ["reject", "partial"] }
         ],

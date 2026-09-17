@@ -68,7 +68,7 @@ internal static class EnemyScopePlan
             .EnumerateArray().Select(_ => (object?)null).ToArray();
         var json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
             runtime = kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
             permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },

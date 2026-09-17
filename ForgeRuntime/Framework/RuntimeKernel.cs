@@ -44,8 +44,8 @@ public sealed class RuntimeSubscriptionGate
 /// <summary>Single-thread simulation dispatcher. Registration and plans are resolved once; no Unity/game types are owned here.</summary>
 public sealed partial class RuntimeKernel
 {
-    /// <summary>2.0.0 is the Forge Standard v0.2 wire (schemaVersion 2 plans); it moves together with the website.</summary>
-    public const string ApiVersion = "2.0.0";
+    /// <summary>1.0.0 is the release wire of the Forge Standard; it moves together with the website.</summary>
+    public const string ApiVersion = "1.0.0";
     public const int MaximumEventHistory = 65536;
     public const int MaximumEventPayloadBytes = 65536;
     private readonly int threadId = Environment.CurrentManagedThreadId;

@@ -102,6 +102,14 @@ public static class PureConditions
         };
     }
 
+    /// <summary>The enum comparison the catalog's `forge.condition.enum.compare` row performs: both operands are
+    /// members of the one set the row's structural parameter chose, so the answer is equality between the member
+    /// names the frame resolved the compiled values back to. A value the author left unwritten (<c>null</c>) equals
+    /// nothing: an empty value is no member of the set, which is why the row's nullable port turns a missing value
+    /// into `false` instead of comparing it against the set's first member.</summary>
+    public static bool EnumEquals(string? value, string member)
+        => value != null && string.Equals(value, member, StringComparison.Ordinal);
+
     /// <summary>The typed comparison the catalog's `forge.condition.predicate.compare` row performs: one row for
     /// the four classes its structural `value_type` parameter offers, so `g-compare` is no longer one row per
     /// type. `valueType` is the member the plan compiled, `<c>null</c>` when the author left the optional

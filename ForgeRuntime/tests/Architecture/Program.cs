@@ -38,7 +38,7 @@ foreach (var assembly in assemblies)
         assembly.GetName().Name + " does not embed a second kernel");
 }
 
-var kernel = new RuntimeKernel(new RuntimeIdentity("forge.architecture.check", "0.1.0", RuntimeKernel.ApiVersion, "offline-no-game"));
+var kernel = new RuntimeKernel(new RuntimeIdentity("forge.architecture.check", "1.0.0", RuntimeKernel.ApiVersion, "offline-no-game"));
 var handles = new List<RuntimeModuleHandle>();
 // The runtime's own trigger contract is one of the builtin providers a host registers before any package: the
 // domain declarations below bind canonical Trigger ids whose shapes it owns, and a domain module carries no copy.

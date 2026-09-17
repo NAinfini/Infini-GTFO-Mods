@@ -6,7 +6,7 @@ static class InstanceResolutionTests
     private const string Secret = "76561198000000000";
     private sealed class Native { public override string ToString() => "native-" + Secret; }
 
-    private static RuntimeKernel Kernel() => new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "synthetic"));
+    private static RuntimeKernel Kernel() => new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "synthetic"));
     private static string Registry(string provider)
         => "{\"providers\":[{\"id\":\"" + provider + "\",\"kind\":\"extension\",\"version\":\"1.0.0\",\"dependencies\":[]}],\"capabilities\":[],\"bindings\":[]}";
     private static RuntimeModule Module(string provider, Dictionary<string, Func<EntityReference, bool>>? resolvers,

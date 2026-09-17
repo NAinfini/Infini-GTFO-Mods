@@ -35,7 +35,7 @@ public sealed class EnvironmentRegistrationTests
     {
         var providers = new[]
         {
-            new { id = ModuleDefinition.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() }
+            new { id = ModuleDefinition.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() }
         };
         var capabilities = JsonDocument.Parse(CapabilitiesJson()).RootElement.EnumerateArray().Select(x => x.Clone()).ToArray();
         var bindings = JsonDocument.Parse(RuntimeJson.From(
@@ -81,7 +81,7 @@ public sealed class EnvironmentRegistrationTests
     }
 
     private static RuntimeKernel Kernel()
-        => new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        => new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
 
     [Fact]
     public void TheSlicesRowsRegisterWithTheRuntime()

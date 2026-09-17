@@ -1,4 +1,4 @@
-# Infini Forge Runtime 1.2.0（开发中，未发布）
+# Infini Forge Runtime 1.0.0（开发中，未发布）
 
 > 实施顺序与原版内容完整覆盖见[唯一开发计划](../../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md) §4，分步验收见 §7；本文件仅说明实现与用法。
 
@@ -6,7 +6,7 @@ Runtime 是唯一的公共服务与 GTFO 宿主：类型、注册、权限、生
 
 交付要求见唯一开发计划 §6 U-RUNTIME、U-NET（链接见[仓库 README](../README.md)），带日期的验证记录见 [VALIDATION.md](VALIDATION.md)。跨包依赖规则、provider 身份与所有权见下文“跨包结构与所有权”。公共 SDK 的 API 细节见 [Framework/README.md](Framework/README.md) 与 [Framework/HOST-LIFECYCLE.md](Framework/HOST-LIFECYCLE.md)。
 
-**1.2.0 尚未发布、安装或完成任何游戏验收。** 下面描述的全部能力都是 implementation-only。
+**1.0.0 尚未发布、安装或完成任何游戏验收。** 下面描述的全部能力都是 implementation-only。
 
 ## 当前能力
 
@@ -112,13 +112,13 @@ Level = error
 | 模块 | provider ID | 版本 | 注册内容 |
 | --- | --- | --- | --- |
 | Development | — | — | 不登记 provider；原生插件 `NAinfini.ForgeDevelopment` 1.0.0 只在 `Authoring` 下启动 |
-| Trigger | `forge.module.trigger` | `0.1.0` | 1 条 `evaluate` 绑定（`forge.condition.predicate.compare`）；由本包原生插件 `NAinfini.ForgeTrigger` 0.1.0 注册，宿主不再内联编译或代注册 |
-| Map | `forge.module.gtfo.map` | `0.1.0` | 清单为空；原生插件 `NAinfini.ForgeMap` 0.1.0 追加 `gtfo.player` resolver 与实例解析器 |
-| Weapon | `forge.module.gtfo.weapon` | `0.1.0` | 2 个观察型 trigger 与 binding；原生插件 `NAinfini.ForgeWeapon` 0.1.0 登记 `gtfo.equipment` resolver |
+| Trigger | `forge.module.trigger` | `1.0.0` | 1 条 `evaluate` 绑定（`forge.condition.predicate.compare`）；由本包原生插件 `NAinfini.ForgeTrigger` 1.0.0 注册，宿主不再内联编译或代注册 |
+| Map | `forge.module.gtfo.map` | `1.0.0` | 清单为空；原生插件 `NAinfini.ForgeMap` 1.0.0 追加 `gtfo.player` resolver 与实例解析器 |
+| Weapon | `forge.module.gtfo.weapon` | `1.0.0` | 2 个观察型 trigger 与 binding；原生插件 `NAinfini.ForgeWeapon` 1.0.0 登记 `gtfo.equipment` resolver |
 | Enemy | `forge.module.gtfo.enemy` | `1.0.0` | binding 与 Hook 由原生插件 `NAinfini.ForgeEnemy` 1.0.0 注册；`ForgeEnemy/ModuleDefinition.cs` 只剩身份常量 |
 | 共享 combat 合同 | `forge.contract.combat` | — | 5 个 canonical 定义，逐字采用网站目录行，0 个 binding |
 
-宿主插件 `NAinfini.ForgeRuntime` 1.2.0 自己只有 1 个检查点 Hook 与 3 个 GTFO-API 关卡事件订阅。
+宿主插件 `NAinfini.ForgeRuntime` 1.0.0 自己只有 1 个检查点 Hook 与 3 个 GTFO-API 关卡事件订阅。
 
 **跨领域所有权。**
 

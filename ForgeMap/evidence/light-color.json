@@ -76,7 +76,7 @@
     },
     {
       "fact": "the frames a transition runs on",
-      "derivation": "Harmony postfix on Player.PlayerInteraction.FixedUpdate for the locally owned player only -> Plugin.Session.WorldEpoch -> LightColorFades.Tick(worldEpoch, Time.deltaTime)",
+      "derivation": "the session's one kernel clock (MapClock, observing RuntimeLifecycleKind.TickAdvanced through the map-object module's registration and taken only while a transition is in flight) -> Plugin.Session.WorldEpoch -> LightColorFades.Tick(worldEpoch, Time.deltaTime)",
       "refusal": "A frame with no session clears the table, and a tick whose world is not the table's drops it instead of writing at light objects the level teardown already took; a light that throws on a write is dropped from its own transition and leaves the others of the same frame running."
     }
   ],

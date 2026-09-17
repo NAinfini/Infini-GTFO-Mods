@@ -186,7 +186,7 @@ public static class EnemyNodeValueContract
               "logic"
             },
             execution = "query",
-            inputs = new object[] { new { id = EnemyPort, type = "entity" } },
+            inputs = new object[] { new { id = EnemyPort, type = "entity", entityKinds = new[] { "gtfo.enemy" } } },
             outputs,
             parameters = Array.Empty<object>()
         }

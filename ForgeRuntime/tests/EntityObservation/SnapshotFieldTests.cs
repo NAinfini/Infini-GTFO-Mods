@@ -187,7 +187,7 @@ internal static class SnapshotFieldTests
         /// fixture restates it, so this file needs no internal surface to write a plan.</summary>
         private const int Execution = 0, Number = 3, Entity = 7, Event = 10, Result = 11;
         private readonly RuntimeModuleHandle handle;
-        internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         internal readonly List<string> Values = new();
         internal RuntimeEventRows? Rows { get; private set; }
         internal Action<RuntimeEventRows>? OnDispatch;

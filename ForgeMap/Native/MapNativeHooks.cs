@@ -9,9 +9,10 @@ namespace ForgeMap.Native;
 /// readbacks in `MapObjectHooks`, the expedition readback in `ExpeditionHooks`, the player-life readbacks in
 /// `PlayerLifeFacts`, the player-state readbacks in `PlayerStateHooks`, the player-event readbacks in
 /// `PlayerEventHooks`, the door-terminal readbacks in `DoorTerminalHooks`, the level-object readbacks in
-/// `LevelObjectHooks` and the overhead readbacks in `TeammateOverheadHooks` are the whole set; the plugin hands
-/// this one list to the class processor, so a hook is installed exactly when it is listed here and nowhere
-/// else.</summary>
+/// `LevelObjectHooks` and the overhead readbacks in `TeammateOverheadHooks` are the whole set; no half of this
+/// package patches a simulation step, because the ticks the zones and the light transitions need ride the kernel's
+/// own clock. The plugin hands this one list to the class processor, so a hook is installed exactly when it is
+/// listed here and nowhere else.</summary>
 internal static class MapNativeHooks
 {
     internal static IReadOnlyList<Type> Types { get; } = Array.AsReadOnly(new[]
@@ -36,11 +37,6 @@ internal static class MapNativeHooks
         typeof(ExpeditionStartedReadback), typeof(ReactorWaveReadback),
         typeof(HsuSampledReadback), typeof(CheckpointRestoredReadback),
         typeof(ZoneEnteredReadback), typeof(PortalWarpedReadback),
-        // The one tick of the trigger-zone half. A hook is installed exactly when it is listed here, and the
-        // judging module answers nothing until the session that owns it exists.
-        typeof(TriggerZoneTick),
-        // The one tick of the light-colour row: the frames a colour/intensity transition is spread over.
-        typeof(LightColorTick),
         typeof(TeammateOverheadRender), typeof(TeammateOverheadRemoved), typeof(TeammateOverheadVisibility)
     });
 }

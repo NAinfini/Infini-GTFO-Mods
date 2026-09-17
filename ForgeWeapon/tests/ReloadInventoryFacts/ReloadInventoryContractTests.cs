@@ -91,7 +91,7 @@ public sealed class ReloadInventoryContractTests
             Assert.Contains(id, Capabilities);
             Assert.Equal("forge.contract.trigger", row.GetProperty("owner").GetString());
             Assert.Equal("trigger", row.GetProperty("kind").GetString());
-            Assert.Equal("2.0.0", row.GetProperty("version").GetString());
+            Assert.Equal("1.0.0", row.GetProperty("version").GetString());
             Assert.Equal("authoring-contract-only", row.GetProperty("parameters").GetProperty("support").GetString());
             var graph = row.GetProperty("graph");
             Assert.Equal("host", graph.GetProperty("execution").GetString());

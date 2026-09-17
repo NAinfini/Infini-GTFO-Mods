@@ -159,6 +159,14 @@ public sealed partial class MapObjectModule : IDisposable
     }
     public bool IsRegistered => !_disposed && _registration is { IsRegistered: true };
 
+    /// <summary>Whether a loaded plan or a suspended wait is listening on one of this provider's own bindings. The
+    /// gates are taken at registration and the kernel refreshes each one in place wherever the subscription table
+    /// changes, so this answers for the world as it is now rather than as it was when the caller looked last. A
+    /// binding this provider does not publish answers false: a question about somebody else's trigger is not this
+    /// module's to answer.</summary>
+    internal bool HasSubscribers(string bindingId)
+        => _gates != null && _gates.TryGetValue(bindingId, out var gate) && gate.HasSubscribers;
+
     /// <summary>The one Map registration. The package's other domains attach to it instead of registering a
     /// second provider of the same identity namespace.</summary>
     public RuntimeModuleHandle Registration

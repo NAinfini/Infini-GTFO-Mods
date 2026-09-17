@@ -17,7 +17,7 @@ internal sealed class Scene : IDisposable
         .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
         .Single(c => c.GetParameters().Length == 10);
 
-    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     internal readonly EnemyAgent Enemy;
     internal readonly EnemyLocomotion Locomotion;

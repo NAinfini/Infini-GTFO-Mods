@@ -3,7 +3,7 @@ using System;
 namespace ForgeRuntime
 {
     internal enum RuntimeMode { Off, Authoring, Play }
-    internal static class Plugin { internal const string PluginVersion = "1.2.0"; internal static readonly BepInEx.Logging.ManualLogSource PluginLog = new(); }
+    internal static class Plugin { internal const string PluginVersion = "1.0.0"; internal static readonly BepInEx.Logging.ManualLogSource PluginLog = new(); }
 }
 namespace BepInEx { public static class Paths { public static string GameRootPath = ""; public static string BepInExRootPath = ""; } }
 namespace BepInEx.Logging

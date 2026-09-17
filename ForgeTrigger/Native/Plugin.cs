@@ -8,12 +8,12 @@ using HostPlugin = ForgeRuntime.Plugin;
 namespace ForgeTrigger.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.0.0")]
 public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "NAinfini.ForgeTrigger";
     public const string PluginName = "Infini Forge Trigger";
-    public const string PluginVersion = "0.1.0";
+    public const string PluginVersion = "1.0.0";
     private bool _loadAttempted;
     internal static RuntimeModuleHandle? Registration { get; private set; }
 

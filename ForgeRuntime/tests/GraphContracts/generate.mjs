@@ -155,7 +155,7 @@ const variableSeed = structuredClone(fixedSeed);
 variableSeed.capabilities[1].graph.portGroups = [{id:'values',side:'outputs',parameter:'output_count',
     minimum:2,maximum:32,slots:[{id:'value',type:'number'}]}];
 const limits = {...forgeRuntimeLimits};
-const manifestFor = registry => ({schemaVersion:1,runtime:{id:'forge.runtime',version:'1.2.0',
+const manifestFor = registry => ({schemaVersion:1,runtime:{id:'forge.runtime',version:'1.0.0',
     apiVersion:forgeRuntimeApiVersion,gameBuild:'synthetic-no-game'},registry,limits,
     bindingSupport:registry.bindings.map(b=>({bindingId:b.id,verification:'implementation-only',requiredPermissions:[]}))});
 const fixedManifest = manifestFor(fixedSeed), variableManifest = manifestFor(variableSeed);
@@ -186,7 +186,7 @@ const sourceFiles = fs.readdirSync(path.join(site,'site/forge')).filter(f=>f.end
     .map(f=>path.join('site/forge',f)).concat(['Tools/register-typescript.ts']);
 const hashes = Object.fromEntries(sourceFiles.map(f=>[f,
     createHash('sha256').update(fs.readFileSync(path.join(site,f))).digest('hex')]));
-fs.writeFileSync(destination,JSON.stringify({schemaVersion:2,kind:'test-only-graph-contract-vectors',
+fs.writeFileSync(destination,JSON.stringify({schemaVersion:1,kind:'test-only-graph-contract-vectors',
     gameVerified:false,sourceHashes:hashes,variableDefinitions:variable.map(d=>d.id+'@'+d.version),
     registrations,resolutions,plans:{fixedSeed,variableSeed,fixedPlan,variablePlan}},null,2)+'\n');
 console.log(JSON.stringify({registrations:registrations.length,resolutions:resolutions.length,

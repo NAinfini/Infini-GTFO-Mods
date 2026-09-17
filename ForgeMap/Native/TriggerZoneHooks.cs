@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using ForgeMap;
 using ForgeRuntime.Framework;
-using HarmonyLib;
-using Player;
 
 namespace ForgeMap.Native;
 
@@ -22,39 +20,34 @@ namespace ForgeMap.Native;
 /// volume that would have been judged in coordinates nobody converted. The authored table itself is never
 /// mutated: placement is a fold, and the next level places its own zones from the same document.
 ///
-/// The tick is driven by the local player's own fixed update rather than by a component of this package's own: the
-/// runtime advances its kernel from the same Unity step, and a player's fixed update is the one call that exists on
-/// every machine exactly once for the machine's own player. The judgment itself is the host's — the tick is guarded
-/// before any world read — while the blocking bodies are every machine's own local physics.
+/// The tick is driven by the kernel's own clock, once per advance, rather than by the local player's fixed update:
+/// the runtime advances the kernel from the same Unity step, and a player's fixed update exists once per player on
+/// the machine. The judgment itself is the host's — <see cref="TriggerZoneModule.Tick"/> is guarded before any
+/// world read — while the blocking bodies are every machine's own local physics.
 /// </summary>
 internal sealed class TriggerZoneSession : IDisposable
 {
-    /// <summary>The one live session, reached by the tick patch. A package registers once and a hook is installed
-    /// once, so there is exactly one.</summary>
-    internal static TriggerZoneSession? Current { get; private set; }
-
     private readonly TriggerZoneSource _source;
     private readonly TriggerZoneModule _module;
     private readonly TriggerZoneColliders _colliders;
     private readonly TriggerZoneRoomLookup? _rooms;
     private readonly Func<MapLevelReference?> _level;
-    private readonly Func<long> _tick;
+    private readonly Func<bool> _subscribed;
     private readonly Action<string> _report;
     private readonly HashSet<string> _reported = new(StringComparer.Ordinal);
     private IReadOnlyList<TriggerZone> _authored = Array.Empty<TriggerZone>();
     private MapLevelReference? _placedLevel;
-    private long _lastTick = long.MinValue;
     private bool _disposed;
 
     private TriggerZoneSession(TriggerZoneSource source, TriggerZoneModule module, TriggerZoneColliders colliders,
-        TriggerZoneRoomLookup? rooms, Func<MapLevelReference?> level, Func<long> tick, Action<string> report)
+        TriggerZoneRoomLookup? rooms, Func<MapLevelReference?> level, Func<bool> subscribed, Action<string> report)
     {
         _source = source;
         _module = module;
         _colliders = colliders;
         _rooms = rooms;
         _level = level;
-        _tick = tick;
+        _subscribed = subscribed;
         _report = report;
     }
 
@@ -73,13 +66,15 @@ internal sealed class TriggerZoneSession : IDisposable
         ArgumentNullException.ThrowIfNull(report); ArgumentNullException.ThrowIfNull(log);
         var source = mapObjects.Zones;
         var module = new TriggerZoneModule(kernel, mapObjects.Registration, mapObjects, authority, level, report);
-        var session = new TriggerZoneSession(source, module, new TriggerZoneColliders(report), rooms, level,
-            () => kernel.CurrentTick, report);
+        // A zone nobody listens to is not work: the two facts this half publishes are the only reason to judge a
+        // volume, so the clock is taken only while one of their bindings has a subscriber.
+        var subscribed = () => mapObjects.HasSubscribers(TriggerZoneContract.BindingOf(TriggerZoneContract.EnteredFact))
+            || mapObjects.HasSubscribers(TriggerZoneContract.BindingOf(TriggerZoneContract.ExitedFact));
+        var session = new TriggerZoneSession(source, module, new TriggerZoneColliders(report), rooms, level, subscribed, report);
         try
         {
             session._authored = TriggerZoneData.Load(report);
             source.Load(session._authored);
-            Current = session;
             log("trigger zones: " + source.Zones.Count + " zone(s) loaded from this install's package documents.");
             session.Place();
             session.SyncBodies();
@@ -87,22 +82,36 @@ internal sealed class TriggerZoneSession : IDisposable
         }
         catch
         {
-            Current = null;
             session.Dispose();
             throw;
         }
     }
 
-    /// <summary>One tick of this machine. The patch that drives it runs once per local player per fixed update, so
-    /// the kernel's own tick number is the throttle: one judgment per tick, whoever called it first.</summary>
+    /// <summary>Whether this half has work a clock tick would spend: a zone the running level placed and a
+    /// subscriber on one of the two bindings it publishes. A level that placed no zone, and a zone nobody
+    /// subscribed to, both answer false — the first because there is nothing to judge, the second because the
+    /// judgment would reach nobody.</summary>
+    internal bool Pending => !_disposed && _source.Zones.Count > 0 && _subscribed();
+
+    /// <summary>One tick of this machine: the level's zones are placed, the host judges them, and every machine's
+    /// blocking bodies follow. The kernel's clock calls it at the cadence of the game's own collision trigger
+    /// (`LG_CollisionWorldEventTrigger.COLLISION_CHECK_INTERVAL`, see <see cref="MapClock"/>), so a tick that
+    /// arrives less than a cadence after the last one does not exist at all.</summary>
     internal void Tick()
     {
         if (_disposed) return;
-        var tick = _tick();
-        if (_lastTick == tick) return;
-        _lastTick = tick;
         Place();
         _module.Tick();
+        SyncBodies();
+    }
+
+    /// <summary>The level-facing half of the work, run when a level or its zones may have changed rather than on a
+    /// clock tick: this is where a new level's room-local poses become world poses, and it is a native side effect
+    /// that belongs to a native stage.</summary>
+    internal void Refresh()
+    {
+        if (_disposed) return;
+        Place();
         SyncBodies();
     }
 
@@ -132,25 +141,7 @@ internal sealed class TriggerZoneSession : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        if (ReferenceEquals(Current, this)) Current = null;
         _colliders.Dispose();
         _module.Dispose();
-    }
-}
-
-/// <summary>
-/// The one Harmony patch of this family: after the local player's own fixed update, one zone tick. Every other
-/// player's copy of this call belongs to another body on this machine, so it returns before touching the module —
-/// which is also what keeps a client's fixed update from spending the query budget the host's plans need.
-/// </summary>
-[HarmonyPatch(typeof(PlayerInteraction), nameof(PlayerInteraction.FixedUpdate))]
-internal static class TriggerZoneTick
-{
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void Postfix(PlayerInteraction __instance)
-    {
-        var owner = __instance.m_owner;
-        if (owner == null || !owner.IsLocallyOwned) return;
-        TriggerZoneSession.Current?.Tick();
     }
 }

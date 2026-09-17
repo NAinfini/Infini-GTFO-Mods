@@ -13,7 +13,7 @@ internal sealed class TestWorld : IDisposable
     internal EntityReference Owner => new("fixture.player:a", Kernel.WorldEpoch, 1);
     internal TestWorld(bool start = true, int maxActive = 1024, int maxHistory = 8192)
     {
-        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.weapon.test", "0.1.0",
+        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.weapon.test", "1.0.0",
             RuntimeKernel.ApiVersion, "synthetic-no-game"));
         Kernel.BeginWorld(7);
         // The host registers the runtime's own contract providers before any domain package; the weapon module's

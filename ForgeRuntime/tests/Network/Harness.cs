@@ -11,7 +11,7 @@ namespace ForgeRuntime.Network.Tests;
 /// </summary>
 internal static class Harness
 {
-    internal static readonly RuntimeIdentitySummary Identity = new("NAinfini.ForgeRuntime", "1.2.0", "2.0.0", "20403457");
+    internal static readonly RuntimeIdentitySummary Identity = new("NAinfini.ForgeRuntime", "1.0.0", "1.0.0", "20403457");
 
     internal static readonly PlanIdentity[] Plans =
     {

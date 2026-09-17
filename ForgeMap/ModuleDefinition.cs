@@ -12,7 +12,7 @@ namespace ForgeMap;
 public static class ModuleDefinition
 {
     public const string ProviderId = "forge.module.gtfo.map";
-    public const string Version = "0.1.0";
+    public const string Version = "1.0.0";
 
     /// <summary>The declaration of this assembly's own surface alone: every capability it declares with the one
     /// binding that implements it. A registration that carries no native half declares exactly this, and it is
@@ -83,15 +83,15 @@ public static class ModuleDefinition
                 // own and a plan may name the one object it subscribes to; every row whose shape the runtime's
                 // `TriggerContracts` already owns is bound here without a second copy.
                 MapObjectContract.AddressedRow(MapObjectContract.DoorStateCapability, "门状态阶段变化", "门的开关状态变了。",
-                    MapObjectContract.Port("next", "execution"), MapObjectContract.Port("door", "entity"),
+                    MapObjectContract.Port("next", "execution"), MapObjectContract.Port("door", "entity", new[] { "gtfo.map_object" }),
                     MapObjectContract.Port("state", "string"),
                     new { id = "phase", type = "enum", schema = "interaction_phase", optional = true }),
                 MapObjectContract.AddressedRow(MapObjectContract.TerminalCommandCapability, "终端命令被接受", "终端接受了一条命令。",
-                    MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity"),
-                    MapObjectContract.Optional("actor", "entity"), MapObjectContract.Port("command", "string")),
+                    MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity", new[] { "gtfo.map_object" }),
+                    MapObjectContract.Optional("actor", "entity", new[] { "gtfo.player" }), MapObjectContract.Port("command", "string")),
                 MapObjectContract.Row(MapObjectContract.TerminalSessionCapability, "玩家登上 / 离开终端", "玩家进入或退出终端。",
-                    MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity"),
-                    MapObjectContract.Optional("actor", "entity"), MapObjectContract.Port("active", "boolean")),
+                    MapObjectContract.Port("next", "execution"), MapObjectContract.Port("terminal", "entity", new[] { "gtfo.map_object" }),
+                    MapObjectContract.Optional("actor", "entity", new[] { "gtfo.player" }), MapObjectContract.Port("active", "boolean")),
                 // The level-object rows: their capability JSON is `LevelObjectContract`'s own, parsed here rather
                 // than restated, so the declaration, the catalog and the binding stay one fact. The native
                 // registration adds no second copy of them. The generator rows are the map-object category's own

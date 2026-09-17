@@ -39,7 +39,7 @@ internal sealed class LevelEventWorld : IDisposable
     /// registers its built-in providers (ruling 148.3).</summary>
     internal static LevelEventWorld Start(long worldEpoch = 1)
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         // The control module owns the one step every entrypoint needs, so it registers before the plans below are
         // mounted; the trigger rows are their own contract's, registered beside this provider the way the host
         // registers its built-in providers (ruling 148.3).
@@ -63,7 +63,7 @@ internal sealed class LevelEventWorld : IDisposable
             {
                 providers = new[]
                 {
-                    new { id = LevelEventContract.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() }
+                    new { id = LevelEventContract.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() }
                 },
                 capabilities = LevelEventContract.CapabilityRows(),
                 bindings = LevelEventContract.BindingRows()

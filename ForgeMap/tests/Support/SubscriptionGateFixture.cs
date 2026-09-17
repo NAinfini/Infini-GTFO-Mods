@@ -118,7 +118,7 @@ internal static class SubscriptionGateFixture
         string planId = "test.subscription-gate." + binding;
         string json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId,
             resource = new { id = "test.subscription-gate", revision = "revision-1" },
             runtime = kernel.Identity,
             // The author's own domain, read from the trigger this plan subscribes to: a plan only loads under a

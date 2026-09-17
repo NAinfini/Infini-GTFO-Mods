@@ -11,12 +11,12 @@ namespace ForgeMap.Native;
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 // A versioned dependency is a SemVer range, so the version literal is a floor: this package loads on the
 // release it was built against or any later one.
-[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.0.0")]
 public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "NAinfini.ForgeMap";
     public const string PluginName = "Infini Forge Map";
-    public const string PluginVersion = "0.1.0";
+    public const string PluginVersion = "1.0.0";
     private bool _loadAttempted;
     internal static MapPluginSession? Session { get; private set; }
 

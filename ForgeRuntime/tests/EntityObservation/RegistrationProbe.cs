@@ -6,7 +6,7 @@ static class RegistrationProbe
     // This probe is never counted as a passed gameplay or query implementation.
     public static void Run()
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "synthetic"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "synthetic"));
         var reference = ContractTests.Ref(); int observed = 0;
         const string registry = "{\"providers\":[{\"id\":\"test.entities\",\"kind\":\"extension\",\"version\":\"1.0.0\",\"dependencies\":[]}],\"capabilities\":[],\"bindings\":[]}";
         kernel.BeginWorld(1);

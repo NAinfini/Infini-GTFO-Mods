@@ -18,7 +18,7 @@ namespace ForgeWeapon;
 public static class ModuleDefinition
 {
     public const string ProviderId = "forge.module.gtfo.weapon";
-    public const string Version = "0.2.0";
+    public const string Version = "1.0.0";
     /// <summary>The one mount target kind this provider answers for: an official offline gear block id, which
     /// every instance of that block hangs on, as opposed to one address or one native object.</summary>
     public const string GearBlockAttachmentKind = "gear-block";

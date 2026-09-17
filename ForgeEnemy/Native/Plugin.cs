@@ -11,7 +11,7 @@ namespace ForgeEnemy.Native;
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 // A versioned dependency is a SemVer range, so the version literal is a floor: this package loads on the
 // release it was built against or any later one.
-[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.0.0")]
 // GTFO-API raises GameDataAPI.OnGameDataInitialized after GameData.Initialize, which is where every
 // DataBlock row — including custom EnemyDataBlocks injected by MTFO — is present; the spawn
 // requirement table is built from that table and from the base prefabs. GUID and minimum version read from

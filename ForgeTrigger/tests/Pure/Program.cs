@@ -113,6 +113,8 @@ void Run()
         CollectionTests.Run(Check);
         TextTests.Run(Check, Reject);
         NumericBoundaryTests.Run(Check);
+        VectorTests.Run(Check);
+        EnumTests.Run(Check);
         // Public R3 consumers run in tests/R3Consumers and the full validation entrypoint.
         
         // The declaration tables are the advertised vocabulary: every helper exercised above stays a method unless a
@@ -131,7 +133,7 @@ void Run()
             && module.BindingSupport.Count == declared.Length
             && declared.All(node => module.BindingSupport.Any(support => support.BindingId == node.BindingId)),
             "helpers are not advertised as runtime handlers beyond the declaration table");
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "pure-test-no-game"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "pure-test-no-game"));
         using (kernel.RegisterModule(module, RuntimeLogLevel.Off))
         {
             var before = kernel.ExportManifest();

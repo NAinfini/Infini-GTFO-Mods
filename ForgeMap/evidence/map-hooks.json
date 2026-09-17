@@ -951,25 +951,6 @@
       "readback": "the terminal's own CurrentStateName and, while a player is at it, the interaction source the session actor is resolved from; oldState/newState are not fact sources"
     },
     {
-      "hook": "TriggerZoneTick",
-      "assembly": "Modules-ASM.dll",
-      "type": "PlayerInteraction",
-      "name": "FixedUpdate",
-      "signature": "System.Void PlayerInteraction::FixedUpdate()",
-      "isVirtual": false,
-      "isStatic": false,
-      "rva": null,
-      "patch": "postfix",
-      "session": "off",
-      "postfix": {
-        "instanceParameter": "__instance",
-        "arguments": [],
-        "reads": [],
-        "writes": [],
-        "guard": null
-      }
-    },
-    {
       "hook": "WeakDoorAttackedReadback",
       "assembly": "Modules-ASM.dll",
       "type": "LevelGeneration.LG_WeakDoor",
@@ -1930,13 +1911,6 @@
       "type": "PlayerGuiLayer",
       "isStatic": false,
       "signature": "PUI_LocalPlayerStatus PlayerGuiLayer::get_m_playerStatus()"
-    },
-    {
-      "id": "playerinteraction-get-m-owner",
-      "assembly": "Modules-ASM.dll",
-      "type": "PlayerInteraction",
-      "isStatic": false,
-      "signature": "Player.LocalPlayerAgent PlayerInteraction::get_m_owner()"
     },
     {
       "id": "playerinventorybase-get-wieldeditem",

@@ -139,7 +139,7 @@ internal sealed class ZoneScene : IDisposable
     private readonly RuntimeModuleHandle mounts;
     private readonly Dictionary<string, EntityReference> standing = new(StringComparer.Ordinal);
     internal RuntimeKernel Kernel { get; } =
-        new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "query-facts"));
+        new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "query-facts"));
     internal string? ResultCode { get; private set; }
     internal string? ResultDetail { get; private set; }
     internal JsonElement Recorded { get; private set; }
@@ -377,7 +377,7 @@ internal sealed class ZoneScene : IDisposable
         var constants = new object[] { 0 };
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = PlanId, resource = new { id = PlanId, revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = PlanId, resource = new { id = PlanId, revision = "1" },
             runtime = Kernel.Identity, domain = "logic", authority = "host", failurePolicy = "stop-entrypoint",
             permissions, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth },
@@ -448,7 +448,7 @@ internal sealed class CompareScene : IDisposable
     private readonly RuntimeModuleHandle fixture;
     private readonly RuntimeModuleHandle mounts;
     internal RuntimeKernel Kernel { get; } =
-        new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "query-facts"));
+        new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "query-facts"));
 
     internal CompareScene()
     {
@@ -633,7 +633,7 @@ internal sealed class CompareScene : IDisposable
             .Select((port, index) => (port, index)).Single(x => x.port.GetProperty("id").GetString() == id).index;
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = PlanId, resource = new { id = PlanId, revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = PlanId, resource = new { id = PlanId, revision = "1" },
             runtime = Kernel.Identity, domain = "logic", authority = "host", failurePolicy = "stop-entrypoint",
             permissions, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth },

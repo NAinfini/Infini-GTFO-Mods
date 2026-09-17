@@ -37,7 +37,7 @@ void RejectCode(Action action, string code, string name)
     Check(a.Publish(s.Event("a1", "example.alpha", tick: 2)).Code == "event-id-conflict", "reusing identity with changed event rejects");
     Check(a.Publish(s.Event("cross", "example.beta")).Code == "binding-owner", "module cannot publish another module binding");
     Reject(() => s.Register("example.alpha"), "provider conflict rejects atomically");
-    Reject(() => s.Kernel.RegisterModule(Fixture.Module("example.third") with { ApiVersion = "1.0.0" }, RuntimeLogLevel.Off), "API version mismatch");
+    Reject(() => s.Kernel.RegisterModule(Fixture.Module("example.third") with { ApiVersion = "9.0.0" }, RuntimeLogLevel.Off), "API version mismatch");
     Check(b.IsRegistered, "rejected registration does not damage other module");
 }
 {
@@ -141,8 +141,8 @@ void RejectCode(Action action, string code, string name)
     Reject(() => RuntimeJson.Parse("{\"schemaVersion\":1,\"schemaVersion\":2}"), "duplicate JSON keys reject");
     JsonNode Step(JsonNode node) => node["entrypoints"]![0]!["steps"]![0]!;
     void Load(JsonNode node, string code, string name) => RejectCode(() => s.Kernel.LoadPlan(node.ToJsonString()), code, name);
-    bad = JsonNode.Parse(plan)!; bad["schemaVersion"] = 1;
-    Load(bad, "plan-version", "schemaVersion 1 plans are not read");
+    bad = JsonNode.Parse(plan)!; bad["schemaVersion"] = 3;
+    Load(bad, "plan-version", "schemaVersion 3 plans are not read");
     bad = JsonNode.Parse(plan)!; Step(bad)["layout"]!["inputs"]![1]!["cardinality"] = 1;
     Load(bad, "layout-mismatch", "file layout must equal the registered contract");
     bad = JsonNode.Parse(plan)!; Step(bad)["layout"]!["constants"]![0] = null;
@@ -290,7 +290,7 @@ void RejectCode(Action action, string code, string name)
         "an out-of-bounds promoted value is rejected before invocation, never clamped");
 }
 {
-    // A schemaVersion 4 plan is a graph, not a chain. This provider registers its own canonical
+    // A schemaVersion 1 plan is a graph, not a chain. This provider registers its own canonical
     // compare-shaped condition beside the recorded-event trigger and action, so these cases exercise the loader and
     // the kernel without depending on the ForgeTrigger package; the control step uses the SDK's real branch contract.
     const string id = "example.graph";
@@ -374,7 +374,7 @@ void RejectCode(Action action, string code, string name)
         Check(canonical.SequenceEqual(new object[] { "Compare", "Branch", "Guard" }), "the fixture graph has the expected canonical order");
         // Successor entries are array positions of that canonical order, so the array below is written in it.
         return JsonNode.Parse(RuntimeJson.From(new {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = "graph", resource = new { id = "author.resource", revision = "revision-1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = "graph", resource = new { id = "author.resource", revision = "revision-1" },
             runtime = graphKernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Fixture.Permissions,
             dependencies = Array.Empty<string>(),
             limits = new { graphKernel.Limits.MaxEventsPerTick, graphKernel.Limits.MaxCommandsPerTick, graphKernel.Limits.MaxQueuedEvents, graphKernel.Limits.MaxCausalDepth },
@@ -445,7 +445,7 @@ void RejectCode(Action action, string code, string name)
     var otherTrigger = otherKernel.ResolveGraphContract(Fixture.TriggerCapability("example.other"), "1.0.0", RuntimeJson.EmptyObject);
     var otherLayout = JsonNode.Parse(RuntimeJson.From(Layout(otherContract, Array.Empty<object>())).GetRawText())!;
     var otherPlanJson = JsonNode.Parse(RuntimeJson.From(new {
-        schemaVersion = 4, kind = "forge-runtime-plan", planId = "other", resource = new { id = "author.resource", revision = "revision-1" },
+        schemaVersion = 1, kind = "forge-runtime-plan", planId = "other", resource = new { id = "author.resource", revision = "revision-1" },
         runtime = otherKernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Array.Empty<string>(),
         dependencies = Array.Empty<string>(),
         limits = new { otherKernel.Limits.MaxEventsPerTick, otherKernel.Limits.MaxCommandsPerTick, otherKernel.Limits.MaxQueuedEvents, otherKernel.Limits.MaxCausalDepth },
@@ -649,7 +649,7 @@ void RejectCode(Action action, string code, string name)
         var actionContract = kernel.ResolveGraphContract(Fixture.ActionCapability(Provider), "1.0.0", RuntimeJson.From(new { amount = 5 }));
         int Port(JsonElement contract, string side, string port) => contract.GetProperty(side).EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == port).i;
         var plan = RuntimeJson.From(new {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = "compare-" + op + "-" + left + "-" + right, resource = new { id = "author.resource", revision = "revision-1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = "compare-" + op + "-" + left + "-" + right, resource = new { id = "author.resource", revision = "revision-1" },
             runtime = kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Fixture.Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },
             bindings = pins, attachments = Fixture.Attachments,
@@ -928,7 +928,7 @@ sealed class Scenario
 }
 static class Fixture
 {
-    public static readonly RuntimeIdentity Identity = new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457");
+    public static readonly RuntimeIdentity Identity = new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457");
     public static readonly string[] Permissions = { "example.health.write" };
     // Wire-side dense port-type indexes; test fixtures write frames independently of the SDK.
     internal static readonly string[] WirePortTypes = { "execution", "boolean", "integer", "number", "string", "enum", "vector3", "entity", "resource", "handle", "event", "result", "policy" };
@@ -1035,14 +1035,14 @@ static class Fixture
         int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
         var trigger = Graph(Trigger(provider)); var action = Graph(provider + ".binding.apply");
         var inputs = new[] { new { slot = Slot(action.GetProperty("inputs"), "target"), fromEventSlot = Slot(trigger.GetProperty("outputs"), "target") } };
-        // schemaVersion 4: a linear action chain still names its entry point and every successor explicitly, and a
+        // schemaVersion 1: a linear action chain still names its entry point and every successor explicitly, and a
         // chain is already in nodeId ordinal order, so it is its own canonical step order.
         var steps = Enumerable.Range(0, stepCount).Select(i => new {
             nodeId = "Action" + i, nodeKind = "action", binding = ids.IndexOf(provider + ".binding.apply"), layout = Layout(action, new object[] { 5 }),
             inputs, successors = new int?[] { i + 1 < stepCount ? i + 1 : null }
         }).ToArray();
         return RuntimeJson.From(new {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" }, runtime = kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions = Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth }, bindings = pins,
             attachments = attachments ?? Attachments,

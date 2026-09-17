@@ -23,7 +23,7 @@ public sealed class Plugin : BasePlugin
     /// release.json pins for the base dependency that ships the assembly.</summary>
     public const string GtfoApiMinimumVersion = ">=0.5.0";
     public const string PluginName = "Infini Forge Runtime";
-    public const string PluginVersion = "1.2.0";
+    public const string PluginVersion = "1.0.0";
     // The latch is per process, not per instance, so it is static like the readiness flag it guards.
     private static bool _loadAttempted;
     private static bool _loadComplete;

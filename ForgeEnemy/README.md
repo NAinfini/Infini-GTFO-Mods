@@ -8,7 +8,7 @@
 
 ## 工程结构
 
-`ForgeEnemy/Native/ForgeEnemy.Native.csproj` 是真实插件，标记 `[BepInPlugin("NAinfini.ForgeEnemy", "Infini Forge Enemy", "1.0.0")]`、`[BepInDependency("NAinfini.ForgeRuntime", "1.2.0")]` 与 `[BepInDependency("dev.gtfomodding.gtfo-api", "0.5.0")]`（GUID 与版本读自随包的 `GTFO-API.dll`；`GameDataAPI.OnGameDataInitialized` 是出生要求表的构建时点）。它只引用宿主与唯一 SDK，不附带第二份 SDK，通过公开的 `Plugin.Runtime` 注册同一个内核。唯一生产接收器是 `Native/EnemyModule.cs`；Runtime 不再创建 Enemy provider，也不再编译 Enemy Hook。出生要求推导的源码 `Spawn/EnemySpawnRequirements.cs` 由本工程直接编译进来，不是通过加载第二个托管程序集。
+`ForgeEnemy/Native/ForgeEnemy.Native.csproj` 是真实插件，标记 `[BepInPlugin("NAinfini.ForgeEnemy", "Infini Forge Enemy", "1.0.0")]`、`[BepInDependency("NAinfini.ForgeRuntime", "1.0.0")]` 与 `[BepInDependency("dev.gtfomodding.gtfo-api", "0.5.0")]`（GUID 与版本读自随包的 `GTFO-API.dll`；`GameDataAPI.OnGameDataInitialized` 是出生要求表的构建时点）。它只引用宿主与唯一 SDK，不附带第二份 SDK，通过公开的 `Plugin.Runtime` 注册同一个内核。唯一生产接收器是 `Native/EnemyModule.cs`；Runtime 不再创建 Enemy provider，也不再编译 Enemy Hook。出生要求推导的源码 `Spawn/EnemySpawnRequirements.cs` 由本工程直接编译进来，不是通过加载第二个托管程序集。
 
 `ForgeEnemy/ForgeEnemy.csproj` 是托管辅助工程：`Receivers/` 只剩提交路径审计使用的治疗提交与线程边界；`Spawn/` 是交给 Map 的出生空间要求合同与内容依赖计算。它**不是另一个游戏插件，不应当作玩家发行包**。原来 `Receivers/` 下未被任何工程引用的身份表与伤害观察窗口是 `EnemyModule` 的重复实现，已删除。`ModuleDefinition.cs` 现在只保留包身份常量 `ProviderId` 与 `Version`，`Create()` 方法已删除——因此不可能与 Native 的真实 provider 重复注册。
 

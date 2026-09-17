@@ -114,8 +114,8 @@ public static class WeaponDeployableFactsContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "device", "type": "entity" },
-          { "id": "actor", "type": "entity", "nullable": true },
+          { "entityKinds": ["gtfo.equipment"], "id": "device", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "actor", "type": "entity", "nullable": true },
           { "id": "equipment_kind", "type": "enum", "schema": "equipment_kind" },
           { "id": "equipment_action", "type": "enum", "schema": "equipment_action", "nullable": true },
           { "id": "ammo", "type": "integer", "nullable": true }
@@ -139,8 +139,8 @@ public static class WeaponDeployableFactsContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "device", "type": "entity" },
-          { "id": "actor", "type": "entity", "nullable": true }
+          { "entityKinds": ["gtfo.equipment"], "id": "device", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "actor", "type": "entity", "nullable": true }
         ],
         "parameters": []
       }
@@ -161,7 +161,7 @@ public static class WeaponDeployableFactsContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "device", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "device", "type": "entity" },
           { "id": "position", "type": "vector3", "unit": "m" }
         ],
         "parameters": []

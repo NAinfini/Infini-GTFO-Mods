@@ -88,6 +88,7 @@ public static class DoorTerminalActionContract
 
     internal static object Port(string id, string type) => new { id, type };
     internal static object Many(string id, string type) => new { id, type, cardinality = "many" };
+    internal static object Many(string id, string type, string[] entityKinds) => new { id, type, cardinality = "many", entityKinds };
     internal static object Field(string id, string type) => new { id, type };
     internal static object EnumField(string id, string schema) => new { id, type = "enum", schema };
     internal static object Structural(string id, bool required, params string[] values)
@@ -100,7 +101,7 @@ public static class DoorTerminalActionContract
     public static object LockRow() => Row(LockCapability, "给门加锁", "给门加回它自己的锁。", new object[]
         {
             Port("in", "execution"),
-            Many("doors", "entity")
+            Many("doors", "entity", new[] { "gtfo.map_object" })
         },
         new object[]
         {
@@ -120,7 +121,7 @@ public static class DoorTerminalActionContract
     public static object UnlockRow() => Row(UnlockCapability, "解锁门", "解开门的锁。", new object[]
         {
             Port("in", "execution"),
-            Many("doors", "entity")
+            Many("doors", "entity", new[] { "gtfo.map_object" })
         },
         new object[]
         {

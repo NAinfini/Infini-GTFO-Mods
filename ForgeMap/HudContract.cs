@@ -82,7 +82,7 @@ public static class HudContract
             inputs = new object[]
             {
                 new { id = "in", type = "execution" },
-                new { id = "viewers", type = "entity", cardinality = "many" },
+                new { id = "viewers", type = "entity", cardinality = "many", entityKinds = new[] { "gtfo.player" } },
                 new { id = "value", type = "number" },
                 new { id = "maximum", type = "number", optional = true },
                 new { id = "label", type = "string", optional = true },

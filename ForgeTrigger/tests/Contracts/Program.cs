@@ -145,7 +145,7 @@ if (args[0] == "export")
 {
     using var harness = new Harness(seed);
     File.WriteAllText(Path.Combine(output, "sdk-manifest.json"), harness.Kernel.ExportManifest());
-    var canonicalKernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "canonical-contract-audit-no-game"));
+    var canonicalKernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "canonical-contract-audit-no-game"));
     using (canonicalKernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off))
     using (canonicalKernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off))
         File.WriteAllText(Path.Combine(output, "sdk-canonical-manifest.json"), canonicalKernel.ExportManifest());

@@ -43,7 +43,7 @@ public sealed class MapObjectHitTests
 
     private static RuntimeKernel Kernel()
     {
-        var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         // The canonical combat contract provider the host registers as a builtin: the Map provider binds the
         // heal action the player half implements, and the runtime refuses a binding whose capability was never
         // declared.

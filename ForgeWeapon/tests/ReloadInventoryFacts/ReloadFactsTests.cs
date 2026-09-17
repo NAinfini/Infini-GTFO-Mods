@@ -45,6 +45,27 @@ public sealed class ReloadFactsTests
         Assert.Equal(0, world.Reload.OpenCount);
     }
 
+    /// <summary>A closed transfer row does not stop the life from moving: the transfer fact is not built, but the
+    /// amount was still added to the life, which is why the ending is still published — a life that had moved
+    /// nothing publishes no ending at all. The gate is read before the event value, not after it.</summary>
+    [Fact]
+    public void a_closed_transfer_row_publishes_no_transfer_but_the_life_still_moves()
+    {
+        var (world, _, _, weapon) = Armed();
+        using var _ = world;
+
+        world.Reload.FlagChanged(weapon, reloading: true);
+        weapon.Clip = 45;
+        world.Closed.Add(Transferred);
+        world.Reload.MagazineRead(weapon);
+        world.Reload.FlagChanged(weapon, reloading: false);
+
+        Assert.Single(world.Facts(Started));
+        Assert.Empty(world.Facts(Transferred));
+        Assert.Single(world.Facts(Completed));
+        Assert.Equal(0, world.Reload.OpenCount);
+    }
+
     /// <summary>A reload that moved no ammunition closes without a fact: the node list's `e-w-reload` is start and
     /// completion, so an interrupted reload is not a node and the life is simply dropped.</summary>
     [Fact]

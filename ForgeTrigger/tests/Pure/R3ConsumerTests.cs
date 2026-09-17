@@ -97,7 +97,7 @@ internal static class R3ConsumerTests
                     role == "event-target" ? "red" : role == "instigator" ? "green" : "blue");
             }
             Actors = new RuntimeActorContext(actors);
-            Kernel = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "test-only-r3"));
+            Kernel = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "test-only-r3"));
             var module = new RuntimeModule(RuntimeKernel.ApiVersion,
                 RuntimeJson.From(new { providers = new[] { new { id = "test.trigger.observations", kind = "extension", version = "1.0.0", dependencies = Array.Empty<string>() } },
                     capabilities = Array.Empty<object>(), bindings = Array.Empty<object>() }).GetRawText(),

@@ -83,7 +83,7 @@ internal static class IntegrationCases
 
     private static void Hooks()
     {
-        var k = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var k = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         k.BeginWorld(1); k.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
         k.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
         LocalPlan.OwnMounts(k);

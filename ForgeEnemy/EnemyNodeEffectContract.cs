@@ -109,6 +109,7 @@ public static class EnemyNodeEffectContract
             "cardinality": "many"
           },
           {
+            "entityKinds": ["gtfo.player", "gtfo.enemy", "gtfo.equipment"],
             "id": "source",
             "type": "entity"
           }
@@ -312,6 +313,7 @@ public static class EnemyNodeEffectContract
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.enemy"],
             "id": "enemies",
             "type": "entity",
             "cardinality": "many"

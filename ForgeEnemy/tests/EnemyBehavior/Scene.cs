@@ -64,7 +64,7 @@ internal static class Scene
     /// shape, and the real handlers' rules are covered by the cases that run the decisions.</summary>
     internal static RuntimeKernel RowKernel()
     {
-        var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         kernel.BeginWorld(1);
         var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
         {

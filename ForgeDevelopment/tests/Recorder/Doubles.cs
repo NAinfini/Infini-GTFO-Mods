@@ -198,7 +198,7 @@ namespace ForgeRuntime
 
     public static class Plugin
     {
-        public const string PluginVersion = "1.2.0-test";
+        public const string PluginVersion = "1.0.0";
         public static RuntimeMode ConfiguredMode { get; set; } = RuntimeMode.Authoring;
     }
 }

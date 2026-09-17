@@ -99,10 +99,10 @@ internal static class HandshakeChecks
         suite.Case("handshake: identity mismatch");
         Harness.Open();
         var versionAck = Harness.Build(SessionRole.Host).Receive(new NetworkEnvelope(NetworkMessageKind.Hello, 2,
-            Harness.HelloBody(SessionRole.Client, identity: new RuntimeIdentitySummary("NAinfini.ForgeRuntime", "1.1.0", "2.0.0", "20403457"))))!.Value;
+            Harness.HelloBody(SessionRole.Client, identity: new RuntimeIdentitySummary("NAinfini.ForgeRuntime", "1.0.0", "1.0.0", "20403457"))))!.Value;
         suite.Equal(NetworkCodes.RuntimeMismatch, versionAck.Ack.ReasonCode, "another runtime version is refused");
         var buildAck = Harness.Build(SessionRole.Host).Receive(new NetworkEnvelope(NetworkMessageKind.Hello, 2,
-            Harness.HelloBody(SessionRole.Client, identity: new RuntimeIdentitySummary("NAinfini.ForgeRuntime", "1.2.0", "2.0.0", "20403456"))))!.Value;
+            Harness.HelloBody(SessionRole.Client, identity: new RuntimeIdentitySummary("NAinfini.ForgeRuntime", "1.0.0", "1.0.0", "20403456"))))!.Value;
         suite.Equal(NetworkCodes.RuntimeMismatch, buildAck.Ack.ReasonCode, "another game build is refused");
     }
 
@@ -157,7 +157,7 @@ internal static class HandshakeChecks
         suite.Case("handshake: rejected client stays gated");
         Harness.Open();
         var rejectingHost = Harness.Attach(SessionRole.Host, 1);
-        var mismatchedClient = Harness.Attach(SessionRole.Client, 2, identity: new RuntimeIdentitySummary("OtherRuntime", "9.9.9", "2.0.0", "20403457"));
+        var mismatchedClient = Harness.Attach(SessionRole.Client, 2, identity: new RuntimeIdentitySummary("OtherRuntime", "9.9.9", "1.0.0", "20403457"));
         var rejectedAck = Harness.Handshake(rejectingHost, mismatchedClient);
         suite.Equal((byte)0, rejectedAck.Accepted, "the host refused the client");
         suite.True(rejectingHost.Handshake.RequirePeer(2) != null, "host gate stays closed for a refused peer");

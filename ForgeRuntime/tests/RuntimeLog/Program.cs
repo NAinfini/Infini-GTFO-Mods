@@ -42,7 +42,7 @@ void RejectCode(string code, Action action, string message)
 }
 string NewDirectory() => Path.Combine(root, (++sequence).ToString("D2"));
 RuntimeKernel Kernel(IRuntimeLogSink sink, RuntimeLogLevel level)
-    => new(new RuntimeIdentity(Runtime, "1.2.0", RuntimeKernel.ApiVersion, "managed-test"), new RuntimeLimits(), sink, level);
+    => new(new RuntimeIdentity(Runtime, "1.0.0", RuntimeKernel.ApiVersion, "managed-test"), new RuntimeLimits(), sink, level);
 RuntimeLogRecord Record(RuntimeLogLevel level, string code, long tick)
     => new() { Level = level, Code = code, Provider = Runtime, Tick = tick, WorldEpoch = 1 };
 RuntimeModule Module(string id) => new(RuntimeKernel.ApiVersion, JsonSerializer.Serialize(new {
@@ -268,7 +268,7 @@ Case("provider level gates and fixed rejection codes", () => {
     Check(checkedSink.Records.Count == 1, "rejected records reached the sink");
     RejectCode("log-level", () => Kernel(new CaptureSink(), RuntimeLogLevel.Trace), "trace accepted as a configured level");
     Check(Throws<ArgumentNullException>(() => Kernel(null!, RuntimeLogLevel.Error)), "null sink accepted");
-    var unconfigured = new RuntimeKernel(new RuntimeIdentity(Runtime, "1.2.0", RuntimeKernel.ApiVersion, "managed-test"));
+    var unconfigured = new RuntimeKernel(new RuntimeIdentity(Runtime, "1.0.0", RuntimeKernel.ApiVersion, "managed-test"));
     RejectCode("log-unconfigured", () => unconfigured.WriteLog(Record(RuntimeLogLevel.Error, "x", 1)), "kernel without sink wrote");
     RejectCode("log-unconfigured", unconfigured.ElevateLogging, "kernel without sink elevated");
     RejectCode("log-provider-unregistered", () => unconfigured.LogGate(Runtime), "kernel without sink has a level table");

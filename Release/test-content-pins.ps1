@@ -75,7 +75,7 @@ internal static class GameRuntimeBridge
     $releasePath = Join-Path $fixtureRoot 'Release/release.json'
     Write-Text $releasePath ($release | ConvertTo-Json -Depth 10)
     $manifestPath = Join-Path $workspace 'runtime-manifest.json'
-    Write-Text $manifestPath '{"runtime":{"id":"forge.runtime","version":"1.2.0","apiVersion":"2.0.0","gameBuild":"7"}}'
+    Write-Text $manifestPath '{"runtime":{"id":"forge.runtime","version":"1.0.0","apiVersion":"1.0.0","gameBuild":"7"}}'
     $alphaAssemblies = @('Alpha.dll', 'Alpha.Core.dll')
     foreach ($file in @('Alpha.dll', 'Alpha.Core.dll', 'manifest.json')) { Write-Text (Join-Path $staging "NAinfini-Alpha/$file") "alpha $file`n" }
     foreach ($file in @('Beta.dll', 'manifest.json')) { Write-Text (Join-Path $staging "NAinfini-Beta/$file") "beta $file`n" }
@@ -161,11 +161,11 @@ internal static class GameRuntimeBridge
 
     Write-Host ''
     Write-Host '== gameBuild 与宿主源码不一致：退出 1 =='
-    Write-Text $manifestPath '{"runtime":{"id":"forge.runtime","version":"1.2.0","apiVersion":"2.0.0","gameBuild":"8"}}'
+    Write-Text $manifestPath '{"runtime":{"id":"forge.runtime","version":"1.0.0","apiVersion":"1.0.0","gameBuild":"8"}}'
     $run = Invoke-Pins ($arguments + @('--output', $outputPath))
     Check ($run.ExitCode -eq 1) "运行清单 gameBuild 不符时退出 1（实际 $($run.ExitCode)）"
     Check ($run.Output -match 'game build 8') "错误信息列出两个 gameBuild（$($run.Output)）"
-    Write-Text $manifestPath '{"runtime":{"id":"forge.runtime","version":"1.2.0","apiVersion":"2.0.0","gameBuild":"7"}}'
+    Write-Text $manifestPath '{"runtime":{"id":"forge.runtime","version":"1.0.0","apiVersion":"1.0.0","gameBuild":"7"}}'
 
     Write-Host ''
     Write-Host '== BepInEx 根反推游戏根；两个根互斥；缺少参数退出 2 =='

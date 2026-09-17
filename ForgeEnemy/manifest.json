@@ -5,6 +5,6 @@
   "description": "Forge Enemy: enemy instances, health and combat receivers, spawn requirements and native observation for the Forge framework. Registers provider forge.module.gtfo.enemy with the Forge Runtime; hard dependency on ForgeRuntime.",
   "dependencies": [
     "BepInEx-BepInExPack_GTFO-3.2.2",
-    "NAinfini-ForgeRuntime-1.2.0"
+    "NAinfini-ForgeRuntime-1.0.0"
   ]
 }

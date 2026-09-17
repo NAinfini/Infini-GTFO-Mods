@@ -15,7 +15,7 @@ namespace ForgeTrigger;
 public static class ModuleDefinition
 {
     public const string ProviderId = "forge.module.trigger";
-    public const string Version = "0.1.0";
+    public const string Version = "1.0.0";
 
     public static RuntimeModule Create() => new(RuntimeKernel.ApiVersion,
         RuntimeJson.From(new

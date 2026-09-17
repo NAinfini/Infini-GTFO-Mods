@@ -144,8 +144,8 @@ public static class WeaponOverrideContract
         "execution": "host",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "equipment", "type": "entity" },
-          { "id": "source", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "equipment", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "source", "type": "entity" },
           { "id": "rate", "type": "number" },
           { "id": "duration", "type": "integer", "unit": "tick" }
         ],
@@ -191,7 +191,7 @@ public static class WeaponOverrideContract
         "execution": "host",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "equipment", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "equipment", "type": "entity" },
           { "id": "cone", "type": "number", "unit": "deg" },
           { "id": "seed", "type": "integer" },
           { "id": "movement_scale", "type": "number" },
@@ -245,7 +245,7 @@ public static class WeaponOverrideContract
         "execution": "host",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "equipment", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "equipment", "type": "entity" },
           { "id": "horizontal", "type": "number" },
           { "id": "vertical", "type": "number" },
           { "id": "recovery", "type": "number" },

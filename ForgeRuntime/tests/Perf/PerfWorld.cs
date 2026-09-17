@@ -403,7 +403,7 @@ internal static class PerfWorld
             }).ToArray();
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId,
+                schemaVersion = 1, kind = "forge-runtime-plan", planId,
                 resource = new { id = "forge.perf.resource", revision = "1" }, runtime = kernel.Identity,
                 domain = "map", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = Array.Empty<string>(), dependencies = Array.Empty<string>(),

@@ -93,7 +93,7 @@ public static class PlayerCommandContract
         parameters = new { description = "把玩家打进倒地状态。", descriptionEn = "Puts a player into the downed state." },
         graph = new
         {
-            domains = new[] { "player", "map", "logic" },
+            domains = new[] { "map", "player", "logic" },
             execution = "host",
             inputs = new object[]
             {
@@ -142,7 +142,7 @@ public static class PlayerCommandContract
       "owner": "forge.contract.combat",
       "kind": "action",
       "label": "救起倒地玩家",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "按明确规则把倒地的人救起来。",
         "summary": "按明确规则把倒地的人救起来。",
@@ -156,7 +156,7 @@ public static class PlayerCommandContract
         "inputs": [
           { "id": "in", "type": "execution" },
           { "id": "targets", "type": "entity", "cardinality": "many" },
-          { "id": "source", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "source", "type": "entity" },
           { "id": "duration", "type": "integer", "unit": "tick" },
           { "id": "restored_health", "type": "number", "unit": "hp" }
         ],

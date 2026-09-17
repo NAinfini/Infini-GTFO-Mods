@@ -57,7 +57,7 @@ public sealed class MapNativeAdapterTests
 
     private static RuntimeKernel Kernel()
     {
-        var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         kernel.BeginWorld(++World);
         // The canonical contract providers the host registers as builtins before any package loads: the Map
         // provider binds capability ids it does not own (`forge.trigger.interaction.lock_state`,
@@ -80,7 +80,7 @@ public sealed class MapNativeAdapterTests
     /// would look like, and the one registration the runtime refuses on the provider itself.</summary>
     private static RuntimeModule RivalMapProvider() => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
     {
-        providers = new[] { new { id = ModuleDefinition.ProviderId, kind = "native", version = "9.9.9", dependencies = Array.Empty<string>() } },
+        providers = new[] { new { id = ModuleDefinition.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
         capabilities = Array.Empty<object>(), bindings = Array.Empty<object>()
     }).GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
 
@@ -805,7 +805,6 @@ public sealed class MapNativeAdapterTests
             typeof(ExpeditionStartedReadback), typeof(ReactorWaveReadback),
             typeof(HsuSampledReadback), typeof(CheckpointRestoredReadback),
             typeof(ZoneEnteredReadback), typeof(PortalWarpedReadback),
-            typeof(TriggerZoneTick),
             typeof(TeammateOverheadRender), typeof(TeammateOverheadRemoved), typeof(TeammateOverheadVisibility)
         }), "Unexpected hook set.");
         Spawn(A); Hook(typeof(PlayerSpawnedReadback)); Hook(typeof(PlayerDespawnedReadback));

@@ -206,7 +206,7 @@ internal sealed class PlayerFactsWorld : IDisposable
         string planId = "test.player-facts." + name;
         string json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId,
             resource = new { id = "author.resource", revision = "revision-1" },
             runtime = Kernel.Identity, domain = "player", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = used.SelectMany(id => support[id]).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray(),
@@ -307,7 +307,7 @@ internal sealed class PlayerFactsWorld : IDisposable
     /// down row it owns, and one binding per row.</summary>
     private string Registry() => RuntimeJson.From(new
     {
-        providers = new[] { new { id = PlayerStateContract.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() } },
+        providers = new[] { new { id = PlayerStateContract.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
         capabilities = PlayerStateContract.ValueRows().Append(PlayerCommandContract.DownRow()).ToArray(),
         bindings = TestObservedBindings().Concat(PlayerStateContract.ValueBindings())
             .Append(DownBinding()).ToArray()

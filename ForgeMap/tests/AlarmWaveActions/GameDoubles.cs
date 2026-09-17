@@ -191,12 +191,12 @@ internal static class Fixture
     internal static AlarmWaveActions Attach()
     {
         _registration?.Dispose();
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.test.alarmwave", "0.1.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.test.alarmwave", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         kernel.BeginWorld(1);
         var capabilities = JsonDocument.Parse(AlarmWaveContract.CapabilitiesJson).RootElement;
         var registry = RuntimeJson.From(new
         {
-            providers = new[] { new { id = AlarmWaveContract.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() } },
+            providers = new[] { new { id = AlarmWaveContract.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities,
             bindings = AlarmWaveContract.Bindings()
         });

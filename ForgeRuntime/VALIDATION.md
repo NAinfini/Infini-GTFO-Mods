@@ -225,7 +225,7 @@ SDK 合同与注册探针 76 项、Enemy 消费方 66 项、Trigger 的 R3 消�
 
 以上都是托管替身与编译后元数据证据，没有加载 GTFO。
 
-## U-RUNTIME — API 2.0.0 与 plan schemaVersion 2
+## U-RUNTIME — API 1.0.0 与 plan schemaVersion 4
 
 与网站 `ebc37a11`（Forge Standard v0.2）同批。`RuntimeKernel.ApiVersion` 为 2.0.0，是模块、宿主身份与测试唯一的版本来源；`GameRuntimeBridge` 原先写死的 1.0.0 身份一并改掉。manifest 自身 schemaVersion 仍为 1。
 
@@ -237,7 +237,7 @@ SDK 合同与注册探针 76 项、Enemy 消费方 66 项、Trigger 的 R3 消�
 | --- | --- |
 | Framework | 242；`--fixtures` 270，网站 27 个非法计划逐条核对拒绝码均为预期原因 |
 | GraphContracts | 1911，0 失败；verify.py 通过；5 个错误实现全部检出（新增 `plan-skips-expansion`） |
-| GameBindings | 默认 31；`--fixtures` 62；`--bridge` 57；`--native` 51（GameAssembly SHA-256 `C6A5C3CD…`）；`--export-manifest` 实际导出 apiVersion 2.0.0 |
+| GameBindings | 默认 31；`--fixtures` 62；`--bridge` 57；`--native` 51（GameAssembly SHA-256 `C6A5C3CD…`）；`--export-manifest` 实际导出 apiVersion 1.0.0 |
 | 宿主 | Architecture 36；HostIntegration 默认 42、`--host` 53；PluginStartup 35；HostConfiguration 66；LifecycleWork `--fixtures` 57；EntityObservation 75、`--probe-registration` 76 |
 | Enemy | LifecycleFacts 52/52；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
 | Map / Weapon | MapContracts 报告 33 通过、0 失败；IdentityDispatchReview 20/20 |
@@ -265,7 +265,7 @@ handler 不感知提升：dispatch 把事件送来的值并回 Parameters，再�
 | GraphContracts | 1911，0 失败；verify.py 通过 |
 | GameBindings | 默认 31；`--fixtures` 64 |
 | 宿主 | Architecture 36；HostIntegration 默认 42、`--host` 51（`2a20d18` 删除原型探针时去掉 2 项）；PluginStartup 35；HostConfiguration 66；LifecycleWork `--fixtures` 57；EntityObservation 75、`--probe-registration` 76 |
-| Enemy | LifecycleFacts 52/52（生成的计划与当时的 `examples/limb-broken-heal.plan.json` 一致；该示例已在 heal 2.0.0 改为多值输入时删除）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
+| Enemy | LifecycleFacts 52/52（生成的计划与当时的 `examples/limb-broken-heal.plan.json` 一致；该示例已在 heal 改为多值输入时删除）；CommitAudit 52/52；NativePlugin 24/24；ReceiverProbe 40/40；EntityObservation 66/66；BehaviorObservation 22/22 |
 | Map / Weapon | MapContracts 通过；IdentityDispatchReview 20/20 |
 | Trigger | 完整入口通过，见 [Trigger 验证记录](../ForgeTrigger/VALIDATION.md) |
 
@@ -281,7 +281,7 @@ public EntityReference? ResolveEntityInstance(string kind, object instance);    
 public bool IsEntityCurrent(EntityReference reference);                                                     // RuntimeKernel
 ```
 
-版本：`RuntimeKernel.ApiVersion` 保持 2.0.0，它是与网站共享的 I-MANIFEST 版本，manifest 形状没有变化。宿主插件保持 1.2.0：这是纯增量接口，此前加入 `EntityObservers` 时同样没有递增，Map、Enemy 与 Weapon 的 `BepInDependency` 和测试都锁定 1.2.0。**代价是：若已有不含这些接口的 1.2.0 构建在外流通，Weapon 在其上会以缺失方法加载失败**；首次发布这组插件前需要维护者确认是否改为 1.3.0。
+版本：`RuntimeKernel.ApiVersion` 与宿主插件都是 1.0.0，这是与网站共享的 I-MANIFEST 版本，manifest 形状没有变化。本发行集尚未发布，因此不存在需要区分的旧构建（版本号统一见 [README](README.md)）。
 
 新增 `tests/EntityObservation/InstanceResolutionTests.cs`，分为注册（归属、非法 key、原子性、跨模块拒绝、只问拥有者、注销）、就绪状态、失败文本（异常消息与内部异常不外泄）、答案核验（他人命名空间、前缀相近、旧世界、拥有者拒绝）、观察保护、`IsEntityCurrent` 真假、manifest 不变七组。
 

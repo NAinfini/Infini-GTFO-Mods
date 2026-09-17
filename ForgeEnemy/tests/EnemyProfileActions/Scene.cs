@@ -22,7 +22,7 @@ internal sealed class Scene : IDisposable
         .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
         .Single(c => c.GetParameters().Length == 10);
 
-    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     internal readonly EnemyAgent Enemy;
     internal readonly EntityReference Reference;
@@ -48,7 +48,7 @@ internal sealed class Scene : IDisposable
     /// registration only checks that every registered handler has a shape, and nothing here dispatches.</summary>
     internal static RuntimeKernel RowKernel()
     {
-        var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         kernel.BeginWorld(1);
         kernel.RegisterModule(new RuntimeModule(RuntimeKernel.ApiVersion, """
         {

@@ -95,7 +95,7 @@ internal sealed class WorkFixture
         var contracts = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
         {
             [DamageBinding] = Kernel.ResolveGraphContract("forge.trigger.combat.damage_applied", "1.0.0", Parameters(DamageBinding)),
-            [HealBinding] = Kernel.ResolveGraphContract("forge.action.combat.heal", "2.0.0", Parameters(HealBinding))
+            [HealBinding] = Kernel.ResolveGraphContract("forge.action.combat.heal", "1.0.0", Parameters(HealBinding))
         };
         object Layout(string id) => new { inputs = Slots(contracts[id].GetProperty("inputs")), outputs = Slots(contracts[id].GetProperty("outputs")),
             constants = Row("capabilities", pins.Single(p => p.bindingId == id).capabilityId).GetProperty("graph").GetProperty("parameters")
@@ -111,7 +111,7 @@ internal sealed class WorkFixture
         var inputs = wires.OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = "test.lifecycle.plan", resource = new { id = "test.lifecycle.plan", revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = "test.lifecycle.plan", resource = new { id = "test.lifecycle.plan", revision = "1" },
             runtime = Kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth }, bindings = pins,
             attachments = new[] { new { kind = "level", reference = "test.level" } },

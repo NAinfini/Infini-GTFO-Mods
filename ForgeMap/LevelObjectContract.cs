@@ -208,7 +208,7 @@ public static class LevelObjectContract
           { "id": "next", "type": "execution" },
           { "id": "scan", "type": "handle", "handleKind": "effect", "lifetime": "encounter", "optional": true },
           { "id": "progress", "type": "number", "unit": "ratio" },
-          { "id": "participants", "type": "entity", "cardinality": "many" },
+          { "entityKinds": ["gtfo.player"], "id": "participants", "type": "entity", "cardinality": "many" },
           { "id": "count", "type": "integer" }
         ],
         "parameters": [
@@ -269,7 +269,7 @@ public static class LevelObjectContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "container", "type": "entity" },
+          { "entityKinds": ["gtfo.map_object"], "id": "container", "type": "entity" },
           { "id": "state", "type": "enum", "schema": "container_state" }
         ],
         "parameters": [
@@ -301,7 +301,7 @@ public static class LevelObjectContract
           { "id": "next", "type": "execution" },
           { "id": "item", "type": "entity" },
           { "id": "picked_up", "type": "boolean" },
-          { "id": "actor", "type": "entity", "optional": true }
+          { "entityKinds": ["gtfo.player"], "id": "actor", "type": "entity", "optional": true }
         ],
         "parameters": [
           { "id": "resource", "type": "resource", "role": "structural", "required": true, "resourceKind": "item" }

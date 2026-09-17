@@ -76,7 +76,7 @@ internal static class Contexts
     /// and the kernel is standing only so the epoch is the kernel's own.</summary>
     internal static RuntimeQuerySession Session(long worldEpoch)
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "environment-facts"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "environment-facts"));
         // The kernel reports epoch zero until a world is begun, so the case begins its own either way: a session
         // with no world behind it answers no read, which is what a stale-epoch case is about.
         kernel.BeginWorld(worldEpoch);

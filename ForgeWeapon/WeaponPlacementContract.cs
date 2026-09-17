@@ -82,7 +82,7 @@ public static class WeaponPlacementContract
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "部署成功",
-      "version": "2.1.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "部署物成功放好了。",
         "summary": "部署物成功放好了。",
@@ -96,8 +96,8 @@ public static class WeaponPlacementContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "actor", "type": "entity" },
-          { "id": "deployed", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "actor", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "deployed", "type": "entity" },
           { "id": "equipment_kind", "type": "enum", "schema": "equipment_kind", "nullable": true },
           { "id": "position", "type": "vector3", "unit": "m", "optional": true }
         ],
@@ -112,7 +112,7 @@ public static class WeaponPlacementContract
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "哨戒炮放下 / 收回",
-      "version": "2.1.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "把放下的装置收回背包了。",
         "summary": "把放下的装置收回背包了。",
@@ -126,8 +126,8 @@ public static class WeaponPlacementContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "actor", "type": "entity" },
-          { "id": "deployed", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "actor", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "deployed", "type": "entity" },
           { "id": "equipment_kind", "type": "enum", "schema": "equipment_kind", "nullable": true }
         ],
         "parameters": []

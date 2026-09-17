@@ -12,7 +12,7 @@ static class ObjectEntityResolutionTests
         public override string ToString() => "native-" + Name;
     }
 
-    private static RuntimeKernel Kernel() => new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "synthetic"));
+    private static RuntimeKernel Kernel() => new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "synthetic"));
 
     private static string Registry(string provider)
         => "{\"providers\":[{\"id\":\"" + provider + "\",\"kind\":\"extension\",\"version\":\"1.0.0\",\"dependencies\":[]}],\"capabilities\":[],\"bindings\":[]}";

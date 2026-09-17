@@ -104,6 +104,7 @@ public static class EnemyCombatContract
                 "cardinality": "many"
               },
               {
+                "entityKinds": ["gtfo.player", "gtfo.enemy", "gtfo.equipment"],
                 "id": "source",
                 "type": "entity"
               }
@@ -231,11 +232,13 @@ public static class EnemyCombatContract
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemies",
                 "type": "entity",
                 "cardinality": "many"
               },
               {
+                "entityKinds": ["gtfo.player", "gtfo.enemy", "gtfo.equipment"],
                 "id": "source",
                 "type": "entity"
               }

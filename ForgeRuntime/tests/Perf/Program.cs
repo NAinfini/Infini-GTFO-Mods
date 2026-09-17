@@ -284,7 +284,10 @@ internal static class Program
         Harness.Note("        call per dispatch is the activation memo working; the candidate count is the query's own width.");
         var cases = new (int Reads, int Candidates, bool Chain)[]
         {
-            (2, 1, false), (2, 32, false), (32, 32, false), (100, 32, true),
+            // The empty-candidate case is the query path's floor: the step is still evaluated and the memo still
+            // holds it, but the selector answers nobody, so the difference from `(2, 1, false)` is what the
+            // candidate width costs. A number for the 32-candidate case alone says nothing about that split.
+            (2, 0, false), (2, 1, false), (2, 32, false), (32, 32, false), (100, 32, true),
         };
         foreach (var (reads, candidates, chain) in cases)
         {

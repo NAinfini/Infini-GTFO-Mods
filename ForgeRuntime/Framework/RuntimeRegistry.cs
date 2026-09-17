@@ -140,9 +140,11 @@ internal sealed class RuntimeRegistry
             // `observe` is also the trigger role, whose event payload arrives as a whole frame and needs no
             // evaluator. Only an observation that is evaluated on demand — a selector, a condition or a value row
             // — registers one, and it does so in the same table `evaluate` uses: there is one evaluator
-            // mechanism. A value row is declared `kind: state` with `execution: query`; `modifier` is the pure
-            // layer's producing kind and is not a value row's kind.
-            if (role == "observe" && RuntimeJson.Text(capability, "kind") is not ("selector" or "condition" or "state")) continue;
+            // mechanism. A value row is declared `kind: state` with `execution: query`, except where the catalog
+            // categorizes it `modifier` and still declares a world read: that row is answered on demand like a
+            // state row, so its kind is in this list too. A pure `modifier` is an `evaluate` binding and never
+            // reaches this branch.
+            if (role == "observe" && RuntimeJson.Text(capability, "kind") is not ("selector" or "condition" or "state" or "modifier")) continue;
             var handlerName = RuntimeJson.Text(binding, "handler");
             RuntimeJson.Require(suppliedEvaluators.TryGetValue(handlerName, out var evaluator) && evaluator != null, "missing-evaluator", id);
             next.Evaluators.Add(id, evaluator!); usedEvaluators.Add(handlerName);
@@ -346,10 +348,9 @@ internal sealed class RuntimeRegistry
             RuntimeJson.Require(RuntimeJson.Text(b, "status") is "planned" or "implemented", "binding-status", id);
             var role = RuntimeJson.Text(b, "role");
             RuntimeJson.Require(role is "execute" or "observe" or "evaluate", "binding-role", id);
-            // An evaluated binding names a selector, a condition or a value row (`kind: state`). `modifier` is the
-            // pure layer's producing kind, so it is accepted only where that layer runs: a `modifier` row that
-            // names a world port or declares a read is a value row wearing the wrong kind, and it is refused here
-            // rather than answered as one.
+            // An evaluated binding names a selector, a condition or a value row (`kind: state`). A `modifier` is
+            // accepted only where the pure layer runs: a `modifier` that reads the world is a query value row,
+            // answered as an observation rather than in the pure layer, so it is refused here.
             if (role == "evaluate")
             {
                 var evaluatedKind = RuntimeJson.Text(capability, "kind");

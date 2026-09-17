@@ -12,7 +12,7 @@ internal sealed class Scene : IDisposable
         .GetType("ForgeRuntime.Framework.RuntimeGraphContracts", true)!
         .GetMethod("Layout", BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+    internal readonly RuntimeKernel Kernel = new(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     internal readonly EnemyAgent Enemy;
     internal readonly EntityReference Ref;
@@ -124,7 +124,7 @@ internal sealed class Scene : IDisposable
         };
         var json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = "test.behavior." + binding,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = "test.behavior." + binding,
             resource = new { id = "test.behavior", revision = "1" }, runtime = Kernel.Identity,
             domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = pins.SelectMany(p => support[p]).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray(),

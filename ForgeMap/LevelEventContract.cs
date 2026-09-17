@@ -172,6 +172,7 @@ public static class LevelEventContract
     /// six trigger capability rows are the runtime's trigger contract's own text (ruling 148.3), so this file
     /// carries no second spelling of them.</summary>
     public static object Port(string id, string type) => new { id, type };
+    public static object Port(string id, string type, string[] entityKinds) => new { id, type, entityKinds };
     /// <summary>One resource input port: the kind and the schema name the provider answers for, so a plan that
     /// wires a reference of another kind fails the port rather than being read as the nearest one.</summary>
     public static object ResourcePort(string id, string kind, string schema)
@@ -268,7 +269,7 @@ public static class LevelEventContract
             new { input = "objectives", target = "resource", cardinality = "one", requires = new[] { "objective.timer" }, result = "result" }),
         ActionRow(DimensionCapability, "全队闪入、传送进维度或清空维度",
             "把整队闪一下、传送进另一个维度，或者清空一个维度。",
-            new object[] { Port("in", "execution"), Port("players", "entity"), Integer("dimension") },
+            new object[] { Port("in", "execution"), Port("players", "entity", new[] { "gtfo.player" }), Integer("dimension") },
             new object[]
             {
                 Enum("mode", DimensionModes, required: true),
@@ -278,7 +279,7 @@ public static class LevelEventContract
             new { input = "players", target = "entity", cardinality = "one", requires = new[] { "player.dimension" }, result = "result" }),
         ActionRow(ExpeditionEndCapability, "立即通关 / 全队倒地也算通关",
             "以明确的结果结束远征。",
-            new object[] { Port("in", "execution"), Port("participants", "entity") },
+            new object[] { Port("in", "execution"), Port("participants", "entity", new[] { "gtfo.player" }) },
             new object[] { Enum("ending", ExpeditionOutcomes, required: true) },
             "forge.result.map.expedition_end", Array.Empty<(string, string)>(),
             new { input = "participants", target = "entity", cardinality = "one", requires = new[] { "expedition.end" }, result = "result" })

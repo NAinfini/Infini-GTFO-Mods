@@ -167,10 +167,12 @@ public static class AttackInstanceContract
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "source",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           },
@@ -207,10 +209,12 @@ public static class AttackInstanceContract
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "source",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           },
@@ -247,10 +251,12 @@ public static class AttackInstanceContract
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           }

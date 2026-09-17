@@ -266,6 +266,214 @@ public sealed class TriggerZoneTests
     }
 
     [Fact]
+    public void ABodyThatCrossesAThinZoneInOneBeatEntersAndLeavesInThatOrder()
+    {
+        using var world = TriggerZoneWorld.Start();
+        // Twenty centimetres thick: a running body is inside it for less than one beat, so a tick that judged only
+        // where the body ended up would see neither an entry nor an exit.
+        world.LoadOne("thin", "box", "0.2, 4, 4", "0, 0, 0");
+        var runner = world.Player("1", -1, 0, 0);
+        Assert.Equal(0, world.Tick().Entered);
+
+        world.Move(runner, 1, 0, 0);
+        var crossed = world.Tick();
+
+        Assert.Equal(1, crossed.Entered);
+        Assert.Equal(1, crossed.Exited);
+        Assert.Equal(1, world.Count(Entered));
+        Assert.Equal(1, world.Count(Exited));
+        // The two edges are the order the body made them in, and the same body on both.
+        Assert.Equal(2, world.Published.Count);
+        Assert.Equal(TriggerZoneContract.BindingOf(Entered), world.Published[0].BindingId);
+        Assert.Equal(TriggerZoneContract.BindingOf(Exited), world.Published[1].BindingId);
+        Assert.Equal("gtfo.player:1",
+            world.Published[0].Outputs.GetProperty("target").GetProperty("id").GetString());
+        Assert.Equal("gtfo.player:1",
+            world.Published[1].Outputs.GetProperty("target").GetProperty("id").GetString());
+        // It left the volume, so it is not a member of it.
+        Assert.Empty(world.ZoneModule.Inside("thin"));
+    }
+
+    [Fact]
+    public void APlacementAcrossAThinZonePublishesNoEdge()
+    {
+        // A body set down on the far side of a wall never walked through it. Forty metres in one beat is not the
+        // game carrying the body along a path, so the line between the two places crosses nothing.
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("thin", "box", "0.2, 4, 4", "0, 0, 0");
+        var warped = world.Player("1", -20, 0, 0);
+        Assert.Equal(0, world.Tick().Entered);
+
+        world.Move(warped, 20, 0, 0);
+        var placed = world.Tick();
+
+        Assert.Equal(0, placed.Entered);
+        Assert.Equal(0, placed.Exited);
+        Assert.Empty(world.Published);
+        Assert.Empty(world.ZoneModule.Inside("thin"));
+    }
+
+    [Fact]
+    public void APlacementJustPastTheJudgedDistanceCrossesNothing()
+    {
+        // The bound is what decides, and it decides the same way on its own doorstep: one hundredth of a metre past
+        // the furthest the game can carry a body in a beat is already a placement and not a path.
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("thin", "box", "0.2, 4, 4", "0, 0, 0");
+        var placed = world.Player("1", -1, 0, 0);
+        Assert.Equal(0, world.Tick().Entered);
+
+        world.Move(placed, -1 + TriggerZoneModule.MaximumJudgedTravel + 0.01, 0, 0);
+        var tick = world.Tick();
+
+        Assert.Equal(0, tick.Entered);
+        Assert.Equal(0, tick.Exited);
+        Assert.Empty(world.Published);
+    }
+
+    [Fact]
+    public void TheFurthestJudgedTravelStillCrossesAThinZone()
+    {
+        // Exactly one beat of the quickest movement this module judges is still movement: a body carried that far
+        // walked the line, so the thin wall it crossed fires once in and once out.
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("thin", "box", "0.2, 4, 4", "0, 0, 0");
+        var runner = world.Player("1", -TriggerZoneModule.MaximumJudgedTravel / 2, 0, 0);
+        Assert.Equal(0, world.Tick().Entered);
+
+        world.Move(runner, TriggerZoneModule.MaximumJudgedTravel / 2, 0, 0);
+        var crossed = world.Tick();
+
+        Assert.Equal(1, crossed.Entered);
+        Assert.Equal(1, crossed.Exited);
+    }
+
+    [Fact]
+    public void APlacementIntoAZonePublishesOnlyAnEntry()
+    {
+        // Landing inside is a fact about where the body is, not about how it got there: the zone reports the
+        // arrival it can see and invents no exit to go with it.
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("room", "box", "4, 4, 4", "0, 0, 0");
+        var warped = world.Player("1", -20, 0, 0);
+        Assert.Equal(0, world.Tick().Entered);
+
+        world.Move(warped, 0, 0, 0);
+        var arrived = world.Tick();
+
+        Assert.Equal(1, arrived.Entered);
+        Assert.Equal(0, arrived.Exited);
+        Assert.Single(world.ZoneModule.Inside("room"));
+    }
+
+    [Fact]
+    public void APlacementOutOfAZonePublishesTheExitItReallyMade()
+    {
+        // The other half of the same rule. The body is observably outside a volume it was a member of, so the
+        // membership really changed; suppressing that exit would leave the zone believing in a body that has left.
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("room", "box", "4, 4, 4", "0, 0, 0");
+        var warped = world.Player("1", 0, 0, 0);
+        Assert.Equal(1, world.Tick().Entered);
+
+        world.Move(warped, 20, 0, 0);
+        var left = world.Tick();
+
+        Assert.Equal(0, left.Entered);
+        Assert.Equal(1, left.Exited);
+        Assert.Empty(world.ZoneModule.Inside("room"));
+    }
+
+    [Fact]
+    public void ABodyThatStaysInsidePublishesOneEntry()
+    {
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("thin", "box", "0.2, 4, 4", "0, 0, 0");
+        var sitter = world.Player("1", -1, 0, 0);
+        world.Tick();
+
+        world.Move(sitter, 0, 0, 0);
+        Assert.Equal(1, world.Tick().Entered);
+
+        // Staying put is not a second entry, and moving within the volume is not a leave and a re-entry.
+        Assert.Equal(0, world.Tick().Entered);
+        world.Move(sitter, 0.04, 0, 0);
+        var inside = world.Tick();
+        Assert.Equal(0, inside.Entered);
+        Assert.Equal(0, inside.Exited);
+        Assert.Equal(1, world.Count(Entered));
+        Assert.Equal(0, world.Count(Exited));
+        Assert.Single(world.ZoneModule.Inside("thin"));
+    }
+
+    [Fact]
+    public void ABodyThatPassesBesideAZonePublishesNothing()
+    {
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("gate", "box", "2, 2, 2", "0, 0, 0");
+        var passer = world.Player("1", -3, 2, 0);
+        world.Tick();
+
+        // Two metres above the volume for the whole of the travel: the line between the two places never meets it.
+        world.Move(passer, 3, 2, 0);
+        var tick = world.Tick();
+
+        Assert.Equal(0, tick.Entered);
+        Assert.Equal(0, tick.Exited);
+        Assert.Empty(world.Published);
+        Assert.Empty(world.ZoneModule.Inside("gate"));
+    }
+
+    [Fact]
+    public void AnEnemyCrossingAThinZoneIsJudgedLikeAPlayer()
+    {
+        using var world = TriggerZoneWorld.Start();
+        world.LoadOne("thin", "box", "0.2, 4, 4", "0, 0, 0", who: "enemy");
+        var runner = world.Enemy("9", -1, 0, 0);
+        world.Tick();
+
+        world.Move(runner, 1, 0, 0);
+        var crossed = world.Tick();
+
+        Assert.Equal(1, crossed.Entered);
+        Assert.Equal(1, crossed.Exited);
+        Assert.Equal("gtfo.enemy:9", world.Last(Exited)!.Outputs.GetProperty("target").GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public void CrossingIsJudgedForEveryShape()
+    {
+        // The segment test is the zone's own rule carried from a point to a line, so every shape the document can
+        // build crosses the same way a box does.
+        using var ball = TriggerZoneWorld.Start();
+        ball.LoadOne("ball", "sphere", "0.2, 0.2, 0.2", "0, 0, 0");
+        var throughBall = ball.Player("1", -1, 0, 0);
+        ball.Tick();
+        ball.Move(throughBall, 1, 0, 0);
+        Assert.Equal(1, ball.Tick().Entered);
+        Assert.Equal(1, ball.Count(Exited));
+
+        using var pill = TriggerZoneWorld.Start();
+        pill.LoadOne("pill", "capsule", "0.2, 4, 0.2", "0, 0, 0");
+        var throughPill = pill.Player("1", -1, 0, 0);
+        pill.Tick();
+        pill.Move(throughPill, 1, 0, 0);
+        Assert.Equal(1, pill.Tick().Entered);
+        Assert.Equal(1, pill.Count(Exited));
+
+        // The same capsule crossed lengthways instead: a line that stays above its top cap meets neither the cap
+        // nor the axis between them, so the shape's own extents are part of the test and not just its diameter.
+        using var over = TriggerZoneWorld.Start();
+        over.LoadOne("pill", "capsule", "0.2, 4, 0.2", "0, 0, 0");
+        var passer = over.Player("1", -1, 3, 0);
+        over.Tick();
+        over.Move(passer, 1, 3, 0);
+        var missed = over.Tick();
+        Assert.Equal(0, missed.Entered);
+        Assert.Equal(0, missed.Exited);
+    }
+
+    [Fact]
     public void OnlyPlayersAZoneReactsToArePublished()
     {
         using var world = TriggerZoneWorld.Start();

@@ -34,7 +34,7 @@ internal static class TriggerZonePlan
             capabilities[pins[BranchBinding].Capability], RuntimeJson.EmptyObject);
         string json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId,
             resource = new { id = "author.resource", revision = "revision-1" },
             runtime = world.Kernel.Identity, domain = "map", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = used.SelectMany(id => support[id]).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray(),

@@ -237,7 +237,7 @@ static class TimingTests
             Check(a.AcquireNumericLease(request).Code == "not-host", "state cannot mutate before host authority is established");
             s.Kernel.Advance(0, true);
             Check(a.AcquireNumericLease(request with { DefinitionId = "example.missing" }).Code == "state-definition", "unknown state definition is not a private second registry");
-            Check(a.AcquireNumericLease(request with { DefinitionVersion = "2.0.0" }).Code == "state-version", "state definition version is pinned");
+            Check(a.AcquireNumericLease(request with { DefinitionVersion = "9.0.0" }).Code == "state-version", "state definition version is pinned");
             Check(a.AcquireNumericLease(request with { Multiplier = -1 }).Code == "state-number" && a.AcquireNumericLease(request with { Additive = double.NaN }).Code == "state-number", "unsafe state numbers reject");
             Check(a.AcquireNumericLease(request with { DurationTicks = 0 }).Code == "invalid-integer", "state duration must be positive");
             Reject(() => s.Kernel.EvaluateNumericState(target, TimingScenario.State, "speed", double.PositiveInfinity), "state-number");

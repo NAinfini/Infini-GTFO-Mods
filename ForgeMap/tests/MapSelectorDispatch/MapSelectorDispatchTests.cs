@@ -10,7 +10,7 @@ namespace ForgeMap.Tests.MapSelectorDispatch;
 /// <summary>
 /// End-to-end dispatch of the `forge.selector.target.players` query step through the real RuntimeKernel: the
 /// production Map player identity module, the production selector binding, a test trigger and a test action,
-/// and one schemaVersion 4 plan attached to `level`. The plan loader, the activation memo, the budgeted query
+/// and one schemaVersion 1 plan attached to `level`. The plan loader, the activation memo, the budgeted query
 /// session and the dispatch walk are the kernel's own; only the native player objects are the managed doubles
 /// the adapter suite already uses (source-linked, synthetic and NOT game-verified). No Harmony patch is
 /// installed and the game is never started.
@@ -334,7 +334,7 @@ public sealed class MapSelectorDispatchTests
     private static Session Start(string planId, long world = 1, int reads = 0, bool attach = true, int relation = 1)
     {
         var sink = new CaptureSink();
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"),
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"),
             new RuntimeLimits(), sink, RuntimeLogLevel.Error);
         var recorded = new List<string>();
         // Real registration order: the Map module (which owns the one registration and carries the selector
@@ -486,7 +486,7 @@ public sealed class MapSelectorDispatchTests
         };
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
             runtime = kernel.Identity, domain = Domain, authority = "host", failurePolicy = "stop-entrypoint",
             permissions = Array.Empty<string>(), dependencies = Array.Empty<string>(),
             limits = new { maxEventsPerTick = 8, maxCommandsPerTick = 8, maxQueuedEvents = 8, maxCausalDepth = 4 },

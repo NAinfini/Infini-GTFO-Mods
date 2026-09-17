@@ -31,7 +31,7 @@ void Require(bool condition, string detail) { if (!condition) throw new Exceptio
 void Throws(Action action) { try { action(); } catch { return; } throw new Exception("Expected rejection."); }
 RuntimeKernel Kernel()
 {
-    var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+    var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
     // One world per kernel: a world epoch only ever advances, so the second BeginWorld this fixture used to
     // repeat is a refusal rather than a reset.
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);

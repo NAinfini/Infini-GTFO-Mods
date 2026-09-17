@@ -35,7 +35,7 @@ namespace ForgeMap
     public static class ModuleDefinition
     {
         public const string ProviderId = "forge.module.gtfo.map";
-        public const string Version = "0.1.0";
+        public const string Version = "1.0.0";
     }
 }
 

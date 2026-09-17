@@ -190,7 +190,7 @@ public static class WeaponHolderActionsContract
         "execution": "owner",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "equipment", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "equipment", "type": "entity" },
           { "id": "holder", "type": "entity" },
           { "id": "reload_profile", "type": "resource", "resourceKind": "profile", "schema": "forge.resource.profile", "optional": true }
         ],
@@ -234,7 +234,7 @@ public static class WeaponHolderActionsContract
         "execution": "owner",
         "inputs": [
           { "id": "in", "type": "execution" },
-          { "id": "equipment", "type": "entity" },
+          { "entityKinds": ["gtfo.equipment"], "id": "equipment", "type": "entity" },
           { "id": "holder", "type": "entity" },
           { "id": "amount", "type": "integer" }
         ],

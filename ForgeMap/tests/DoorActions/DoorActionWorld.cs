@@ -75,7 +75,7 @@ internal sealed class DoorActionWorld : IDisposable
         RuntimeKernel.ApiVersion,
         RuntimeJson.From(new
         {
-            providers = new[] { new { id = ModuleDefinition.ProviderId, kind = "native", version = "0.1.0", dependencies = Array.Empty<string>() } },
+            providers = new[] { new { id = ModuleDefinition.ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
             capabilities = DoorActionContract.Rows(),
             bindings = DoorActionContract.Bindings()
         }).GetRawText(),

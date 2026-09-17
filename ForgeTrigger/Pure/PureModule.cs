@@ -20,10 +20,11 @@ public sealed record PureNode(string CapabilityId, string Kind, string Label, st
 ///
 /// The vocabulary is the authoring node list's own: a fixed number, the eight arithmetic rows the calculation node
 /// names (add, subtract, multiply, divide, minimum, maximum, absolute, round), the clamp, the host-evaluated random
-/// draw, the two text rows, and the logic predicates (all, any, not). The comparison is not here: the catalog
-/// declares its typed row `query` because one `value_type` member is an entity, so it is declared with the other
-/// evaluated conditions and compares through the same <see cref="PureConditions"/> helpers. Rows the list does not
-/// have — the vector, curve, falloff, remap, by-* and collection families, `chance`, `lerp`, `select_value` and
+/// draw, the two text rows, the two-point rows that measure the gap between two positions, and the logic predicates
+/// (all, any, not). The comparison is not here: the catalog declares its typed row `query` because one `value_type`
+/// member is an entity, so it is declared with the other evaluated conditions and compares through the same
+/// <see cref="PureConditions"/> helpers. Rows the list does not have — the remaining vector rows (dot, cross,
+/// normalize, angle), curve, falloff, remap, by-* and collection families, `chance`, `lerp`, `select_value` and
 /// `power` — are deleted rather than left declared: a declared row nobody can author is a second vocabulary, and
 /// the random draw merged the probability gate into itself (a probability is that draw compared through
 /// `forge.condition.predicate.compare`).
@@ -53,6 +54,7 @@ public static class PureModule
     public static IReadOnlyList<PureNode> Nodes { get; } = ScalarDeclarations.Nodes
         .Concat(VariadicDeclarations.Nodes)
         .Concat(TextDeclarations.Nodes)
+        .Concat(VectorDeclarations.Nodes)
         .Concat(ConditionDeclarations.Nodes)
         .ToArray();
 
@@ -93,9 +95,13 @@ public static class PureModule
     /// `variadic` is null for every row the plan does not expand.</summary>
     internal static PureNode Row(string capabilityId, string kind, string label, string description,
         JsonElement[] inputs, JsonElement[] outputs, JsonElement[] parameters, JsonElement? variadic,
-        HandlerShape shape, EvaluatorHandler evaluate, bool variadicShape = false, string[]? domains = null)
+        HandlerShape shape, EvaluatorHandler evaluate, bool variadicShape = false, string[]? domains = null,
+        string? name = null)
     {
-        var name = capabilityId[(capabilityId.LastIndexOf('.') + 1)..];
+        // The id's last segment names the binding and the handler, and nothing else may: one handler name is one
+        // implementation. The enum comparison is the one row whose last segment another row already uses — the
+        // typed comparison's — so it states its own name instead of sharing an implementation with it.
+        name ??= capabilityId[(capabilityId.LastIndexOf('.') + 1)..];
         return new PureNode(capabilityId, kind, label, description,
             DeclarationGraph("pure", domains ?? Domains, inputs, outputs, parameters, variadic),
             ModuleDefinition.ProviderId + ".binding." + name, "trigger." + kind + "." + name,
@@ -118,6 +124,28 @@ public static class PureModule
     internal static JsonElement Text(string id) => Typed(id, "string");
     internal static JsonElement Enum(string id, string schema) => Port(id, "enum", schema);
     internal static JsonElement Typed(string id, string type) => Port(id, type);
+
+    /// <summary>A port that carries the catalog's own unit. The unit is part of the port, so a value measured in
+    /// something else is refused at the boundary instead of being read as if it were this one.</summary>
+    internal static JsonElement PortWithUnit(string id, string type, string unit) => RuntimeJson.From(new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+    {
+        ["id"] = RuntimeJson.From(id), ["type"] = RuntimeJson.From(type), ["unit"] = RuntimeJson.From(unit)
+    });
+
+    /// <summary>A port whose enum set the row's own structural parameter chooses rather than the declaration. One
+    /// row then covers every shared set instead of one row per set, which is the website's `schemaParameter` on the
+    /// authoring side; the frame replaces it with the member the plan wrote before a handler ever reads the port.
+    /// A nullable port may be unwritten, and what an unwritten one means stays the row's own rule.</summary>
+    internal static JsonElement DeferredEnum(string id, string setParameter, bool nullable = false)
+    {
+        var port = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+        {
+            ["id"] = RuntimeJson.From(id), ["type"] = RuntimeJson.From("enum"),
+            ["schemaParameter"] = RuntimeJson.From(setParameter)
+        };
+        if (nullable) port["nullable"] = RuntimeJson.From(true);
+        return RuntimeJson.From(port);
+    }
 
     /// <summary>A parameter the plan may leave out; the catalog declares the bound, not a default value.</summary>
     internal static JsonElement CountParameter() => Structural("input_count", "integer", 2, 32);
@@ -219,6 +247,17 @@ public static class PureModule
     internal static JsonElement All(EvaluationContext context) => Value(VariadicNodes.All(Flags(context)));
     internal static JsonElement Any(EvaluationContext context) => Value(VariadicNodes.Any(Flags(context)));
     internal static JsonElement Not(EvaluationContext context) => Value(PureConditions.Not(Flag(context, "input")));
+    /// <summary>The two two-point rows: both read the same pair of metre ports, one answers the gap in metres and
+    /// the other the unit direction the gap points in.</summary>
+    internal static JsonElement Distance(EvaluationContext context)
+        => Value(VectorNodes.Distance(Position(context, "from"), Position(context, "to")));
+    internal static JsonElement Direction(EvaluationContext context)
+        => Value(VectorNodes.Direction(Position(context, "from"), Position(context, "to")));
+    /// <summary>The enum comparison: both ports carry the set the row's own parameter chose, so the two values are
+    /// the member names the frame already resolved their compiled indices back to. A value the plan did not write
+    /// passes nothing — an empty value is no member of the set, so it cannot equal one.</summary>
+    internal static JsonElement EnumCompare(EvaluationContext context)
+        => Value(PureConditions.EnumEquals(OptionalText(context, "value"), PortText(context, "equals")));
 
     /// <summary>Every input port of a variadic row is one slot of the same computation. The frame keeps the
     /// contract's own port order, which is the order the author wired, so the values are read in that order; the
@@ -240,6 +279,14 @@ public static class PureModule
     private static bool Flag(EvaluationContext context, string port) => context.Inputs.GetProperty(port).GetBoolean();
     private static long Whole(EvaluationContext context, string port) => context.Inputs.GetProperty(port).GetInt64();
     private static string PortText(EvaluationContext context, string port) => context.Inputs.GetProperty(port).GetString()!;
+    /// <summary>A port the plan may have left out. An unwritten nullable port is absent or null rather than a
+    /// member, and reading it as one would answer for a value nobody wrote.</summary>
+    private static string? OptionalText(EvaluationContext context, string port)
+        => context.Inputs.TryGetProperty(port, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    /// <summary>A position port as its three components. The frame has already checked the vector's shape and
+    /// that every component is finite, so the row reads the value it was handed and adds no second rule.</summary>
+    private static double[] Position(EvaluationContext context, string port)
+        => context.Inputs.GetProperty(port).EnumerateArray().Select(component => component.GetDouble()).ToArray();
     private static double Parameter(EvaluationContext context, string name) => context.Parameters.GetProperty(name).GetDouble();
     private static string EnumParameter(EvaluationContext context, string name) => context.Parameters.GetProperty(name).GetString()!;
 
@@ -255,4 +302,5 @@ public static class PureModule
     private static JsonElement Value(double value) => RuntimeJson.From(new { value });
     private static JsonElement Value(bool value) => RuntimeJson.From(new { value });
     private static JsonElement Value(string value) => RuntimeJson.From(new { value });
+    private static JsonElement Value(double[] value) => RuntimeJson.From(new { value });
 }

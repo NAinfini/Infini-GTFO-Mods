@@ -98,7 +98,9 @@ public static class TerminalObjectContract
         => new { id = "result", type = "result", schema, fields };
 
     internal static object Port(string id, string type) => new { id, type };
+    internal static object Port(string id, string type, string[] entityKinds) => new { id, type, entityKinds };
     internal static object Many(string id, string type) => new { id, type, cardinality = "many" };
+    internal static object Many(string id, string type, string[] entityKinds) => new { id, type, cardinality = "many", entityKinds };
     internal static object Field(string id, string type) => new { id, type };
     internal static object EnumField(string id, string schema) => new { id, type = "enum", schema };
     internal static object UnitField(string id, string type, string unit) => new { id, type, unit };
@@ -108,8 +110,8 @@ public static class TerminalObjectContract
         new object[]
         {
             Port("in", "execution"),
-            Many("terminals", "entity"),
-            Port("actor", "entity"),
+            Many("terminals", "entity", new[] { "gtfo.map_object" }),
+            Port("actor", "entity", new[] { "gtfo.player" }),
             Port("command", "string"),
             UnitField("slot", "integer", "index"),
             Port("arguments", "string")
@@ -134,7 +136,7 @@ public static class TerminalObjectContract
         new object[]
         {
             Port("in", "execution"),
-            Many("terminals", "entity"),
+            Many("terminals", "entity", new[] { "gtfo.map_object" }),
             Port("command", "string"),
             UnitField("slot", "integer", "index")
         },
@@ -156,7 +158,7 @@ public static class TerminalObjectContract
         new object[]
         {
             Port("in", "execution"),
-            Many("terminals", "entity"),
+            Many("terminals", "entity", new[] { "gtfo.map_object" }),
             Port("text", "string"),
             UnitField("lifetime", "integer", "tick")
         },

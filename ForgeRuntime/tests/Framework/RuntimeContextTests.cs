@@ -401,7 +401,7 @@ internal static class RuntimeContextTests
             }).ToArray();
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
+                schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
                 runtime = kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = Fixture.Permissions, dependencies = Array.Empty<string>(),
                 limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },

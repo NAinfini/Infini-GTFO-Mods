@@ -28,7 +28,7 @@ public sealed class DoorTerminalActionTests
     }
 
     private static SyntheticLevel Level()
-        => new(new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457")));
+        => new(new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457")));
 
     private static MapObjectReference AddressOf(LG_SecurityDoor door)
         => DoorObservation.Decide(door).Address ?? throw new Exception("The door carried no address.");

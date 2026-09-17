@@ -338,7 +338,7 @@ internal sealed class MapObjectFixture : IDisposable
         var branchContract = Kernel.ResolveGraphContract("forge.control.flow.branch", capabilities["forge.control.flow.branch"], RuntimeJson.EmptyObject);
         string json = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId,
+            schemaVersion = 1, kind = "forge-runtime-plan", planId,
             resource = new { id = "author.resource", revision = "revision-1" },
             runtime = Kernel.Identity, domain = "map", authority = "host", failurePolicy = "stop-entrypoint",
             // The plan's permissions are exactly the binding closure's own union (permission-lock), so they are

@@ -21,7 +21,7 @@ internal sealed record Receipt(string Work, long Operations, double Milliseconds
 
 internal static class Harness
 {
-    internal static readonly RuntimeIdentity Identity = new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457");
+    internal static readonly RuntimeIdentity Identity = new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457");
     private static readonly List<Receipt> Receipts = new();
 
     /// <summary>

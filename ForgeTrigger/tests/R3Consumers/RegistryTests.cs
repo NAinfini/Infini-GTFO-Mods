@@ -55,7 +55,7 @@ internal static class RegistryTests
 
     internal static void Run(Action<bool, string> check, string resultPath)
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "trigger-manifest-no-game"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "trigger-manifest-no-game"));
         using var handle = kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off);
         var manifest = kernel.ExportManifest();
         // The declared tables, each read with the role its own rows register under: the pure table evaluates, and

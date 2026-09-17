@@ -140,7 +140,7 @@ internal static class PresentationDispatchTests
     /// </summary>
     private sealed class Scene
     {
-        internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         internal readonly RuntimeModuleHandle Module;
         internal readonly List<string> Applied = new();
         /// <summary>The players the provider says its presentation steps address; unsorted on purpose, so a case
@@ -287,7 +287,7 @@ internal static class PresentationDispatchTests
                 .EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == port).i;
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId = PlanId,
+                schemaVersion = 1, kind = "forge-runtime-plan", planId = PlanId,
                 resource = new { id = "example.present.resource", revision = "1" }, runtime = kernel.Identity,
                 domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = Array.Empty<string>(), dependencies = Array.Empty<string>(),

@@ -31,7 +31,7 @@ internal sealed class ObjectiveWorld : IDisposable
     /// reader and the contract's own shape table.</summary>
     internal static ObjectiveWorld Start(long worldEpoch = 1)
     {
-        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         var registration = kernel.RegisterModule(Definition(), RuntimeLogLevel.Off);
         kernel.BeginWorld(worldEpoch);
         kernel.StartRuntime(static () => { });
@@ -49,7 +49,7 @@ internal sealed class ObjectiveWorld : IDisposable
                 {
                     new
                     {
-                        id = LevelObjectiveValueContract.ProviderId, kind = "native", version = "0.1.0",
+                        id = LevelObjectiveValueContract.ProviderId, kind = "native", version = "1.0.0",
                         dependencies = Array.Empty<string>()
                     }
                 },

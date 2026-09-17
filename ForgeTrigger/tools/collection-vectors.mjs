@@ -65,7 +65,7 @@ for (const seed of [-1,4294967296]) {
     invalid('shuffle', emit, {candidates:[], seed}, 'pure-seed', 'seed is outside 0…4294967295');
     invalid('random', emit, {candidates:[a], seed, max_targets:1}, 'pure-seed', 'seed is outside 0…4294967295');
 }
-// The 2.0.0 count value is an unbounded integer input, so values outside the candidate budget still compare.
+// The 1.0.0 count value is an unbounded integer input, so values outside the candidate budget still compare.
 for (const [operator, value] of [['eq',-1],['gt',-1],['lt',4097],['eq',4097]]) add('count', {}, {candidates:[a], operator, value});
 invalid('distinct', emit, {candidates:Array(4097).fill(a)}, 'pure-collection-budget', 'Preview target budget exceeded');
 const large = Array.from({length:4096},(_,i)=>ref('test.entity:'+i));

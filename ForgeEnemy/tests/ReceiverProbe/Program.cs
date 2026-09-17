@@ -31,7 +31,7 @@ EnemyAgent Enemy(long pointer = 10, ushort id = 7)
 }
 (RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) Scene(Func<EnemyAgent, uint?>? enemyType = null)
 {
-    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
+    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
     kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
     LocalPlan.OwnMounts(kernel);
@@ -606,7 +606,7 @@ Case("mount.enemy-type-unregistered-kind", () =>
 // same `Attacks` field that counts a heal's `Sends`: no injection seam and no second write path exists.
 (RuntimeKernel Kernel, EnemyModule Module, EnemyAgent Enemy, EntityReference Ref) ActionScene(Action<EnemyAgent>? onAttack)
 {
-    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
+    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
     kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
     var module = new EnemyModule(kernel, RuntimeLogLevel.Off, () => true, _ => { });
@@ -638,7 +638,7 @@ string Field(JsonElement row, string name) => row.TryGetProperty(name, out var v
 Case("action.ports-match-contract", () =>
 {
     var scene = ActionScene(null);
-    var contract = scene.Kernel.ResolveGraphContract("forge.action.combat.damage", "2.0.0", RuntimeJson.EmptyObject);
+    var contract = scene.Kernel.ResolveGraphContract("forge.action.combat.damage", "1.0.0", RuntimeJson.EmptyObject);
     // The execution ports are the kernel's own frames, not handler arguments.
     var declared = contract.GetProperty("inputs").EnumerateArray()
         .Where(p => p.GetProperty("type").GetString() != "execution").Select(p => p.GetProperty("id").GetString()!)

@@ -50,6 +50,14 @@ internal static class RuntimeGraphContracts
         "deployment", "cooldown", "charge", "pool_membership", "pool", "request" };
     internal static readonly string[] HandleLifetimes = { "invocation", "resource_instance", "entity_life", "encounter",
         "expedition", "session" };
+    /// <summary>The entity kinds a port may name, in the order the runtime observes them. An entity port that
+    /// declares none accepts every kind, which is what keeps the generic ports — a selector's target, a
+    /// comparison's operand, a `for_each` item — wired to every source; a declaring port accepts only the kinds
+    /// its own list carries. Mirrors site/forge/contracts.ts graphEntityKinds, which is the one source of the
+    /// order. The spelling is `RuntimeEntitySnapshot.Kind`'s own, so the kind a port promises is the kind the
+    /// snapshot publishes and neither side needs a translation table.</summary>
+    internal static readonly string[] EntityKinds = { "gtfo.player", "gtfo.enemy", "gtfo.map_object",
+        "gtfo.level_object", "gtfo.level", "gtfo.zone", "gtfo.equipment" };
     /// <summary>Declaration order is the compiled valueSet index of an enum port. The website's
     /// `graphEnumSets` is the one source of that order; this table declares the same sets in the same
     /// order, and the website's enum test reads this source back to prove it.</summary>
@@ -130,6 +138,10 @@ internal static class RuntimeGraphContracts
     };
     internal static readonly IReadOnlyDictionary<string, string[]> EnumSets =
         EnumSetTable.ToDictionary(x => x.Name, x => x.Members, StringComparer.Ordinal);
+    /// <summary>The set names in declaration order: the members a structural `enum_set` parameter chooses from, so a
+    /// row that covers every shared set — `forge.condition.enum.compare`, `forge.control.flow.enum_switch` — reads
+    /// this list instead of restating it. Published through <see cref="RuntimeEnumSets"/>.</summary>
+    internal static readonly string[] EnumSetNames = EnumSetTable.Select(set => set.Name).ToArray();
     /// <summary>Whether a name is a member of one of the shared sets, asked by name so a caller that reads a
     /// member from outside a port (an observation field) can check it without a port to index the set through.</summary>
     internal static bool IsEnumMember(string set, string? member)
@@ -259,14 +271,32 @@ internal static class RuntimeGraphContracts
         => ValueTypeMatches(a, b) && Cardinality(a) == Cardinality(b);
     /// <summary>Value contract equality ignoring cardinality: a wired plan input may pair a
     /// non-nullable "one" output with a "many" input, wrapped into a one-element collection at dispatch.
-    /// Every other dimension must still match exactly.</summary>
+    /// Every other dimension must still match exactly — except entity kinds, which narrow: see
+    /// <see cref="EntityKindsNarrow"/>.</summary>
     internal static bool ValueTypeMatches(JsonElement a, JsonElement b)
         => RuntimeJson.Text(a, "type") == RuntimeJson.Text(b, "type")
-           && new[] { "schema", "unit", "resourceKind", "handleKind", "lifetime" }.All(key => Optional(a, key) == Optional(b, key));
+           && new[] { "schema", "unit", "resourceKind", "handleKind", "lifetime" }.All(key => Optional(a, key) == Optional(b, key))
+           && EntityKindsNarrow(a, b);
+    /// <summary>The kinds one port declares, or null for a port that declares none. A declaration is the one
+    /// place kinds come from: nothing is derived from the value a wire happens to carry at run time.</summary>
+    private static string[]? DeclaredEntityKinds(JsonElement port)
+        => port.TryGetProperty("entityKinds", out var kinds) && kinds.ValueKind == JsonValueKind.Array
+            ? kinds.EnumerateArray().Select(kind => kind.GetString() ?? string.Empty).ToArray() : null;
+    /// <summary>Kind compatibility between a producer (`output`) and a consumer (`input`): every kind the
+    /// output may carry has to be one the input accepts, so a narrow port wires into a wide one and never the
+    /// other way. An input that declares none accepts them all, which is the one direction that makes the
+    /// generic ports universal. Mirrors site/forge/graph-schema.ts assignableGraphPort.</summary>
+    internal static bool EntityKindsNarrow(JsonElement output, JsonElement input)
+    {
+        var carried = DeclaredEntityKinds(output);
+        if (carried == null) return true;
+        var accepted = DeclaredEntityKinds(input);
+        return accepted == null || carried.All(kind => accepted.Contains(kind, StringComparer.Ordinal));
+    }
 
     internal static void ValidatePort(JsonElement port, string id)
     {
-        RuntimeJson.Shape(port, "id type", "cardinality schema resourceKind handleKind lifetime unit nullable optional codes fields valueTypeParameter");
+        RuntimeJson.Shape(port, "id type", "cardinality schema resourceKind handleKind lifetime unit nullable optional codes fields valueTypeParameter schemaParameter entityKinds");
         RuntimeJson.Require(IsName(RuntimeJson.Text(port, "id")), "port-name", id);
         var type = RuntimeJson.Text(port, "type");
         RuntimeJson.Require(PortTypes.Contains(type), "port-type", id);
@@ -276,16 +306,32 @@ internal static class RuntimeGraphContracts
         foreach (var key in new[] { "cardinality", "schema", "resourceKind", "handleKind", "lifetime", "unit" })
             if (port.TryGetProperty(key, out var text)) RuntimeJson.Text(text);
         if (port.TryGetProperty("cardinality", out _)) RuntimeJson.Require(Cardinalities.Contains(Cardinality(port)), "port-cardinality", id);
+        // Kinds belong to an entity port alone: any other port promising them would be naming a kind it cannot
+        // deliver. An empty or repeating list is the same authoring mistake, and a member outside the table is
+        // not a kind this runtime observes.
+        if (port.TryGetProperty("entityKinds", out var entityKinds))
+        {
+            RuntimeJson.Require(type == "entity" && entityKinds.ValueKind == JsonValueKind.Array, "port-entity-kinds", id);
+            var kinds = entityKinds.EnumerateArray().Select(kind => kind.ValueKind == JsonValueKind.String ? kind.GetString() : null).ToArray();
+            RuntimeJson.Require(kinds.Length > 0 && kinds.All(kind => kind != null && EntityKinds.Contains(kind)), "port-entity-kinds", id);
+            RuntimeJson.Require(kinds.Distinct(StringComparer.Ordinal).Count() == kinds.Length, "port-entity-kinds", id);
+        }
         // A typed port declares only its class and defers its concrete type to the structural member an author
         // chooses: the member's own rules are applied where it resolves (`TypedPort`), because the declaration
         // cannot know which of them will be the port's. The class itself is still refused here when no member
         // could ever be one.
+        // A schema parameter is the same deferral for the port's identity: the enum set arrives from the member the
+        // plan compiles, so the declaration carries the parameter and never a set of its own beside it.
+        var deferredSchema = port.TryGetProperty("schemaParameter", out var schemaParameter);
+        if (deferredSchema)
+            RuntimeJson.Require(IsName(RuntimeJson.Text(schemaParameter)) && !port.TryGetProperty("schema", out _), "port-type", id);
         if (port.TryGetProperty("valueTypeParameter", out var parameter))
         {
             RuntimeJson.Require(IsName(RuntimeJson.Text(parameter)) && ValueTypeParameterTypes.Contains(type),
                 "port-type", id);
             return;
         }
+        if (deferredSchema) return;
         RequirePortTypeContract(port, type, id);
     }
 
@@ -384,6 +430,23 @@ internal static class RuntimeGraphContracts
         }
     }
 
+    /// <summary>The structural enum a port's `schemaParameter` defers to, checked against the members it could ever
+    /// resolve to: every member names a shared member set, because the resolved port's schema is an identity both
+    /// sides compare and a member without one would compile a port nothing could read. Mirrors
+    /// site/forge/graph-schema.ts portSchemaParameter.</summary>
+    private static void ValidateSchemaParameter(JsonElement port, JsonElement[] parameters, string id)
+    {
+        var name = Optional(port, "schemaParameter");
+        if (name == null) return;
+        var parameter = parameters.FirstOrDefault(p => RuntimeJson.Text(p, "id") == name);
+        var detail = id + "." + RuntimeJson.Text(port, "id") + "." + name;
+        RuntimeJson.Require(parameter.ValueKind == JsonValueKind.Object && RuntimeJson.Text(parameter, "type") == "enum"
+            && RuntimeJson.Text(parameter, "role") == "structural", "port-type", detail);
+        var members = EnumMembers(parameter);
+        RuntimeJson.Require(members.Length > 0, "port-type", detail);
+        foreach (var member in members) RuntimeJson.Require(EnumSets.ContainsKey(member), "port-type", detail + "." + member);
+    }
+
     /// <summary>Every port a contract declares, the variable templates and port-group slots included: a typed port
     /// is checked against its parameter wherever it is declared, not only on the two fixed sides.</summary>
     private static JsonElement[] DeclaredPorts(JsonElement graph)
@@ -469,7 +532,7 @@ internal static class RuntimeGraphContracts
         foreach (var parameter in parameters) ValidateParameter(parameter, inputs, id);
         // A typed port hands its concrete type rules to the member it resolves to, so what is checked here is the
         // parameter itself and every member it offers — a variable template and a port-group slot included.
-        foreach (var port in DeclaredPorts(graph)) ValidateTypeParameter(port, parameters, execution, id);
+        foreach (var port in DeclaredPorts(graph)) { ValidateTypeParameter(port, parameters, execution, id); ValidateSchemaParameter(port, parameters, id); }
         ValidateVariadic(graph, id);
         ValidatePortGroups(graph, id);
         ValidateReadDeclarations(graph, execution, id);
@@ -696,6 +759,35 @@ internal static class RuntimeGraphContracts
             resolved[side] = RuntimeJson.From(resolved[side].EnumerateArray().Select(port => TypedPort(graph, port, parameters)).ToArray());
         return RuntimeJson.From(resolved);
     }
+    private static JsonElement TypedPort(JsonElement graph, JsonElement port, JsonElement parameters)
+    {
+        port = ValueTypePort(graph, port, parameters);
+        return SchemaTypePort(graph, port, parameters);
+    }
+
+    /// <summary>The same resolution for the schema dimension: the member the author chose becomes the port's
+    /// concrete enum set, and the port's own type rules then apply to it exactly as if the set had been written on
+    /// the row. This is where a row that covers every shared set becomes a contract naming one, long before a plan
+    /// exists. Mirrors site/forge/graph-schema.ts schemaTypePort.</summary>
+    private static JsonElement SchemaTypePort(JsonElement graph, JsonElement port, JsonElement parameters)
+    {
+        var name = Optional(port, "schemaParameter");
+        if (name == null) return port;
+        var detail = RuntimeJson.Text(port, "id") + "." + name;
+        var parameter = RuntimeJson.Rows(graph, "parameters").FirstOrDefault(p => RuntimeJson.Text(p, "id") == name);
+        RuntimeJson.Require(parameter.ValueKind == JsonValueKind.Object && RuntimeJson.Text(parameter, "type") == "enum"
+            && RuntimeJson.Text(parameter, "role") == "structural", "port-type", detail);
+        var written = parameters.TryGetProperty(name, out var given);
+        RuntimeJson.Require(written || !RuntimeJson.Flag(parameter, "required"), "port-type", detail);
+        var member = EnumMember(parameter, written ? given : RuntimeJson.From(EnumMembers(parameter)[0]));
+        RuntimeJson.Require(EnumSets.ContainsKey(member), "port-type", detail + "." + member);
+        var fields = port.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone(), StringComparer.Ordinal);
+        fields["schema"] = RuntimeJson.From(member);
+        var resolved = RuntimeJson.From(fields);
+        RequirePortTypeContract(resolved, RuntimeJson.Text(resolved, "type"), RuntimeJson.Text(port, "id"));
+        return resolved;
+    }
+
     /// <summary>The port a typed contract resolves to: the class the port declares is replaced by the member its
     /// structural parameter names, and that member's own type is then the port's — its metadata rules included, so a
     /// member the declared metadata cannot carry is refused here rather than promised by the row. An unknown member, a
@@ -704,7 +796,7 @@ internal static class RuntimeGraphContracts
     /// is the member the declaration order names as the default — that is what lets a glue row like `present` be
     /// dropped on a wire without a second answer to a question the wire already answered. Mirrors
     /// site/forge/graph-schema.ts valueTypePort.</summary>
-    private static JsonElement TypedPort(JsonElement graph, JsonElement port, JsonElement parameters)
+    private static JsonElement ValueTypePort(JsonElement graph, JsonElement port, JsonElement parameters)
     {
         var name = ValueTypeParameter(port);
         if (name == null) return port;
@@ -782,4 +874,18 @@ internal static class RuntimeGraphContracts
         "handle" => Array.IndexOf(HandleKinds, Optional(port, "handleKind")),
         _ => -1
     };
+}
+
+/// <summary>The shared enum vocabulary as a package reads it: the names of the member sets the runtime knows, in the
+/// declaration order that is every set's compiled index basis. A row that covers all of them at once — the glue
+/// rows whose `enum_set` parameter chooses one set per node instance — has to spell that list in its own contract,
+/// and spelling it a second time in a package is how the two copies drift. Mirrors the website's `graphEnumSets`
+/// key order, which the C# table declares and an SDK test reads back.</summary>
+public static class RuntimeEnumSets
+{
+    public static IReadOnlyList<string> Names => RuntimeGraphContracts.EnumSetNames;
+    /// <summary>One set's members, in the order its compiled values index.</summary>
+    public static IReadOnlyList<string> Members(string set)
+        => RuntimeGraphContracts.EnumSets.TryGetValue(set, out var members)
+            ? members : throw new RuntimeContractException("port-enum-set", "Unknown enum set: " + set);
 }

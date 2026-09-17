@@ -52,7 +52,7 @@ internal sealed class SelectorScene : IDisposable
     /// ceiling.</summary>
     internal SelectorScene(int extra = 0)
     {
-        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+        Kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
         Kernel.BeginWorld(1);
         // The module's own trigger rows name canonical capabilities the builtin contract providers own, and the
         // plan's mount needs a level owner: these are the providers the host registers, so this suite registers
@@ -191,7 +191,7 @@ internal sealed class SelectorScene : IDisposable
             .Select((port, index) => (port, index)).Single(x => x.port.GetProperty("id").GetString() == id).index;
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = PlanId, resource = new { id = PlanId, revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = PlanId, resource = new { id = PlanId, revision = "1" },
             runtime = Kernel.Identity, domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint",
             permissions, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth },
@@ -265,7 +265,7 @@ internal sealed class SelectorScene : IDisposable
 /// candidate source. The kernel exists so the module has one to register with; no plan is loaded into it.</summary>
 internal sealed class CandidateWorld : IDisposable
 {
-    internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"));
+    internal readonly RuntimeKernel Kernel = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"));
     internal readonly EnemyModule Module;
     private ushort nextId = 1000;
 

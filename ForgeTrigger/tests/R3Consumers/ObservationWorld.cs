@@ -5,7 +5,7 @@ using ForgeRuntime.Framework;
 // Synthetic test provider only. Every observation uses the actual public registration path.
 internal sealed class ObservationWorld : IDisposable
 {
-    internal RuntimeKernel Kernel { get; } = new(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "synthetic-r3-spatial"));
+    internal RuntimeKernel Kernel { get; } = new(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "synthetic-r3-spatial"));
     internal Dictionary<string, RuntimeEntitySnapshot> Entities { get; } = new(StringComparer.Ordinal);
     internal RuntimeModuleHandle Handle { get; }
     internal Func<EntityReference, RuntimeEntitySnapshot?>? OnObserve { get; set; }

@@ -9,14 +9,14 @@ using HostPlugin = ForgeRuntime.Plugin;
 namespace ForgeWeapon.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-[BepInDependency("NAinfini.ForgeRuntime", ">=1.2.0")]
+[BepInDependency("NAinfini.ForgeRuntime", ">=1.0.0")]
 // Equipment owners are ForgeMap's gtfo.player references; without Map every backpack would stay ownerless.
-[BepInDependency("NAinfini.ForgeMap", ">=0.1.0")]
+[BepInDependency("NAinfini.ForgeMap", ">=1.0.0")]
 public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "NAinfini.ForgeWeapon";
     public const string PluginName = "Infini Forge Weapon";
-    public const string PluginVersion = "0.2.0";
+    public const string PluginVersion = "1.0.0";
     private bool _loadAttempted;
 
     public override void Load()

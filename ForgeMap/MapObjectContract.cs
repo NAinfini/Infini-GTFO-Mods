@@ -77,8 +77,10 @@ public static class MapObjectContract
         };
 
     internal static object Port(string id, string type) => new { id, type };
+    internal static object Port(string id, string type, string[] entityKinds) => new { id, type, entityKinds };
 
     internal static object Optional(string id, string type) => new { id, type, optional = true };
+    internal static object Optional(string id, string type, string[] entityKinds) => new { id, type, optional = true, entityKinds };
 
     internal static object BindingRow(string capability, string handler) => new
     {

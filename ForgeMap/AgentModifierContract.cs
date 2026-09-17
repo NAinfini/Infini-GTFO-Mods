@@ -67,7 +67,7 @@ public static class AgentModifierContract
       "owner": "forge.contract.combat",
       "kind": "action",
       "label": "应用有来源的属性修正器",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "给目标加一条带来源的属性修正。",
         "summary": "给目标加一条带来源的属性修正。",
@@ -95,6 +95,7 @@ public static class AgentModifierContract
             "cardinality": "many"
           },
           {
+            "entityKinds": ["gtfo.player", "gtfo.enemy", "gtfo.equipment"],
             "id": "source",
             "type": "entity"
           },
@@ -214,7 +215,7 @@ public static class AgentModifierContract
       "owner": "forge.contract.combat",
       "kind": "action",
       "label": "移除指定来源属性修正器",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "把指定来源的属性修正撤掉。",
         "summary": "把指定来源的属性修正撤掉。",

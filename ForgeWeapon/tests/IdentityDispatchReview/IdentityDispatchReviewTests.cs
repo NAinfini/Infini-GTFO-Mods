@@ -299,7 +299,7 @@ public sealed class IdentityDispatchReviewTests
             var kinds = new[] { "action", "trigger" }; var trigger = Graph("trigger"); var action = Graph("action");
             return RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
+                schemaVersion = 1, kind = "forge-runtime-plan", planId = "fixture.plan", resource = new { id = "fixture.resource", revision = "r1" },
                 runtime = Kernel.Identity, domain = "weapon", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = permissions ?? new[] { "fixture.dispatch.use" }, dependencies = Array.Empty<string>(),
                 // The fixture plan mounts on the one level this fixture owns the mount kind for.

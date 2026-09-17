@@ -28,7 +28,7 @@ internal static class AuthoringContractTests
                 check(Same(definition, expected), "shared definition equals actual SDK " + id);
                 shared++;
             }
-            var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "authoring-audit-no-game"));
+            var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "authoring-audit-no-game"));
             var before = kernel.ExportManifest();
             var module = new RuntimeModule(RuntimeKernel.ApiVersion, seed.GetRawText(), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
             if (row.GetProperty("accepted").GetBoolean())

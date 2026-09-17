@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable><ImplicitUsings>disable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>ForgeMap.Native</AssemblyName><RootNamespace>ForgeMap.Native</RootNamespace>
-    <Version>0.1.0</Version><IsPackable>false</IsPackable>
+    <Version>1.0.0</Version><IsPackable>false</IsPackable>
     <GTFOBepInExPath Condition="'$(GTFOBepInExPath)' == ''">$(GTFO_BEPINEX_PATH)</GTFOBepInExPath>
   </PropertyGroup>
   <Target Name="RequireHostInputs" BeforeTargets="ResolveReferences">
@@ -14,7 +14,7 @@
       Text="Set GTFOBepInExPath or GTFO_BEPINEX_PATH to existing local compilation references." />
   </Target>
   <ItemGroup>
-    <Compile Include="Plugin.cs;MapPluginSession.cs;MapNativeHooks.cs;PlayerIdentityModule.cs;PlayerLifeFacts.cs;PlayerObservation.cs;PlayerSelector.cs;PlayerHealthReceiver.cs;PlayerHealthAction.cs;MapObjectHooks.cs;MapObjectSources.cs;GeneratorSource.cs;MapObjectHit.cs;DoorObservation.cs;TerminalObservation.cs;ZoneIndex.cs;LevelIdentity.cs;ExpeditionHooks.cs;MapActionOutcome.cs;DoorActions.cs;DoorActionCommands.cs;TerminalActions.cs;TerminalObjectActions.cs;ObjectiveActions.cs;ObjectiveActionHandler.cs;AlarmWaveActions.cs;PlayerActions.cs;AgentModifierAdapter.cs;AgentModifierValues.cs;PlayerStateFacts.cs;PlayerEventFacts.cs;PlayerStateHooks.cs;PlayerEventHooks.cs;PlayerValueReads.cs;PlayerNativeSources.cs;PlayerCommandActions.cs;PlayerSessions.cs;EnvironmentActions.cs;EnvironmentQuery.cs;EnvironmentZoneTable.cs;LightColorFade.cs;LightColorHooks.cs;HudActions.cs;TeammateOverhead.cs;TeammateOverheadHooks.cs;DoorTerminalDerivations.cs;DoorTerminalPublisher.cs;DoorTerminalFacts.cs;DoorTerminalActions.cs;DoorTerminalHooks.cs;LevelObjectHooks.cs;LevelObjectObservation.cs;LevelEventHooks.cs;LevelEventObservation.cs;LevelEventActions.cs;LevelObjectiveValueReader.cs;TriggerZoneData.cs;TriggerZoneCollision.cs;TriggerZoneHooks.cs;TriggerZoneRoomResolver.cs" />
+    <Compile Include="Plugin.cs;MapPluginSession.cs;MapNativeHooks.cs;PlayerIdentityModule.cs;PlayerLifeFacts.cs;PlayerObservation.cs;PlayerSelector.cs;PlayerHealthReceiver.cs;PlayerHealthAction.cs;MapObjectHooks.cs;MapObjectSources.cs;GeneratorSource.cs;MapObjectHit.cs;DoorObservation.cs;TerminalObservation.cs;ZoneIndex.cs;LevelIdentity.cs;ExpeditionHooks.cs;MapActionOutcome.cs;DoorActions.cs;DoorActionCommands.cs;TerminalActions.cs;TerminalObjectActions.cs;ObjectiveActions.cs;ObjectiveActionHandler.cs;AlarmWaveActions.cs;PlayerActions.cs;AgentModifierAdapter.cs;AgentModifierValues.cs;PlayerStateFacts.cs;PlayerEventFacts.cs;PlayerStateHooks.cs;PlayerEventHooks.cs;PlayerValueReads.cs;PlayerNativeSources.cs;PlayerCommandActions.cs;PlayerSessions.cs;EnvironmentActions.cs;EnvironmentQuery.cs;EnvironmentZoneTable.cs;LightColorFade.cs;MapClock.cs;HudActions.cs;TeammateOverhead.cs;TeammateOverheadHooks.cs;DoorTerminalDerivations.cs;DoorTerminalPublisher.cs;DoorTerminalFacts.cs;DoorTerminalActions.cs;DoorTerminalHooks.cs;LevelObjectHooks.cs;LevelObjectObservation.cs;LevelEventHooks.cs;LevelEventObservation.cs;LevelEventActions.cs;LevelObjectiveValueReader.cs;TriggerZoneData.cs;TriggerZoneCollision.cs;TriggerZoneHooks.cs;TriggerZoneRoomResolver.cs" />
     <!-- The Map provider definition comes from the game-independent ForgeMap assembly; no second provider. -->
     <ProjectReference Include="../ForgeMap.csproj" Private="false" />
     <Reference Include="ForgeRuntime" HintPath="$(ForgeRuntimeAssembly)" Private="false" />

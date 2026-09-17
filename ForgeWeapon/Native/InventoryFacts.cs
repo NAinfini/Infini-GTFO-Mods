@@ -165,10 +165,10 @@ internal sealed class InventoryObserver
                     + " identity; no pickup fact published.");
                 return;
             }
-            var fact = new RuntimeEvent(Id(), ReloadInventoryContract.PickedUpBinding, _epoch, Tick(),
-                "gtfo.equipment:" + now.Equipment.Id,
-                RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = now.Equipment }));
-            Publish("picked_up", now.Equipment.Id, fact);
+            Publish("picked_up", now.Equipment.Id, ReloadInventoryContract.PickedUpBinding,
+                () => new RuntimeEvent(Id(), ReloadInventoryContract.PickedUpBinding, _epoch, Tick(),
+                    "gtfo.equipment:" + now.Equipment.Id,
+                    RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = now.Equipment })));
             Count(player, now.Equipment, 1, 1);
             return;
         }
@@ -180,13 +180,13 @@ internal sealed class InventoryObserver
                     + " no drop fact published.");
                 return;
             }
-            var fact = new RuntimeEvent(Id(), ReloadInventoryContract.DroppedBinding, _epoch, Tick(),
-                "gtfo.equipment:" + before.Equipment.Id,
-                before.Position == null
-                    ? RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = before.Equipment })
-                    : RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = before.Equipment,
-                        position = before.Position }));
-            Publish("dropped", before.Equipment.Id, fact);
+            Publish("dropped", before.Equipment.Id, ReloadInventoryContract.DroppedBinding,
+                () => new RuntimeEvent(Id(), ReloadInventoryContract.DroppedBinding, _epoch, Tick(),
+                    "gtfo.equipment:" + before.Equipment.Id,
+                    before.Position == null
+                        ? RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = before.Equipment })
+                        : RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = before.Equipment,
+                            position = before.Position })));
             Count(player, before.Equipment, 0, -1);
             return;
         }
@@ -201,10 +201,10 @@ internal sealed class InventoryObserver
     private void Count(Player player, EntityReference? equipment, int count, int delta)
     {
         if (equipment == null) return;
-        var fact = new RuntimeEvent(Id(), ReloadInventoryContract.StackChangedBinding, _epoch, Tick(),
-            "gtfo.equipment:" + equipment.Id,
-            RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = equipment, count, delta }));
-        Publish("stack_changed", equipment.Id, fact);
+        Publish("stack_changed", equipment.Id, ReloadInventoryContract.StackChangedBinding,
+            () => new RuntimeEvent(Id(), ReloadInventoryContract.StackChangedBinding, _epoch, Tick(),
+                "gtfo.equipment:" + equipment.Id,
+                RuntimeJson.From(new { actor = (EntityReference?)player.Owner, item = equipment, count, delta })));
     }
 
     /// <summary>Every pool the player holds, read back after a body that could have written one. A gain is a refill
@@ -228,10 +228,10 @@ internal sealed class InventoryObserver
                     + " rounds with no live equipment identity; no refill fact published.");
                 continue;
             }
-            var fact = new RuntimeEvent(Id(), ReloadInventoryContract.RefilledBinding, _epoch, Tick(),
-                "gtfo.equipment:" + equipment.Id,
-                RuntimeJson.From(new { actor = (EntityReference?)player.Owner, equipment, amount = gain }));
-            Publish("refilled", equipment.Id, fact);
+            Publish("refilled", equipment.Id, ReloadInventoryContract.RefilledBinding,
+                () => new RuntimeEvent(Id(), ReloadInventoryContract.RefilledBinding, _epoch, Tick(),
+                    "gtfo.equipment:" + equipment.Id,
+                    RuntimeJson.From(new { actor = (EntityReference?)player.Owner, equipment, amount = gain })));
         }
     }
 
@@ -246,10 +246,10 @@ internal sealed class InventoryObserver
         if (!Enter() || _native.ItemIsReloading(item)) return;
         var equipment = _native.EquipmentOfItem(item);
         if (equipment == null || !_uses.Add(equipment.Id)) return;
-        var fact = new RuntimeEvent(Id(), ReloadInventoryContract.UseStartedBinding, _epoch, Tick(),
-            "gtfo.equipment:" + equipment.Id,
-            RuntimeJson.From(new { actor = _native.OwnerOfItem(item), equipment }));
-        Publish("use_started", equipment.Id, fact);
+        Publish("use_started", equipment.Id, ReloadInventoryContract.UseStartedBinding,
+            () => new RuntimeEvent(Id(), ReloadInventoryContract.UseStartedBinding, _epoch, Tick(),
+                "gtfo.equipment:" + equipment.Id,
+                RuntimeJson.From(new { actor = _native.OwnerOfItem(item), equipment })));
     }
 
     /// <summary>A use sequence that had started is over. This row reports refusals, not outcomes, so an ended use
@@ -268,11 +268,11 @@ internal sealed class InventoryObserver
         if (!Enter()) return;
         var equipment = _native.EquipmentOfItem(item);
         if (equipment == null) return;
-        var fact = new RuntimeEvent(Id(), ReloadInventoryContract.UseFailedBinding, _epoch, Tick(),
-            "gtfo.equipment:" + equipment.Id,
-            RuntimeJson.From(new { actor = _native.OwnerOfItem(item), equipment,
-                outcome = RejectedOutcome, reason = NotReloadableReason }));
-        Publish("use_failed", equipment.Id, fact);
+        Publish("use_failed", equipment.Id, ReloadInventoryContract.UseFailedBinding,
+            () => new RuntimeEvent(Id(), ReloadInventoryContract.UseFailedBinding, _epoch, Tick(),
+                "gtfo.equipment:" + equipment.Id,
+                RuntimeJson.From(new { actor = _native.OwnerOfItem(item), equipment,
+                    outcome = RejectedOutcome, reason = NotReloadableReason })));
     }
 
     private bool Enter()
@@ -308,15 +308,19 @@ internal sealed class InventoryObserver
         _epoch = -1;
     }
 
-    private void Publish(string kind, string subject, RuntimeEvent fact)
+    /// <summary>Publishes one row's fact, and builds it only when somebody subscribes to the row. Nothing is
+    /// listening on a closed binding: the kernel would answer `no-consumer` for the event, so it is never reached
+    /// and the fact is not reported — and the fact itself, its id, its ports and its payload, is work no consumer
+    /// would ever read. Reading the gate here rather than at the call site is what keeps every publish point from
+    /// having to remember the order.</summary>
+    private void Publish(string kind, string subject, string binding, Func<RuntimeEvent> fact)
     {
-        // Nothing is listening on this row's binding: the kernel would answer `no-consumer` for the event this call
-        // was handed, so the kernel is never reached and the fact is not reported.
-        if (_unsubscribed(fact.BindingId)) return;
-        try { _publish(fact); }
+        if (_unsubscribed(binding)) return;
+        var built = fact();
+        try { _publish(built); }
         catch (RuntimeContractException error)
         { _report("weapon." + kind + "-fact-rejected: " + error.Code); return; }
-        _info("weapon." + kind + "-fact subject=" + subject + " id=" + fact.EventId);
+        _info("weapon." + kind + "-fact subject=" + subject + " id=" + built.EventId);
     }
 
     private string Id() => "gtfo.weapon.inventory:" + Number(_epoch) + ":" + Number(checked(++_sequence));

@@ -34,7 +34,7 @@ internal sealed class RecordFixture
     internal RecordFixture(RuntimeLogLevel runtimeLevel, RuntimeLimits? limits = null)
     {
         Sink = new CaptureSink();
-        Kernel = new RuntimeKernel(new RuntimeIdentity(Runtime, "1.2.0", RuntimeKernel.ApiVersion, "managed-test"),
+        Kernel = new RuntimeKernel(new RuntimeIdentity(Runtime, "1.0.0", RuntimeKernel.ApiVersion, "managed-test"),
             limits ?? new RuntimeLimits(), Sink, runtimeLevel);
         // A kernel without a sink keeps no level table, so a module level is whatever the fixture was asked to run at.
         var moduleLevel = runtimeLevel == RuntimeLogLevel.Off ? RuntimeLogLevel.Off : RuntimeLogLevel.Info;
@@ -95,7 +95,7 @@ internal sealed class RecordFixture
         object[] ActionInputs() => new object[] { new { slot = 1, fromEventSlot = 1 }, new { slot = 2, value = 3 } };
         return RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" },
             runtime = Kernel.Identity, domain = "logic", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = Array.Empty<string>(), dependencies = Array.Empty<string>(),
             limits = new { maxEventsPerTick, maxCommandsPerTick, maxQueuedEvents, maxCausalDepth = 4 },

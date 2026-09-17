@@ -78,6 +78,7 @@ internal static class EnemyBehaviorContract
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemies",
                 "type": "entity",
                 "cardinality": "many"

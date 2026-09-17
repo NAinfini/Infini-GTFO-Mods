@@ -343,7 +343,7 @@ internal static class ResourceRegistryTests
             .Select((p, index) => (p, index)).Single(x => RuntimeJson.Text(x.p, "id") == id).index;
         var plan = RuntimeJson.From(new
         {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
+            schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
             runtime = kernel.Identity, domain = "map", authority = "host", failurePolicy = "stop-entrypoint",
             permissions = Fixture.Permissions, dependencies = Array.Empty<string>(),
             limits = new { kernel.Limits.MaxEventsPerTick, kernel.Limits.MaxCommandsPerTick, kernel.Limits.MaxQueuedEvents, kernel.Limits.MaxCausalDepth },
@@ -488,7 +488,7 @@ internal static class ResourceRegistryTests
             };
             Kernel.LoadPlan(RuntimeJson.From(new
             {
-                schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
+                schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = "author.resource", revision = "revision-1" },
                 runtime = Kernel.Identity, domain = "map", authority = "host", failurePolicy = "stop-entrypoint",
                 permissions = Fixture.Permissions, dependencies = Array.Empty<string>(),
                 limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth },

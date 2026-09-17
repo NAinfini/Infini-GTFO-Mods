@@ -13,12 +13,12 @@
          provider declaration those contracts name is supplied by the doubles, because the Map package assembly is
          held by other batches' work in flight. -->
     <Compile Include="../../EnvironmentContract.cs;../../HudContract.cs;../../ObjectiveActionContract.cs" />
-    <Compile Include="../../Native/EnvironmentActions.cs;../../Native/EnvironmentQuery.cs;../../Native/EnvironmentZoneTable.cs;../../Native/LightColorFade.cs;../../Native/HudActions.cs" />
+    <Compile Include="../../Native/EnvironmentActions.cs;../../Native/EnvironmentQuery.cs;../../Native/EnvironmentZoneTable.cs;../../Native/LightColorFade.cs;../../Native/MapClock.cs;../../Native/HudActions.cs" />
     <Compile Include="../../Native/PlayerSessions.cs;../../Native/TeammateOverhead.cs" />
     <Compile Include="AssemblyAttributes.cs;Contexts.cs;GameDoubles.cs;EnvironmentWorld.cs" />
     <Compile Include="EnvironmentActionTests.cs;EnvironmentPresentationTests.cs;EnvironmentHudTests.cs" />
     <Compile Include="EnvironmentOverheadTests.cs" />
-    <Compile Include="EnvironmentQueryTests.cs;EnvironmentRegistrationTests.cs;EnvironmentLightColorTests.cs" />
+    <Compile Include="EnvironmentQueryTests.cs;EnvironmentRegistrationTests.cs;EnvironmentLightColorTests.cs;MapClockTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../ForgeRuntime/Framework/ForgeRuntime.Framework.csproj" />

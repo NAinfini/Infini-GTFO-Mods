@@ -331,7 +331,7 @@ public sealed class IdentityAcceptanceTests
 
     private sealed class Fixture : IDisposable
     {
-        public RuntimeKernel Kernel { get; } = new(new("forge.weapon.acceptance", "0.1.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
+        public RuntimeKernel Kernel { get; } = new(new("forge.weapon.acceptance", "1.0.0", RuntimeKernel.ApiVersion, "synthetic-no-game"));
         public EquipmentIdentitySession Session { get; }
         public bool NativeAlive = true, OwnerAlive = true;
         public int NativeCalls, OwnerCalls;

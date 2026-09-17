@@ -39,7 +39,7 @@ SDK 目前没有输入类 trigger 的合同模块，这两个 capability 暂由 
 `Native/ForgeWeapon.Native.csproj` 是独立项目，引用真实 interop 程序集与宿主 `ForgeRuntime.dll` 编译，不进入 `ForgeWeapon.dll`，也不引用 ForgeMap 程序集。
 
 组成：
-- `Plugin`：BepInEx 插件 `NAinfini.ForgeWeapon` / `Infini Forge Weapon` / `0.2.0`（与 `ForgeWeapon.dll` 版本一致），依赖 `NAinfini.ForgeRuntime` 1.2.0 与 `NAinfini.ForgeMap` 0.1.0。宿主 Off 时不注册、不装 Hook；宿主不可用时抛出；Load 只允许一次，失败回滚并保留原始异常，`Unload()` 返回 false（不热卸载）。本包自己的 cfg 是 `BepInEx/config/NAinfini.ForgeWeapon.cfg`，`[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启，非法值在注册前抛错；该级别随注册交给内核，成为 `forge.module.gtfo.weapon` 这个 provider 自己的级别。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
+- `Plugin`：BepInEx 插件 `NAinfini.ForgeWeapon` / `Infini Forge Weapon` / `1.0.0`（与 `ForgeWeapon.dll` 版本一致），依赖 `NAinfini.ForgeRuntime` 1.0.0 与 `NAinfini.ForgeMap` 1.0.0。宿主 Off 时不注册、不装 Hook；宿主不可用时抛出；Load 只允许一次，失败回滚并保留原始异常，`Unload()` 返回 false（不热卸载）。本包自己的 cfg 是 `BepInEx/config/NAinfini.ForgeWeapon.cfg`，`[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启，非法值在注册前抛错；该级别随注册交给内核，成为 `forge.module.gtfo.weapon` 这个 provider 自己的级别。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
 - `WeaponNativeSession` 按固定顺序启动：注册窗口内先注册身份 Session（重复 provider 在装 Hook 前失败），再装 Hook；失败时回滚，释放时先注销再卸 Hook。任何意外异常都锁存故障，并清空句柄表。
 - `WeaponNativeHooks` 有 23 个 Hook：21 个 `Priority.Last` 的 postfix-only Hook 只读回、不改参数或返回值，另加装备池的一对（一个 `Priority.Last` postfix、一个 `Priority.First` prefix，见下节）：
   - `PlayerBackpack.CreateAndStoreBackpackItem` / `TryClearSlot` / `DestroyAllInstance` / `SetDeployed`

@@ -65,6 +65,28 @@ public sealed class InventoryFactsTests
         Assert.Equal(1, FactsWorld.Number(stack, "delta"));
     }
 
+    /// <summary>A closed row still does its own bookkeeping. With only the pickup row's gate closed the pickup
+    /// fact is not built, while the count row the same change publishes — the slot's own registration — is
+    /// published as usual. This is the ordering the publish points have to hold: the gate is read before the
+    /// event value, not after it.</summary>
+    [Fact]
+    public void a_closed_pickup_row_publishes_no_pickup_but_still_registers_the_count()
+    {
+        var (world, _, _, item, backpack) = Armed();
+        using var _ = world;
+        backpack.Empty(Standard);
+        world.Inventory.Reconcile(backpack);
+        world.Closed.Add(PickedUp);
+
+        backpack.Hold(Standard, FactsWorld.Item(item));
+        world.Inventory.Reconcile(backpack);
+
+        Assert.Empty(world.Facts(PickedUp));
+        var stack = Assert.Single(world.Facts(Stack));
+        Assert.Equal(1, FactsWorld.Number(stack, "count"));
+        Assert.Equal(1, FactsWorld.Number(stack, "delta"));
+    }
+
     [Fact]
     public void an_emptied_slot_becomes_a_drop_and_a_count_of_zero()
     {

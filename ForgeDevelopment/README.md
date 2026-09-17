@@ -18,7 +18,7 @@
 
 托管 SDK 程序集已删除：原来只登记空 provider 的 `ForgeDevelopment.csproj` 与 `ModuleDefinition.cs`（`forge.module.development` 0.1.0）都不再存在，也没有测试种子保留这个身份；包版本只取 `Native/Plugin.cs` 的 `PluginVersion`。
 
-插件身份是 `[BepInPlugin("NAinfini.ForgeDevelopment", "Infini Forge Development", "1.0.0")]`，硬依赖 `NAinfini.ForgeRuntime` 1.2.0，软依赖 InfiniTweaks（同装时要求 2.5.0 或更新，旧版包含重复采集器）。原生工程只引用宿主 `ForgeRuntime.dll` 与 SDK，不内嵌第二个内核；构建时必须显式传入 `ForgeRuntimeAssembly`、`ForgeFrameworkAssembly` 与 `GTFOBepInExPath`，缺一即失败。
+插件身份是 `[BepInPlugin("NAinfini.ForgeDevelopment", "Infini Forge Development", "1.0.0")]`，硬依赖 `NAinfini.ForgeRuntime` 1.0.0，软依赖 InfiniTweaks（同装时要求 2.5.0 或更新，旧版包含重复采集器）。原生工程只引用宿主 `ForgeRuntime.dll` 与 SDK，不内嵌第二个内核；构建时必须显式传入 `ForgeRuntimeAssembly`、`ForgeFrameworkAssembly` 与 `GTFOBepInExPath`，缺一即失败。
 
 **启动门槛：** 只有 `ForgeRuntime.Plugin.ConfiguredMode == Authoring` 时才启动。`Off` 与 `Play` 记录一行 inactive 日志后返回，不绑定配置、不打 Hook、不加组件；`Authoring` 但 `Plugin.Runtime` 为 null（宿主启动失败）时 Load 抛出。启动顺序是绑定配置 → `RuntimeDiagnostics.Initialize` → `RecRuntime.Start`（会话 → 日志捕获 → 跟踪器 → 内核通道）→ 本程序集的 `harmony.PatchAll` → `AuthoringMonitor` → `CaptureRegistry.EnsureStarted`（把 `CaptureMonitor` 挂到同一个 GameObject）→ `ExperimentRunner` 与 `ExperimentPanel` 组件 + `ExperimentPanel.Load()` → 可选的 `PerformanceMonitor`；任一步失败按已获取阶段逆序清理（实验面板 → 实验 runner → capture → 记录器 → Hook → 性能组件 → 作者组件 → 诊断停止），失败收据写入 `Data["ForgeDevelopment.StartupCleanupFailures"]`，原始异常不被替换，同一实例不重试。记录器内部各阶段自己降级：会话开不出来才整体跳过，日志/跟踪/内核任一段失败都只记一条 `stage_failed` 并继续跑其余通道。
 

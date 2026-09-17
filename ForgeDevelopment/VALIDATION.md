@@ -15,9 +15,13 @@
   $art="$env:TEMP\integ-dev\art"; $tart="$env:TEMP\integ-dev\art-tests"
   dotnet build ForgeRuntime/Framework/ForgeRuntime.Framework.csproj -c Release --artifacts-path $art -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH
   dotnet build ForgeRuntime/ForgeRuntime.csproj            -c Release --artifacts-path $art -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH
-  dotnet build ForgeDevelopment/Native/ForgeDevelopment.Native.csproj -c Release --artifacts-path $art `
+  dotnet build ForgeMap/Native/ForgeMap.Native.csproj      -c Release --artifacts-path $art `
       -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -p:ForgeRuntimeAssembly=$art\bin\ForgeRuntime\release\ForgeRuntime.dll `
       -p:ForgeFrameworkAssembly=$art\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll
+  dotnet build ForgeDevelopment/Native/ForgeDevelopment.Native.csproj -c Release --artifacts-path $art `
+      -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -p:ForgeRuntimeAssembly=$art\bin\ForgeRuntime\release\ForgeRuntime.dll `
+      -p:ForgeFrameworkAssembly=$art\bin\ForgeRuntime.Framework\release\ForgeRuntime.Framework.dll `
+      -p:ForgeMapNativeAssembly=$art\bin\ForgeMap.Native\release\ForgeMap.Native.dll
   dotnet run --project ForgeDevelopment/tests/Recorder/Recorder.csproj -c Release --artifacts-path $tart
   dotnet run --project ForgeDevelopment/tests/PluginStartup/PluginStartup.csproj -c Release --artifacts-path $tart
   dotnet run --project ForgeDevelopment/tests/Experiments/Experiments.csproj -c Release --artifacts-path $tart -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH

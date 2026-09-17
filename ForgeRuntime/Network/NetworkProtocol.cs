@@ -14,7 +14,7 @@ internal static class NetworkProtocol
     internal const ushort Version = 1;
 
     /// <summary>Event names are registered once, per message type, and never built from user data.</summary>
-    internal const string Prefix = "NAinfini.Forge.v1.";
+    internal const string Prefix = "NAinfini.Forge.";
 
     internal const string HelloEvent = Prefix + "hello";
     internal const string HelloAckEvent = Prefix + "hello-ack";

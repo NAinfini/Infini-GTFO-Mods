@@ -7,8 +7,8 @@ namespace ForgeTrigger.Targeting;
 
 /// <summary>The query module's registration tables: the families of on-demand rows this module publishes, joined in
 /// composition order. Each family owns its declaration file — conditions, collection selectors, event-role
-/// selectors — and this file adds one composition line per family, so a batch that adds rows adds a file and a
-/// line instead of editing a shared table.
+/// selectors, list predicates, entity-state reads — and this file adds one composition line per family, so a batch
+/// that adds rows adds a file and a line instead of editing a shared table.
 ///
 /// The rows are evaluated on demand by the kernel's `query` step, which hands each handler a
 /// <see cref="RuntimeQuerySession"/> — the only way a step reaches the world — and the explicit actor roles of the
@@ -22,7 +22,9 @@ public static class ObservedQueryModule
     private static readonly ObservedFamily Families = ObservedFamily.Compose(
         ObservedConditionDeclarations.Family,
         ObservedCollectionDeclarations.Family,
-        ObservedEntityDeclarations.Family);
+        ObservedEntityDeclarations.Family,
+        ObservedListDeclarations.Family,
+        ObservedEntityStateDeclarations.Family);
 
     /// <summary>The declared rows in registration order. Public because the contract tests iterate the same table
     /// the module registers instead of restating it.</summary>

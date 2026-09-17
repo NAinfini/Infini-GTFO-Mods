@@ -268,7 +268,9 @@ public sealed class AmmoSupplyTests
         Assert.Equal(WeaponSupplyContract.AmmoConsumeCapability, consume.GetProperty("id").GetString());
         Assert.Equal("host", add.GetProperty("graph").GetProperty("execution").GetString());
         Assert.Equal("one", add.GetProperty("graph").GetProperty("recipients").GetProperty("cardinality").GetString());
-        Assert.Equal(new[] { "standard", "special", "class", "resource_pack_rel", "none", "current_consumable" },
+        // The rows declare the five pools a request can act on; `none` stays in the native name table because it
+        // is the index-aligned name of the native member no row offers.
+        Assert.Equal(new[] { "standard", "special", "class", "resource_pack_rel", "current_consumable" },
             add.GetProperty("graph").GetProperty("parameters").EnumerateArray().First().GetProperty("values")
                 .EnumerateArray().Select(value => value.GetString()).ToArray());
 

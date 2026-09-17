@@ -124,7 +124,7 @@ public static class WeaponMeleeHitContract
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "source", "type": "entity" },
+          { "entityKinds": ["gtfo.player", "gtfo.enemy"], "id": "source", "type": "entity" },
           { "id": "target", "type": "entity" },
           { "id": "limb", "type": "integer", "nullable": true },
           { "id": "damage", "type": "number", "unit": "hp" },

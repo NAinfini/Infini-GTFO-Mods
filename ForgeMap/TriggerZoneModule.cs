@@ -16,6 +16,12 @@ public readonly record struct TriggerZoneTickResult(string Status, string Code, 
 /// membership changed. Nothing is polled on a client: the guard is the first thing a tick checks, so a machine that
 /// is not the host makes no world read and spends no query budget a plan may need.
 ///
+/// A tick judges where a target is now and the line it travelled since the last tick, because the two are a cadence
+/// apart: a body that crossed a thin volume between them is one entry and one exit, in that order, rather than
+/// nothing at all. A line is only a path while the game carried the body along it: a target further from its last
+/// judged place than the game can carry one in a beat was put where it is — a warp, this package's own teleport, a
+/// fall the level undid — and only where it stands now is judged, so a volume it was placed beyond never fires.
+///
 /// Membership is the module's own table, one set per zone. An entity that stops being a candidate of its kind — a
 /// dead enemy, a player who left — is dropped from the set silently and publishes no exit, because a disappearance
 /// is not the same fact as walking out. An entity whose position could not be read keeps the membership it had: a
@@ -33,6 +39,31 @@ public sealed class TriggerZoneModule : IDisposable
     /// per-query ceiling is refused by name, and this module keeps the membership it had — so the value is
     /// declared here as the number a reader of this module's reports can compare against.</summary>
     public const int MaximumTargetsPerTick = 256;
+    /// <summary>The quickest the game carries a body this module judges, in metres per second: the widest move that
+    /// is still a move rather than a placement. It is the one number of this module no dump can hand over — the game
+    /// keeps its speeds as data rather than as code. `PlayerLocomotion` carries the speed it is moving at
+    /// (`m_lastMoveSpeed` at 0x1B8, dump line 656256), `EnemyLocomotion` the ceiling of its own archetype
+    /// (`m_maxMovementSpeed` at 0x1E0, line 663099) and the player's melee lunge the two speeds its attack data
+    /// names (`MWS_AttackLight.m_wantedNormalSpeed`/`m_wantedChargeSpeed`, lines 615376-615377), and every one of
+    /// them is serialized from a data block this repository cannot read offline; the build states no speed constant
+    /// (a pass over every `const float` in the dump finds scroll, explode, blend and line speeds and no movement).
+    /// The bound is therefore inferred, with the movement of the game as the ground: a sprint raised by a booster
+    /// (`AgentModifier.MovementSpeed`, 250, scales the block's own value), a melee lunge and an enemy charge are
+    /// single-digit to low-double-digit metres per second, so 30 m/s leaves the fastest of them at least twice its
+    /// own speed as headroom, and a body quicker than that was not carried along the line it appears to have taken.
+    /// It judges the same thin crossing one beat at 2 m does — a sprint carrying a body across a wall must stay
+    /// visible — which is why the bound sits above that and not at it. This is the value to re-derive in the game
+    /// (see `evidence/trigger-zone-natives.json`, "placement-bound").</summary>
+    public const double MaximumJudgedSpeed = 30;
+    /// <summary>The greatest distance one beat of the game's own movement covers: <see cref="MaximumJudgedSpeed"/>
+    /// over the 0.1 second a zone is judged at — `MapClock.TriggerZoneSeconds`, the game's own
+    /// `LG_CollisionWorldEventTrigger.COLLISION_CHECK_INTERVAL`, which carries that citation. The distance is
+    /// written out rather than multiplied because the two halves cannot share the expression: the clock lives in the
+    /// native half of the package and its test project compiles it in as a source without this module beside it.
+    /// They are one fact and move together. A target further than this from where the last judgment left it was
+    /// placed rather than carried, so the straight line between the two places is not a path it walked and nothing
+    /// on it was crossed.</summary>
+    public const double MaximumJudgedTravel = 3;
     /// <summary>Zones this module holds for one install.</summary>
     public const int MaximumZones = TriggerZoneManifest.MaximumZones;
     /// <summary>The entity kinds a zone reads, spelled exactly as the providers that own them register them.</summary>
@@ -48,6 +79,11 @@ public sealed class TriggerZoneModule : IDisposable
     /// <summary>One membership set per zone id: the entities this module judged inside it at the last tick it
     /// judged the zone. The reference is kept with the id so an exit names the entity the entry named.</summary>
     private readonly Dictionary<string, Dictionary<string, EntityReference>> _inside = new(StringComparer.Ordinal);
+    /// <summary>The place each target was judged at in the last complete tick, one entry per entity that tick read.
+    /// The tick after it judges the line from this place to the place the target is at now, which is what makes a
+    /// crossing between two judgments observable. A target the last tick did not read — a body that just appeared
+    /// in the world, or one whose position was unreadable — has no entry and is judged by where it is alone.</summary>
+    private Dictionary<string, double[]> _previous = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _transitions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _reported = new(StringComparer.Ordinal);
     /// <summary>The level the current membership was judged in. The membership and the level it was read in are
@@ -89,7 +125,8 @@ public sealed class TriggerZoneModule : IDisposable
             : Array.Empty<EntityReference>();
 
     /// <summary>One tick of the host's own judgment. It reads the world at most once per entity kind and once for
-    /// the positions of the candidate set, and publishes one fact per target whose membership changed.</summary>
+    /// the positions of the candidate set, and publishes one fact per target whose membership changed — or whose
+    /// travel between this judgment and the last crossed a volume that neither end of it stood in.</summary>
     public TriggerZoneTickResult Tick()
     {
         if (_disposed || !_mapObjects.IsRegistered) return Idle("module-disposed");
@@ -152,25 +189,50 @@ public sealed class TriggerZoneModule : IDisposable
             foreach (var reference in candidates)
             {
                 if (!Reacts(zone, reference) || !positions.TryGetValue(reference.Id, out var position)) continue;
-                if (zone.Contains(position)) current_[reference.Id] = reference;
+                var wasInside = members.ContainsKey(reference.Id);
+                var isInside = zone.Contains(position);
+                if (isInside)
+                {
+                    current_[reference.Id] = reference;
+                    if (!wasInside) entered += Publish(TriggerZoneContract.EnteredFact, zone, reference) ? 1 : 0;
+                    continue;
+                }
+                if (wasInside)
+                {
+                    exited += Publish(TriggerZoneContract.ExitedFact, zone, reference) ? 1 : 0;
+                    continue;
+                }
+                // Neither end is inside, but the body may have crossed the whole volume between the two judgments:
+                // that is one entry and one exit, in the order the body made them. A body with no place from the
+                // last tick is new here and is judged by where it is, which is what the two branches above just did.
+                if (!_previous.TryGetValue(reference.Id, out var before)) continue;
+                // A body this far from where the last judgment left it was put there rather than carried there, so
+                // the line between the two places is not a path it walked and no volume on that line was crossed.
+                // The two branches above already published what is true either way: a member observed outside
+                // really did leave, and a body that landed inside really did arrive.
+                if (Travel(before, position) > MaximumJudgedTravel) continue;
+                if (!zone.IntersectsSegment(before, position)) continue;
+                entered += Publish(TriggerZoneContract.EnteredFact, zone, reference) ? 1 : 0;
+                exited += Publish(TriggerZoneContract.ExitedFact, zone, reference) ? 1 : 0;
             }
             if (unknown.Count != 0)
                 foreach (var pair in members)
                     if (unknown.Contains(Kind(pair.Value))) current_[pair.Key] = pair.Value;
-            foreach (var reference in current_.Values)
-                if (!members.ContainsKey(reference.Id)) entered += Publish(TriggerZoneContract.EnteredFact, zone, reference) ? 1 : 0;
             foreach (var pair in members)
             {
-                if (current_.ContainsKey(pair.Key)) continue;
-                // A target that is gone is dropped; a target that is still here and left the volume gets its fact.
-                if (!observable.Contains(pair.Key)) continue;
-                if (positions.ContainsKey(pair.Key)) exited += Publish(TriggerZoneContract.ExitedFact, zone, pair.Value) ? 1 : 0;
-                else if (players != null && enemies != null)
+                // The edges themselves were published as each candidate was judged. What is left is the member this
+                // tick could not judge at all: still a target, but with no position to leave a volume from.
+                if (current_.ContainsKey(pair.Key) || !observable.Contains(pair.Key)) continue;
+                if (positions.ContainsKey(pair.Key)) continue;
+                if (players != null && enemies != null)
                     ReportOnce("unread:" + pair.Key, "trigger-zone-observation: " + pair.Key
                         + " is a current target whose position could not be read; no exit was published for it.");
             }
             if (current_.Count == 0) _inside.Remove(zone.Id); else _inside[zone.Id] = current_;
         }
+        // The places just judged are where the next tick's segments start. A target this tick did not read has no
+        // place here, so the next tick treats it as a body that just appeared and judges it by where it is then.
+        _previous = positions;
         return new TriggerZoneTickResult("complete", "zones-judged", wanted.Count, candidates.Count, entered, exited);
     }
 
@@ -186,6 +248,16 @@ public sealed class TriggerZoneModule : IDisposable
             TriggerZoneWho.Enemy => Kind(reference) == EnemyKind,
             _ => Kind(reference) is PlayerKind or EnemyKind
         };
+
+    /// <summary>The distance between the two places one body was judged at, in metres. Both positions carry three
+    /// coordinates: a snapshot of any other count is never read into one.</summary>
+    private static double Travel(IReadOnlyList<double> from, IReadOnlyList<double> to)
+    {
+        var x = to[0] - from[0];
+        var y = to[1] - from[1];
+        var z = to[2] - from[2];
+        return Math.Sqrt((x * x) + (y * y) + (z * z));
+    }
 
     private static string Kind(EntityReference reference)
     {
@@ -246,6 +318,7 @@ public sealed class TriggerZoneModule : IDisposable
     {
         _inside.Clear();
         _transitions.Clear();
+        _previous = new Dictionary<string, double[]>(StringComparer.Ordinal);
     }
 
     private void ReportOnce(string key, string message)

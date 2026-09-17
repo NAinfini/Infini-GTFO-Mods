@@ -298,9 +298,9 @@ internal sealed class WeaponSupplyAdapter
     /// most, and a request beyond this is not a count any pool could answer.</summary>
     internal const int MaximumAmount = 9999;
 
-    /// <summary>The `ammo_type` parameter as the native enum. The catalog's member order and the native
-    /// `Player.AmmoType` declaration order are the same six members, so the index is the native value and there is
-    /// no second mapping table to drift.</summary>
+    /// <summary>The `ammo_type` parameter as the native enum. This table is the native `Player.AmmoType`
+    /// declaration order, so the index is the native value and there is no second mapping table to drift. A
+    /// member no row offers (`none`) still resolves here; the row's own policy is what refuses it.</summary>
     private static bool TryAmmoType(JsonElement parameters, out AmmoType type, out string code)
     {
         type = AmmoType.None;

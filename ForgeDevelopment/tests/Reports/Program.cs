@@ -304,7 +304,7 @@ try
     findings.SetMetadata("projectId", "findings-project");
     findings.SetMetadata("projectManifestHash", "manifest-hash");
     findings.SetMetadata("experiment:authoringSha256", new string('a', 64));
-    findings.SetMetadata("experiment:packageVersion", "2.0.0");
+    findings.SetMetadata("experiment:packageVersion", "1.0.0");
     for (var index = 0; index < 124; index++) findings.SetMetadata("key" + index, embedded);
     for (var index = 0; index < 3; index++) findings.Check("object", "check-" + index, "observed", embedded);
     var escapedIssue = new string('\u0001', 4096);
@@ -325,7 +325,7 @@ try
         Check(metadata.EnumerateObject().Select(property => property.Name)
             .SequenceEqual(new[] { "experiment:authoringSha256", "experiment:packageVersion", "projectId", "projectManifestHash" })
             && metadata.GetProperty("projectId").GetString() == "findings-project"
-            && metadata.GetProperty("experiment:packageVersion").GetString() == "2.0.0",
+            && metadata.GetProperty("experiment:packageVersion").GetString() == "1.0.0",
             "the critical identities survive and ordinary metadata is dropped");
         Check(overflow.GetProperty("droppedMetadata").GetInt64() == 124,
             "every dropped metadata entry is counted");

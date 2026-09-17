@@ -32,7 +32,7 @@ MAP1 也交付了可重复运行的原生 API 与字节证据检查工具：本�
 从 MAP5 切出的先行切片，目的是给 Weapon 等领域提供经核验的玩家引用。MAP5 其余内容（生命状态映射、救起与重生、落点、检查点）未开始。
 
 `Native/ForgeMap.Native.csproj` 是独立项目，引用真实 interop 编译，不进入 `ForgeMap.dll`：
-- `Plugin`：BepInEx 插件 `NAinfini.ForgeMap` / `Infini Forge Map` / `0.1.0`，依赖 `NAinfini.ForgeRuntime` 1.2.0。宿主 Off 时不注册、不装 Hook；Load 只允许一次，`Unload()` 返回 false。本包自己的 cfg 是 `BepInEx/config/NAinfini.ForgeMap.cfg`，`[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启，非法值在注册前抛错；该级别随注册交给内核，成为 `forge.module.gtfo.map` 这个 provider 自己的级别。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
+- `Plugin`：BepInEx 插件 `NAinfini.ForgeMap` / `Infini Forge Map` / `1.0.0`，依赖 `NAinfini.ForgeRuntime` 1.0.0。宿主 Off 时不注册、不装 Hook；Load 只允许一次，`Unload()` 返回 false。本包自己的 cfg 是 `BepInEx/config/NAinfini.ForgeMap.cfg`，`[Logging] Level` 取 `off`、`error`、`info`，默认 `error`，改动需重启，非法值在注册前抛错；该级别随注册交给内核，成为 `forge.module.gtfo.map` 这个 provider 自己的级别。发布身份沿用现有命名模式，**未经确认，没有清单或打包**。
 - `MapPluginSession`：与 Enemy 相同的顺序。注册窗口内先注册模块（重复 provider 或 `gtfo.player` 命名空间冲突在装 Hook 前原子失败），再装 Hook；失败回滚先卸 Hook 再注销并保留原始异常；回调异常锁存故障并清表；释放时先注销再卸 Hook；所属线程检查。
 - `PlayerIdentityModule`：`MapPluginSession` 在 `ModuleDefinition.Create()` 上追加本包的全部运行期接口——`gtfo.player` 的 `EntityResolvers`、`EntityInstanceResolvers`、`EntityObservers` 与 `EntityCandidates`，以及 `forge.selector.target.players` 的求值器——不另造 provider。
 - `MapNativeHooks`：插件安装的 Hook 列表。玩家的 2 个 `Priority.Last` postfix，只决定何时读回、不读参数：`PlayerManager.OnPlayerSpawned` 与 `PlayerManager.OnPlayerDespawned`。两者都是非虚方法，由 `PlayerReplicationManager.OnSpawn` / `OnDeSpawn` 调用，本地、远端与 bot 玩家都经过这里（静态调用边见证据文件）。选这两个是因为它们是所有玩家生成与销毁的共同汇合点：`RegisterPlayerAgent` 与 `PlayerSync.OnSpawn` 没有直接调用者（接口派发），`PlayerAgent.Setup` / `OnDespawn` 是被 `LocalPlayerAgent` 覆盖的虚方法。同一列表里的另外 3 个是门/终端的 map-object 读回（`Native/MapObjectHooks.cs`）。

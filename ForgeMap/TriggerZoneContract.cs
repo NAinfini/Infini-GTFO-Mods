@@ -273,6 +273,37 @@ public sealed class TriggerZone
         }
     }
 
+    /// <summary>Whether the straight line a body travelled between two world positions meets this zone. A tick
+    /// judges a cadence apart, so a body can cross a thin volume entirely between two judgments; this is the test
+    /// that makes the crossing observable instead of lost. The line is carried into the zone's own frame and the
+    /// shape's own rule is applied to the whole line rather than to one point: a box is met when the line crosses
+    /// the volume of the point test, a sphere when the line's closest approach to the centre is within the radius,
+    /// and a capsule when its closest approach to the zone's own Y-axis segment is. Two positions are required,
+    /// because one point is what <see cref="Contains"/> already answers.</summary>
+    public bool IntersectsSegment(IReadOnlyList<double> from, IReadOnlyList<double> to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+        if (from.Count != 3 || to.Count != 3)
+            throw new RuntimeContractException("spatial-point", "A position requires three coordinates.");
+        const double epsilon = 1e-9;
+        var start = ToLocal(from[0] - Position[0], from[1] - Position[1], from[2] - Position[2]);
+        var end = ToLocal(to[0] - Position[0], to[1] - Position[1], to[2] - Position[2]);
+        var direction = new[] { end[0] - start[0], end[1] - start[1], end[2] - start[2] };
+        switch (Shape)
+        {
+            case TriggerZoneShape.Box:
+                return MeetsBox(start, direction);
+            case TriggerZoneShape.Sphere:
+                return DistanceToSpine(start, direction, 0d) <= Size[0] / 2d + epsilon;
+            default:
+                // Capsule: the same `size[1]`-long Y-axis segment with `size[0]`-diameter caps Contains reads, so
+                // an axis shorter than the diameter collapses to the sphere of the same diameter.
+                var spine = Math.Max(Size[1] / 2d - Size[0] / 2d, 0);
+                return DistanceToSpine(start, direction, spine) <= Size[0] / 2d + epsilon;
+        }
+    }
+
     /// <summary>The zone's own coordinates of one world offset: the inverse of the zone's rotation applied to it.
     /// A quaternion and its conjugate are inverses for a unit quaternion, which is what the parser guarantees.</summary>
     private double[] ToLocal(double x, double y, double z)
@@ -293,6 +324,75 @@ public sealed class TriggerZone
         var nz = z / scale;
         return scale * Math.Sqrt(nx * nx + ny * ny + nz * nz);
     }
+
+    /// <summary>Whether the segment `start + t * direction` for t in [0, 1] meets the axis-aligned box of this
+    /// zone's own half extents. The slab test keeps, per axis, the interval of t the segment spends inside that
+    /// axis' slab; the segment meets the box exactly when the three intervals share a point. A direction component
+    /// of zero leaves that axis a single containment test, which is the point case of <see cref="Contains"/>.</summary>
+    private bool MeetsBox(double[] start, double[] direction)
+    {
+        const double epsilon = 1e-9;
+        var low = 0d;
+        var high = 1d;
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var half = Size[axis] / 2d + epsilon;
+            if (Math.Abs(direction[axis]) <= 1e-12)
+            {
+                if (Math.Abs(start[axis]) > half) return false;
+                continue;
+            }
+            var first = (-half - start[axis]) / direction[axis];
+            var second = (half - start[axis]) / direction[axis];
+            if (first > second) (first, second) = (second, first);
+            low = Math.Max(low, first);
+            high = Math.Min(high, second);
+            if (low > high) return false;
+        }
+        return true;
+    }
+
+    /// <summary>The closest approach between the body's own segment and the zone's Y-axis segment of half-length
+    /// <paramref name="axis"/>, by the closest-point construction for two segments (Ericson, Real-Time Collision
+    /// Detection §5.1.9). The spine is a segment and not a point so a capsule needs one call, and a zero-length
+    /// spine is exactly the sphere test.</summary>
+    private static double DistanceToSpine(double[] start, double[] direction, double axis)
+    {
+        const double epsilon = 1e-12;
+        var spine = new[] { 0d, 2 * axis, 0d };
+        // The spine starts at (0, -axis, 0), so the offset of the body's start from the spine's start is that
+        // start shifted up by the half-length.
+        var offset = new[] { start[0], start[1] + axis, start[2] };
+        var a = Dot(direction, direction);
+        var e = Dot(spine, spine);
+        var f = Dot(spine, offset);
+        double s;
+        double t;
+        if (a <= epsilon && e <= epsilon) { s = 0d; t = 0d; }
+        else if (a <= epsilon) { s = 0d; t = Math.Clamp(f / e, 0d, 1d); }
+        else
+        {
+            var c = Dot(direction, offset);
+            if (e <= epsilon) { t = 0d; s = Math.Clamp(-c / a, 0d, 1d); }
+            else
+            {
+                var b = Dot(direction, spine);
+                var denominator = a * e - b * b;
+                s = denominator != 0d ? Math.Clamp((b * f - c * e) / denominator, 0d, 1d) : 0d;
+                t = (b * s + f) / e;
+                if (t < 0d) { t = 0d; s = Math.Clamp(-c / a, 0d, 1d); }
+                else if (t > 1d) { t = 1d; s = Math.Clamp((b - c) / a, 0d, 1d); }
+            }
+        }
+        var px = start[0] + direction[0] * s;
+        var py = start[1] + direction[1] * s;
+        var pz = start[2] + direction[2] * s;
+        // The closest point on the spine is (0, -axis + 2 * axis * t, 0); the spine's own x and z are zero.
+        return Length(px, py - (-axis + 2 * axis * t), pz);
+    }
+
+    private static double Dot(double[] left, double[] right)
+        => left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
 
     public override string ToString() => Id + "@" + Level;
 }
@@ -678,7 +778,7 @@ public static class TriggerZoneContract
     public static object Row(string capability, string label, string description)
         => new
         {
-            id = capability, owner = ProviderId, kind = "trigger", label, version = "2.0.0",
+            id = capability, owner = ProviderId, kind = "trigger", label, version = "1.0.0",
             parameters = new { description },
             graph = new
             {
@@ -687,7 +787,7 @@ public static class TriggerZoneContract
                 {
                     new { id = "next", type = "execution" },
                     new { id = "target", type = "entity" },
-                    new { id = "zone", type = "entity" }
+                    new { id = "zone", type = "entity", entityKinds = new[] { "gtfo.zone" } }
                 },
                 parameters = Array.Empty<object>()
             }

@@ -165,14 +165,14 @@ sealed class TestWorld : IDisposable
         int Slot(JsonElement ports, string name) => ports.EnumerateArray().Select((p, i) => (p, i)).Single(x => x.p.GetProperty("id").GetString() == name).i;
         var trigger = Graph(Trigger); var action = Graph(Action);
         return RuntimeJson.From(new {
-            schemaVersion = 4, kind = "forge-runtime-plan", planId = "map1.test.plan",
+            schemaVersion = 1, kind = "forge-runtime-plan", planId = "map1.test.plan",
             resource = new { id = "map1.test.shared-room", revision = "fixture-revision" }, runtime = Kernel.Identity,
             domain = "map", authority = "host", failurePolicy = "stop-entrypoint", permissions = permissions ?? new[] { Permission }, dependencies = Array.Empty<string>(),
             limits = new { Kernel.Limits.MaxEventsPerTick, Kernel.Limits.MaxCommandsPerTick, Kernel.Limits.MaxQueuedEvents, Kernel.Limits.MaxCausalDepth }, bindings = pins,
             // A plan declares which mount target it belongs to; the synthetic mount owner answers this one, so
             // the plan is dispatched only while the world it names is the world the kernel is in.
             attachments = new[] { new { kind = "level", reference = MountReference } },
-            // schemaVersion 3: the record step owns the action's single execution successor, left
+            // schemaVersion 1: the record step owns the action's single execution successor, left
             // unwired so the entrypoint ends after it.
             entrypoints = new[] { new { nodeId = "Observed", binding = Binding(Trigger), layout = Layout(trigger), start = 0,
                 steps = new[] { new { nodeId = "RecordIdentity", nodeKind = "action", binding = Binding(Action), layout = Layout(action),

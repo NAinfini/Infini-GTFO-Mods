@@ -27,7 +27,7 @@ const uint FixtureLevelRundown = 31; const char FixtureLevelTier = 'A'; const in
 const string FixtureLevelReference = "31:A:0";
 RuntimeKernel Kernel(string worldLevel = FixtureLevelReference)
 {
-    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
+    var kernel = new RuntimeKernel(new RuntimeIdentity("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "20403457"), new RuntimeLimits());
     kernel.BeginWorld(1); kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off); kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
     kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
     kernel.RegisterModule(ForgeTrigger.ModuleDefinition.Create(), RuntimeLogLevel.Off);
@@ -126,7 +126,7 @@ string LocalPlan(RuntimeKernel k, string planId, string trigger, string action, 
         .OrderBy(x => x.Slot).Select(x => x.Row).ToArray();
     return RuntimeJson.From(new
     {
-        schemaVersion = 4, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = k.Identity,
+        schemaVersion = 1, kind = "forge-runtime-plan", planId, resource = new { id = planId, revision = "1" }, runtime = k.Identity,
         domain = "enemy", authority = "host", failurePolicy = "stop-entrypoint", permissions, dependencies = Array.Empty<string>(),
         limits = new { k.Limits.MaxEventsPerTick, k.Limits.MaxCommandsPerTick, k.Limits.MaxQueuedEvents, k.Limits.MaxCausalDepth }, bindings = pins,
         // These plans mount the one level the mount double above stands in for, in the reference spelling the
@@ -554,7 +554,7 @@ if (args.Length >= 2 && args[0] == "--fixtures")
     // a valid one. Pins older than this registry would make each invalid plan "fail" on binding-lock instead of its own
     // defect, and a plan recorded for another wire version would make every case "fail" on plan-version, so a stale
     // fixture set is blocked as a whole rather than run.
-    const int planSchemaVersion = 4; // The one version RuntimePlan.Parse reads (`plan-version`).
+    const int planSchemaVersion = 1; // The one version RuntimePlan.Parse reads (`plan-version`).
     var registry = RuntimeJson.Parse(live.ExportManifest()).GetProperty("registry");
     string Registered(string list, string id) => registry.GetProperty(list).EnumerateArray()
         .Where(r => r.GetProperty("id").GetString() == id).Select(r => r.GetProperty("version").GetString()!).DefaultIfEmpty("unregistered").First();

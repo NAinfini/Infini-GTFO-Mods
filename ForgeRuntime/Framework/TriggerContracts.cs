@@ -66,7 +66,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "实际伤害提交完成",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "伤害真的打上去了，数字是实际值。",
             "summary": "伤害真的打上去了，数字是实际值。",
@@ -90,6 +90,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player", "gtfo.enemy"],
                 "id": "source",
                 "type": "entity",
                 "nullable": true
@@ -131,7 +132,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "生命值变化",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "生命值变了。",
             "summary": "生命值变了。",
@@ -177,7 +178,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "敌人开始死亡",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "敌人的死亡流程开始。",
             "summary": "敌人的死亡流程开始。",
@@ -200,10 +201,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemy",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.player", "gtfo.enemy"],
                 "id": "source",
                 "type": "entity",
                 "nullable": true
@@ -217,7 +220,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "敌人部位被打爆",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "某个可破坏部位被打断了。",
             "summary": "某个可破坏部位被打断了。",
@@ -258,7 +261,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "开火（每一发）",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "确实打出了一发。",
             "summary": "确实打出了一发。整次攻击从起手到收招用「攻击开始」到「攻击完成」。",
@@ -282,10 +285,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "source",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.equipment"],
                 "id": "equipment",
                 "type": "entity"
               },
@@ -302,7 +307,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "产生待解析命中候选",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "产生了一个待确认的命中，还没结算伤害。",
             "summary": "产生了一个待确认的命中，还没结算伤害。",
@@ -326,10 +331,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player", "gtfo.enemy"],
                 "id": "source",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.equipment"],
                 "id": "equipment",
                 "type": "entity"
               },
@@ -357,7 +364,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "实体被移除",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "某个东西从世界里移除了。",
             "summary": "某个东西从世界里移除了。",
@@ -399,7 +406,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "敌人生成",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "一个东西真的出现在世界里了。",
             "summary": "一个东西真的出现在世界里了。",
@@ -442,7 +449,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "部署成功",
-          "version": "2.1.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "部署物成功放好了。",
             "summary": "部署物成功放好了。",
@@ -464,10 +471,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "actor",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.equipment"],
                 "id": "deployed",
                 "type": "entity"
               },
@@ -492,7 +501,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "哨戒炮放下 / 收回",
-          "version": "2.1.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "回收完成，资源也还回来了。",
             "summary": "回收完成。",
@@ -514,10 +523,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "actor",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.equipment"],
                 "id": "deployed",
                 "type": "entity"
               },
@@ -536,7 +547,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "装备切入",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "玩家切到了某件装备。",
             "summary": "玩家切到了某件装备。",
@@ -559,10 +570,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "actor",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.equipment"],
                 "id": "equipment",
                 "type": "entity"
               }
@@ -575,7 +588,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "装备切出",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "玩家把某件装备收起来了。",
             "summary": "玩家把某件装备收起来了。",
@@ -598,10 +611,12 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "actor",
                 "type": "entity"
               },
               {
+                "entityKinds": ["gtfo.equipment"],
                 "id": "equipment",
                 "type": "entity"
               }
@@ -614,7 +629,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "锁或钥匙条件状态变化",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "锁上了、解锁了，或钥匙条件变了。",
             "summary": "锁上了、解锁了，或钥匙条件变了。",
@@ -637,6 +652,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.map_object"],
                 "id": "door",
                 "type": "entity"
               },
@@ -657,7 +673,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "终端命令执行结果",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "终端命令跑完，带结果。",
             "summary": "终端命令跑完，带结果。",
@@ -680,6 +696,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.map_object"],
                 "id": "terminal",
                 "type": "entity"
               },
@@ -701,7 +718,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "远征成功、失败或退出",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "远征结束，无论是通关、团灭还是退出。",
             "summary": "远征结束，无论是通关、团灭还是退出。",
@@ -736,7 +753,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "玩家进入低血量",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "一个玩家掉进低血量的那一刻。",
             "summary": "玩家进入低血量。",
@@ -759,6 +776,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "player",
                 "type": "entity"
               }
@@ -771,7 +789,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "感染值变化",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "一个玩家的感染值发生变化。",
             "summary": "感染值变了。",
@@ -794,6 +812,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "player",
                 "type": "entity"
               },
@@ -814,7 +833,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "使用补给包",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "一个玩家用掉一份补给。",
             "summary": "玩家使用补给。",
@@ -838,6 +857,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "player",
                 "type": "entity"
               },
@@ -855,7 +875,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "捡起消耗品或资源",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "一个玩家捡起消耗品或资源。",
             "summary": "玩家捡起物品。",
@@ -879,6 +899,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "player",
                 "type": "entity"
               },
@@ -896,7 +917,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "玩家发出标记（Ping）",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "一个玩家按下标记键，带上他标出的位置。",
             "summary": "玩家发出标记。",
@@ -919,6 +940,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "player",
                 "type": "entity"
               },
@@ -942,7 +964,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "敌人由休眠转为清醒",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "敌人从睡眠中醒来。",
             "summary": "敌人从睡眠中醒来。",
@@ -965,6 +987,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemy",
                 "type": "entity"
               }
@@ -977,7 +1000,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "获得有效攻击目标",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "敌人锁定了一个攻击目标。",
             "summary": "敌人锁定了一个攻击目标。",
@@ -1000,6 +1023,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemy",
                 "type": "entity"
               },
@@ -1018,7 +1042,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "失去攻击目标",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "敌人跟丢了目标。",
             "summary": "敌人跟丢了目标。",
@@ -1041,6 +1065,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemy",
                 "type": "entity"
               },
@@ -1059,7 +1084,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "侦察兵发现玩家 / 尖叫",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "侦察兵的触须扫到了东西。",
             "summary": "侦察兵的触须扫到了东西。",
@@ -1082,6 +1107,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemy",
                 "type": "entity"
               },
@@ -1105,7 +1131,7 @@ public static class TriggerContracts
           "owner": "forge.contract.trigger",
           "kind": "trigger",
           "label": "侦察兵尖叫",
-          "version": "2.0.0",
+          "version": "1.0.0",
           "parameters": {
             "description": "侦察兵的呼叫进入新阶段。",
             "summary": "侦察兵的呼叫进入新阶段。",
@@ -1128,6 +1154,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.enemy"],
                 "id": "enemy",
                 "type": "entity"
               },
@@ -1166,6 +1193,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.map_object"],
                 "id": "door",
                 "type": "entity"
               },
@@ -1209,6 +1237,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.map_object"],
                 "id": "door",
                 "type": "entity"
               },
@@ -1253,6 +1282,7 @@ public static class TriggerContracts
                 "type": "execution"
               },
               {
+                "entityKinds": ["gtfo.map_object"],
                 "id": "door",
                 "type": "entity"
               },
@@ -1274,6 +1304,7 @@ public static class TriggerContracts
                 "unit": "m"
               },
               {
+                "entityKinds": ["gtfo.player"],
                 "id": "attacker",
                 "type": "entity",
                 "optional": true
@@ -1287,7 +1318,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "玩家倒地",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "玩家倒地了。",
         "summary": "玩家倒地了。",
@@ -1310,10 +1341,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.player", "gtfo.enemy"],
             "id": "source",
             "type": "entity",
             "nullable": true
@@ -1327,7 +1360,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "开始救人 / 被救起",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "有人开始救人。",
         "summary": "有人开始救人。",
@@ -1350,10 +1383,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "rescuer",
             "type": "entity"
           }
@@ -1366,7 +1401,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "救援被打断",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "救援被打断。",
         "summary": "救援被打断。",
@@ -1389,10 +1424,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "rescuer",
             "type": "entity",
             "nullable": true
@@ -1410,7 +1447,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "玩家被救起",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "玩家被救起来了。",
         "summary": "玩家被救起来了。",
@@ -1433,10 +1470,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "rescuer",
             "type": "entity",
             "nullable": true
@@ -1450,7 +1489,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "规则确认玩家死亡",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "规则确认玩家死亡。",
         "summary": "规则确认玩家死亡。",
@@ -1473,10 +1512,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.player", "gtfo.enemy"],
             "id": "source",
             "type": "entity",
             "nullable": true
@@ -1490,7 +1531,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "玩家传送完成",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "玩家被传送了。",
         "summary": "玩家被传送了。",
@@ -1513,6 +1554,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
@@ -1535,7 +1577,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "玩家重生完成",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "玩家重生完成。",
         "summary": "玩家重生完成。",
@@ -1558,6 +1600,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "player",
             "type": "entity"
           },
@@ -1575,7 +1618,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "换弹开始 / 完成",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "开始装填。",
         "summary": "开始装填。",
@@ -1599,10 +1642,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           }
@@ -1615,7 +1660,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "弹药进入弹匣",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "子弹真的进弹匣了。",
         "summary": "子弹真的进弹匣了。",
@@ -1639,10 +1684,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           },
@@ -1659,7 +1706,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "换弹完成",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "装填结束。",
         "summary": "装填结束。",
@@ -1683,10 +1730,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           }
@@ -1699,7 +1748,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "装备补给完成",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "补给完成。",
         "summary": "补给完成。",
@@ -1721,10 +1770,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           },
@@ -1741,7 +1792,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "堆叠数量变化",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "消耗品的数量变了。",
         "summary": "消耗品的数量变了。",
@@ -1763,6 +1814,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
@@ -1787,7 +1839,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "拾取完成",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "玩家捡起了东西。",
         "summary": "玩家捡起了东西。",
@@ -1809,6 +1861,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
@@ -1825,7 +1878,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "物品被捡起 / 放下",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "玩家丢下了东西。",
         "summary": "玩家丢下了东西。",
@@ -1847,6 +1900,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
@@ -1869,7 +1923,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "使用前摇开始",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "使用动作开始。",
         "summary": "使用动作开始。",
@@ -1891,10 +1945,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           }
@@ -1907,7 +1963,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "使用失败并给出原因",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "使用失败，并告诉你原因。弹匣空了打不出去走「弹匣打空 / 全部没弹」，不是这一条。",
         "summary": "使用失败，并告诉你原因。弹匣空了打不出去走「弹匣打空 / 全部没弹」，不是这一条。",
@@ -1929,10 +1985,12 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.player"],
             "id": "actor",
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.equipment"],
             "id": "equipment",
             "type": "entity"
           },
@@ -2045,7 +2103,7 @@ public static class TriggerContracts
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "player", "type": "entity" },
+          { "entityKinds": ["gtfo.player"], "id": "player", "type": "entity" },
           { "id": "zone", "type": "string" }
         ],
         "parameters": []
@@ -2066,7 +2124,7 @@ public static class TriggerContracts
         "inputs": [],
         "outputs": [
           { "id": "next", "type": "execution" },
-          { "id": "portal", "type": "entity" },
+          { "entityKinds": ["gtfo.map_object"], "id": "portal", "type": "entity" },
           { "id": "dimension", "type": "integer" },
           { "id": "previous", "type": "integer" }
         ],
@@ -2078,7 +2136,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "敌人死亡",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "这次伤害把目标打死了。",
         "summary": "这次伤害把目标打死了。敌人刚进入死亡流程用「死亡流程开始」，那一步不一定真的结算成击杀。",
@@ -2106,6 +2164,7 @@ public static class TriggerContracts
             "type": "entity"
           },
           {
+            "entityKinds": ["gtfo.player", "gtfo.enemy"],
             "id": "source",
             "type": "entity",
             "nullable": true,
@@ -2125,7 +2184,7 @@ public static class TriggerContracts
       "owner": "forge.contract.trigger",
       "kind": "trigger",
       "label": "敌人部位受伤",
-      "version": "2.0.0",
+      "version": "1.0.0",
       "parameters": {
         "description": "某个部位挨打了。",
         "summary": "某个部位挨打了。",
@@ -2197,6 +2256,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.enemy"],
             "id": "enemy",
             "type": "entity"
           },
@@ -2237,6 +2297,7 @@ public static class TriggerContracts
             "type": "execution"
           },
           {
+            "entityKinds": ["gtfo.enemy"],
             "id": "enemy",
             "type": "entity"
           },
@@ -2333,6 +2394,7 @@ public static class TriggerContracts
             "optional": true
           },
           {
+            "entityKinds": ["gtfo.enemy"],
             "id": "spawned",
             "type": "entity",
             "cardinality": "many"

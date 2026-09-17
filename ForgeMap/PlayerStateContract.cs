@@ -257,7 +257,7 @@ public static class PlayerStateContract
             new object[] { new { id = "position", type = "vector3", unit = "m" } }),
         ValueRow(WieldedGearValueCapability, "玩家手持装备", "读一个玩家当前拿在手上的装备。",
             "Reads the equipment one player is currently holding.",
-            new object[] { new { id = "equipment", type = "entity", nullable = true } }),
+            new object[] { new { id = "equipment", type = "entity", nullable = true, entityKinds = new[] { "gtfo.equipment" } } }),
         ValueRow(AmmoValueCapability, "玩家弹药", "读一个玩家手上武器的弹匣与备用弹药。",
             "Reads the clip and reserve ammunition of the weapon one player is holding.",
             new object[]
@@ -292,9 +292,9 @@ public static class PlayerStateContract
         parameters = new { description, descriptionEn },
         graph = new
         {
-            domains = new[] { "player", "map", "logic" },
+            domains = new[] { "map", "player", "logic" },
             execution = "query",
-            inputs = new object[] { new { id = "player", type = "entity" } },
+            inputs = new object[] { new { id = "player", type = "entity", entityKinds = new[] { "gtfo.player" } } },
             outputs,
             parameters = Array.Empty<object>()
         }

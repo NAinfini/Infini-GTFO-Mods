@@ -10,7 +10,7 @@ internal static class LifecycleProbe
         }), new Dictionary<string, CommandHandler>(), Array.Empty<BindingSupport>());
     private static RuntimeKernel Kernel()
     {
-        var kernel = new RuntimeKernel(new("forge.runtime", "1.2.0", RuntimeKernel.ApiVersion, "managed-test"));
+        var kernel = new RuntimeKernel(new("forge.runtime", "1.0.0", RuntimeKernel.ApiVersion, "managed-test"));
         kernel.BeginWorld(1); return kernel;
     }
     internal static void Startup()

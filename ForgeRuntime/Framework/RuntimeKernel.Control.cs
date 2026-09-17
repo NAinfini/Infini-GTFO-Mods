@@ -7,7 +7,7 @@ namespace ForgeRuntime.Framework;
 
 /// <summary>
 /// The kernel's one control dispatcher. Every control step the plan declares — branch, sequence, delay, interval,
-/// repeat, for_each, cancel, present — is walked here, in the same place the plan's successor table is followed, so there is
+/// repeat, for_each, for_each_position, enum_switch, cancel, restart, present — is walked here, in the same place the plan's successor table is followed, so there is
 /// no second router and no control-specific execution path. A control's execution outputs are ordinary forward
 /// successors: `next` continues, `pulse`/`body` names the step the next activation starts from, and the kernel
 /// holds the continuation (plan, control step, output index, frame snapshot, handle) itself. Nothing rewinds the
@@ -147,18 +147,44 @@ public sealed partial class RuntimeKernel
             }
             case "forge.control.flow.repeat":
             case "forge.control.flow.for_each":
+            case "forge.control.flow.for_each_position":
             {
-                var forEach = step.Control == "forge.control.flow.for_each";
-                var rounds = forEach ? CandidateCount(inputs, step) : Count(inputs, "count", step);
+                // One loop, three sources: a count, the candidates a selector picked, or the positions an upstream
+                // step published. `for_each_position` is `for_each`'s own frame — item and index are published for
+                // the round the same way — over the `positions` port instead of `candidates`.
+                var forEach = step.Control != "forge.control.flow.repeat";
+                var source = step.Control == "forge.control.flow.for_each_position" ? "positions" : "candidates";
+                var rounds = forEach ? CandidateCount(inputs, step, source) : Count(inputs, "count", step);
                 if (rounds == 0) { cursor = Successor(step, 0); return null; }
                 var frame = new ControlFrame
                 {
                     Descriptor = step, Step = stepIndex, Output = 1, Round = 0, Rounds = rounds, Loop = true, ForEach = forEach,
-                    Successors = successors, Items = forEach ? inputs.GetProperty("candidates") : default
+                    Successors = successors, Items = forEach ? inputs.GetProperty(source) : default
                 };
                 controlWalk.Add(frame);
                 WriteLoopFrame(frame);
                 cursor = Successor(step, 1);
+                return null;
+            }
+            case "forge.control.flow.enum_switch":
+            {
+                // The member the resolved set lists at index i is the value `case_(i+1)` stands for — the set's own
+                // declaration order is its compiled value basis, so no second table is consulted. A value that is
+                // absent (the port is nullable), unknown to the set, or past the authored case count leaves through
+                // `otherwise`, which is the last execution output; exactly one exit is entered, never two, and a
+                // value the set does not know is not an error the event is rejected for.
+                var otherwise = successors.Length - 1;
+                RuntimeJson.Require(otherwise >= 2, RuntimeAbiCodes.ControlShape, step.NodeId);
+                var schema = RuntimeJson.Text(RuntimeJson.Rows(step.Contract, "inputs").First(port => RuntimeJson.Text(port, "id") == "value"), "schema");
+                var value = inputs.TryGetProperty("value", out var raw) && raw.ValueKind == JsonValueKind.String ? raw.GetString() : null;
+                var exit = otherwise;
+                if (value != null)
+                {
+                    var members = RuntimeEnumSets.Members(schema);
+                    for (var index = 0; index < members.Count && index < otherwise; index++)
+                        if (string.Equals(members[index], value, StringComparison.Ordinal)) { exit = index; break; }
+                }
+                cursor = Successor(step, exit);
                 return null;
             }
             case "forge.control.flow.cancel":
@@ -254,12 +280,12 @@ public sealed partial class RuntimeKernel
         else stepFrames[frame.Step] = RuntimeJson.From(new { index = frame.Round });
     }
 
-    /// <summary>The rounds a `for_each` may run: the candidate count bounded by the input's own budget and by the
-    /// per-control iteration ceiling. A candidate set larger than the budget is refused rather than truncated —
-    /// the plan asked for all of them.</summary>
-    private int CandidateCount(JsonElement inputs, ResolvedStep step)
+    /// <summary>The rounds a `for_each`/`for_each_position` may run: the count of its own list input — candidates
+    /// or positions — bounded by the input's own budget and by the per-control iteration ceiling. A list larger
+    /// than the budget is refused rather than truncated: the plan asked for all of them.</summary>
+    private int CandidateCount(JsonElement inputs, ResolvedStep step, string port)
     {
-        var candidates = inputs.TryGetProperty("candidates", out var value) && value.ValueKind == JsonValueKind.Array ? value.GetArrayLength() : 0;
+        var candidates = inputs.TryGetProperty(port, out var value) && value.ValueKind == JsonValueKind.Array ? value.GetArrayLength() : 0;
         var budget = inputs.TryGetProperty("budget", out var limit) ? (int)RuntimeJson.Integer(limit, 0) : candidates;
         RuntimeJson.Require(budget <= Limits.MaxControlIterations, RuntimeAbiCodes.IterationBudget, step.NodeId);
         RuntimeJson.Require(candidates <= budget, RuntimeAbiCodes.IterationBudget, step.NodeId);

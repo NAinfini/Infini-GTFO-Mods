@@ -59,13 +59,21 @@ internal sealed class FactsWorld : IDisposable
             new Dictionary<string, Func<EntityReference, bool>> { [kind] = reference => Live.Contains(reference) }),
             RuntimeLogLevel.Off);
         Native = new Reads(this);
-        // The fixture publishes every row it drives: no plan is mounted here, so the subscription gate this
-        // observer asks is answered "subscribed" rather than standing a plan up behind every case.
+        // The fixture publishes every row it drives unless a case closes one: no plan is mounted here, so the
+        // subscription gate this observer asks is answered "subscribed" rather than standing a plan up behind
+        // every case. `Closed` lets one case close exactly one row's gate and watch what that row's publish point
+        // does — its local bookkeeping still has to run, and the event value must not be built.
         Reload = new ReloadObserver(Native, reference => Live.Contains(reference), () => WorldEpoch, () => Tick,
-            () => Authoritative, Publish, Reports.Add, Infos.Add, _ => false);
+            () => Authoritative, Publish, Reports.Add, Infos.Add, Unsubscribed);
         Inventory = new InventoryObserver(Native, owner => Reload.OpenFor(owner), () => WorldEpoch, () => Tick,
-            () => Authoritative, Publish, Reports.Add, Infos.Add, _ => false);
+            () => Authoritative, Publish, Reports.Add, Infos.Add, Unsubscribed);
     }
+
+    /// <summary>The rows a case has closed, so the observer's publish points take their no-subscriber path. Empty
+    /// by default: a case that names no binding behaves as if a plan subscribed to every row.</summary>
+    internal HashSet<string> Closed { get; } = new();
+
+    private bool Unsubscribed(string binding) => Closed.Contains(binding);
 
     internal IReadOnlyList<RuntimeEvent> Published => _published;
 

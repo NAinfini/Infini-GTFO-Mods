@@ -4,17 +4,15 @@
   "readOn": "2026-09-16",
   "gameBuild": "20403457",
   "profile": "r2modmanPlus-local/GTFO/profiles/Forge-MapEditor-QA/BepInEx",
-  "summary": "触发区的三个原生挂点：每 tick 的驱动、玩家/敌人位置与候选集的读取、以及 layer 13 的阻挡碰撞体。本文件只记录取证结论：哪些是本机可编译验证的成员、哪些来自 ni-triggerwall 的实测、哪些必须进游戏确认。",
+  "summary": "触发区的原生读取面：玩家/敌人位置与候选集的读取、以及 layer 13 的阻挡碰撞体。本文件只记录取证结论：哪些是本机可编译验证的成员、哪些来自 ni-triggerwall 的实测、哪些必须进游戏确认。判定本身不再挂任何原生钩子：它由内核的单一时钟（RuntimeLifecycleKind.TickAdvanced）按 0.1 秒节拍驱动，该节拍取自原生 LG_CollisionWorldEventTrigger.COLLISION_CHECK_INTERVAL（见 hooks 的 collision-check-interval）。",
   "hooks": [
     {
-      "id": "tick",
-      "type": "Player.PlayerInteraction",
-      "member": "FixedUpdate()",
-      "use": "HarmonyPostfix：本机自己的玩家每物理帧调用一次，作为 TriggerZoneSession.Tick() 的驱动（每内核 tick 去重一次，见 TriggerZoneHooks.Tick）。",
-      "il2cppWrapper": "编译通过：ForgeMap/tests/TriggerZoneFacts/TriggerZoneNative.csproj 对 QA profile 的 interop/Modules-ASM.dll 编译成功（dotnet build，Release，exit 0），证明该类型与成员在真程序集里存在且签名匹配。",
-      "precedent": "InfiniTweaks/InteractionFixes.cs:11 已用同一成员做 HarmonyPatch（同仓既有用法）。",
-      "hostClient": "每台机器自己的 PlayerInteraction 都在跑，所以 postfix 里必须先判 m_owner.IsLocallyOwned；非本机玩家直接 return，主机判定在 TriggerZoneModule.Tick 的 authority 守卫之后才发生。",
-      "risk": "与 GameRuntimeBridge.FixedTick 的先后顺序未定义（两者都是 FixedUpdate）。本 tick 用 kernel.CurrentTick 去重，因此最坏情况是判定晚一帧，不会重复判定。"
+      "id": "collision-check-interval",
+      "type": "LevelGeneration.LG_CollisionWorldEventTrigger",
+      "member": "public const float COLLISION_CHECK_INTERVAL = 0.1",
+      "use": "本包触发区判定节拍的唯一来源：每 0.1 秒判定一次，而不是每帧。",
+      "evidence": "dump.cs（build 20403457，SHA-256 BF657C0ED162E781DAB49D8C9299130F07186F59B73DAE7F28E598FD396DE1CC，本机 ForgeWeapon W1 证据目录）第 697077 行；同类型的 private float m_collisionCheckTimer（0x38，第 697075 行）、private bool m_playerWasInLastCheck（0x3C，第 697076 行）与 private void Update()（第 697094 行）表明该组件在 Update 里按这个常量计时重判自己的体积。",
+      "未证": "原生按 0.1 秒重判的是『玩家点是否在体积内』（m_playerWasInLastCheck），两次判定之间的穿越它同样看不到；本包的线段判定（TriggerZone.IntersectsSegment）是自己的补充，不是原生行为。"
     },
     {
       "id": "local-owner",
@@ -64,9 +62,10 @@
     }
   ],
   "notEvidence": [
-    "谁先跑（本 tick 与 GameRuntimeBridge.FixedTick）无保证，只能确定不会重复判定（kernel.CurrentTick 去重）。",
+    "谁先跑（本 tick 与 GameRuntimeBridge.FixedTick）不再是问题：判定直接观察 GameRuntimeBridge.FixedTick 推进后的 TickAdvanced，同一 tick 内只有一次判定；每台机器按自己测到的步长累计 0.1 秒节拍并保留余数，因此帧率不同的机器每秒判定次数一致；落后超过一整拍的步长只判定一次、欠下的拍不补跑（避免卡顿后突然连判）。",
     "裁定 112.4 的『trigger 行输入 zone + 参数 who』在模组内核不成立：RuntimePlan.cs:278 对 trigger 要求 inputs.Length == 0 && definitions.Length == 0；本切片改用包数据里的 zone.who 与事件 string 输出 zone。",
     "事件的按 zone 作用域（计划只挂到某一个 zone）目前只有 scope 字符串 gtfo.trigger_zone:<id>，没有 attachment kind 的匹配机制。",
-    "bot 是否算玩家、敌人是否真的不碰撞 layer 13、子弹是否被挡：均需进游戏确认。"
+    "bot 是否算玩家、敌人是否真的不碰撞 layer 13、子弹是否被挡：均需进游戏确认。",
+    "placement-bound：TriggerZoneModule.MaximumJudgedSpeed = 30 m/s（一拍 3 米，见 MaximumJudgedTravel）是把『被抬着走』与『被放过去』分开的界。它不是从构建里读出来的数值：dump 里没有任何移动速度常量（全文 const float 扫描只得滚动/爆炸/混合/连线速度），玩家与敌人的速度是序列化数据——PlayerLocomotion.m_lastMoveSpeed（0x1B8，656256）、EnemyLocomotion.m_maxMovementSpeed（0x1E0，663099）、玩家近战前冲 MWS_AttackLight.m_wantedNormalSpeed/m_wantedChargeSpeed（615376-615377，值来自 MeleeAttackData）——本机没有可离线读取的 GameData。30 m/s 是推断值（冲刺+增益、近战前冲、敌人冲锋都在个位数到十几 m/s，留一倍以上余量），必须进游戏实测复核；界以下的小距离瞬移仍会走线段判定。"
   ]
 }

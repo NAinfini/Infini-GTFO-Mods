@@ -37,6 +37,10 @@ internal sealed partial class MapPluginSession : IDisposable
     /// them and the blocking bodies of the level being played. It publishes through the map-object path the doors
     /// and terminals already use.</summary>
     internal TriggerZoneSession? TriggerZones { get; private set; }
+    /// <summary>The one registration on the kernel's own clock this package takes. It is held only while there is
+    /// work — an in-flight light fade, or a placed zone with a subscriber — so an idle session pays nothing per
+    /// frame. Every half that can produce work announces it through <see cref="MapClock.Wake"/>.</summary>
+    private MapClock? _clock;
     /// <summary>The alarm, scan and wave half's attachment: the five execute rows are static handlers, and this is
     /// the registration and kernel they mint and resolve their effect handles through.</summary>
     private AlarmWaveActions? _alarmWave;
@@ -115,6 +119,18 @@ internal sealed partial class MapPluginSession : IDisposable
             // exactly once is refused by name and left unjudged instead of being placed at a guessed world pose.
             session.TriggerZones = TriggerZoneSession.Start(kernel, session.MapObjects, () => SNet.IsMaster,
                 () => LevelIdentity.Read(log), room => TriggerZoneRoomResolver.Lookup(kernel.WorldEpoch, room), report, log);
+            // The one clock. The zone half is asked for its own work every time the clock looks; the light table has
+            // no way to be asked — a schedule is announced from inside the command handler that makes it, which runs
+            // in a dispatch rather than in a stage that could call this half — so it announces itself through the
+            // hook below. Both jobs share the one registration, which is taken by the first of them to have work.
+            session._clock = new MapClock(session.MapObjects.Registration,
+                () => session.TriggerZones?.Refresh(),
+                () => session.TriggerZones?.Pending ?? false,
+                () => session.TriggerZones?.Tick(),
+                () => LightColorFades.Count > 0,
+                seconds => LightColorFades.Tick(kernel.WorldEpoch, seconds),
+                () => UnityEngine.Time.deltaTime);
+            LightColorFades.WorkScheduled = session._clock.Wake;
             // The five alarm/scan/wave rows are static handlers that mint and resolve their handles through the
             // kernel, so this is the one line that hands them their registration; it runs on the thread the kernel
             // was built on, which is the thread every half of this session is created on.
@@ -610,7 +626,7 @@ internal sealed partial class MapPluginSession : IDisposable
         var module = LevelEvents;
         if (_disposed || _faulted || module == null) return;
         if (_kernel.StartupState is RuntimeStartupState.Failed or RuntimeStartupState.Stopped) return;
-        try { callback(module); }
+        try { callback(module); _clock?.Wake(); }
         catch (Exception error)
         {
             _faulted = true;
@@ -633,7 +649,7 @@ internal sealed partial class MapPluginSession : IDisposable
         CheckThread();
         ArgumentNullException.ThrowIfNull(callback);
         if (_disposed || _faulted || _kernel.StartupState is RuntimeStartupState.Failed or RuntimeStartupState.Stopped) return;
-        try { callback(Module); }
+        try { callback(Module); _clock?.Wake(); }
         catch (Exception error)
         {
             _faulted = true;
@@ -723,8 +739,13 @@ internal sealed partial class MapPluginSession : IDisposable
         // before native detours or session flags can be changed.
         var errors = new List<Exception>();
         DetachHalves(errors);
-        // The light transitions this session scheduled are frames of this session's world: a patch that still runs
-        // for one frame after teardown must find nothing to write into.
+        // The clock is given back before the registration it hangs on, so no callback of this session's world is
+        // left to run against a disposed provider. The light transitions this session scheduled are frames of this
+        // session's world: a clock that somehow still ran for one frame after teardown must find nothing to write
+        // into, and the table's own announcement must not reach a wake of the next session's clock.
+        _clock?.Dispose();
+        _clock = null;
+        LightColorFades.WorkScheduled = null;
         LightColorFades.Clear();
         MapObjects?.Dispose();
         Module.Dispose();
