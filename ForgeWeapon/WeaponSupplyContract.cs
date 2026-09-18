@@ -18,11 +18,6 @@ namespace ForgeWeapon;
 /// absolute round count is converted against the pool's own cap read before the call and the landing is read back
 /// after it. Evidence: `evidence/weapon-supply.json`.
 ///
-/// <b>The two ports the native path cannot carry</b> stay declared and are refused by name rather than dropped:
-/// `cap` (every pool already has the game's own cap, and honouring a second one would be a Forge-side bound the
-/// game does not enforce) and `provenance` (the gift carries no source field). Both are optional so a plan that
-/// does not ask for them still loads, exactly as the mark row treats its unanswerable ports.
-///
 /// <b>What the consume row cannot do from the host.</b> The gift body clamps only at the pool's cap
 /// (`InventorySlotAmmo.AddAmmo` is `Min(AmmoInPack + amount, AmmoMaxCap)`), so a negative amount could drive a
 /// pool below zero; the body that does clamp both ends is `PlayerAmmoStorage.UpdateBulletsInPack(AmmoType, int)`,
@@ -55,12 +50,11 @@ public static class WeaponSupplyContract
         "standard", "special", "class", "resource_pack_rel", "none", "current_consumable"
     });
 
-    /// <summary>The two structural policies, spelled as the catalog spells them. Only the members the native path
-    /// can honour are listed for what the handler accepts; the rest are refused by name with the row's own code.
-    /// </summary>
+    /// <summary>The two overflow policies the native path can actually honour: clamp through the game's own
+    /// pool cap, or reject before the write when the requested amount would overflow.</summary>
     public static readonly IReadOnlyList<string> OverflowPolicies = Array.AsReadOnly(new[]
     {
-        "discard", "clamp", "reject"
+        "clamp", "reject"
     });
 
     public static readonly IReadOnlyList<string> FailurePolicies = Array.AsReadOnly(new[]
@@ -71,14 +65,13 @@ public static class WeaponSupplyContract
     /// <summary>The two handler shapes, resolved at registration against each row's own ports: the single
     /// recipient the row names, the amount it asks for, and the result it answers with.</summary>
     public static readonly HandlerShape AddShape = new HandlerShape()
-        .Inputs("player", "amount", "cap", "provenance").Outputs("result").Parameters("ammo_type", "overflow_policy");
+        .Inputs("player", "amount").Outputs("result").Parameters("ammo_type", "overflow_policy");
     public static readonly HandlerShape ConsumeShape = new HandlerShape()
         .Inputs("player", "amount").Outputs("result").Parameters("ammo_type", "failure_policy");
 
-    /// <summary>The two catalog rows. `cap` and `provenance` (add) are the ports this provider declares and
-    /// refuses: a required port is a port a plan must wire, so marking them required would make every step
-    /// unloadable. The consume row declares no transaction port: the native removal is one packet-sending call
-    /// with no transaction to join, so the handle kind has no member and the port has nothing to carry.</summary>
+    /// <summary>The two catalog rows expose only native-backed ports. The consume row declares no transaction
+    /// port: the native removal is one packet-sending call with no transaction to join, so the handle kind has no
+    /// member and the port has nothing to carry.</summary>
     public const string AmmoAddRowDocument = """
     {
       "id": "forge.action.weapon.ammo_add",
@@ -93,9 +86,7 @@ public static class WeaponSupplyContract
         "inputs": [
           { "id": "in", "type": "execution" },
           { "entityKinds": ["gtfo.player"], "id": "player", "type": "entity" },
-          { "id": "amount", "type": "integer" },
-          { "id": "cap", "type": "integer", "optional": true },
-          { "id": "provenance", "type": "string", "optional": true }
+          { "id": "amount", "type": "integer" }
         ],
         "outputs": [
           { "id": "next", "type": "execution" },
@@ -112,7 +103,7 @@ public static class WeaponSupplyContract
           { "id": "ammo_type", "type": "enum", "role": "structural", "required": true,
             "values": ["standard", "special", "class", "resource_pack_rel", "current_consumable"] },
           { "id": "overflow_policy", "type": "enum", "role": "structural", "required": true,
-            "values": ["discard", "clamp", "reject"] }
+            "values": ["clamp", "reject"] }
         ],
         "recipients": { "input": "player", "target": "entity", "cardinality": "one",
           "requires": ["ammo.pool"], "result": "result" }

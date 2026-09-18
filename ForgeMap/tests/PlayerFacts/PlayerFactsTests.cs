@@ -214,45 +214,18 @@ public sealed class PlayerFactsTests
     // ---- value rows --------------------------------------------------------------------------------------
 
     [Fact]
-    public void downed_answers_the_life_state_it_was_given()
-    {
-        Require(PlayerValueReads.AnswerDowned(Snapshot(lifeState: "downed")).GetProperty("value").GetBoolean(), "A downed life read as standing.");
-        Require(!PlayerValueReads.AnswerDowned(Snapshot(lifeState: "alive")).GetProperty("value").GetBoolean(), "An upright life read as downed.");
-        var dead = PlayerValueReads.AnswerDowned(Snapshot(lifeState: "dead"));
-        Require(!dead.GetProperty("alive").GetBoolean(), "A dead life read as alive.");
-    }
-
-    [Fact]
-    public void position_answers_three_coordinates_or_refuses()
-    {
-        var payload = PlayerValueReads.AnswerPosition(Snapshot());
-        Require(payload.GetProperty("position").EnumerateArray().Select(value => value.GetDouble()).SequenceEqual(new double[] { 1, 2, 3 }),
-            "The position port differs.");
-    }
-
-    [Fact]
     public void the_native_answered_values_carry_their_refusal_codes_through()
     {
         using var world = new PlayerFactsWorld();
         var life = world.Spawn();
         world.Values.Infection = 0.35;
         world.Values.Wielded = life.Reference;
-        world.Values.Ammo = new PlayerAmmo(3, 12, 44);
         world.Values.Carried = life.Reference;
 
         Require(Math.Abs(PlayerValueReads.AnswerInfection(world.Values, life.Reference, Snapshot()).GetProperty("value").GetDouble() - 0.35) < 0.0001,
             "The infection value differs.");
         Require(PlayerValueReads.AnswerWieldedGear(world.Values, life.Reference, Snapshot()).GetProperty("equipment").GetProperty("id").GetString()
             == life.Reference.Id, "The wielded gear entity differs.");
-        var ammo = PlayerValueReads.AnswerAmmo(world.Values, life.Reference, Snapshot());
-        Require(ammo.GetProperty("clip").GetInt32() == 3 && ammo.GetProperty("clip_max").GetInt32() == 12 && ammo.GetProperty("reserve").GetInt32() == 44,
-            "The ammunition ports differ.");
-
-        world.Values.AmmoReadable = false;
-        Require(Refusal(() => PlayerValueReads.AnswerAmmo(world.Values, life.Reference, Snapshot())) == "no-wielded-gear",
-            "An unreadable clip was answered.");
-        Require(Refusal(() => PlayerValueReads.AnswerAmmo(null, life.Reference, Snapshot())) == PlayerValueReads.SourceUnavailableCode,
-            "A missing source was answered.");
     }
 
     [Fact]

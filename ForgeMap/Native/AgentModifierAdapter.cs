@@ -8,9 +8,10 @@ using ForgeRuntime.Framework;
 
 namespace ForgeMap.Native;
 
-/// <summary>The two `forge.action.combat.attribute_*` handlers for `gtfo.player` and the
-/// `forge.action.player.movement_profile` preset that writes the same table: native modifications written per
-/// recipient through `AgentModifierManager.AddSyncedModifierValue`, and the revoke that names what was written.
+/// <summary>The sourced attribute apply handler, the canonical `forge.action.effect.cancel` handler for its effect
+/// handles, and the `forge.action.player.movement_profile` preset that writes the same table: native modifications
+/// written per recipient through `AgentModifierManager.AddSyncedModifierValue`, then released through the kernel's
+/// one handle-cancellation path.
 /// The provider owns the `AgentModifier` table, so this adapter is the one place that writes it and the one place
 /// that keeps the modification ids it must later release. One movement preset is two members of that table under
 /// one effect handle, never a second write path beside this one.
@@ -25,8 +26,8 @@ namespace ForgeMap.Native;
 /// The id, not the handle, is what the native clear takes, so the ledger is the provider's own: modification id →
 /// the life it was written on, the attribute member, the submission and the tick it expires at. The handle a
 /// command's modifications are filed under is the kernel's own effect handle — the step's `effect` block is what
-/// gave it a duration and a cancellation — so `attribute_remove` can be asked for exactly what an
-/// `attribute_apply` handed out, and the kernel calls `RestoreApply` back when that effect ends.
+/// gives it duration and cancellation — so canonical `effect.cancel` addresses exactly what `attribute_apply`
+/// handed out, and the kernel calls `RestoreApply` when that effect ends.
 ///
 /// Three properties of the native path are recorded rather than assumed, and all three are the game-internal
 /// confirmation items `ForgeMap/evidence/agent-modifier-hooks.json` lists: which side of `AddSyncedModifierValue`
@@ -58,10 +59,6 @@ internal sealed class AgentModifierAdapter : IDisposable
     internal const string NoOpAttributeCode = "attribute-no-op";
     internal const string OperationCode = "operation-unsupported";
     internal const string AmountCode = "amount-out-of-range";
-    /// <summary>The movement preset's own refusal: `jump_gravity` has no member in the native modification table,
-    /// so a request that carries it cannot be served as asked and is refused by name rather than served without
-    /// it.</summary>
-    internal const string GravityCode = "jump-gravity-unsupported";
     /// <summary>The movement preset's own `duration` port: the preset is not a rule an `effect` block times, so it
     /// keeps the port and the tick pass that releases what came due.</summary>
     internal const string DurationCode = "duration-out-of-range";
@@ -74,7 +71,6 @@ internal sealed class AgentModifierAdapter : IDisposable
     internal const string AfterUnknownCode = "not-attempted-after-unknown-commit";
     internal const string HandleMissingCode = "modifier-handle-missing";
     internal const string HandleStaleCode = "stale-handle";
-    internal const string AttributeMismatchCode = "modifier-attribute-mismatch";
     internal const string AllRejectedCode = "attribute-all-rejected";
     internal const string AllUnknownCode = "attribute-all-unknown";
     private const string CommittedCode = "committed";
@@ -86,15 +82,9 @@ internal sealed class AgentModifierAdapter : IDisposable
     {
         AuthorityCode, KindCode, StaleCode, AttributeCode, NoOpAttributeCode, OperationCode, AmountCode,
         DurationCode, TargetsCode, WriteBudgetCode, HandleBudgetCode, IdExhaustedCode, CommitExceptionCode,
-        ClearExceptionCode, AfterUnknownCode, HandleMissingCode, HandleStaleCode, AttributeMismatchCode,
-        AllRejectedCode, AllUnknownCode, GravityCode
+        ClearExceptionCode, AfterUnknownCode, HandleMissingCode, HandleStaleCode,
+        AllRejectedCode, AllUnknownCode
     };
-
-    /// <summary>The attribute a movement preset's group answers with. A preset is two native modifiers, so a
-    /// `remove` narrowed to one `agent_modifier` member never covers it — the name is deliberately outside the
-    /// table those requests are validated against, and the whole preset is released by an unnarrowed remove, by
-    /// the tick its own `duration` port expires at, or by the world's end.</summary>
-    private const string ProfileAttribute = "movement-profile";
 
     /// <summary>One row of the apply result, in the canonical row's own columns: the four fixed columns first,
     /// then this row's `amount` and the command's `target_count`. `amount` is the signed contribution the entry
@@ -112,11 +102,14 @@ internal sealed class AgentModifierAdapter : IDisposable
         [property: JsonPropertyName("speed")] double Speed,
         [property: JsonPropertyName("target_count")] int TargetCount);
 
-    /// <summary>One row of the remove result: the same fixed columns, the life the modification belonged to as
-    /// `target`, and the number of modifications the request named.</summary>
-    internal sealed record RemoveRow(EntityReference Target, string Status,
+    /// <summary>One row of the canonical effect-cancel result: fixed result columns plus the target count for the
+    /// entities whose native modifier state the addressed effect covered.</summary>
+    internal sealed record CancelRow(EntityReference Target, string Status,
         [property: JsonPropertyName("committed")] string CommitState, string Code,
         [property: JsonPropertyName("target_count")] int TargetCount);
+
+    private static readonly JsonElement CancelHandlesPort = AgentModifierContract.CancelCapability.GetProperty("graph")
+        .GetProperty("inputs").EnumerateArray().Single(port => port.GetProperty("id").GetString() == "handles").Clone();
 
     /// <summary>The kernel's own identity of a handle value: the world, the generation, the pool slot and the
     /// creating provider. It is read so a request handle can be matched against the one the kernel cast, which is
@@ -166,7 +159,6 @@ internal sealed class AgentModifierAdapter : IDisposable
     private sealed class Group
     {
         internal HandleKey Key;
-        internal string Attribute = "";
         internal readonly List<uint> Ids = new();
     }
 
@@ -179,7 +171,6 @@ internal sealed class AgentModifierAdapter : IDisposable
     private readonly List<uint> _due = new();
     private readonly List<uint> _pending = new();
     private readonly List<EntityReference> _lost = new();
-    private readonly List<Group> _resolved = new();
     private RuntimeLifecycleSubscription? _lifecycle;
     private long _writeTick = -1;
     private int _writesThisTick;
@@ -197,9 +188,9 @@ internal sealed class AgentModifierAdapter : IDisposable
     internal static CommandResult ApplyHandler(CommandContext context)
         => Current is { } adapter ? adapter.Apply(context) : CommandResult.Rejected(AuthorityCode);
 
-    /// <summary>The `attribute_remove` entry point the registration's handler table holds.</summary>
-    internal static CommandResult RemoveHandler(CommandContext context)
-        => Current is { } adapter ? adapter.Remove(context) : CommandResult.Rejected(AuthorityCode);
+    /// <summary>The canonical `forge.action.effect.cancel` entry point held by the registration.</summary>
+    internal static CommandResult CancelHandler(CommandContext context)
+        => Current is { } adapter ? adapter.Cancel(context) : CommandResult.Rejected(AuthorityCode);
 
     /// <summary>The `forge.action.player.movement_profile` entry point the registration's handler table holds. The
     /// preset writes the same native table the two sourced-modifier rows above write, so it is the same adapter
@@ -209,9 +200,8 @@ internal sealed class AgentModifierAdapter : IDisposable
 
     /// <summary>The `attribute_apply` row's own restore callback, which the kernel calls when the effect its card
     /// asked for ends — by its duration, by a cancellation, by a released plan or by the world. What ends is every
-    /// modification that command filed under that handle, and a handle the module has already released through its
-    /// own removal action is the no-op it has to be: the kernel keeps the instance until its duration runs out, and
-    /// a restore that found nothing to undo is not a failure.</summary>
+    /// modification that command filed under that handle; the kernel owns that one cancellation path, so a repeated
+    /// restore after the group is already gone is the no-op it has to be.</summary>
     internal static void RestoreApply(RuntimeEffectContext context)
     {
         if (Current is not { } adapter || !HandleKey.TryRead(context.Handle, out var key)) return;
@@ -339,7 +329,7 @@ internal sealed class AgentModifierAdapter : IDisposable
         JsonElement outputs = RuntimeJson.From(new { results = rows });
         if (named && written.Count != 0)
         {
-            var group = new Group { Key = key, Attribute = attribute! };
+            var group = new Group { Key = key };
             foreach (var entry in written) group.Ids.Add(entry.Id);
             _groups.Add(key, group);
         }
@@ -350,8 +340,7 @@ internal sealed class AgentModifierAdapter : IDisposable
     /// movement are written as one preset under one effect handle, because a command that set only half a profile
     /// is not the state the plan asked for: both amounts and the lifetime are checked once, before the first
     /// recipient, the handle is minted before the first write, and a recipient whose second write the native entry
-    /// refuses has its first one revoked through the same clear the expiry path uses. `jump_gravity` is refused by
-    /// name before any of that, because the table has no member for it.</summary>
+    /// refuses has its first one revoked through the same clear the expiry path uses.</summary>
     internal CommandResult Profile(CommandContext context)
     {
         CheckThread();
@@ -362,9 +351,6 @@ internal sealed class AgentModifierAdapter : IDisposable
         // `source` carries no faction or targeting restriction on this row either; it is still a required,
         // kernel-validated entity reference.
         _ = context.GetEntityInput("source");
-        if (context.Inputs.TryGetProperty("jump_gravity", out var gravity)
-            && gravity.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
-            return CommandResult.Rejected(GravityCode);
         if (!Multiplier(context, "speed", out double speed)
             || !Multiplier(context, "acceleration", out double acceleration))
             return CommandResult.Rejected(AmountCode);
@@ -465,76 +451,91 @@ internal sealed class AgentModifierAdapter : IDisposable
             : RuntimeJson.From(new { results = rows, profile_handle = handle });
         if (written.Count != 0)
         {
-            var group = new Group { Key = key, Attribute = ProfileAttribute };
+            var group = new Group { Key = key };
             foreach (var entry in written) group.Ids.Add(entry.Id);
             _groups.Add(key, group);
         }
         return Aggregate(committed, rejected, unknown, rows.Select(row => row.Code).ToArray(), outputs);
     }
 
-    /// <summary>The `forge.action.combat.attribute_remove` handler: the immediate removal, which ends what an
-    /// apply handed out right here instead of waiting for the effect's own clock. The request names the handles —
-    /// the effect handle collection, optionally narrowed to one attribute — and every modification the handles
-    /// cover is released through the same native clear the restore and the expiry paths use. A request that names
-    /// a handle this provider no longer holds, or an attribute one of them was not written under, is refused as a
-    /// whole before anything is cleared.
-    ///
-    /// The kernel's effect instance is not ended here: it belongs to the plan's own card and its `cancel` handle,
-    /// and it stays until its duration runs out or its handle is cancelled. By then the group is gone, so the
-    /// restore callback this adapter answers is the no-op an already-undone effect has to be.</summary>
-    internal CommandResult Remove(CommandContext context)
+    /// <summary>The canonical `forge.action.effect.cancel` handler. It accepts only kernel effect handles.
+    /// The kernel validates kind, lifetime and provider ownership, spends each handle exactly once, and invokes
+    /// <see cref="RestoreApply"/> to release the native modifier group. No attribute filter or second remove
+    /// protocol exists beside that handle identity.</summary>
+    internal CommandResult Cancel(CommandContext context)
     {
         CheckThread();
         if (PlayerIdentityModule.Current is not { } players || !players.CanCommit)
             return CommandResult.Rejected(AuthorityCode);
-        var attribute = context.Inputs.TryGetProperty("attribute", out var attributeValue)
-            && attributeValue.ValueKind == JsonValueKind.String ? attributeValue.GetString() : null;
-        if (attribute != null && !AgentModifierValues.TryParse(attribute, out _))
-            return CommandResult.Rejected(AttributeCode);
-        if (!context.Inputs.TryGetProperty("modifiers", out var modifiers)
-            || modifiers.ValueKind != JsonValueKind.Array || modifiers.GetArrayLength() == 0)
+        if (!context.Inputs.TryGetProperty("handles", out var handles)
+            || handles.ValueKind != JsonValueKind.Array || handles.GetArrayLength() == 0)
             return CommandResult.Rejected(HandleMissingCode);
+        if (handles.GetArrayLength() > CommandResult.MaximumFacts)
+            return CommandResult.Rejected(TargetsCode);
 
-        _resolved.Clear();
-        foreach (var value in modifiers.EnumerateArray())
+        var work = new List<(JsonElement Handle, HandleKey Key, EntityReference[] Targets)>();
+        var seen = new HashSet<HandleKey>();
+        var allTargets = new List<EntityReference>();
+        foreach (var value in handles.EnumerateArray())
         {
             if (!HandleKey.TryRead(value, out var key) || !_groups.TryGetValue(key, out var group))
                 return CommandResult.Rejected(HandleStaleCode);
-            if (attribute != null && attribute != group.Attribute) return CommandResult.Rejected(AttributeMismatchCode);
-            if (!_resolved.Contains(group)) _resolved.Add(group);
+            if (!seen.Add(key)) continue;
+            var targets = group.Ids
+                .Where(id => _entries.ContainsKey(id))
+                .Select(id => _entries[id].Target)
+                .Distinct()
+                .ToArray();
+            foreach (var target in targets) if (!allTargets.Contains(target)) allTargets.Add(target);
+            work.Add((value.Clone(), key, targets));
         }
-        _pending.Clear();
-        foreach (var group in _resolved)
-            foreach (var id in group.Ids)
-                if (_entries.ContainsKey(id) && !_pending.Contains(id)) _pending.Add(id);
-        if (_pending.Count > CommandResult.MaximumFacts) return CommandResult.Rejected(TargetsCode);
+        if (allTargets.Count > CommandResult.MaximumFacts)
+            return CommandResult.Rejected(TargetsCode);
 
-        var rows = new List<RemoveRow>(_pending.Count);
-        int removed = 0, rejected = 0, unknown = 0;
-        bool stopClearing = false;
-        foreach (var id in _pending)
+        var rows = new List<CancelRow>(allTargets.Count);
+        var codes = new List<string>(work.Count);
+        int cancelled = 0, rejected = 0, unknown = 0;
+        bool stop = false;
+        foreach (var item in work)
         {
-            if (!_entries.TryGetValue(id, out var entry)) continue;
-            RemoveRow Row(string status, string state, string code)
-                => new(entry.Target, status, state, code, _pending.Count);
-
-            if (stopClearing) { rows.Add(Row("rejected", CommitStates.None, AfterUnknownCode)); rejected++; continue; }
-            if (!players.CanCommit) { rows.Add(Row("rejected", CommitStates.None, AuthorityCode)); rejected++; continue; }
-            try { AgentModifierManager.ClearSyncedModifierChange(id); }
-            catch (Exception error)
+            string status, state, code;
+            if (stop)
             {
-                unknown++;
-                stopClearing = true;
-                _report("map.attribute-remove-clear-exception: " + error.GetType().Name);
-                rows.Add(Row("unknown", CommitStates.Unknown, ClearExceptionCode));
-                continue;
+                status = "rejected"; state = CommitStates.None; code = AfterUnknownCode; rejected++;
             }
-            Forget(entry);
-            rows.Add(Row("succeeded", CommitStates.Confirmed, CommittedCode));
-            removed++;
+            else if (!players.CanCommit)
+            {
+                status = "rejected"; state = CommitStates.None; code = AuthorityCode; rejected++;
+            }
+            else
+            {
+                try
+                {
+                    var ended = _registration.CancelHandle(item.Handle, CancelHandlesPort, "forge.action.effect.cancel");
+                    if (ended == 0)
+                    {
+                        status = "rejected"; state = CommitStates.None; code = HandleStaleCode; rejected++;
+                    }
+                    else if (_groups.ContainsKey(item.Key))
+                    {
+                        status = "unknown"; state = CommitStates.Unknown; code = ClearExceptionCode; unknown++; stop = true;
+                    }
+                    else
+                    {
+                        status = "succeeded"; state = CommitStates.Confirmed; code = CommittedCode; cancelled += ended;
+                    }
+                }
+                catch (RuntimeContractException error)
+                {
+                    status = "rejected"; state = CommitStates.None; code = error.Code; rejected++;
+                }
+            }
+            codes.Add(code);
+            foreach (var target in item.Targets)
+                rows.Add(new CancelRow(target, status, state, code, allTargets.Count));
         }
-        var outputs = RuntimeJson.From(new { results = rows });
-        return Aggregate(removed, rejected, unknown, rows.Select(row => row.Code).ToArray(), outputs);
+        var outputs = RuntimeJson.From(new { results = rows, cancelled });
+        return Aggregate(cancelled, rejected, unknown, codes.ToArray(), outputs);
     }
 
     /// <summary>The world-change and per-tick half. A world change clears everything the previous world's ledger
@@ -695,7 +696,7 @@ internal sealed class AgentModifierAdapter : IDisposable
         => reference.Id != null && reference.Id.StartsWith(kind + ":", StringComparison.Ordinal);
 
     /// <summary>The two native writes one movement preset is: the speed and the acceleration multiplier, in the
-    /// order the row names them. The table carries no third member for the row's `jump_gravity` input.</summary>
+    /// order the row names them.</summary>
     private static (AgentModifier Modifier, double Amount)[] Preset(double speed, double acceleration)
         => new[] { (AgentModifier.MovementSpeed, speed), (AgentModifier.MovementAcceleration, acceleration) };
 

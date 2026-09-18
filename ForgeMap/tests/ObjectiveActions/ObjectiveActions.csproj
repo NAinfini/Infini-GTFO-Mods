@@ -19,9 +19,9 @@
     <!-- The contract under test, compiled here rather than referenced from the package: a focused test must build
          and run on its own while other batches hold their packages mid-flight, and the only member of the
          provider declaration this slice's contract names is the provider id, which the doubles supply. -->
-    <Compile Include="../../../ForgeMap/ObjectiveActionContract.cs" />
-    <Compile Include="../../Native/MapActionOutcome.cs;../../Native/ObjectiveActions.cs;../../Native/ObjectiveActionHandler.cs" />
-    <Compile Include="AssemblyAttributes.cs;Contexts.cs;ObjectiveActionsTests.cs;SyntheticWorld.cs;GameDoubles.cs" />
+    <Compile Include="../../../ForgeMap/ObjectiveActionContract.cs;../../../ForgeMap/SessionActionContract.cs" />
+    <Compile Include="../../Native/MapActionOutcome.cs;../../Native/ObjectiveActions.cs;../../Native/ObjectiveActionHandler.cs;../../Native/SessionActions.cs" />
+    <Compile Include="AssemblyAttributes.cs;Contexts.cs;ObjectiveActionsTests.cs;CheckpointSaveTests.cs;SyntheticWorld.cs;GameDoubles.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

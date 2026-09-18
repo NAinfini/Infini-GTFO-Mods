@@ -72,6 +72,7 @@ public static class ModuleRegistration
         // terminal-active rows fold into. The alarm switch the retired `door_alarm` folded into was deleted by
         // the rulings: a door's alarm is the scan row's own instance kind.
         .Concat(MapStateContract.CapabilityRows())
+        .Concat(SessionActionContract.CapabilityRows())
         .ToArray();
 
     /// <summary>Every capability row of the registration, in the order the contracts declare them: the terminal
@@ -130,6 +131,7 @@ public static class ModuleRegistration
         .Concat(InteractionTextContract.BindingRows())
         .Concat(TerminalContentContract.BindingRows())
         .Concat(MapStateContract.BindingRows())
+        .Concat(SessionActionContract.BindingRows())
         // generic-player: one binding per row above, in the same order.
         .Concat(new object[] { CombatImpulseContract.BindingRow() })
         .Concat(new object[] { PlayerStaminaContract.BindingRow() })
@@ -169,6 +171,7 @@ public static class ModuleRegistration
         .Concat(InteractionTextContract.Supports())
         .Concat(TerminalContentContract.Supports())
         .Concat(MapStateContract.Supports())
+        .Concat(SessionActionContract.Supports())
         // generic-player: one support row per binding above, in the same order.
         .Concat(new[] { CombatImpulseContract.Support() })
         .Concat(new[] { PlayerStaminaContract.Support() })
@@ -218,6 +221,7 @@ public static class ModuleRegistration
         foreach (var (name, shape) in InteractionTextContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in TerminalContentContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in MapStateContract.Shapes()) shapes[name] = shape;
+        foreach (var (name, shape) in SessionActionContract.Shapes()) shapes[name] = shape;
         // generic-player: the batch's port layouts, read from the same contracts their rows come from.
         foreach (var (name, shape) in CombatImpulseContract.Shapes()) shapes[name] = shape;
         foreach (var (name, shape) in PlayerStaminaContract.Shapes()) shapes[name] = shape;

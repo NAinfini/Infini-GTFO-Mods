@@ -23,7 +23,7 @@ internal static class Contexts
         .GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, new[]
         {
             typeof(RuntimeEvent), typeof(long), typeof(string), typeof(string), typeof(string), typeof(string),
-            typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool)
+            typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool), typeof(Func<EntityReference, object?>)
         }, null) ?? throw new InvalidOperationException("CommandContext's own constructor was not found.");
 
     private static readonly MethodInfo ResolveEnumParameters = typeof(RuntimeJson)
@@ -39,7 +39,7 @@ internal static class Contexts
         return (CommandContext)Constructor.Invoke(new object?[]
         {
             origin, 0L, "test.command", "test.plan", "author.resource", "revision-1", "A_action",
-            Resolve(capabilityId, parameters), Bag(inputs), isHost
+            Resolve(capabilityId, parameters), Bag(inputs), isHost, new Func<EntityReference, object?>(_ => null)
         })!;
     }
 
@@ -72,5 +72,9 @@ internal static class Contexts
 
     /// <summary>The capability row itself, exactly what a registration declares it as.</summary>
     internal static JsonElement Row(string capabilityId)
-        => RuntimeJson.From(ObjectiveActionContract.Graphs[capabilityId]);
+    {
+        if (capabilityId == SessionActionContract.CheckpointSaveCapability)
+            return RuntimeJson.From(SessionActionContract.CapabilityRows()[0]);
+        return RuntimeJson.From(ObjectiveActionContract.Graphs[capabilityId]);
+    }
 }

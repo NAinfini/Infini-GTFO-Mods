@@ -97,23 +97,6 @@ internal sealed class NativePlayerValues : IPlayerValueSource
         return true;
     }
 
-    public bool TryAmmo(EntityReference reference, out PlayerAmmo ammo, out string code)
-    {
-        ammo = default;
-        if (!TryWieldedItem(reference, out var item, out code)) return false;
-        if (item == null) { code = NoWieldedGearCode; return false; }
-        if (Agent(reference, out var agent, out code) is false) return false;
-        try
-        {
-            int clip = item.GetCurrentClip(), maximum = item.GetMaxClip(), reserve = item.GetClassAmmoInPackAbs(agent!.Owner);
-            if (clip < 0 || maximum <= 0 || clip > maximum || reserve < 0) { code = ReadbackCode; return false; }
-            ammo = new PlayerAmmo(clip, maximum, reserve);
-        }
-        catch (Exception) { code = ReadbackCode; return false; }
-        code = "";
-        return true;
-    }
-
     public bool TryCarriedItem(EntityReference reference, out EntityReference? item, out string code)
     {
         item = null;

@@ -45,14 +45,13 @@ static int Export(string releasePath, string outputPath)
         ?? throw new InvalidDataException("release.json declares no player package with provider id " + HostIdentity.ProviderId + ".");
     string gameBuild = ReadGameBuild(releasePath);
     var kernel = new RuntimeKernel(new RuntimeIdentity(host.ProviderId!, host.Version, RuntimeKernel.ApiVersion, gameBuild));
-    // The host reaches these three through the SDK-internal RegisterBuiltinModule, which differs from this call
-    // only in the log level it hands over; no manifest row depends on that level. The Trigger contract registers
-    // before the packages below, because their bindings name the capability rows it owns.
+    // Replay the same Runtime-owned built-ins that GameRuntimeBridge registers in game. The configured log
+    // level differs here, but no manifest row depends on that level.
     kernel.RegisterModule(CombatContracts.Module(), RuntimeLogLevel.Off);
     kernel.RegisterModule(ControlContracts.Module(), RuntimeLogLevel.Off);
+    kernel.RegisterModule(VariableContracts.Module(), RuntimeLogLevel.Off);
+    // Trigger/observation must still precede domain packages whose bindings name those rows.
     kernel.RegisterModule(TriggerContracts.Module(), RuntimeLogLevel.Off);
-    // The kernel's own read of any entity a plan holds; like the two contracts above it is registered before the
-    // packages, so a manifest row of it is present for a plan that pins it.
     kernel.RegisterModule(ObservationContracts.Module(), RuntimeLogLevel.Off);
     RuntimeModule? map = null;    foreach (var package in players)
     {
@@ -79,7 +78,8 @@ static int Export(string releasePath, string outputPath)
                         ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.RecoilHandler),
                         ExportOnlyHandler(ForgeWeapon.WeaponOverrideContract.PropertyHandler)),
                     inventoryGive: ExportOnlyHandler(ForgeWeapon.InventoryActionContract.GiveHandler),
-                    inventoryConsume: ExportOnlyHandler(ForgeWeapon.InventoryActionContract.ConsumeHandler)),
+                    inventoryConsume: ExportOnlyHandler(ForgeWeapon.InventoryActionContract.ConsumeHandler),
+                    projectileLaunch: ExportOnlyHandler(ForgeWeapon.CombatPrimitiveContract.ProjectileLaunchHandler)),
                     RuntimeLogLevel.Off);
                 // The holder tier is a second provider inside this same package, so the running registry carries
                 // it and the manifest has to as well. Its session resolver and its two bodies belong to the

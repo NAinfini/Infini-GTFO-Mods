@@ -13,10 +13,8 @@ namespace ForgeMap;
 /// command mints one `effect`/`entity_life` handle for the pair of writes it made per recipient, so a later
 /// remove or cancel holds the whole preset.
 ///
-/// `jump_gravity` has no native member: the modification table carries no jump or gravity attribute, and a direct
-/// field write on `PlayerLocomotion` would not replicate. The port therefore stays declared — a plan that wires it
-/// must reach the handler to be refused by name — and is marked optional, which is the only shape in which a row
-/// whose native path cannot carry one of its inputs is still a row a plan can use.</summary>
+/// The contract exposes only the native movement modifiers this build can actually carry: movement speed and
+/// acceleration, plus the requested duration. Unsupported jump/gravity tuning is not advertised as a callable port.</summary>
 public static class MovementProfileContract
 {
     public const string CapabilityId = "forge.action.player.movement_profile";
@@ -33,15 +31,14 @@ public static class MovementProfileContract
     public const string BindingId = ModuleDefinition.ProviderId + ".binding.player.movement_profile";
 
     /// <summary>The one shape of the handler, resolved once at registration against the capability: the recipient
-    /// collection, the required source reference, the two modifiers the native table carries, the input it cannot
-    /// carry and the requested lifetime. The native half reads this shape rather than describing a second
-    /// one.</summary>
+    /// collection, the required source reference, the two modifiers the native table carries and the requested
+    /// lifetime. The native half reads this shape rather than describing a second one.</summary>
     public static readonly HandlerShape Shape = new HandlerShape()
-        .Inputs("targets", "source", "speed", "acceleration", "jump_gravity", "duration")
+        .Inputs("targets", "source", "speed", "acceleration", "duration")
         .Outputs("result", "profile_handle");
 
-    /// <summary>The capability row: the catalog's own graph, with `jump_gravity` optional for the reason this
-    /// contract's own summary gives, and the recipients contract naming the effect handle the row returns.</summary>
+    /// <summary>The capability row, with only native-backed movement ports and the recipients contract naming
+    /// the effect handle the row returns.</summary>
     public static object Row() => new
     {
         id = CapabilityId,
@@ -61,7 +58,6 @@ public static class MovementProfileContract
                 new { id = "source", type = "entity", entityKinds = new[] { "gtfo.player" } },
                 new { id = "speed", type = "number" },
                 new { id = "acceleration", type = "number" },
-                new { id = "jump_gravity", type = "number", optional = true },
                 new { id = "duration", type = "integer", unit = "tick" }
             },
             outputs = new object[]
@@ -72,7 +68,6 @@ public static class MovementProfileContract
                     id = "result", type = "result", schema = "forge.result.player.movement_profile",
                     codes = new[]
                     {
-                        "jump-gravity-unsupported",
                         "authority-or-phase",
                         "modifier-target-kind",
                         "stale-or-unsupported-recipient",

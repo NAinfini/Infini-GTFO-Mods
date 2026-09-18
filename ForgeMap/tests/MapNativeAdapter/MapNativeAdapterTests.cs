@@ -274,7 +274,7 @@ public sealed class MapNativeAdapterTests
             .GetField("EffectRestores", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(registry)!;
         var binding = AgentModifierContract.Binding(AgentModifierContract.ApplyCapabilityId);
         Require(restores.Contains(binding), "The apply binding has no effect restore registered: " + binding);
-        Require(!restores.Contains(AgentModifierContract.Binding(AgentModifierContract.RemoveCapabilityId)),
+        Require(!restores.Contains(AgentModifierContract.Binding(AgentModifierContract.CancelCapabilityId)),
             "The removal row carries no effect block and must register no restore.");
     }
 

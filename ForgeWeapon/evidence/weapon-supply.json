@@ -72,7 +72,9 @@
         "BulletsMaxCap": "int (+0x1C)",
         "CostOfBullet": "float (+0x24)"
       },
-      "members": { "AddAmmo(float ammoAmount)": "RVA 0x12F7D70, dumpLine 658163" }
+      "members": {
+        "AddAmmo(float ammoAmount)": "RVA 0x12F7D70, dumpLine 658163"
+      }
     },
     "Player.pAmmoGive": {
       "fields": {
@@ -85,7 +87,14 @@
     },
     "Player.AmmoType": {
       "declared": "public enum AmmoType : byte",
-      "members": ["Standard = 0", "Special = 1", "Class = 2", "ResourcePackRel = 3", "None = 4", "CurrentConsumable = 5"],
+      "members": [
+        "Standard = 0",
+        "Special = 1",
+        "Class = 2",
+        "ResourcePackRel = 3",
+        "None = 4",
+        "CurrentConsumable = 5"
+      ],
       "note": "the same six members in the same order as the catalog's `ammo_type` parameter, which is why the parameter travels as the native value with no second mapping table"
     }
   },
@@ -137,24 +146,33 @@
     "ammo_add": {
       "poolSelection": "the `ammo_type` structural parameter, whose six members and the native enum's six members share one order; only Standard, Special and Class have a pAmmoGive field, so the other three are refused with `ammo-pool-has-no-gift`",
       "amount": "the row's `amount` is a round count; it is converted against the pool's own cap read immediately before the call (GetAmmoMaxCap) and the bullets that landed are the difference the same pool reports afterwards (GetBulletsInPack). The result's `amount` is that readback",
-      "overflowPolicy": "`clamp` is the native behaviour; `reject` is implemented as a pre-read refusal (`ammo-pool-overflow`) with nothing written; `discard` is refused by name (`ammo-overflow-discard-unsupported`) because the native body clamps and a discard that clamped would be a different action",
-      "refusedByPort": {
-        "cap": "ammo-cap-unsupported — every pool already has the game's own cap",
-        "provenance": "ammo-provenance-unsupported — pAmmoGive carries no source field"
-      }
+      "overflowPolicy": "clamp is the native pool-cap behaviour; reject pre-reads the pool and refuses before writing when the requested rounds would overflow."
     },
     "ammo_consume": {
       "pool": "any of the six native pools, because UpdateBulletsInPack indexes the storage's own table",
       "ownership": "the pool must be this machine's own player's or a bot's (`SNet_Player.IsLocal || IsBot`): a remote client's ammunition is its own state, synced to the host through PlayerAmmoStorage.NeedsSync / PlayerBackpackManager.SendLocalAmmoData (0x175B280) and ReceiveAmmoSync (0x1758EA0), so a write to the host's mirrored copy would be overwritten by its owner; it is refused with `ammo-pool-not-owned-here`",
       "failurePolicy": "`reject` refuses when the pool holds less than the request (`ammo-pool-insufficient`); `partial` spends what the pool holds and reports the number",
-      "refusedByPort": { "transaction": "ammo-transaction-unsupported — the storage write is one clamped field write and has nowhere to put a transaction handle" }
+      "refusedByPort": {
+        "transaction": "ammo-transaction-unsupported — the storage write is one clamped field write and has nowhere to put a transaction handle"
+      }
     },
     "codes": [
-      "authority-or-phase", "ammo-recipient-unknown", "amount-out-of-range", "ammo-type-unknown", "ammo-policy-unknown",
-      "ammo-cap-unsupported", "ammo-provenance-unsupported", "ammo-overflow-discard-unsupported", "ammo-pool-has-no-gift",
-      "ammo-transaction-unsupported", "ammo-pool-unavailable", "ammo-pool-not-owned-here", "ammo-pool-overflow",
-      "ammo-pool-insufficient", "ammo-pool-empty", "ammo-readback-exception", "ammo-change-unobserved",
-      "native-commit-exception", "ammo-committed"
+      "authority-or-phase",
+      "ammo-recipient-unknown",
+      "amount-out-of-range",
+      "ammo-type-unknown",
+      "ammo-policy-unknown",
+      "ammo-pool-has-no-gift",
+      "ammo-transaction-unsupported",
+      "ammo-pool-unavailable",
+      "ammo-pool-not-owned-here",
+      "ammo-pool-overflow",
+      "ammo-pool-insufficient",
+      "ammo-pool-empty",
+      "ammo-readback-exception",
+      "ammo-change-unobserved",
+      "native-commit-exception",
+      "ammo-committed"
     ]
   },
   "testCoverage": {
@@ -162,8 +180,8 @@
     "cases": 28,
     "covers": [
       "the gift the row submits (pool, relative amount, addressee) and the readback it reports",
-      "the native clamp at the pool's cap, the reject policy's pre-read refusal and the discard refusal",
-      "the refused cap, provenance, transaction, ammo-type, policy, amount and pool-selection paths",
+      "the native clamp at the pool's cap and the reject policy's pre-read refusal",
+      "the refused transaction, ammo-type, invalid policy, amount and pool-selection paths",
       "both host gates (the game's master flag and the kernel's authoritative phase) before any native call",
       "a foreign recipient kind, an unnameable player, a throwing lookup and a missing backpack",
       "the throwing gift and the unreadable pool, each with its own commit state",

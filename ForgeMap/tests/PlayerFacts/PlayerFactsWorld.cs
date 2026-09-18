@@ -64,9 +64,6 @@ internal sealed class TestValueSource : IPlayerValueSource
     internal EntityReference? Wielded { get; set; }
     internal bool WieldedReadable { get; set; } = true;
     internal string WieldedCode { get; set; } = "equipment-unresolved";
-    internal PlayerAmmo Ammo { get; set; } = new(7, 12, 30);
-    internal bool AmmoReadable { get; set; } = true;
-    internal string AmmoCode { get; set; } = "no-wielded-gear";
     internal EntityReference? Carried { get; set; }
     internal bool CarriedReadable { get; set; } = true;
     internal string CarriedCode { get; set; } = "backpack-unavailable";
@@ -84,12 +81,6 @@ internal sealed class TestValueSource : IPlayerValueSource
     {
         equipment = Wielded; code = WieldedReadable ? "" : WieldedCode;
         return WieldedReadable;
-    }
-
-    public bool TryAmmo(EntityReference reference, out PlayerAmmo ammo, out string code)
-    {
-        ammo = Ammo; code = AmmoReadable ? "" : AmmoCode;
-        return AmmoReadable;
     }
 
     public bool TryCarriedItem(EntityReference reference, out EntityReference? item, out string code)

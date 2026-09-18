@@ -13,7 +13,7 @@ namespace ForgeMap.Tests.AgentModifierFacts;
 internal sealed record PlayerFixture(SNet_Player Player, PlayerAgent Agent, EntityReference Reference);
 
 /// <summary>One case's world: a kernel holding the two registrations the real startup performs — the combat
-/// contract module that declares and owns `forge.action.combat.attribute_apply`/`attribute_remove`, and the Map
+/// contract module that declares and owns `forge.action.combat.attribute_apply`/`forge.action.effect.cancel`, and the Map
 /// provider that binds them to this package's handlers — plus the player identity and the attribute-modifier
 /// adapter on that registration. There is no loader, no session and no hook: the handlers are driven directly with
 /// a real `CommandContext`, so a shape that does not resolve against its own capability fails here exactly as it
@@ -29,7 +29,7 @@ internal sealed class ModifierWorld : IDisposable
         .GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, new[]
         {
             typeof(RuntimeEvent), typeof(long), typeof(string), typeof(string), typeof(string), typeof(string),
-            typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool)
+            typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool), typeof(Func<EntityReference, object?>)
         }, null) ?? throw new InvalidOperationException("CommandContext's own constructor was not found.");
 
     /// <summary>The kernel's own effect handle is what a plan's step carries into its handler, and its setter is
@@ -73,7 +73,7 @@ internal sealed class ModifierWorld : IDisposable
             new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
             {
                 [AgentModifierContract.ApplyHandlerName] = AgentModifierAdapter.ApplyHandler,
-                [AgentModifierContract.RemoveHandlerName] = AgentModifierAdapter.RemoveHandler,
+                [AgentModifierContract.CancelHandlerName] = AgentModifierAdapter.CancelHandler,
                 [MovementProfileContract.HandlerName] = AgentModifierAdapter.ProfileHandler
             }, AgentModifierContract.Support().Concat(new[] { MovementProfileContract.Support() }).ToArray(),
             new Dictionary<string, Func<EntityReference, bool>>(StringComparer.Ordinal)
@@ -134,7 +134,8 @@ internal sealed class ModifierWorld : IDisposable
             origin, Kernel.CurrentTick, "test.command", "test.plan", "author.resource", "revision-1", "A_action",
             parameters == null ? RuntimeJson.EmptyObject : RuntimeJson.From(parameters),
             inputs == null ? RuntimeJson.EmptyObject : RuntimeJson.From(inputs),
-            isHost
+            isHost,
+            (Func<EntityReference, object?>)(reference => Identity.CurrentAgent(reference))
         })!;
     }
 
@@ -173,11 +174,16 @@ internal sealed class ModifierWorld : IDisposable
         })!);
     /// <summary>A handle minted the way the kernel's own effect handle is: through the registration the plan's
     /// provider registered under, so its provider index is the one the ledger files against.</summary>
-    internal JsonElement MintHandle() => _registration.CreateEffectHandle("entity_life");
+    internal JsonElement MintHandle()
+    {
+        var handle = _registration.CreateEffectHandle("entity_life");
+        _registration.RegisterCancel(handle, () => EndEffect(handle, EffectEndReasons.Cancelled));
+        return handle;
+    }
 
-    /// <summary>One remove request over the handles a case collected.</summary>
-    internal CommandResult Remove(object? inputs)
-        => Adapter.Remove(Context(AgentModifierContract.RemoveCapabilityId, inputs, null));
+    /// <summary>One canonical effect-cancel request over the handles a case collected.</summary>
+    internal CommandResult Cancel(object? inputs)
+        => Adapter.Cancel(Context(AgentModifierContract.CancelCapabilityId, inputs, null));
 
     /// <summary>One movement preset request, over the production row's own id.</summary>
     internal CommandResult Profile(object? inputs)

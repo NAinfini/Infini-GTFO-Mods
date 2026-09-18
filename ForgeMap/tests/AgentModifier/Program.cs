@@ -35,7 +35,7 @@ internal static class Program
         MovementProfile();
         MovementProfileRefusals();
         HandleCancel();
-        Remove();
+        Cancel();
         Lifetimes();
         Console.WriteLine($"checks={_checks} failures={_failures}");
         return _failures == 0 ? 0 : 1;
@@ -57,7 +57,7 @@ internal static class Program
 
     /// <summary>The ruled shape, taken from the contract the registration declares: `attribute` is an
     /// `agent_modifier` member, `priority` is gone, `operation` keeps the three members the native entry can
-    /// express, and the handle the apply row returns is the `effect`/`entity_life` one the remove row consumes —
+    /// express, and the handle the apply row returns is the `effect`/`entity_life` one canonical cancel consumes —
     /// the kernel's own, which the step's `effect` block times and the restore callback ends.</summary>
     private static void RuledShape()
     {
@@ -79,16 +79,19 @@ internal static class Program
         Check(Ports(applyGraph, "outputs").SequenceEqual(new[] { "next", "result", "modifier" })
             && Port(applyGraph, "outputs", "modifier").GetProperty("handleKind").GetString() == "effect"
             && Port(applyGraph, "outputs", "modifier").GetProperty("lifetime").GetString() == "entity_life",
-            "apply publishes the effect handle the remove row consumes");
+            "apply publishes the effect handle canonical cancel consumes");
         Check(apply.GetProperty("owner").GetString() == AgentModifierContract.OwnerProviderId,
             "the capability stays owned by the combat contract provider");
 
-        var remove = AgentModifierContract.RemoveCapability;
-        var removeGraph = remove.GetProperty("graph");
-        Check(Ports(removeGraph, "inputs").SequenceEqual(new[] { "in", "modifiers", "attribute" })
-            && Port(removeGraph, "inputs", "modifiers").GetProperty("cardinality").GetString() == "many"
-            && Port(removeGraph, "inputs", "attribute").GetProperty("schema").GetString() == AgentModifierContract.AttributeSet,
-            "remove takes the handle collection and the same attribute member");
+        var cancel = AgentModifierContract.CancelCapability;
+        var cancelGraph = cancel.GetProperty("graph");
+        Check(Ports(cancelGraph, "inputs").SequenceEqual(new[] { "in", "handles" })
+            && Port(cancelGraph, "inputs", "handles").GetProperty("cardinality").GetString() == "many"
+            && Port(cancelGraph, "inputs", "handles").GetProperty("handleKind").GetString() == "effect"
+            && Port(cancelGraph, "inputs", "handles").GetProperty("lifetime").GetString() == "entity_life",
+            "cancel takes only canonical entity-life effect handles");
+        Check(Ports(cancelGraph, "outputs").SequenceEqual(new[] { "next", "result", "cancelled" }),
+            "cancel reports canonical result rows and the number of effects actually ended");
 
         // The movement preset is this provider's own row, not the combat contract's: it declares its own binding,
         // its own support, its own shape, and the one refusal the native table forces on it.
@@ -98,33 +101,31 @@ internal static class Program
         // Every code the adapter can answer with is declared on a row of this slice, so a refusal is part of the
         // published contract instead of a string the handler invented after the shape was frozen.
         var applyCodes = Codes(apply);
-        var removeCodes = Codes(remove);
-        var declaredCodes = applyCodes.Concat(removeCodes).Concat(Codes(preset)).ToHashSet(StringComparer.Ordinal);
-        foreach (var code in AgentModifierAdapter.RefusalCodes)
-            Check(declaredCodes.Contains(code), "declared code: " + code);
         Check(applyCodes.Contains("attribute-no-op") && applyCodes.Contains("modifier-id-exhausted")
             && applyCodes.Contains("handle-budget") && applyCodes.Contains("modifier-budget"),
             "the apply row declares its own refusals");
-        Check(removeCodes.Contains("modifier-handle-missing") && removeCodes.Contains("stale-handle")
-            && removeCodes.Contains("modifier-attribute-mismatch"), "the remove row declares its own refusals");
+        Check(AgentModifierAdapter.RefusalCodes.Contains(AgentModifierAdapter.HandleMissingCode)
+            && AgentModifierAdapter.RefusalCodes.Contains(AgentModifierAdapter.HandleStaleCode),
+            "the cancel adapter keeps explicit missing/stale handle refusals");
 
         Check(AgentModifierContract.Binding(AgentModifierContract.ApplyCapabilityId)
                 == ModuleDefinition.ProviderId + ".binding.attribute_apply"
-            && AgentModifierContract.Support().All(row => row.RequiredPermissions.SequenceEqual(new[] { AgentModifierContract.Permission })),
-            "each binding is this provider's own and carries the catalog's permission");
+            && AgentModifierContract.Binding(AgentModifierContract.CancelCapabilityId)
+                == ModuleDefinition.ProviderId + ".binding.effect_cancel"
+            && AgentModifierContract.ApplySupport().RequiredPermissions.SequenceEqual(new[] { AgentModifierContract.Permission })
+            && AgentModifierContract.CancelSupport().RequiredPermissions.Count == 0,
+            "apply and cancel expose their distinct canonical permission requirements");
         Check(AgentModifierContract.Shapes().Keys.OrderBy(k => k, StringComparer.Ordinal).SequenceEqual(
-            new[] { AgentModifierContract.ApplyHandlerName, AgentModifierContract.RemoveHandlerName }.OrderBy(k => k, StringComparer.Ordinal)),
-            "the handler shapes cover both rows");
+            new[] { AgentModifierContract.ApplyHandlerName, AgentModifierContract.CancelHandlerName }.OrderBy(k => k, StringComparer.Ordinal)),
+            "the handler shapes cover apply and canonical cancel");
 
         // The movement preset's own shape and binding.
         Check(preset.GetProperty("id").GetString() == MovementProfileContract.CapabilityId
             && preset.GetProperty("owner").GetString() == ModuleDefinition.ProviderId,
             "the preset is this provider's own capability");
         Check(Ports(presetGraph, "inputs").SequenceEqual(
-                new[] { "in", "targets", "source", "speed", "acceleration", "jump_gravity", "duration" }),
-            "the preset declares the catalog's ports in the catalog's order");
-        Check(Port(presetGraph, "inputs", "jump_gravity").GetProperty("optional").GetBoolean(),
-            "jump_gravity is declared and optional, because no native member carries it");
+                new[] { "in", "targets", "source", "speed", "acceleration", "duration" }),
+            "the preset declares only the native-backed catalog ports in order");
         Check(Port(presetGraph, "inputs", "source").GetProperty("entityKinds").EnumerateArray()
                 .Select(kind => kind.GetString()).SequenceEqual(new[] { "gtfo.player" }),
             "the preset's source is the player namespace");
@@ -141,9 +142,6 @@ internal static class Program
             && MovementProfileContract.Support().RequiredPermissions.SequenceEqual(new[] { MovementProfileContract.Permission })
             && MovementProfileContract.Shapes().Keys.SequenceEqual(new[] { MovementProfileContract.HandlerName }),
             "the preset's binding, support and shape are this provider's own");
-        Check(Codes(preset).Contains(AgentModifierAdapter.GravityCode),
-            "the preset declares the refusal the native table forces on it");
-
         // The integration's own composition: the combat contract module declares both rows and this provider only
         // binds them. The fixture registers exactly that composition, so this case fails if either id stops being
         // declared by the provider that owns it.
@@ -154,8 +152,8 @@ internal static class Program
                 .Single().GetProperty("id").GetString() == AgentModifierContract.OwnerProviderId,
             "the capability owner is the provider the canonical combat rows belong to");
         Check(declared.Contains(AgentModifierContract.ApplyCapabilityId)
-            && declared.Contains(AgentModifierContract.RemoveCapabilityId),
-            "both sourced-modifier rows are declared by the combat contract provider");
+            && declared.Contains(AgentModifierContract.CancelCapabilityId),
+            "apply and canonical effect cancel are declared by the combat contract provider");
     }
 
     /// <summary>The explicit table: every native member with its own value, the shared set fully covered, and a
@@ -343,19 +341,20 @@ internal static class Program
                 targets = new[] { a.Reference }, source = a.Reference, attribute = Attribute, amount = 0.25
             });
             var handle = world.LastHandle!.Value;
-            world.Remove(new { modifiers = new[] { handle } });
-            Check(world.Adapter.LiveModifiers == 0 && AgentModifierManager.Clears.Count == 1,
-                "the removal releases what the kernel's handle named");
-            // The kernel keeps the instance until its own duration runs out, so the restore it calls afterwards
-            // finds nothing: an effect the module already undid is not an error.
+            var cancelled = world.Cancel(new { handles = new[] { handle } });
+            Check(cancelled.Status == CommandStatuses.Succeeded
+                && cancelled.Outputs.GetProperty("cancelled").GetInt32() == 1
+                && world.Adapter.LiveModifiers == 0 && AgentModifierManager.Clears.Count == 1,
+                "canonical cancel spends the kernel handle and releases what it named");
+            // A restore callback reached again after canonical cancellation is idempotent.
             world.EndEffect(handle, EffectEndReasons.Expired);
             Check(AgentModifierManager.Clears.Count == 1 && world.Adapter.LiveModifiers == 0,
-                "the ending of an effect the removal already released is a no-op");
-            Check(applied.Status == CommandStatuses.Succeeded, "the apply that the removal ended had committed");
+                "the ending of an effect canonical cancel already released is a no-op");
+            Check(applied.Status == CommandStatuses.Succeeded, "the apply that cancel ended had committed");
         }
 
-        // A step with no `effect` block carries no handle, and a handle that is not the kernel's own is not filed:
-        // the modifications stay in the ledger until a removal, a life or the world releases them.
+        // A step with no `effect` block carries no handle, and a handle no command filed under names no group:
+        // those modifications stay in the ledger until the life or the world releases them.
         using (var world = new ModifierWorld())
         {
             var a = world.Spawn(1);
@@ -374,10 +373,9 @@ internal static class Program
         }
     }
 
-    /// <summary>Removal names what an apply handed out: the handle collection is resolved against the ledger, the
-    /// optional attribute narrows it, and a request that cannot be carried out is refused as a whole before
-    /// anything is cleared.</summary>
-    private static void Remove()
+    /// <summary>Canonical effect cancellation addresses only effect handles. The adapter preflights every handle
+    /// before spending any, then lets the kernel spend the handle and invoke the same restore callback expiry uses.</summary>
+    private static void Cancel()
     {
         using var world = new ModifierWorld();
         var a = world.Spawn(1);
@@ -388,31 +386,30 @@ internal static class Program
         });
         var handle = world.LastHandle!.Value;
 
-        Check(Code(world.Remove(new { modifiers = Array.Empty<object>() })) == "modifier-handle-missing",
-            "a remove without a handle is refused");
-        Check(Code(world.Remove(new
+        Check(Code(world.Cancel(new { handles = Array.Empty<object>() })) == AgentModifierAdapter.HandleMissingCode,
+            "cancel without a handle is refused");
+        Check(Code(world.Cancel(new
         {
-            modifiers = new object[]
+            handles = new object[]
             {
                 new { worldEpoch = world.Kernel.WorldEpoch, lifeEpoch = 1, local = 0, provider = 7 }
             }
-        })) == "stale-handle", "a handle no group answers for is refused");
-        Check(Code(world.Remove(new { modifiers = new object[] { handle }, attribute = "glue-strength" })) == "modifier-attribute-mismatch",
-            "an attribute the handles were not written under is refused");
+        })) == AgentModifierAdapter.HandleStaleCode, "a handle no group answers for is refused");
         Check(AgentModifierManager.Clears.Count == 0 && world.Adapter.LiveModifiers == 2,
-            "no refused remove cleared anything");
+            "no refused cancel cleared anything");
 
-        var removed = world.Remove(new { modifiers = new object[] { handle }, attribute = Attribute });
-        var rows = Rows(removed);
-        Check(removed.Status == CommandStatuses.Succeeded && rows.Length == 2
+        var cancelled = world.Cancel(new { handles = new object[] { handle } });
+        var rows = Rows(cancelled);
+        Check(cancelled.Status == CommandStatuses.Succeeded && rows.Length == 2
+            && cancelled.Outputs.GetProperty("cancelled").GetInt32() == 1
             && Row(rows, 0).GetProperty("target_count").GetInt32() == 2
             && RuntimeJson.Entity(Row(rows, 0).GetProperty("target")) == a.Reference
             && RuntimeJson.Entity(Row(rows, 1).GetProperty("target")) == b.Reference,
-            "removal reports one row per modification with the life it belonged to");
+            "cancel reports each affected life and one spent effect handle");
         Check(AgentModifierManager.Clears.Count == 2 && world.Adapter.LiveModifiers == 0,
-            "every modification the handle covered was released");
-        Check(Code(world.Remove(new { modifiers = new object[] { handle } })) == "stale-handle",
-            "a handle whose whole group was released is refused");
+            "canonical cancel released every modification the handle covered");
+        Check(Code(world.Cancel(new { handles = new object[] { handle } })) == AgentModifierAdapter.HandleStaleCode,
+            "a spent effect handle is stale on a second cancel");
     }
 
     /// <summary>Lifetime: an entity loss releases, a world change and a stop release everything, and a native
@@ -448,7 +445,7 @@ internal static class Program
             world.Kernel.BeginWorld(world.Kernel.WorldEpoch + 1);
             Check(AgentModifierManager.Clears.Count == 1 && world.Adapter.LiveModifiers == 0,
                 "a new world releases every id the previous one held");
-            Check(Code(world.Remove(new { modifiers = new object[] { handle } })) == "stale-handle",
+            Check(Code(world.Cancel(new { handles = new object[] { handle } })) == AgentModifierAdapter.HandleStaleCode,
                 "a handle minted in the previous world is refused");
         }
 
@@ -525,10 +522,11 @@ internal static class Program
                 && handle.GetProperty("local").GetInt32() >= 0,
                 "the preset returned the one effect handle its writes hang on");
 
-            var removed = world.Remove(new { modifiers = new object[] { handle } });
-            Check(removed.Status == CommandStatuses.Succeeded && AgentModifierManager.Clears.Count == 4
-                && world.Adapter.LiveModifiers == 0,
-                "the preset's own handle releases both members of every recipient");
+            var cancelled = world.Cancel(new { handles = new object[] { handle } });
+            Check(cancelled.Status == CommandStatuses.Succeeded
+                && cancelled.Outputs.GetProperty("cancelled").GetInt32() == 1
+                && AgentModifierManager.Clears.Count == 4 && world.Adapter.LiveModifiers == 0,
+                "the preset's own effect handle cancels both members of every recipient");
         }
     }
 
@@ -539,16 +537,13 @@ internal static class Program
     {
         using var world = new ModifierWorld();
         var a = world.Spawn(1);
-        object Frame(object? speed = null, object? acceleration = null, object? jumpGravity = null,
+        object Frame(object? speed = null, object? acceleration = null,
             object? duration = null, object? targets = null) => new
         {
             targets = targets ?? new[] { a.Reference }, source = a.Reference,
-            speed = speed ?? 1.5, acceleration = acceleration ?? 0.5,
-            jump_gravity = jumpGravity, duration = duration ?? 0
+            speed = speed ?? 1.5, acceleration = acceleration ?? 0.5, duration = duration ?? 0
         };
 
-        Check(Code(world.Profile(Frame(jumpGravity: 1.0))) == AgentModifierAdapter.GravityCode,
-            "the input the native table cannot carry is refused by name");
         Check(Code(world.Profile(Frame(speed: 0))) == "amount-out-of-range"
             && Code(world.Profile(Frame(acceleration: 2000000))) == "amount-out-of-range",
             "a preset multiplier outside the native entry's range is refused, either member");

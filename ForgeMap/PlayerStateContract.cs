@@ -51,10 +51,7 @@ public static class PlayerStateContract
     // ---------------------------------------------------------------- capabilities this provider owns
 
     public const string InfectionValueCapability = "forge.query.player.infection";
-    public const string DownedValueCapability = "forge.query.player.downed";
-    public const string PositionValueCapability = "forge.query.player.position";
     public const string WieldedGearValueCapability = "forge.query.player.wielded_gear";
-    public const string AmmoValueCapability = "forge.query.player.ammo";
     public const string CarriedItemValueCapability = "forge.query.player.carried_item";
     /// <summary>`v-p-tool`: the energy the held item's own class-ammunition pool holds and the consumables the
     /// backpack carries. One row, because the two answers are the two halves of the same question — "how much of
@@ -64,10 +61,7 @@ public static class PlayerStateContract
     /// <summary>The value handler names: the evaluator this provider registers for each read-only row. The name
     /// is also the shape key, so the registration cannot supply an evaluator whose ports were never declared.</summary>
     public const string InfectionValueHandler = "gtfo.player.value.infection";
-    public const string DownedValueHandler = "gtfo.player.value.downed";
-    public const string PositionValueHandler = "gtfo.player.value.position";
     public const string WieldedGearValueHandler = "gtfo.player.value.wielded_gear";
-    public const string AmmoValueHandler = "gtfo.player.value.ammo";
     public const string CarriedItemValueHandler = "gtfo.player.value.carried_item";
     public const string ToolValueHandler = "gtfo.player.value.tool";
 
@@ -192,20 +186,10 @@ public static class PlayerStateContract
     /// <summary>`forge.query.player.infection`: the receiver's infection value.</summary>
     public static JsonElement InfectionAnswer(double value) => RuntimeJson.From(new { value });
 
-    /// <summary>`forge.query.player.downed`: the life's downed and alive flags, read from the same sample.</summary>
-    public static JsonElement DownedAnswer(bool downed, bool alive) => RuntimeJson.From(new { value = downed, alive });
-
-    /// <summary>`forge.query.player.position`: the life's position in metres.</summary>
-    public static JsonElement PositionAnswer(double[] position) => RuntimeJson.From(new { position });
-
     /// <summary>`forge.query.player.wielded_gear`: the equipment entity of the item the player is holding, or
     /// null when the player holds no item this process can name.</summary>
     public static JsonElement WieldedGearAnswer(EntityReference? equipment)
         => RuntimeJson.From(new { equipment });
-
-    /// <summary>`forge.query.player.ammo`: the wielded weapon's clip and its reserve, in rounds.</summary>
-    public static JsonElement AmmoAnswer(int clip, int clipMaximum, int reserve)
-        => RuntimeJson.From(new { clip, clip_max = clipMaximum, reserve });
 
     /// <summary>`forge.query.player.carried_item`: the expedition item this player carries, or null when nobody
     /// in the backpack holds one. A read that happened and found nothing is an answer, not a missing port.</summary>
@@ -232,23 +216,9 @@ public static class PlayerStateContract
     {
         OperatorValueRow(InfectionValueCapability, "玩家感染值", "读一个玩家当前的感染值。",
             "Reads one player's current infection value."),
-        ValueRow(DownedValueCapability, "玩家是否倒地", "读一个玩家是否倒地、是否还活着。",
-            "Reads whether one player is downed and whether the life is still alive.",
-            new object[] { new { id = "value", type = "boolean" }, new { id = "alive", type = "boolean" } }),
-        ValueRow(PositionValueCapability, "玩家位置", "读一个玩家当前的位置。",
-            "Reads one player's current position.",
-            new object[] { new { id = "position", type = "vector3", unit = "m" } }),
         ValueRow(WieldedGearValueCapability, "玩家手持装备", "读一个玩家当前拿在手上的装备。",
             "Reads the equipment one player is currently holding.",
             new object[] { new { id = "equipment", type = "entity", nullable = true, entityKinds = new[] { "gtfo.equipment" } } }),
-        ValueRow(AmmoValueCapability, "玩家弹药", "读一个玩家手上武器的弹匣与备用弹药。",
-            "Reads the clip and reserve ammunition of the weapon one player is holding.",
-            new object[]
-            {
-                new { id = "clip", type = "integer" },
-                new { id = "clip_max", type = "integer" },
-                new { id = "reserve", type = "integer" }
-            }),
         OperatorValueRow(CarriedItemValueCapability, "玩家背负的大件物品", "读一个玩家背包里背着的大件物品。",
             "Reads the expedition item one player carries in the backpack."),
         ValueRow(ToolValueCapability, "玩家工具能源与消耗品数量",
@@ -297,10 +267,7 @@ public static class PlayerStateContract
     public static IReadOnlyList<object> ValueBindings() => Array.AsReadOnly(new object[]
     {
         ValueBinding(InfectionValueCapability, InfectionValueHandler),
-        ValueBinding(DownedValueCapability, DownedValueHandler),
-        ValueBinding(PositionValueCapability, PositionValueHandler),
         ValueBinding(WieldedGearValueCapability, WieldedGearValueHandler),
-        ValueBinding(AmmoValueCapability, AmmoValueHandler),
         ValueBinding(CarriedItemValueCapability, CarriedItemValueHandler),
         ValueBinding(ToolValueCapability, ToolValueHandler)
     });
@@ -309,8 +276,7 @@ public static class PlayerStateContract
     /// read owns no object and writes nothing, so no row carries a permission.</summary>
     public static IReadOnlyList<BindingSupport> ValueSupport() => Array.AsReadOnly(new[]
     {
-        ValueSupport(InfectionValueCapability), ValueSupport(DownedValueCapability),
-        ValueSupport(PositionValueCapability), ValueSupport(WieldedGearValueCapability), ValueSupport(AmmoValueCapability),
+        ValueSupport(InfectionValueCapability), ValueSupport(WieldedGearValueCapability),
         ValueSupport(CarriedItemValueCapability), ValueSupport(ToolValueCapability)
     });
 
@@ -320,10 +286,7 @@ public static class PlayerStateContract
     public static IReadOnlyDictionary<string, HandlerShape> ValueShapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
         [InfectionValueHandler] = new HandlerShape().Inputs("player").Outputs("value"),
-        [DownedValueHandler] = new HandlerShape().Inputs("player").Outputs("value", "alive"),
-        [PositionValueHandler] = new HandlerShape().Inputs("player").Outputs("position"),
         [WieldedGearValueHandler] = new HandlerShape().Inputs("player").Outputs("equipment"),
-        [AmmoValueHandler] = new HandlerShape().Inputs("player").Outputs("clip", "clip_max", "reserve"),
         [CarriedItemValueHandler] = new HandlerShape().Inputs("player").Outputs("item"),
         [ToolValueHandler] = new HandlerShape().Inputs("player").Outputs("item", "ammo", "ammo_max", "count", "stacks")
     };

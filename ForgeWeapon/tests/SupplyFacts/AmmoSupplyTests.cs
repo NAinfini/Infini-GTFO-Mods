@@ -12,7 +12,6 @@ public sealed class AmmoSupplyTests
 {
     private static readonly object Clamp = new { ammo_type = "class", overflow_policy = "clamp" };
     private static readonly object Reject = new { ammo_type = "class", overflow_policy = "reject" };
-    private static readonly object Discard = new { ammo_type = "class", overflow_policy = "discard" };
     private static readonly object Partial = new { ammo_type = "class", failure_policy = "partial" };
     private static readonly object Strict = new { ammo_type = "class", failure_policy = "reject" };
 
@@ -84,16 +83,13 @@ public sealed class AmmoSupplyTests
     }
 
     [Fact]
-    public void add_refuses_the_policies_and_ports_the_native_gift_cannot_carry()
+    public void add_refuses_invalid_policy_type_and_amount_before_native_write()
     {
         using var world = new SupplyWorld();
         world.Start();
         var (_, _, storage, reference) = world.PlayerRef(1);
         SupplyWorld.Pool(storage, AmmoType.Class, bullets: 10, cap: 100);
 
-        Assert.Equal(WeaponSupplyAdapter.DiscardCode, Add(world, reference, Discard).Code);
-        Assert.Equal(WeaponSupplyAdapter.CapCode, Add(world, reference, Clamp, ("cap", 30)).Code);
-        Assert.Equal(WeaponSupplyAdapter.ProvenanceCode, Add(world, reference, Clamp, ("provenance", "supply")).Code);
         Assert.Equal(WeaponSupplyAdapter.TypeCode, Add(world, reference, new { ammo_type = "nonsense", overflow_policy = "clamp" }).Code);
         Assert.Equal(WeaponSupplyAdapter.PolicyCode, Add(world, reference, new { ammo_type = "class", overflow_policy = "nonsense" }).Code);
         Assert.Equal(WeaponSupplyAdapter.AmountCode, Add(world, reference, Clamp, ("amount", 0)).Code);
@@ -276,7 +272,7 @@ public sealed class AmmoSupplyTests
 
         CommandHandler body = _ => CommandResult.Rejected("never");
         var shapes = WeaponSupplyContract.Shapes(body, body);
-        Assert.Equal(new[] { "player", "amount", "cap", "provenance" }, shapes[WeaponSupplyContract.AmmoAddHandler].InputPorts);
+        Assert.Equal(new[] { "player", "amount" }, shapes[WeaponSupplyContract.AmmoAddHandler].InputPorts);
         Assert.Equal(new[] { "player", "amount" }, shapes[WeaponSupplyContract.AmmoConsumeHandler].InputPorts);
         Assert.Equal(new[] { "ammo_type", "overflow_policy" }, shapes[WeaponSupplyContract.AmmoAddHandler].ParameterIds);
         Assert.Equal(new[] { "ammo_type", "failure_policy" }, shapes[WeaponSupplyContract.AmmoConsumeHandler].ParameterIds);

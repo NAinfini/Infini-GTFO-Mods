@@ -66,9 +66,6 @@ internal sealed class WeaponSupplyAdapter
     internal const string AmountCode = "amount-out-of-range";
     internal const string TypeCode = "ammo-type-unknown";
     internal const string PolicyCode = "ammo-policy-unknown";
-    internal const string CapCode = "ammo-cap-unsupported";
-    internal const string ProvenanceCode = "ammo-provenance-unsupported";
-    internal const string DiscardCode = "ammo-overflow-discard-unsupported";
     internal const string GiftPoolCode = "ammo-pool-has-no-gift";
     internal const string PoolCode = "ammo-pool-unavailable";
     internal const string NotOwnedCode = "ammo-pool-not-owned-here";
@@ -94,15 +91,10 @@ internal sealed class WeaponSupplyAdapter
     {
         if (!adapter.Authoritative()) return CommandResult.Rejected(AuthorityCode);
         if (!Recipient(context, out var recipient, out string code)) return CommandResult.Rejected(code);
-        if (Present(context.Inputs, "cap")) return CommandResult.Rejected(CapCode);
-        if (Present(context.Inputs, "provenance")) return CommandResult.Rejected(ProvenanceCode);
         if (!TryAmount(context.Inputs, out int amount)) return CommandResult.Rejected(AmountCode);
         if (!TryAmmoType(context.Parameters, out AmmoType type, out code)) return CommandResult.Rejected(code);
         if (!TryPolicy(context.Parameters, WeaponSupplyContract.OverflowPolicies, "overflow_policy", out string policy, out code))
             return CommandResult.Rejected(code);
-        // A policy this row cannot honour is refused by name: the native gift clamps at the pool's cap, and a
-        // "discard" that silently clamped would be a different action under the same name.
-        if (policy == "discard") return CommandResult.Rejected(DiscardCode);
         var outcome = adapter.Add(recipient, type, amount, policy == "reject");
         return Aggregate(outcome);
     }

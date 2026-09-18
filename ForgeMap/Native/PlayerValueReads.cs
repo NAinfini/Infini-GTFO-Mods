@@ -5,9 +5,6 @@ using ForgeRuntime.Framework;
 
 namespace ForgeMap.Native;
 
-/// <summary>One wielded weapon's ammunition, in rounds.</summary>
-internal readonly record struct PlayerAmmo(int Clip, int ClipMaximum, int Reserve);
-
 /// <summary>What the tool row reads: the held item the two ammunition numbers belong to, the class-ammunition
 /// pool the game itself spends as tool energy, and the backpack's own consumable stacks.</summary>
 internal readonly record struct PlayerTool(EntityReference? Item, int Ammo, int AmmoMaximum, int Count, int Stacks);
@@ -23,8 +20,6 @@ internal interface IPlayerValueSource
     /// <summary>Whether the player is holding an item at all, and which equipment entity it is. A player holding
     /// nothing answers true with a null entity: "holding nothing" is observed, not unknown.</summary>
     bool TryWieldedGear(EntityReference reference, out EntityReference? equipment, out string code);
-
-    bool TryAmmo(EntityReference reference, out PlayerAmmo ammo, out string code);
 
     /// <summary>Whether the player carries an expedition item, and which equipment entity it is. True with a null
     /// entity means a read that found nobody carrying one.</summary>
@@ -53,7 +48,6 @@ internal sealed class PlayerValueReads
     /// <summary>The code a value read answers when the provider publishes no source. It is a refusal and not an
     /// empty value: the row exists, this process just cannot read it.</summary>
     internal const string SourceUnavailableCode = "player-value-source-unavailable";
-    internal const string PositionUnavailableCode = "position-unavailable";
     internal const string NoWieldedGearCode = "no-wielded-gear";
     internal const string MissingFieldCode = "missing-field";
 
@@ -80,10 +74,7 @@ internal sealed class PlayerValueReads
     internal static IReadOnlyDictionary<string, EvaluatorHandler> Evaluators() => new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
     {
         [PlayerStateContract.InfectionValueHandler] = Evaluate(Infection),
-        [PlayerStateContract.DownedValueHandler] = Evaluate(Downed),
-        [PlayerStateContract.PositionValueHandler] = Evaluate(Position),
         [PlayerStateContract.WieldedGearValueHandler] = Evaluate(WieldedGear),
-        [PlayerStateContract.AmmoValueHandler] = Evaluate(Ammo),
         [PlayerStateContract.CarriedItemValueHandler] = Evaluate(CarriedItem),
         [PlayerStateContract.ToolValueHandler] = Evaluate(Tool)
     };
@@ -123,31 +114,12 @@ internal sealed class PlayerValueReads
         return PlayerStateContract.InfectionAnswer(value);
     }
 
-    /// <summary>The downed state comes from the shared snapshot's own life state, which is the one place the
-    /// provider publishes it: a life that is neither `alive` nor `downed` is dead, and that is what the `alive`
-    /// port answers.</summary>
-    internal static JsonElement AnswerDowned(RuntimeEntitySnapshot snapshot)
-        => PlayerStateContract.DownedAnswer(snapshot.LifeState == "downed", snapshot.LifeState != "dead");
-
-    internal static JsonElement AnswerPosition(RuntimeEntitySnapshot snapshot)
-        => snapshot.Position.Count == 3
-            ? PlayerStateContract.PositionAnswer(new[] { snapshot.Position[0], snapshot.Position[1], snapshot.Position[2] })
-            : throw new RuntimeContractException(PositionUnavailableCode, "This provider publishes no position for the life.");
-
     internal static JsonElement AnswerWieldedGear(IPlayerValueSource? source, EntityReference reference, RuntimeEntitySnapshot snapshot)
     {
         if (source == null) throw new RuntimeContractException(SourceUnavailableCode, "No player value source is attached.");
         if (!source.TryWieldedGear(reference, out var equipment, out var code))
             throw new RuntimeContractException(code, "Wielded gear read failed: " + code);
         return PlayerStateContract.WieldedGearAnswer(equipment);
-    }
-
-    internal static JsonElement AnswerAmmo(IPlayerValueSource? source, EntityReference reference, RuntimeEntitySnapshot snapshot)
-    {
-        if (source == null) throw new RuntimeContractException(SourceUnavailableCode, "No player value source is attached.");
-        if (!source.TryAmmo(reference, out var ammo, out var code))
-            throw new RuntimeContractException(code, "Ammunition read failed: " + code);
-        return PlayerStateContract.AmmoAnswer(ammo.Clip, ammo.ClipMaximum, ammo.Reserve);
     }
 
     internal static JsonElement AnswerCarriedItem(IPlayerValueSource? source, EntityReference reference, RuntimeEntitySnapshot snapshot)
@@ -173,17 +145,8 @@ internal sealed class PlayerValueReads
     private static JsonElement Infection(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerInfection(reads._source, reference, snapshot);
 
-    private static JsonElement Downed(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerDowned(snapshot);
-
-    private static JsonElement Position(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerPosition(snapshot);
-
     private static JsonElement WieldedGear(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerWieldedGear(reads._source, reference, snapshot);
-
-    private static JsonElement Ammo(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerAmmo(reads._source, reference, snapshot);
 
     private static JsonElement CarriedItem(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerCarriedItem(reads._source, reference, snapshot);

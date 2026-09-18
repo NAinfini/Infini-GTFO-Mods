@@ -48,6 +48,7 @@
         "forge.contract.control",
         "forge.contract.observation",
         "forge.contract.trigger",
+        "forge.contract.variables",
         "forge.runtime"
       ],
       "version": "1.0.0",
@@ -212,7 +213,6 @@
       "audience": "author",
       "dependencies": [
         "BepInEx-BepInExPack_GTFO-3.2.2",
-        "NAinfini-ForgeMap-1.0.0",
         "NAinfini-ForgeRuntime-1.0.0"
       ],
       "identity": {

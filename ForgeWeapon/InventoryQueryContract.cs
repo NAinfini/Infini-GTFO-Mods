@@ -8,9 +8,9 @@ namespace ForgeWeapon;
 /// <summary>The two read-only rows this package owns and evaluates on demand: the ammunition of one equipment
 /// life (`forge.query.equipment.ammo`) and whether a holder's backpack carries a named item
 /// (`forge.condition.predicate.inventory_item`). The catalog lists the condition row already and has no owner for
-/// it, and the ammunition row is this package's own id: the runtime's `forge.query.player.ammo`
-/// (<c>ForgeMap.PlayerStateContract</c>) answers for the weapon a player is holding and for nothing else, so a
-/// plan that has an equipment entity in hand cannot ask it anything. Both rows are declared here with the ports,
+/// it, and the ammunition row is this package's own id: authors first read the wielded equipment with
+/// `forge.query.player.wielded_gear`, then pass that explicit equipment entity to `forge.query.equipment.ammo`.
+/// There is no second implicit player-ammo read path. Both rows are declared here with the ports,
 /// the labels and the description the catalog spells, and both are answered by this package's native half through
 /// <see cref="IInventoryQuerySource"/>: a process without that half refuses both reads by code rather than
 /// declaring a row nothing answers.</summary>

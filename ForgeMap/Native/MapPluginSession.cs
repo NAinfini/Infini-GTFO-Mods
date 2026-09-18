@@ -107,6 +107,14 @@ internal sealed partial class MapPluginSession : IDisposable
             // reads the half that is current when the kernel asks, so the halves below are built afterwards, and
             // a half that was never built refuses by name instead of publishing through rows nothing declared.
             session.MapObjects.Register(session.Definition());
+            session.MapObjects.Registration.RegisterAuthoringRoomResolver((worldEpoch, sourcePrefab, scope) =>
+            {
+                var answer = TriggerZoneRoomResolver.Resolve(worldEpoch, sourcePrefab,
+                    new TriggerZoneRoomScope(scope.Dimension, scope.Layer, scope.LocalZoneIndex));
+                var rooms = answer.Rooms.Select(room =>
+                    new AuthoringRoomHit(room.GeomorphInstanceId, room.ZoneInstanceId)).ToArray();
+                return new AuthoringRoomResolution(answer.Refusal, rooms);
+            });
             session.Levels = new LevelObjectModule(kernel, session.MapObjects.Registration, report)
             {
                 // The scan value row reads through the game-bound half: the module owns the shape and the table,
@@ -244,6 +252,7 @@ internal sealed partial class MapPluginSession : IDisposable
         var environment = EnvironmentActions.For(() => !_faulted, _report);
         var presented = EnvironmentPresentation.For(_report);
         var hud = new HudActions(_report);
+        var sessionActions = new SessionActions(() => !_faulted, _report);
         var handlers = new Dictionary<string, CommandHandler>(StringComparer.Ordinal)
         {
             [PlayerHealthContract.HandlerName] = PlayerHealthAction.Execute,
@@ -272,7 +281,7 @@ internal sealed partial class MapPluginSession : IDisposable
             // declared by `forge.contract.combat`, and this registration binds them here.
             [MovementProfileContract.HandlerName] = AgentModifierAdapter.ProfileHandler,
             [AgentModifierContract.ApplyHandlerName] = AgentModifierAdapter.ApplyHandler,
-            [AgentModifierContract.RemoveHandlerName] = AgentModifierAdapter.RemoveHandler,
+            [AgentModifierContract.CancelHandlerName] = AgentModifierAdapter.CancelHandler,
             [EnvironmentContract.LightingHandler] = environment.HandleLighting,
             [EnvironmentContract.LightColorHandler] = environment.HandleLightColor,
             [EnvironmentContract.FogHandler] = environment.HandleFog,
@@ -305,6 +314,7 @@ internal sealed partial class MapPluginSession : IDisposable
             // content. Both are this package's body, keyed by the contract name.
             [InteractionTextContract.HandlerName] = interactionText.Handle,
             [TerminalContentContract.HandlerName] = terminalContent.Handle,
+            [SessionActionContract.CheckpointSaveHandler] = sessionActions.CheckpointSave,
             // generic-player: the batch's four execute bodies, keyed by the names their contracts declare.
             [CombatImpulseContract.HandlerName] = GenericPlayerActions.Impulse,
             [PlayerStaminaContract.HandlerName] = GenericPlayerActions.StaminaChange,

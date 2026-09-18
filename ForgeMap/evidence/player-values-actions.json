@@ -32,20 +32,19 @@
       }
     },
     {
-      "id": "forge.query.player.downed",
-      "status": "implemented",
-      "read": "the shared snapshot's own LifeState, which the player observer publishes as alive | downed | dead (PlayerObservation.Capture reads PlayerAgent.Alive first and PlayerLocomotion.m_currentStateEnum == PLOC_State.Downed second)",
+      "id": "forge.query.entity.life_state",
+      "status": "implemented by ForgeRuntime Observation",
+      "read": "RuntimeEntitySnapshot.LifeState for gtfo.player, exposed once through forge.query.entity.life_state",
       "ports": {
-        "value": "LifeState == \"downed\"",
-        "alive": "LifeState != \"dead\""
+        "state": "recipient_life_state enum (alive/downed/dead)"
       }
     },
     {
-      "id": "forge.query.player.position",
-      "status": "implemented",
-      "read": "RuntimeEntitySnapshot.Position (metres)",
+      "id": "forge.query.entity.position",
+      "status": "implemented by ForgeRuntime Observation",
+      "read": "RuntimeEntitySnapshot.Position (metres) for any observable entity",
       "ports": {
-        "position": "the life's position in metres"
+        "position": "the entity's position in metres"
       }
     },
     {
@@ -61,12 +60,12 @@
       }
     },
     {
-      "id": "forge.query.player.ammo",
-      "status": "implemented",
-      "read": "Player.ItemEquippable.GetCurrentClip() : System.Int32, GetMaxClip() : System.Int32, GetClassAmmoInPackAbs(SNet_Player) : System.Int32 on the wielded item",
+      "id": "forge.query.equipment.ammo",
+      "status": "implemented by ForgeWeapon after forge.query.player.wielded_gear",
+      "read": "Read the player's wielded equipment explicitly, then query that equipment's clip/max/reserve through ForgeWeapon",
       "refusals": [
-        "no-wielded-gear (nothing held, so there is no clip)",
-        "readback-exception"
+        "no equipment entity means there is no ammo subject",
+        "equipment ammo readback refusal is owned by ForgeWeapon"
       ],
       "ports": {
         "clip": "rounds in the clip",
