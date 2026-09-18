@@ -220,7 +220,9 @@ internal sealed class DoorActionWorld : IDisposable
             new object?[]
             {
                 origin, 0L, "test.door.command", "test.door.plan", "test.door.resource", "1", "test.door.node",
-                RuntimeJson.From(parameters ?? new { }), RuntimeJson.From(inputs ?? new { }), isHost
+                RuntimeJson.From(parameters ?? new { }), RuntimeJson.From(inputs ?? new { }), isHost,
+                (Func<EntityReference, object?>)(reference => Doors.TryGetValue(reference, out var door) ? door
+                    : Terminals.TryGetValue(reference, out var terminal) ? terminal : null)
             }, null)!;
         return handler(context);
     }
