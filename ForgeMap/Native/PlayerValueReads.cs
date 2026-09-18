@@ -35,18 +35,17 @@ internal interface IPlayerValueSource
     bool TryTool(EntityReference reference, out PlayerTool tool, out string code);
 }
 
-/// <summary>The eight read-only value rows of the player domain.
+/// <summary>The seven player-domain Data read operators not already owned by ForgeRuntime.
 ///
 /// Every one of them is a `query` step, and every one of them reads the world exactly once through the kernel's
 /// budgeted session: the player it is about is resolved through `TrySnapshot`, which is what charges the query
-/// budget, proves the reference still names a life and carries the fields the shared snapshot owns (health, its
-/// maximum and the position). The fields the shared snapshot does not carry — infection, the wielded gear, its
+/// budget, proves the reference still names a life and carries shared state such as life-state and position. The
+/// fields the shared snapshot does not carry — infection, the wielded gear, its
 /// ammunition and the carried item — are read by this provider's own native half from the same life the snapshot
 /// just verified; that read is not a second world query and adds no second identity check, which is why this file
 /// takes the reference from the snapshot and never from the frame a second time.
 ///
-/// A value that cannot be read is a refusal with a code, never a zero and never an empty answer: a snapshot
-/// without health means the provider does not publish health for that life (`health-unavailable`), a player
+/// A value that cannot be read is a refusal with a code, never a zero and never an empty answer: a player
 /// holding no weapon has no clip (`no-wielded-gear`), and a source that is not attached at all refuses by name
 /// instead of answering from a table that was never filled.</summary>
 internal sealed class PlayerValueReads
@@ -54,7 +53,6 @@ internal sealed class PlayerValueReads
     /// <summary>The code a value read answers when the provider publishes no source. It is a refusal and not an
     /// empty value: the row exists, this process just cannot read it.</summary>
     internal const string SourceUnavailableCode = "player-value-source-unavailable";
-    internal const string HealthUnavailableCode = "health-unavailable";
     internal const string PositionUnavailableCode = "position-unavailable";
     internal const string NoWieldedGearCode = "no-wielded-gear";
     internal const string MissingFieldCode = "missing-field";
@@ -81,7 +79,6 @@ internal sealed class PlayerValueReads
     /// declared with a shape in `PlayerStateContract.ValueShapes`.</summary>
     internal static IReadOnlyDictionary<string, EvaluatorHandler> Evaluators() => new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
     {
-        [PlayerStateContract.HealthValueHandler] = Evaluate(Health),
         [PlayerStateContract.InfectionValueHandler] = Evaluate(Infection),
         [PlayerStateContract.DownedValueHandler] = Evaluate(Downed),
         [PlayerStateContract.PositionValueHandler] = Evaluate(Position),
@@ -117,13 +114,6 @@ internal sealed class PlayerValueReads
     // private so this package's focused tests can drive a row with a written snapshot and a written source: a
     // value row's whole contract is which ports it carries and which refusal it raises, and neither needs a
     // dispatch to be exercised.
-
-    internal static JsonElement AnswerHealth(RuntimeEntitySnapshot snapshot)
-    {
-        if (snapshot.Health is not { } current || snapshot.HealthMaximum is not { } maximum)
-            throw new RuntimeContractException(HealthUnavailableCode, "This provider publishes no health for the life.");
-        return PlayerStateContract.HealthAnswer(current, maximum);
-    }
 
     internal static JsonElement AnswerInfection(IPlayerValueSource? source, EntityReference reference, RuntimeEntitySnapshot snapshot)
     {
@@ -179,9 +169,6 @@ internal sealed class PlayerValueReads
             throw new RuntimeContractException(code, "Tool read failed: " + code);
         return PlayerStateContract.ToolAnswer(tool.Item, tool.Ammo, tool.AmmoMaximum, tool.Count, tool.Stacks);
     }
-
-    private static JsonElement Health(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerHealth(snapshot);
 
     private static JsonElement Infection(PlayerValueReads reads, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerInfection(reads._source, reference, snapshot);

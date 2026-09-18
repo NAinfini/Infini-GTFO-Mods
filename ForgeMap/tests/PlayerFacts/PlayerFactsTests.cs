@@ -214,19 +214,6 @@ public sealed class PlayerFactsTests
     // ---- value rows --------------------------------------------------------------------------------------
 
     [Fact]
-    public void health_answers_the_snapshot_reading_and_refuses_an_absent_one()
-    {
-        var withHealth = Snapshot(health: 42, maximum: 100);
-        var payload = PlayerValueReads.AnswerHealth(withHealth);
-        Require(Math.Abs(payload.GetProperty("value").GetDouble() - 42) < 0.0001, "The health value differs.");
-        Require(Math.Abs(payload.GetProperty("maximum").GetDouble() - 100) < 0.0001, "The health maximum differs.");
-        Require(Math.Abs(payload.GetProperty("fraction").GetDouble() - 0.42) < 0.0001, "The health fraction differs.");
-
-        var refusal = Refusal(() => PlayerValueReads.AnswerHealth(Snapshot(health: null, maximum: null)));
-        Require(refusal == PlayerValueReads.HealthUnavailableCode, "A snapshot without health was answered: " + refusal);
-    }
-
-    [Fact]
     public void downed_answers_the_life_state_it_was_given()
     {
         Require(PlayerValueReads.AnswerDowned(Snapshot(lifeState: "downed")).GetProperty("value").GetBoolean(), "A downed life read as standing.");

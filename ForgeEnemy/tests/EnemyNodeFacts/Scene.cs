@@ -347,7 +347,6 @@ internal sealed class Scene : IDisposable
         var evaluators = EnemyModule.NodeEvaluators();
         var handler = capabilityId switch
         {
-            EnemyNodeValueContract.HealthCapability => EnemyNodeValueContract.HealthHandler,
             EnemyNodeValueContract.AliveCapability => EnemyNodeValueContract.AliveHandler,
             EnemyNodeValueContract.TypeCapability => EnemyNodeValueContract.TypeHandler,
             EnemyNodeValueContract.SleepingCapability => EnemyNodeValueContract.SleepingHandler,

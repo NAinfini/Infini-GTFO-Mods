@@ -17,8 +17,6 @@ internal static class PlayerObservation
     private const string HostPlayerTag = "player.host";
     private const string BotTag = "player.bot";
     private const string SlotTagPrefix = "player.slot-";
-    private const string HealthTag = "hp";
-    private const string HealthMaximumTag = "hp.max";
 
     /// <summary>The one recipient capability this provider serves for a player. It is advertised only where the
     /// reader can also serve it — a verified receiver on a living agent — so a dead player or one without a
@@ -35,9 +33,11 @@ internal static class PlayerObservation
         // publishes as a tag, not the entity number the module assigned that life.
         var first = Capture(agent, player);
         if (first == null || first != Capture(agent, player)) return null;
-        return new RuntimeEntitySnapshot(reference, Kind, Faction, first.LifeState, Tags(player, first.SlotIndex, first.Health),
+        return new RuntimeEntitySnapshot(reference, Kind, Faction, first.LifeState, Tags(player, first.SlotIndex),
             first.Alive && first.Health.Setup ? HealReceiver : Array.Empty<string>(),
-            new double[] { first.X, first.Y, first.Z });
+            new double[] { first.X, first.Y, first.Z },
+            first.Health.Setup ? first.Health.Current : null,
+            first.Health.Setup ? first.Health.Maximum : null);
     }
 
     private sealed record PlayerSample(IntPtr PlayerPointer, IntPtr AgentPointer, string LifeState, bool Alive, int SlotIndex,
@@ -85,22 +85,14 @@ internal static class PlayerObservation
             && locomotion.m_currentStateEnum == PlayerLocomotion.PLOC_State.Downed;
     }
 
-    /// <summary>Position is the agent's own value. Health is reported as two tags because the shared snapshot
-    /// contract carries no health field: a health reader without a verified receiver publishes neither tag.</summary>
-    private static IReadOnlyList<string> Tags(SNet_Player player, int slotIndex, Health health)
+    /// <summary>Tags carry player identity only. Health is first-class snapshot Data and never encoded into tags.</summary>
+    private static IReadOnlyList<string> Tags(SNet_Player player, int slotIndex)
     {
-        var tags = new List<string>(6);
+        var tags = new List<string>(4);
         if (player.IsLocal) tags.Add(LocalPlayerTag);
         if (player.IsMaster) tags.Add(HostPlayerTag);
         if (player.IsBot) tags.Add(BotTag);
         tags.Add(SlotTagPrefix + slotIndex.ToString(CultureInfo.InvariantCulture));
-        if (health.Setup)
-        {
-            tags.Add(HealthTag + "." + Amount(health.Current));
-            tags.Add(HealthMaximumTag + "." + Amount(health.Maximum));
-        }
         return tags;
     }
-
-    private static string Amount(float value) => value.ToString("0.00", CultureInfo.InvariantCulture);
 }

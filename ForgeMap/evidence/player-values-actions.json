@@ -8,51 +8,83 @@
   "evidenceSource": "%TEMP%\\covtrigb\\ilspy (Modules-ASM.dll interop, build 20403457), ForgeMap/evidence/player-observation.json, ForgeMap/evidence/player-actions.json",
   "valueRows": [
     {
-      "id": "forge.query.player.health",
-      "status": "implemented",
-      "read": "RuntimeEntityQuerySession.TrySnapshot(gtfo.player) -> RuntimeEntitySnapshot.Health / .HealthMaximum (the framework's budgeted read; one query charge per step)",
-      "requires": "ForgeMap/Native/PlayerObservation.cs must publish the two snapshot fields. That file already reads them (`ReadHealth` -> damage.Health / damage.HealthMax with setup/owner/finite checks) and currently writes them into tags instead; the rabid batch's fragment asks for the two constructor arguments, and this row refuses with `health-unavailable` until they are published. Same native getter, one read path.",
-      "ports": { "value": "current health (hp)", "maximum": "health maximum (hp)", "fraction": "value / maximum, computed from the same sample" }
+      "id": "forge.query.entity.health",
+      "status": "implemented by ForgeRuntime; ForgeMap supplies gtfo.player snapshot Data",
+      "read": "ForgeMap/Native/PlayerObservation.cs validates Dam_PlayerDamageBase.Health / HealthMax and publishes RuntimeEntitySnapshot.Health / HealthMaximum; ForgeRuntime ObservationContracts owns the shared budgeted entity.health read.",
+      "requires": "PlayerObservation publishes null health when the receiver is unready, foreign or invalid; the shared Operator accepts gtfo.player | gtfo.enemy and refuses absent Data instead of inventing zero.",
+      "ports": {
+        "value": "current health (hp)",
+        "maximum": "health maximum (hp)",
+        "fraction": "value / maximum, computed by the shared Runtime Operator from the same snapshot"
+      }
     },
     {
       "id": "forge.query.player.infection",
       "status": "implemented",
       "read": "Dam.Dam_PlayerDamageBase.Infection (System.Single property) for the life the budgeted snapshot read just verified",
-      "refusals": ["missing-health-receiver", "readback-exception", "stale-or-unsupported-recipient"],
-      "ports": { "value": "the receiver's infection, in the receiver's own unit (the game publishes no unit)" }
+      "refusals": [
+        "missing-health-receiver",
+        "readback-exception",
+        "stale-or-unsupported-recipient"
+      ],
+      "ports": {
+        "value": "the receiver's infection, in the receiver's own unit (the game publishes no unit)"
+      }
     },
     {
       "id": "forge.query.player.downed",
       "status": "implemented",
       "read": "the shared snapshot's own LifeState, which the player observer publishes as alive | downed | dead (PlayerObservation.Capture reads PlayerAgent.Alive first and PlayerLocomotion.m_currentStateEnum == PLOC_State.Downed second)",
-      "ports": { "value": "LifeState == \"downed\"", "alive": "LifeState != \"dead\"" }
+      "ports": {
+        "value": "LifeState == \"downed\"",
+        "alive": "LifeState != \"dead\""
+      }
     },
     {
       "id": "forge.query.player.position",
       "status": "implemented",
       "read": "RuntimeEntitySnapshot.Position (metres)",
-      "ports": { "position": "the life's position in metres" }
+      "ports": {
+        "position": "the life's position in metres"
+      }
     },
     {
       "id": "forge.query.player.wielded_gear",
       "status": "implemented",
       "read": "Player.PlayerAgent.Inventory -> Player.PlayerInventoryBase.WieldedItem (Player.ItemEquippable), then RuntimeKernel.ResolveEntity(object) so whichever package owns the item answers",
-      "refusals": ["equipment-unresolved (an item exists but no package names it as an entity — deliberately different from holding nothing)", "stale-or-unsupported-recipient"],
-      "ports": { "equipment": "the held item's entity, JSON null when the player holds nothing" }
+      "refusals": [
+        "equipment-unresolved (an item exists but no package names it as an entity — deliberately different from holding nothing)",
+        "stale-or-unsupported-recipient"
+      ],
+      "ports": {
+        "equipment": "the held item's entity, JSON null when the player holds nothing"
+      }
     },
     {
       "id": "forge.query.player.ammo",
       "status": "implemented",
       "read": "Player.ItemEquippable.GetCurrentClip() : System.Int32, GetMaxClip() : System.Int32, GetClassAmmoInPackAbs(SNet_Player) : System.Int32 on the wielded item",
-      "refusals": ["no-wielded-gear (nothing held, so there is no clip)", "readback-exception"],
-      "ports": { "clip": "rounds in the clip", "clip_max": "the clip's size", "reserve": "rounds in the pack" }
+      "refusals": [
+        "no-wielded-gear (nothing held, so there is no clip)",
+        "readback-exception"
+      ],
+      "ports": {
+        "clip": "rounds in the clip",
+        "clip_max": "the clip's size",
+        "reserve": "rounds in the pack"
+      }
     },
     {
       "id": "forge.query.player.carried_item",
       "status": "implemented with a derived subject",
       "read": "Player.PlayerBackpackManager.TryGetBackpack(SNet_Player, out PlayerBackpack) -> PlayerBackpack.Slots[] -> BackpackItem.Instance, then Item.m_expeditionGearComponent != null as the DERIVED test for 'this is the expedition item' (the game exposes no carried flag), then RuntimeKernel.ResolveEntity(object)",
-      "refusals": ["backpack-unavailable", "equipment-unresolved"],
-      "ports": { "item": "the carried item's entity, JSON null when nobody in the backpack carries one (a read that happened and found nothing)" }
+      "refusals": [
+        "backpack-unavailable",
+        "equipment-unresolved"
+      ],
+      "ports": {
+        "item": "the carried item's entity, JSON null when nobody in the backpack carries one (a read that happened and found nothing)"
+      }
     },
     {
       "id": "forge.query.player.tool",
@@ -67,7 +99,19 @@
       "status": "implemented (ForgeMap binding)",
       "write": "Dam.Dam_SyncedDamageBase.BulletDamage(System.Single dam, Agents.Agent sourceAgent, UnityEngine.Vector3 position, UnityEngine.Vector3 direction, UnityEngine.Vector3 normal, System.Boolean allowDirectionalBonus, System.Single staggerMulti, System.Single precisionMulti, System.UInt32 gearCategoryId) — the packet-sending half of the game's damage path, called on the victim's own receiver",
       "confirmation": "the receiver's health is read before and after through PlayerHealthReceiver.TryRead; the row reports the health the receiver actually lost (before.Health - after.Health) and an application that landed nothing is an unknown commit, never a success",
-      "refusals": ["authority-or-phase", "mitigation-policy-unsupported (only receiver_rules)", "damage-kind-unsupported (this entry carries the bullet kind, index 0)", "limb-unsupported", "amount-out-of-range", "source-missing", "missing-health-receiver", "not-alive", "no-targets", "too-many-targets", "damage-not-observed (unknown commit)"]
+      "refusals": [
+        "authority-or-phase",
+        "mitigation-policy-unsupported (only receiver_rules)",
+        "damage-kind-unsupported (this entry carries the bullet kind, index 0)",
+        "limb-unsupported",
+        "amount-out-of-range",
+        "source-missing",
+        "missing-health-receiver",
+        "not-alive",
+        "no-targets",
+        "too-many-targets",
+        "damage-not-observed (unknown commit)"
+      ]
     },
     {
       "id": "forge.action.combat.revive",
@@ -75,7 +119,17 @@
       "status": "implemented (ForgeMap binding; the capability row is inserted into CombatContracts by the integration fragment)",
       "write": "Agents.AgentReplicatedActions.PlayerReviveAction(Player.PlayerAgent p_target, Player.PlayerAgent p_source, UnityEngine.Vector3 where) — an SNet_AuthorativeAction: the host submits it and the game's own validation/apply half (DoPlayerReviveValidation / DoPlayerRevive over pPlayerReviveAction{TargetPlayer, SourcePlayer, Where, setHealthData}) runs on every machine",
       "confirmation": "the life is read back through the identity: still downed is `revive-not-observed` (unknown commit)",
-      "refusals": ["authority-or-phase", "cost-policy-unsupported (only `none`; the game's revive charges nothing)", "duration-unsupported", "restored-health-unsupported", "source-missing (a reviver that resolves to a player is required)", "not-alive", "not-downed", "stale-or-unsupported-recipient", "too-many-targets"],
+      "refusals": [
+        "authority-or-phase",
+        "cost-policy-unsupported (only `none`; the game's revive charges nothing)",
+        "duration-unsupported",
+        "restored-health-unsupported",
+        "source-missing (a reviver that resolves to a player is required)",
+        "not-alive",
+        "not-downed",
+        "stale-or-unsupported-recipient",
+        "too-many-targets"
+      ],
       "notHonoured": "`duration` and `restored_health` are refused by name instead of ignored: the game owns the revive interaction's length and the health a revive restores, and the native entry takes neither."
     },
     {
@@ -84,8 +138,16 @@
       "status": "implemented (this provider's own row)",
       "write": "Dam.Dam_SyncedDamageBase.SendSetDead(System.Boolean allowRevive) — the host's own replicated transition; the receive half reads pSetDeadData{allowRevive}",
       "confirmation": "the life is read back through the identity: still alive and not downed is `down-not-observed`. Health is deliberately not the confirmation, because the receiver's own read refuses a life that is no longer alive.",
-      "ports": { "revive_policy": "the row's one structural parameter, allowed | denied, submitted as the native entry's own allowRevive argument" },
-      "refusals": ["authority-or-phase", "already-down", "missing-health-receiver", "native-commit-exception", "down-not-observed (unknown commit)"],
+      "ports": {
+        "revive_policy": "the row's one structural parameter, allowed | denied, submitted as the native entry's own allowRevive argument"
+      },
+      "refusals": [
+        "authority-or-phase",
+        "already-down",
+        "missing-health-receiver",
+        "native-commit-exception",
+        "down-not-observed (unknown commit)"
+      ],
       "unverified": "Whether SendSetDead(true) leaves the life in the downed state or in the dead state is the game's own locomotion decision and is not readable from metadata: the action reports the write as committed only when the life stopped being alive and not-downed, and the in-game check list carries what state the game actually lands in."
     }
   ],

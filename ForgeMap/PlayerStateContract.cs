@@ -50,7 +50,6 @@ public static class PlayerStateContract
 
     // ---------------------------------------------------------------- capabilities this provider owns
 
-    public const string HealthValueCapability = "forge.query.player.health";
     public const string InfectionValueCapability = "forge.query.player.infection";
     public const string DownedValueCapability = "forge.query.player.downed";
     public const string PositionValueCapability = "forge.query.player.position";
@@ -64,7 +63,6 @@ public static class PlayerStateContract
 
     /// <summary>The value handler names: the evaluator this provider registers for each read-only row. The name
     /// is also the shape key, so the registration cannot supply an evaluator whose ports were never declared.</summary>
-    public const string HealthValueHandler = "gtfo.player.value.health";
     public const string InfectionValueHandler = "gtfo.player.value.infection";
     public const string DownedValueHandler = "gtfo.player.value.downed";
     public const string PositionValueHandler = "gtfo.player.value.position";
@@ -191,12 +189,6 @@ public static class PlayerStateContract
 
     // ---------------------------------------------------------------- value answers
 
-    /// <summary>`forge.query.player.health`: the receiver's current and maximum health and their ratio. Every
-    /// number is read from the same sample, so the ratio can never describe a different read than the two
-    /// absolute values.</summary>
-    public static JsonElement HealthAnswer(double value, double maximum)
-        => RuntimeJson.From(new { value, maximum, fraction = maximum > 0 ? value / maximum : 0 });
-
     /// <summary>`forge.query.player.infection`: the receiver's infection value.</summary>
     public static JsonElement InfectionAnswer(double value) => RuntimeJson.From(new { value });
 
@@ -229,7 +221,7 @@ public static class PlayerStateContract
 
     // ---------------------------------------------------------------- value rows
 
-    /// <summary>The eight read-only rows this provider declares. Each one takes the player it is about and
+    /// <summary>The seven player-domain Data read operators not already owned by ForgeRuntime. Each one takes the player it is about and
     /// answers with values only: no `result` row, no handle, no write.
     ///
     /// Their capability kind is `state` — a read-only row answers a state, and it is the kind the framework
@@ -238,14 +230,6 @@ public static class PlayerStateContract
     /// same field and neither is derived from the other.</summary>
     public static IReadOnlyList<object> ValueRows() => Array.AsReadOnly(new[]
     {
-        ValueRow(HealthValueCapability, "玩家生命值", "读一个玩家当前与最大的生命值。",
-            "Reads one player's current and maximum health.",
-            new object[]
-            {
-                new { id = "value", type = "number", unit = "hp" },
-                new { id = "maximum", type = "number", unit = "hp" },
-                new { id = "fraction", type = "number" }
-            }),
         ValueRow(InfectionValueCapability, "玩家感染值", "读一个玩家当前的感染值。",
             "Reads one player's current infection value.",
             new object[] { new { id = "value", type = "number" } }),
@@ -300,10 +284,9 @@ public static class PlayerStateContract
         }
     };
 
-    /// <summary>The eight query bindings, one per value row, paired with <see cref="ValueRows"/> by position.</summary>
+    /// <summary>The seven query bindings, one per value row, paired with <see cref="ValueRows"/> by position.</summary>
     public static IReadOnlyList<object> ValueBindings() => Array.AsReadOnly(new object[]
     {
-        ValueBinding(HealthValueCapability, HealthValueHandler),
         ValueBinding(InfectionValueCapability, InfectionValueHandler),
         ValueBinding(DownedValueCapability, DownedValueHandler),
         ValueBinding(PositionValueCapability, PositionValueHandler),
@@ -313,11 +296,11 @@ public static class PlayerStateContract
         ValueBinding(ToolValueCapability, ToolValueHandler)
     });
 
-    /// <summary>The eight registration support rows, paired with <see cref="ValueBindings"/> by position. A value
+    /// <summary>The seven registration support rows, paired with <see cref="ValueBindings"/> by position. A value
     /// read owns no object and writes nothing, so no row carries a permission.</summary>
     public static IReadOnlyList<BindingSupport> ValueSupport() => Array.AsReadOnly(new[]
     {
-        ValueSupport(HealthValueCapability), ValueSupport(InfectionValueCapability), ValueSupport(DownedValueCapability),
+        ValueSupport(InfectionValueCapability), ValueSupport(DownedValueCapability),
         ValueSupport(PositionValueCapability), ValueSupport(WieldedGearValueCapability), ValueSupport(AmmoValueCapability),
         ValueSupport(CarriedItemValueCapability), ValueSupport(ToolValueCapability)
     });
@@ -327,7 +310,6 @@ public static class PlayerStateContract
     /// into its own shape table.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> ValueShapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
-        [HealthValueHandler] = new HandlerShape().Inputs("player").Outputs("value", "maximum", "fraction"),
         [InfectionValueHandler] = new HandlerShape().Inputs("player").Outputs("value"),
         [DownedValueHandler] = new HandlerShape().Inputs("player").Outputs("value", "alive"),
         [PositionValueHandler] = new HandlerShape().Inputs("player").Outputs("position"),

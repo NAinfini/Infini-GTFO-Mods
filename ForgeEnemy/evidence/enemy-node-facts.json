@@ -71,9 +71,9 @@
   ],
   "values": [
     {
-      "capability": "forge.query.enemy.health",
-      "read": "RuntimeEntitySnapshot.Health / .HealthMaximum",
-      "producer": "ForgeEnemy/Native/Observation/EnemyEntityObserver.cs (this package's own observer, already frozen with those two fields)"
+      "capability": "forge.query.entity.health",
+      "read": "ForgeRuntime ObservationContracts reads RuntimeEntitySnapshot.Health / HealthMaximum and derives fraction for gtfo.player | gtfo.enemy.",
+      "producer": "ForgeEnemy/Native/Observation/EnemyEntityObserver.cs publishes the enemy health pair into the shared snapshot; ForgeEnemy no longer owns a duplicate health query row."
     },
     {
       "capability": "forge.query.enemy.alive",

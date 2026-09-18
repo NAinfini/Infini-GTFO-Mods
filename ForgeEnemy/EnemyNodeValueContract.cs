@@ -52,10 +52,6 @@ public static class EnemyNodeValueContract
     /// <summary>The entity input every row takes.</summary>
     public const string EnemyPort = "enemy";
 
-    /// <summary>`v-e-health`: current and maximum health.</summary>
-    public const string HealthCapability = "forge.query.enemy.health";
-    public const string HealthHandler = "gtfo.enemy.value.health";
-
     /// <summary>`v-e-alive`: whether the enemy is alive.</summary>
     public const string AliveCapability = "forge.query.enemy.alive";
     public const string AliveHandler = "gtfo.enemy.value.alive";
@@ -87,8 +83,7 @@ public static class EnemyNodeValueContract
     /// <summary>Every capability id this contract names, in the same order as <see cref="ValueRows"/>.</summary>
     public static readonly string[] CapabilityIds =
     {
-        HealthCapability, AliveCapability, TypeCapability, SleepingCapability, WhereCapability, TaggedCapability,
-        GroupCapability
+        AliveCapability, TypeCapability, SleepingCapability, WhereCapability, TaggedCapability, GroupCapability
     };
 
     /// <summary>Every handler name this contract declares, in the same order as
@@ -96,7 +91,7 @@ public static class EnemyNodeValueContract
     /// also its shape key, so a registration cannot supply an evaluator whose ports were never declared.</summary>
     public static readonly string[] HandlerNames =
     {
-        HealthHandler, AliveHandler, TypeHandler, SleepingHandler, WhereHandler, TaggedHandler, GroupHandler
+        AliveHandler, TypeHandler, SleepingHandler, WhereHandler, TaggedHandler, GroupHandler
     };
 
     /// <summary>Every binding id this contract declares, in the same order.</summary>
@@ -107,18 +102,11 @@ public static class EnemyNodeValueContract
         return ids;
     }
 
-    /// <summary>The seven read-only rows, each a complete catalog entry: the id, the provider that owns it, the
+    /// <summary>The six enemy-domain Data read operators not already owned by ForgeRuntime. Each row declares the id, provider and
     /// kind and tier the framework's rules require, and the ports the row really answers. A value row answers
     /// values only — no `next`, no `result`, no handle, and no write.</summary>
     public static IReadOnlyList<object> ValueRows() => Array.AsReadOnly(new[]
     {
-        ValueRow(HealthCapability, "敌人生命值", "读一个敌人当前与最大的生命值。",
-            "Reads one enemy's current and maximum health without changing anything.",
-            new object[]
-            {
-                new { id = "value", type = "number", unit = "hp" },
-                new { id = "maximum", type = "number", unit = "hp" }
-            }),
         ValueRow(AliveCapability, "敌人是否存活", "读一个敌人是否还活着。",
             "Reads whether one enemy is still alive.",
             new object[] { new { id = "value", type = "boolean" } }),
@@ -161,12 +149,11 @@ public static class EnemyNodeValueContract
             })
     });
 
-    /// <summary>The seven bindings, one per row, paired with <see cref="ValueRows"/> by position. The role is
+    /// <summary>The six bindings, one per row, paired with <see cref="ValueRows"/> by position. The role is
     /// `observe` for the reason the player value family uses it: an observation evaluated on demand registers
     /// through the evaluator table, and a `query` row is evaluated on demand by definition.</summary>
     public static IReadOnlyList<object> ValueBindings() => Array.AsReadOnly(new object[]
     {
-        ValueBinding(HealthCapability, HealthHandler),
         ValueBinding(AliveCapability, AliveHandler),
         ValueBinding(TypeCapability, TypeHandler),
         ValueBinding(SleepingCapability, SleepingHandler),
@@ -175,11 +162,11 @@ public static class EnemyNodeValueContract
         ValueBinding(GroupCapability, GroupHandler)
     });
 
-    /// <summary>The seven registration support rows, paired with <see cref="ValueBindings"/> by position. A value
+    /// <summary>The six registration support rows, paired with <see cref="ValueBindings"/> by position. A value
     /// read owns no object and writes nothing, so no row carries a permission.</summary>
     public static IReadOnlyList<BindingSupport> ValueSupport() => Array.AsReadOnly(new[]
     {
-        ValueSupport(HealthCapability), ValueSupport(AliveCapability), ValueSupport(TypeCapability),
+        ValueSupport(AliveCapability), ValueSupport(TypeCapability),
         ValueSupport(SleepingCapability), ValueSupport(WhereCapability), ValueSupport(TaggedCapability),
         ValueSupport(GroupCapability)
     });
@@ -188,7 +175,6 @@ public static class EnemyNodeValueContract
     /// here so the native read layer cannot describe a second layout.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> ValueShapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
-        [HealthHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value", "maximum"),
         [AliveHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
         [TypeHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
         [SleepingHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),

@@ -8,21 +8,18 @@ using ForgeRuntime.Framework;
 
 namespace ForgeEnemy.Native;
 
-/// <summary>The seven read-only value rows of the enemy domain (`v-e-health`, `v-e-alive`, `v-e-type`, `v-e-sleep`,
-/// `v-e-where`, `v-e-tagged`).
+/// <summary>The six enemy-domain Data read operators not already owned by ForgeRuntime (`alive`, `type`, `sleep`,
+/// `where`, `tagged`, `group`).
 ///
 /// Every one of them is a `query` step, and every one of them reads the world exactly once through the kernel's
 /// budgeted session: the enemy it is about is resolved through `TrySnapshot`, which is what charges the query
-/// budget and proves the reference still names a life. Four rows answer entirely from that snapshot — health and
-/// its maximum, the life state, the behaviour state's own `aiState` member, and the position. The remaining two
-/// need one reading the shared frame does not carry, and each is read from the same life the snapshot just
-/// verified, with the instance re-checked afterwards: the official enemy type (`EnemyTypeReader`) and the tag
-/// flag with its remaining seconds (`EnemyEntityObserver.ReadTag`). The zone `where` answers comes from the
+/// budget and proves the reference still names a life. The life state, behaviour `aiState` and position are read
+/// from that snapshot. Type, tag and group add the domain-specific reads their contracts require, each against
+/// the same life the snapshot just verified. The zone `where` answer comes from the
 /// kernel's own zone read (`RuntimeQuerySession.TryZone`), which is the provider's registered
 /// `EntityZones` responder and the only zone path this package has.
 ///
-/// A value that cannot be read is a refusal with a code, never a zero and never an empty answer: a snapshot
-/// without health means the provider does not publish health for that life (`health-unavailable`), a behaviour
+/// A value that cannot be read is a refusal with a code, never a zero and never an empty answer: a behaviour
 /// state no `ai_state` member covers is `aiState == "disabled"` and is refused rather than reported as awake, and
 /// a life whose type block does not read has no type (`enemy-type-unavailable`). A zone read that cannot be made
 /// is a refusal of the same kind — an enemy the provider cannot place never arrives as an absent zone — so no port
@@ -35,7 +32,6 @@ internal sealed class EnemyNodeValueReads
     /// <summary>A value read with no enemy domain behind it. It is a refusal and not an empty value: the rows
     /// exist, this session just cannot read them.</summary>
     internal const string SourceUnavailableCode = "enemy-value-source-unavailable";
-    internal const string HealthUnavailableCode = "health-unavailable";
     internal const string PositionUnavailableCode = "position-unavailable";
     internal const string TypeUnavailableCode = "enemy-type-unavailable";
     internal const string StateUnavailableCode = "enemy-state-unavailable";
@@ -80,7 +76,6 @@ internal sealed class EnemyNodeValueReads
     /// declared with a shape in `EnemyNodeValueContract.ValueShapes`.</summary>
     internal static IReadOnlyDictionary<string, EvaluatorHandler> Evaluators() => new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
     {
-        [EnemyNodeValueContract.HealthHandler] = Evaluate(Health),
         [EnemyNodeValueContract.AliveHandler] = Evaluate(Alive),
         [EnemyNodeValueContract.TypeHandler] = Evaluate(Type),
         [EnemyNodeValueContract.SleepingHandler] = Evaluate(Sleeping),
@@ -112,17 +107,10 @@ internal sealed class EnemyNodeValueReads
         return (reference, snapshot!);
     }
 
-    // The seven answers, over the one budgeted read the evaluator already made. They are internal rather than
+    // The six answers, over the one budgeted read the evaluator already made. They are internal rather than
     // private so this package's focused tests can drive a row with a written snapshot and a written instance: a
     // value row's whole contract is which ports it carries and which refusal it raises, and neither needs a
     // dispatch to be exercised.
-
-    internal static JsonElement AnswerHealth(RuntimeEntitySnapshot snapshot)
-    {
-        if (snapshot.Health is not { } current || snapshot.HealthMaximum is not { } maximum)
-            throw new RuntimeContractException(HealthUnavailableCode, "This provider publishes no health for the life.");
-        return RuntimeJson.From(new { value = current, maximum });
-    }
 
     /// <summary>The life state is the one place the provider publishes whether an enemy is alive, so the answer
     /// is its own comparison: `alive` is alive, every other state the frame can carry is not.</summary>
@@ -171,9 +159,6 @@ internal sealed class EnemyNodeValueReads
             throw new RuntimeContractException(TagUnavailableCode, "This life's tag state does not read.");
         return RuntimeJson.From(new { value = reading.Tagged, remaining = (double)reading.RemainingSeconds });
     }
-
-    private static JsonElement Health(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerHealth(snapshot);
 
     private static JsonElement Alive(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerAlive(snapshot);

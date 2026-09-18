@@ -885,6 +885,7 @@ checks += ResourceRegistryTests.Run();
 checks += QueryPresenceTests.Run();
 checks += ZoneReadTests.Run();
 checks += QuerySnapshotTests.Run();
+checks += ObservationDataTests.Run();
 checks += FrameShapeTests.Run();
 checks += PlanContractTests.Run();
 Console.WriteLine($"Framework checks: {checks} passed.");

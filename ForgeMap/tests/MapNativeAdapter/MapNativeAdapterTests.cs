@@ -577,8 +577,9 @@ public sealed class MapNativeAdapterTests
         var living = query.Items[0].Snapshot!;
         Require(living.Kind == "gtfo.player" && living.Faction == "player" && living.LifeState == "alive"
             && living.Position.SequenceEqual(new[] { 1.5, -2.25, 3.0 }), "Living player snapshot differs.");
-        Require(living.Tags.SequenceEqual(new[] { "player.local", "player.host", "player.slot-2", "hp.75.50", "hp.max.100.00" }),
-            "Living player tags differ: " + string.Join(",", living.Tags));
+        Require(living.Tags.SequenceEqual(new[] { "player.local", "player.host", "player.slot-2" })
+            && living.Health == 75.5 && living.HealthMaximum == 100,
+            "Living player Data differs: " + string.Join(",", living.Tags));
         // The one recipient capability this provider serves for a player, advertised exactly where the health
         // reader can also serve it: a verified receiver on a living agent. A dead player and a destroyed or
         // foreign receiver advertise nothing instead of claiming a heal they would have to refuse.
@@ -586,10 +587,11 @@ public sealed class MapNativeAdapterTests
             "Living player observation did not advertise the one recipient capability it serves: " + string.Join(",", living.Receives));
         var dead = query.Items[1].Snapshot!;
         Require(dead.LifeState == "dead" && dead.Tags.SequenceEqual(new[] { "player.bot", "player.slot-3" })
-            && !dead.Tags.Any(tag => tag.StartsWith("hp", StringComparison.Ordinal))
+            && dead.Health == null && dead.HealthMaximum == null
             && dead.Receives.Count == 0, "Dead player snapshot differs: " + string.Join(",", dead.Tags));
         var downed = query.Items[2].Snapshot!;
-        Require(downed.LifeState == "downed" && downed.Tags.SequenceEqual(new[] { "player.slot-2", "hp.12.00", "hp.max.40.00" })
+        Require(downed.LifeState == "downed" && downed.Tags.SequenceEqual(new[] { "player.slot-2" })
+            && downed.Health == 12 && downed.HealthMaximum == 40
             && downed.Position.SequenceEqual(new[] { 8.0, 1.0, -8.0 })
             // Downed is alive in the native health model, so the receiver is still readable and the heal is
             // still accepted; this observer never claims it revives anyone.
@@ -605,10 +607,14 @@ public sealed class MapNativeAdapterTests
         Require(kernel.InspectEntities(new[] { Ref(1, 1, 1) }).IsComplete, "Fixture player was not observable.");
         // A health receiver that does not belong to this agent, or an impossible range, is not reported at all.
         a.Agent.Damage.Owner = null;
-        Require(kernel.InspectEntities(new[] { Ref(1, 1, 1) }).Items[0].Snapshot!.Tags.SequenceEqual(new[] { "player.slot-0" }),
+        var foreignHealth = kernel.InspectEntities(new[] { Ref(1, 1, 1) }).Items[0].Snapshot!;
+        Require(foreignHealth.Tags.SequenceEqual(new[] { "player.slot-0" })
+            && foreignHealth.Health == null && foreignHealth.HealthMaximum == null,
             "A foreign health receiver was reported as readable health.");
         a.Agent.Damage.Owner = a.Agent; a.Agent.Damage.Health = 99f;
-        Require(kernel.InspectEntities(new[] { Ref(1, 1, 1) }).Items[0].Snapshot!.Tags.SequenceEqual(new[] { "player.slot-0" }),
+        var invalidHealth = kernel.InspectEntities(new[] { Ref(1, 1, 1) }).Items[0].Snapshot!;
+        Require(invalidHealth.Tags.SequenceEqual(new[] { "player.slot-0" })
+            && invalidHealth.Health == null && invalidHealth.HealthMaximum == null,
             "Health above the maximum was reported.");
         // The player's own slot and the agent's slot are two native reads: a disagreement is not a snapshot.
         a.Agent.Damage.Health = 10f; a.Agent.PlayerSlotIndex = 1;

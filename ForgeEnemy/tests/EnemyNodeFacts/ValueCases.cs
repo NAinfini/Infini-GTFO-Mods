@@ -6,36 +6,12 @@ using ForgeEnemy.Native.Observation;
 using ForgeRuntime.Framework;
 using static T;
 
-/// <summary>Focused cases for the seven value rows: each one answers the ports its contract declares from the
-/// fact behind it, and each one refuses — with a code, never with a zero or a false — when the read cannot be
-/// made. The refusal paths are the point of the family: a snapshot without health, a behaviour state no
-/// `ai_state` member covers, a life outside every zone and a retired life are four different answers.</summary>
+/// <summary>Focused cases for the six enemy-domain Data read operators not already owned by ForgeRuntime. Each
+/// one answers the ports its contract declares and refuses explicitly when its domain-specific read is unavailable.</summary>
 internal static class ValueCases
 {
     internal static void Run()
     {
-        Case("value.health-answers-value-and-maximum", () =>
-        {
-            using var s = new Scene();
-            var enemy = Scene.NewEnemy();
-            enemy.Damage!.Health = 37.5f;
-            enemy.Damage.HealthMax = 120f;
-            var reference = s.Track(enemy);
-            var answer = s.Evaluate(EnemyNodeValueContract.HealthCapability, new { enemy = reference });
-            Check(Math.Abs(answer.GetProperty("value").GetDouble() - 37.5) < 0.001, "value is not the receiver's health.");
-            Check(Math.Abs(answer.GetProperty("maximum").GetDouble() - 120) < 0.001, "maximum is not the receiver's ceiling.");
-        });
-
-        Case("value.health-refuses-when-the-provider-publishes-none", () =>
-        {
-            using var s = new Scene();
-            var enemy = Scene.NewEnemy();
-            enemy.Alive = false;
-            var reference = s.Track(enemy);
-            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.HealthCapability, new { enemy = reference }))
-                == EnemyNodeValueReads.HealthUnavailableCode, "A life with no readable health did not refuse by name.");
-        });
-
         Case("value.alive-follows-the-life-state", () =>
         {
             using var s = new Scene();
