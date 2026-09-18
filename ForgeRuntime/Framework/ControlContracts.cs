@@ -107,7 +107,7 @@ public static class ControlContracts
     /// always second. Unit-bearing counts are ticks, and the timer handle's kind/lifetime are fixed here.</summary>
     private static object Graph(string kind)
     {
-        if (PrimitiveContracts.ControlGraphs.TryGetProperty(kind, out var primitive)) return primitive;
+        if (BehaviorOperatorContracts.ControlGraphs.TryGetProperty(kind, out var primitive)) return primitive;
         object[] Inputs(params object[] extra) => new object[] { new { id = "in", type = "execution" } }.Concat(extra).ToArray();
         var execution = new { id = "next", type = "execution" };
         var timer = new { id = "timer", type = "handle", handleKind = "timer", lifetime = "encounter" };

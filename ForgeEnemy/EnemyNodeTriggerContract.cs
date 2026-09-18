@@ -10,7 +10,7 @@ namespace ForgeEnemy;
 ///
 /// Both are `forge.trigger.*` rows, so their shapes belong to the framework's own contract module and are declared
 /// by `ForgeRuntime/Framework/TriggerContracts.cs`; this file keeps the ids and the binding half, and carries no
-/// row text of its own. The third row of this family, `forge.trigger.entity.spawned`, is declared by the trigger
+/// row text of its own. The third row of this family, `forge.trigger.enemy.spawned`, is declared by the trigger
 /// contract for the same reason: this provider binds it and carries no copy of its text.
 ///
 /// The catalog ports are the ones `TriggerContracts` declares: `tagged` carries `enemy / tagged`, `glued` carries
@@ -30,12 +30,12 @@ public static class EnemyNodeTriggerContract
     public const string GluedBinding = ModuleDefinition.ProviderId + ".binding.glued";
     public const string GluedHandler = "gtfo.enemy.glued";
 
-    /// <summary>The canonical row this provider only binds: the generic entity-spawn fact, published for an enemy
+    /// <summary>The canonical row this provider only binds: the enemy-spawn fact, published for an enemy
     /// by the enemy provider's own spawn observation and for every other kind by the package that owns it. The row
     /// itself is declared by the trigger contract (`forge.contract.trigger`, `TriggerContracts.Module()`), which
     /// registers before any domain package, so this binding is legal as soon as the module registers and this
     /// package never carries the row's text.</summary>
-    public const string SpawnedCapability = "forge.trigger.entity.spawned";
+    public const string SpawnedCapability = "forge.trigger.enemy.spawned";
 
     /// <summary>Every binding id this contract declares, in registration order.</summary>
     public static readonly string[] BindingIds = { TaggedBinding, GluedBinding };
@@ -45,7 +45,7 @@ public static class EnemyNodeTriggerContract
     public const string TagReadPermission = "gtfo.enemy.detection.read";
     public const string GlueReadPermission = "gtfo.enemy.glue.read";
 
-    /// <summary>The binding id this package declares for the generic spawn row. The capability belongs to the
+    /// <summary>The binding id this package declares for the enemy spawn row. The capability belongs to the
     /// trigger contract's provider and that provider registers before any domain package, so this binding is
     /// legal as soon as the row exists — the fact is the watching provider's, and no other package declares a
     /// second binding for it.</summary>

@@ -15,6 +15,6 @@ public static class PlayerSelectorContract
         id = CapabilityId, owner = ModuleDefinition.ProviderId, kind = "selector", version = "1.0.0",
         label = "查询全部玩家",
         parameters = new { description = "读取当前世界中身份有效的玩家集合；关系与范围由后续选择器处理。" },
-        graph = PrimitiveGraphSource.Get(CapabilityId)
+        graph = BehaviorOperatorGraphSource.Get(CapabilityId)
     }).GetRawText();
 }

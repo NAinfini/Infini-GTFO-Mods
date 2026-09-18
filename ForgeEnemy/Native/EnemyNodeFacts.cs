@@ -51,7 +51,7 @@ internal sealed partial class EnemyModule
     /// <summary>Every marker this provider has placed and not yet removed.</summary>
     private readonly List<MarkerRecord> _markers = new();
 
-    /// <summary>The generic entity-spawn fact, published for an enemy from the enemy's own spawn hook. The
+    /// <summary>The enemy-spawn fact, published from the enemy's own spawn hook. The
     /// reference is the one this module already tracks — the spawn registration runs first and this postfix is
     /// last — and the position is the instance's own, read once and read back. An instance this module cannot
     /// resolve publishes nothing rather than minting an identity of its own.</summary>
@@ -68,7 +68,7 @@ internal sealed partial class EnemyModule
         var position = enemy.Position;
         // A position that does not read is an absent port, never a zero vector: the row's other port is the
         // identity, and an identity with a made-up position would be a different fact.
-        var ports = new Dictionary<string, object> { ["entity"] = reference };
+        var ports = new Dictionary<string, object> { ["enemy"] = reference };
         if (float.IsFinite(position.x) && float.IsFinite(position.y) && float.IsFinite(position.z))
             ports["position"] = new[] { (double)position.x, (double)position.y, (double)position.z };
         PublishNodeFact(EnemyNodeTriggerContract.SpawnedBinding, reference, ports);

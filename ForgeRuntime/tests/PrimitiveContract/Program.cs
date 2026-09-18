@@ -1,15 +1,23 @@
 using System.Text.Json;
 using ForgeRuntime.Framework;
 
-if (args.Length != 1) throw new ArgumentException("Pass the website primitive/primitives.json path.");
+if (args.Length != 2) throw new ArgumentException("Pass primitive/primitives.json and behavior/operators.json paths.");
 using var source = JsonDocument.Parse(File.ReadAllText(args[0]));
+using var operatorSource = JsonDocument.Parse(File.ReadAllText(args[1]));
 var primitives = source.RootElement.GetProperty("primitives").EnumerateArray().ToArray();
+var operators = operatorSource.RootElement.GetProperty("operators").EnumerateArray().ToArray();
 int passed = 0;
 foreach (var p in primitives)
 {
     // This proves schema acceptance only, including proposed rows. It does not register handlers.
     RuntimeGraphContracts.ValidateCapability(p.GetProperty("projection").GetProperty("category").GetString()!,
         p.GetProperty("graph"), p.GetProperty("id").GetString()!);
+    passed++;
+}
+foreach (var op in operators)
+{
+    RuntimeGraphContracts.ValidateCapability(op.GetProperty("projection").GetProperty("category").GetString()!,
+        op.GetProperty("graph"), op.GetProperty("projection").GetProperty("capabilityId").GetString()!);
     passed++;
 }
 int entityCases = 0;
@@ -35,7 +43,7 @@ if (!result.GetProperty("fields").EnumerateArray().Any(p => p.GetProperty("id").
     throw new Exception("Healing must report actual health restored.");
 passed++;
 using var controlRows = JsonDocument.Parse(ControlContracts.Module().RegistryJson);
-foreach (var primitive in primitives.Where(p => p.GetProperty("kind").GetString() == "control" && p.GetProperty("review").GetProperty("status").GetString() == "reviewed"))
+foreach (var primitive in operators.Where(p => p.GetProperty("kind").GetString() == "control" && p.GetProperty("review").GetProperty("status").GetString() == "reviewed"))
 {
     var row = controlRows.RootElement.GetProperty("capabilities").EnumerateArray().Single(p => p.GetProperty("id").GetString() == primitive.GetProperty("id").GetString());
     if (row.GetProperty("graph").GetRawText() != primitive.GetProperty("graph").GetRawText())
@@ -45,7 +53,7 @@ foreach (var primitive in primitives.Where(p => p.GetProperty("kind").GetString(
     }
     passed++;
 }
-var each = PrimitiveContracts.ControlGraphs.GetProperty("for_each");
+var each = BehaviorOperatorContracts.ControlGraphs.GetProperty("for_each");
 foreach (var kind in new[] { "gtfo.player", "gtfo.enemy", "gtfo.equipment" })
 {
     var upstream = RuntimeJson.From(new { id = "targets", type = "entity", cardinality = "many", entityKinds = new[] { kind } });
@@ -58,5 +66,5 @@ var unknown = RuntimeEntityKindFlow.Resolve(each, _ => RuntimeJson.From(new { id
 var unknownItem = RuntimeJson.Rows(unknown, "outputs").Single(p => RuntimeJson.Text(p, "id") == "item");
 if (RuntimeGraphContracts.EntityKindsNarrow(unknownItem, RuntimeJson.From(new { id = "player", type = "entity", entityKinds = new[] { "gtfo.player" } }))) throw new Exception("Unknown entity became player.");
 passed++;
-Console.WriteLine($"PASS {passed}: {primitives.Length} schemas, {entityCases} shared kind fixtures, runtime heal projection and actual delta.");
+Console.WriteLine($"PASS {passed}: {primitives.Length} dynamic primitives, {operators.Length} behavior operators, {entityCases} shared kind fixtures, runtime heal projection and actual delta.");
 Console.WriteLine("Contract/managed validation only; no native game execution is certified.");

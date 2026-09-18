@@ -13,7 +13,7 @@ namespace ForgeEnemy.Native;
 /// answers them — the trigger rows in `EnemyNodeTriggerContract`, the action rows in `EnemyNodeEffectContract`,
 /// the query rows in `EnemyNodeValueContract` — and this file only names them.
 ///
-/// One of the rows here is a canonical row this provider binds rather than owns: `forge.trigger.entity.spawned`
+/// One of the rows here is a canonical row this provider binds rather than owns: `forge.trigger.enemy.spawned`
 /// belongs to the trigger contract's provider, which registers before any domain package.
 ///
 /// The action families written by earlier slices — the enemy control actions, the combat actions, the foam action
@@ -121,7 +121,7 @@ internal sealed partial class EnemyModule
            + ",\n" + EnemyAbilityUsedContract.CapabilityRow;
 
     /// <summary>The binding rows this module's registration appends, in the same order as the capabilities
-    /// above, with the generic spawn row's own binding: that row's capability is the trigger contract's, and
+    /// above, with the enemy spawn row's own binding: that row's capability is the trigger contract's, and
     /// this package is the provider that observes it.</summary>
     internal static string NodeBindingRowsJson
         => string.Join(",\n", System.Linq.Enumerable.Select(EnemyNodeValueContract.ValueBindings(), RuntimeJson.From))

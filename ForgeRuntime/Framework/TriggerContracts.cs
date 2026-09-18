@@ -401,49 +401,8 @@ public static class TriggerContracts
             "parameters": []
           }
         },
-        {
-          "id": "forge.trigger.entity.spawned",
-          "owner": "forge.contract.trigger",
-          "kind": "trigger",
-          "label": "敌人生成",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "一个东西真的出现在世界里了。",
-            "summary": "一个东西真的出现在世界里了。",
-            "summaryEn": "Fires when something has actually appeared in the world.",
-            "labelEn": "Spawned",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "map",
-              "room",
-              "enemy",
-              "weapon",
-              "tool",
-              "consumable",
-              "logic"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "id": "entity",
-                "type": "entity"
-              },
-              {
-                "id": "position",
-                "type": "vector3",
-                "unit": "m"
-              }
-            ],
-            "parameters": []
-          }
-        },
+    """ + PrimitiveContracts.EnemySpawnedCapabilityJson + """
+        ,
         {
           "id": "forge.trigger.equipment.deploy_completed",
           "owner": "forge.contract.trigger",

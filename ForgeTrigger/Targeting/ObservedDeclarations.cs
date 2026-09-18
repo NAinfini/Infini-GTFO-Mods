@@ -109,7 +109,7 @@ internal static class ObservedDeclaration
     /// <summary>Register a reviewed semantic graph, with no duplicate port declarations.</summary>
     internal static ObservedNode Primitive(string id, string label, string description, HandlerShape shape, EvaluatorHandler evaluate)
     {
-        var graph = PrimitiveGraphSource.Get(id);
+        var graph = BehaviorOperatorGraphSource.Get(id);
         var kind = id.Split('.')[1]; var name = id.Split('.')[^1];
         var execution = graph.GetProperty("execution").GetString()!;
         return new ObservedNode(id, kind, execution, execution == "query" ? "observe" : "evaluate",

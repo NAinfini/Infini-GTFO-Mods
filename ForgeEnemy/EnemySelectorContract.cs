@@ -15,7 +15,7 @@ public static class EnemySelectorContract
         id = CapabilityId, owner = ModuleDefinition.ProviderId, kind = "selector", version = "1.0.0",
         label = "查询全部敌人",
         parameters = new { description = "读取当前世界中身份有效的敌人集合；不把敌人种类等同于敌对关系。" },
-        graph = PrimitiveGraphSource.Get(CapabilityId)
+        graph = BehaviorOperatorGraphSource.Get(CapabilityId)
     }).GetRawText();
     public const string BindingRowJson = """
     {"id":"forge.module.gtfo.enemy.binding.target.enemies","capabilityId":"forge.selector.target.enemies",
