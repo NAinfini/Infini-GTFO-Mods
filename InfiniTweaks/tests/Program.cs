@@ -312,4 +312,5 @@ Check(MarkerRules.Defaults(MarkerCategory.Ammo).Distance > MarkerRules.Defaults(
     "Important resources are visible farther than ordinary consumables.");
 MarkerVisualTests.Run(Check);
 CombatStatsTests.Run(Check);
+TelemetryTests.Run(Check);
 Console.WriteLine($"PASS: {count} regression assertions. Unity/IL2CPP, graphics and multiplayer require in-game validation.");

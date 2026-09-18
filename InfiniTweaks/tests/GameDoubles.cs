@@ -276,4 +276,4 @@ namespace InfiniTweaks
     internal static class Plugin { public static readonly Log PluginLog = new(); }
 }
 
-namespace UnityEngine.Profiling { public static class Profiler { public static bool enabled; public static void BeginSample(string name) { } public static void EndSample() { } } }
+namespace UnityEngine.Profiling { public static class Profiler { private static bool _enabled; public static int Reads, Begins, Ends; public static bool enabled { get { Reads++; return _enabled; } set => _enabled = value; } public static void BeginSample(string name) => Begins++; public static void EndSample() => Ends++; } }
