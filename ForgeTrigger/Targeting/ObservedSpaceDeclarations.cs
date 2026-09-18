@@ -27,12 +27,7 @@ public static class ObservedSpaceDeclarations
 
     /// <summary>The declared rows in registration order, in the one table this family owns.</summary>
     public static ObservedFamily Family { get; } = ObservedFamily.Declare(
-        ObservedDeclaration.Node("forge.selector.target.shape_overlap", "query", "范围内的玩家 / 敌人", "用球、锥、盒、柱或胶囊圈一片范围找东西。",
-            ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Vector("center", "m"),
-                ObservedDeclaration.Number("radius", "m"), ObservedDeclaration.Number("angle", "deg"),
-                ObservedDeclaration.Number("height", "m"), ObservedDeclaration.Vector("extents", "m")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")),
-            ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnum("shape", "query_shape"), ObservedDeclaration.EmptyPolicyParameter()),
+        ObservedDeclaration.Primitive("forge.selector.target.shape_overlap", "范围内的玩家 / 敌人", "用球、锥、盒、柱或胶囊圈一片范围找东西。",
             new HandlerShape().Inputs("candidates", "center", "radius", "angle", "height", "extents").Outputs("targets")
                 .Parameters("shape", "empty"), ShapeOverlap),
         ObservedDeclaration.Node("forge.selector.target.nearest", "query", "按距离取最近若干", "按距离取最近的几个。",

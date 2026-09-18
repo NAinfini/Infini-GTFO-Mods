@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text.Json;
 using ForgeRuntime.Framework;
 
 namespace ForgeTrigger.Pure;
@@ -18,9 +17,7 @@ internal static class TextDeclarations
 
     internal static IReadOnlyList<PureNode> Nodes { get; } = new[]
     {
-        PureModule.Row("forge.modifier.value.text", "modifier", "拼接文字", "把一段模板文字和一个数值拼成一句话。",
-            PureModule.Inputs(PureModule.Text("template"), PureModule.Number("value")), PureModule.Outputs(PureModule.Text("value")),
-            PureModule.Parameters(), (JsonElement?)null,
-            new HandlerShape().Inputs("template", "value").Outputs("value"), PureModule.Text, domains: TextDomains)
+        PureModule.OperatorRow("forge.modifier.value.text", "拼接文字", "把一段模板文字和一个数值拼成一句话。",
+            new HandlerShape().Inputs("template", "value").Outputs("value"), PureModule.Text)
     };
 }

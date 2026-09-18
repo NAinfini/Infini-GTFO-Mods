@@ -13,14 +13,11 @@ public static class ObservedEntityDeclarations
 {
     /// <summary>The declared rows in registration order, in the one table this family owns.</summary>
     public static ObservedFamily Family { get; } = ObservedFamily.Declare(
-        ObservedDeclaration.Node("forge.selector.target.self", "query", "当前资源实例", "选中这块逻辑挂在的东西本身。",
-            ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.Entity("target")), ObservedDeclaration.NoParameters,
+        ObservedDeclaration.Primitive("forge.selector.target.self", "当前资源实例", "选中这块逻辑挂在的东西本身。",
             new HandlerShape().Outputs("target"), context => Role(context, "self", required: true)),
-        ObservedDeclaration.Node("forge.selector.target.owner", "query", "所属玩家或拥有者", "选中拥有者，比如拿着这把枪的玩家。",
-            ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
+        ObservedDeclaration.Primitive("forge.selector.target.owner", "所属玩家或拥有者", "选中拥有者，比如拿着这把枪的玩家。",
             new HandlerShape().Outputs("target"), context => Role(context, "owner", required: false)),
-        ObservedDeclaration.Node("forge.selector.target.source", "query", "直接效果来源实体", "选中直接造成这件事的东西。",
-            ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
+        ObservedDeclaration.Primitive("forge.selector.target.source", "直接效果来源实体", "选中直接造成这件事的东西。",
             new HandlerShape().Outputs("target"), context => Role(context, "source", required: false)),
         ObservedDeclaration.Node("forge.selector.target.instigator", "query", "让敌人去追某个玩家", "选中最初挑起这件事的人。",
             ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
