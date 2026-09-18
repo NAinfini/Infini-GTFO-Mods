@@ -113,6 +113,22 @@ public static class PureModule
             variadicShape ? new HandlerShape() : shape, evaluate);
     }
 
+    /// <summary>A reviewed Behavior Operator row. Its graph comes from the generated shared Operator contract;
+    /// this provider contributes only implementation metadata and the evaluator. A PureModule row must remain pure.
+    /// </summary>
+    internal static PureNode OperatorRow(string capabilityId, string label, string description, HandlerShape shape,
+        EvaluatorHandler evaluate, string? name = null)
+    {
+        var graph = BehaviorOperatorGraphSource.Get(capabilityId);
+        if (!string.Equals(graph.GetProperty("execution").GetString(), "pure", StringComparison.Ordinal))
+            throw new RuntimeContractException("operator-tier", capabilityId + " is not a pure Behavior Operator.");
+        var segments = capabilityId.Split('.');
+        var kind = segments[1];
+        name ??= segments[^1];
+        return new PureNode(capabilityId, kind, label, description, graph,
+            ModuleDefinition.ProviderId + ".binding." + name, "trigger." + kind + "." + name, shape, evaluate);
+    }
+
     /// <summary>The catalog declares a variadic row's two base ports itself and expands the rest per plan; the C#
     /// row repeats that declaration rather than deriving it, because the catalog row is the contract. A capability
     /// that expands its ports per plan has no registration-time layout, so a handler shape for one declares no

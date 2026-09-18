@@ -33,15 +33,10 @@ public static class ObservedConditionDeclarations
         // one row instead of one row per class. It is a `query` row and not a `pure` one because the `entity`
         // member is a world value (rule 142.1); the comparison itself still reads no world, which is why its
         // handler never touches `context.Query`.
-        ObservedDeclaration.Node("forge.condition.predicate.compare", "query", "比较（大于、等于、小于……）",
+        ObservedDeclaration.Primitive("forge.condition.predicate.compare", "比较（大于、等于、小于……）",
             "按选定关系比较两个值：数字可以带容差，文字按顺序比较，对象只判是不是同一个。",
-            ObservedDeclaration.Inputs(
-                ObservedDeclaration.TypedValue("left"), ObservedDeclaration.TypedValue("right"),
-                ObservedDeclaration.Enum("operator", "compare_operator"), ObservedDeclaration.OptionalNumber("tolerance")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Bool("value")),
-            ObservedDeclaration.Parameters(ObservedDeclaration.OptionalValueTypeParameter()),
             new HandlerShape().Inputs("left", "right", "operator", "tolerance").Outputs("value").Parameters("value_type"),
-            CompareHandler, new[] { "world" }),
+            CompareHandler),
         // ---- life-state conditions --------------------------------------------------------------------------
         // The observed life state is the whole fact: `downed` is published from the native player downed
         // locomotion state, so this family reads the state a provider observed instead of testing an entity kind.

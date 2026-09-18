@@ -14,14 +14,10 @@ internal static class VariadicDeclarations
 
     internal static IReadOnlyList<PureNode> Nodes { get; } = new[]
     {
-        PureModule.Row("forge.modifier.value.add", "modifier", "计算（加减乘除、最大最小、绝对值、取整）", "把几个数加起来。",
-            PureModule.VariadicInputs("number"), PureModule.Outputs(PureModule.Number("value")),
-            PureModule.Parameters(PureModule.CountParameter()), VariadicNumber,
-            new HandlerShape(), PureModule.Add, variadicShape: true),
-        PureModule.Row("forge.modifier.value.multiply", "modifier", "相乘", "把几个数乘起来。",
-            PureModule.VariadicInputs("number"), PureModule.Outputs(PureModule.Number("value")),
-            PureModule.Parameters(PureModule.CountParameter()), VariadicNumber,
-            new HandlerShape(), PureModule.Multiply, variadicShape: true),
+        PureModule.OperatorRow("forge.modifier.value.add", "计算（加减乘除、最大最小、绝对值、取整）", "把几个数加起来。",
+            new HandlerShape(), PureModule.Add),
+        PureModule.OperatorRow("forge.modifier.value.multiply", "相乘", "把几个数乘起来。",
+            new HandlerShape(), PureModule.Multiply),
         PureModule.Row("forge.modifier.value.minimum", "modifier", "取最小值", "取最小的那个。",
             PureModule.VariadicInputs("number"), PureModule.Outputs(PureModule.Number("value")),
             PureModule.Parameters(PureModule.CountParameter()), VariadicNumber,
@@ -30,13 +26,9 @@ internal static class VariadicDeclarations
             PureModule.VariadicInputs("number"), PureModule.Outputs(PureModule.Number("value")),
             PureModule.Parameters(PureModule.CountParameter()), VariadicNumber,
             new HandlerShape(), PureModule.Maximum, variadicShape: true),
-        PureModule.Row("forge.condition.predicate.all", "condition", "与 / 或 / 非", "所有输入条件都成立才成立。",
-            PureModule.VariadicInputs("boolean"), PureModule.Outputs(PureModule.Bool("value")),
-            PureModule.Parameters(PureModule.CountParameter()), VariadicBoolean,
-            new HandlerShape(), PureModule.All, variadicShape: true),
-        PureModule.Row("forge.condition.predicate.any", "condition", "任一条件成立", "任意一个输入条件成立就成立。",
-            PureModule.VariadicInputs("boolean"), PureModule.Outputs(PureModule.Bool("value")),
-            PureModule.Parameters(PureModule.CountParameter()), VariadicBoolean,
-            new HandlerShape(), PureModule.Any, variadicShape: true)
+        PureModule.OperatorRow("forge.condition.predicate.all", "与 / 或 / 非", "所有输入条件都成立才成立。",
+            new HandlerShape(), PureModule.All),
+        PureModule.OperatorRow("forge.condition.predicate.any", "任一条件成立", "任意一个输入条件成立就成立。",
+            new HandlerShape(), PureModule.Any)
     };
 }
