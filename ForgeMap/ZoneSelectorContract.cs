@@ -30,27 +30,12 @@ public static class ZoneSelectorContract
     /// <summary>The capability row a registration declares, spelled exactly as the authoring catalog row
     /// `forge.selector.target.zone`. The output is nullable because an entity standing in no zone of this level is
     /// a real answer; the handler answers it by refusing, never by naming a zone the level does not have.</summary>
-    public const string CapabilityRowJson = """
+    public static readonly string CapabilityRowJson = RuntimeJson.From(new
     {
-      "id": "forge.selector.target.zone",
-      "owner": "forge.module.gtfo.map",
-      "kind": "selector",
-      "label": "选择关卡 Zone",
-      "version": "1.0.0",
-      "parameters": { "description": "选中所在的关卡 Zone。" },
-      "graph": {
-        "domains": ["map", "room", "enemy", "weapon", "tool", "consumable", "player", "logic"],
-        "execution": "query",
-        "inputs": [
-          { "id": "anchor", "type": "entity" }
-        ],
-        "outputs": [
-          { "id": "zone", "type": "resource", "resourceKind": "zone", "schema": "forge.resource.zone", "nullable": true }
-        ],
-        "parameters": []
-      }
-    }
-    """;
+        id = CapabilityId, owner = ModuleDefinition.ProviderId, kind = "selector", label = "选择关卡 Zone", version = "1.0.0",
+        parameters = new { description = "选中所在的关卡 Zone。" },
+        graph = BehaviorOperatorGraphSource.Get(CapabilityId)
+    }).GetRawText();
 
     /// <summary>The binding row the same registration declares: an on-demand `query` binding, which is the
     /// `observe` role in this runtime.</summary>

@@ -27,11 +27,7 @@ internal static class ConditionDeclarations
     {
         PureModule.OperatorRow("forge.condition.predicate.not", "条件取反", "把条件反过来。",
             new HandlerShape().Inputs("input").Outputs("value"), PureModule.Not),
-        PureModule.Row("forge.condition.enum.compare", "condition", "枚举等于", "把枚举值与该集合中的一个成员比较；值可能没有时不通过。",
-            PureModule.Inputs(PureModule.DeferredEnum("value", "enum_set", nullable: true),
-                PureModule.DeferredEnum("equals", "enum_set")),
-            PureModule.Outputs(PureModule.Bool("value")),
-            PureModule.Parameters(PureModule.InlineEnumParameter("enum_set", RuntimeEnumSets.Names.ToArray())), (JsonElement?)null,
+        PureModule.OperatorRow("forge.condition.enum.compare", "枚举等于", "把枚举值与该集合中的一个成员比较；值可能没有时不通过。",
             new HandlerShape().Inputs("value", "equals").Outputs("value"), PureModule.EnumCompare, name: "enum_compare")
     };
 }

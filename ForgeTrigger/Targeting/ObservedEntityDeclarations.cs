@@ -25,8 +25,7 @@ public static class ObservedEntityDeclarations
         ObservedDeclaration.Node("forge.selector.target.instigator", "query", "让敌人去追某个玩家", "选中最初挑起这件事的人。",
             ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
             new HandlerShape().Outputs("target"), context => Role(context, "instigator", required: false)),
-        ObservedDeclaration.Node("forge.selector.target.event_target", "query", "事件中的目标实体", "选中事件里被作用的那个对象。",
-            ObservedDeclaration.NoPorts, ObservedDeclaration.Outputs(ObservedDeclaration.NullableEntity("target")), ObservedDeclaration.NoParameters,
+        ObservedDeclaration.Primitive("forge.selector.target.event_target", "事件中的目标实体", "选中事件里被作用的那个对象。",
             new HandlerShape().Outputs("target"), context => Role(context, "event-target", required: false)));
 
     /// <summary>The role's reference as the selector's only output: the four nullable roles answer null when the

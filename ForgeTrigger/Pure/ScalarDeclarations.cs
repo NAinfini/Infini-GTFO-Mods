@@ -40,18 +40,9 @@ internal static class ScalarDeclarations
             PureModule.Inputs(PureModule.Number("minimum"), PureModule.Number("maximum"), PureModule.Integer("seed")),
             PureModule.Outputs(PureModule.Number("value")), PureModule.Parameters(), (JsonElement?)null,
             new HandlerShape().Inputs("minimum", "maximum", "seed").Outputs("value"), PureModule.RandomRange),
-        PureModule.Row("forge.modifier.value.map_range", "modifier", "区间映射（含指数曲线与越界策略）",
+        PureModule.OperatorRow("forge.modifier.value.map_range", "区间映射（含指数曲线与越界策略）",
             "把一个输入值按它落在输入区间里的位置映射到输出区间，可以加指数曲线、翻转与越界策略。",
-            PureModule.Inputs(PureModule.Number("value"), PureModule.Number("input_min"), PureModule.Number("input_max"),
-                PureModule.Number("input_floor"), PureModule.Number("input_ceiling"), PureModule.Number("output_min"),
-                PureModule.Number("output_max"), PureModule.Number("exponent"), PureModule.Bool("flip")),
-            PureModule.Outputs(PureModule.Number("value")),
-            PureModule.Parameters(
-                PureModule.InlineEnumParameter("input_unit", PureModule.RangeInputUnits),
-                PureModule.InlineEnumParameter("bounds", PureModule.RangeBounds)),
-            (JsonElement?)null,
             new HandlerShape().Inputs("value", "input_min", "input_max", "input_floor", "input_ceiling", "output_min",
-                "output_max", "exponent", "flip").Outputs("value").Parameters("input_unit", "bounds"),
-            PureModule.MapRange)
+                "output_max", "exponent", "flip").Outputs("value").Parameters("input_unit", "bounds"), PureModule.MapRange)
     };
 }
