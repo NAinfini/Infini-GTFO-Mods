@@ -1,3 +1,0 @@
-FAIL: entity observer disposed lifecycle subscription
-FAIL: subscription remains intact
-{"status":"failed","scope":"public-r3-consumer-integration","gameVerified":false,"assertions":417,"failures":["entity observer disposed lifecycle subscription","subscription remains intact"]}

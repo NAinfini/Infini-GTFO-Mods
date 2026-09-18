@@ -1,7 +1,0 @@
-{
-  "command": [
-    "dotnet",
-    "C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeMap\\bin\\map1-identity-continuation\\bin\\MapIdentity\\release\\ForgeMap.Identity.Tests.dll"
-  ],
-  "exitCode": 0
-}

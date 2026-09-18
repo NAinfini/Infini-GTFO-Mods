@@ -54,7 +54,7 @@ Restart the game after editing the config.
 
 ### Authoring diagnostics
 
-Performance collection belongs to the optional [Forge Development](../ForgeDevelopment/README.md) plugin. Infini Tweaks creates no diagnostics monitor, collector, files or logging thread. Its public `Telemetry` events only let Forge Development time Infini's own hot paths; with no subscriber the measurement scopes do no sampling. The marker and HUD performance comparison is kept in [PERFORMANCE-REVIEW.md](../ForgeDevelopment/PERFORMANCE-REVIEW.md).
+Performance collection belongs to the optional [Forge Development](https://github.com/NAinfini/GTFO-Forge/blob/main/Mods/ForgeDevelopment/README.md) plugin. Infini Tweaks creates no diagnostics monitor, collector, files or logging thread. Its public `Telemetry` events only let Forge Development time Infini's own hot paths; with no subscriber the measurement scopes do no sampling. The marker and HUD performance comparison is kept in [PERFORMANCE-REVIEW.md](https://github.com/NAinfini/GTFO-Forge/blob/main/Mods/ForgeDevelopment/PERFORMANCE-REVIEW.md).
 
 ### Casual-co-op modules (2.2.4)
 
@@ -141,7 +141,7 @@ They check low-stamina clamping, local/remote/bot scope, friendly-fire direction
 The casual-module checks cover distance/aim visibility, perfect-roll matching, held-pack HUD filtering, bounded rewards, effective damage and statistics. `dotnet run --project tests/ResourceSlots -c Release` executes production native-slot registration/callback/occupancy logic with managed doubles; it replaces the deleted polled-selector geometry tests. Removed stacking tests do not count toward this DLL because Core owns stacking. Statistics model tests exercise independent peer resets, snapshots, authority and host migration. Run native patch contract validation after building:
 
 ```powershell
-dotnet run --project tests/NativeContracts/NativeContracts.csproj -c Release -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -- $env:GTFO_BEPINEX_PATH "$PWD/bin/Release/InfiniTweaks.dll" "<ForgeDevelopment.Native.dll 路径，见 ../ForgeDevelopment/scripts/verify-diagnostics.py>" "<本游戏版本的 dump.cs 路径>"
+dotnet run --project tests/NativeContracts/NativeContracts.csproj -c Release -p:GTFOBepInExPath=$env:GTFO_BEPINEX_PATH -- $env:GTFO_BEPINEX_PATH "$PWD/bin/Release/InfiniTweaks.dll" "<GTFO-Forge 构建出的 ForgeDevelopment.Native.dll，构建方法见该仓库 Mods/README.md>" "<本游戏版本的 dump.cs 路径>"
 ```
 
 This reads assembly metadata without executing game code. Live acceptance remains listed in `REVIEW.md`.

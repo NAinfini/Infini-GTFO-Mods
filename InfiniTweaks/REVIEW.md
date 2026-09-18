@@ -51,7 +51,7 @@
 
 Release 双构建零警告／错误；742 项游玩回归、7 项迁移的帧采样、56 项可选订阅／清理、8 项场景扫描、6 项报告分析、18 项 HUD、15 项发现路由检查通过。原生元数据验收单独检查程序集职责归属及现有 hook 与嵌入图标。
 
-这次仅完成拆分，不声称新增生成报告或修复随机／连续切关异常。作者工具的最新要求见[开发计划](../../Infini-GTFO-Model-Site/Docs/forge-contract/FORGE-FRAMEWORK.md) §6 U-DEV-MOD。未启动游戏；生成一致性、实际开销、切关和联网验收待实机。Temp 当前已安装的 2.4.5 不由这次源码拆分自动替换。
+这次仅完成拆分，不声称新增生成报告或修复随机／连续切关异常。作者工具的最新要求见[开发计划](https://github.com/NAinfini/GTFO-Forge/blob/main/Docs/forge-contract/FORGE-FRAMEWORK.md) §6 U-DEV-MOD。未启动游戏；生成一致性、实际开销、切关和联网验收待实机。Temp 当前已安装的 2.4.5 不由这次源码拆分自动替换。
 
 ## 2.4.5 — 2026-09-09
 
@@ -91,7 +91,7 @@ Terminal tests reproduce synchronous watch replacement, input synchronization be
 
 ## 2.3.0 performance candidate (prepared, not deployed)
 
-See [PERFORMANCE-REVIEW.md](../ForgeDevelopment/PERFORMANCE-REVIEW.md) for the 2.2.7 log baseline, ItemMarker/ResourceHelper/HUDInfoPlus source comparisons, changed scan scope, limitations and live acceptance cases. Marker state submissions now occur only on change, ordinary lifecycle checks at 10 Hz, and scene components are collected by one cooperative hierarchy walk. Native projection, immediate input transitions and pickup/count events remain. New workload counters separate discovery from refresh; no same-scene FPS/CPU/GPU comparison has been performed.
+See [PERFORMANCE-REVIEW.md](https://github.com/NAinfini/GTFO-Forge/blob/main/Mods/ForgeDevelopment/PERFORMANCE-REVIEW.md) for the 2.2.7 log baseline, ItemMarker/ResourceHelper/HUDInfoPlus source comparisons, changed scan scope, limitations and live acceptance cases. Marker state submissions now occur only on change, ordinary lifecycle checks at 10 Hz, and scene components are collected by one cooperative hierarchy walk. Native projection, immediate input transitions and pickup/count events remain. New workload counters separate discovery from refresh; no same-scene FPS/CPU/GPU comparison has been performed.
 
 Validation: 781 main regression assertions, 8 independently built scene-inventory checks, 87 native hook contracts and 5 analyzer tests. The scene test initially shared output with the regression project and launched the wrong entry point; it was moved to its own project directory and rerun successfully. One stable marker across 7200 managed refresh calls avoids 28800 old-path setter calls, not 28800 measured draw calls. Existing profiler ownership and missing FrameTiming support are not silently overridden.
 

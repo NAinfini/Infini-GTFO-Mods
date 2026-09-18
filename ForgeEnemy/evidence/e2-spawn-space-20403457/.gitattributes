@@ -1,2 +1,0 @@
-# Tests hash these files byte-for-byte; never convert line endings on checkout.
-* -text

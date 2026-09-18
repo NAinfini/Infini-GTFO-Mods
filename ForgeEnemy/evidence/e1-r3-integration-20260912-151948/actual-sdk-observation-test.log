@@ -1,2 +1,0 @@
-REGISTRATION PROBE: status=complete, code=entities-observed, observerCalls=1, item=entity-observed
-Entity contracts: 76 passed; 0 failed. No native APIs exercised.

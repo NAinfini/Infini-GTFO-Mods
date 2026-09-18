@@ -1,3 +1,0 @@
-FAIL 50/52 lifecycle fact cases; no GTFO execution.
-FAIL integration.real-heal-death_started: permissions
-FAIL integration.real-heal-limb_broken: Binding locks must be ordinal sorted.

@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "C:\Users\nainf\AppData\Local\Temp\forge-development-continue-1bi2lsh2\freeze_reports.py", line 84, in <module>
-    os.replace(temporary, path)
-PermissionError: [WinError 5] Access is denied: 'C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\DiagnosticsReport.cs.development-write.tmp' -> 'C:\\Users\\nainf\\Github\\Infini-GTFO-Mods\\ForgeRuntime\\DiagnosticsReport.cs'

@@ -1,4 +1,0 @@
-FAIL 21/24 Native plugin integration cases; no GTFO execution.
-session.readonly-error-data-keeps-primary: Cleanup evidence replaced primary exception or left a provider.
-plugin.cleanup-readonly-data-always-clears-session: Post-load cleanup failure masked the original or left the static session published.
-session.throwing-error-data-and-reporter-keep-evidence: Failure evidence replaced the cause or lost bounded diagnostics.

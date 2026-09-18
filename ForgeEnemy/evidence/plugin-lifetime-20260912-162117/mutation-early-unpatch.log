@@ -1,3 +1,0 @@
-FAIL 22/24 Native plugin integration cases; no GTFO execution.
-session.dispatch-dispose-rejects-before-unpatch: In-dispatch Dispose changed hook ownership or claimed a known commit.
-session.in-use-dispose-remains-retryable: Rejected disposal removed hooks or changed a live session.

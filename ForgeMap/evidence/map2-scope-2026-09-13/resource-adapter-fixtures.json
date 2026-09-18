@@ -1,8 +1,0 @@
-{
-  "verification": "fixture-schema-only",
-  "nativeGameExecuted": false,
-  "passed": true,
-  "validPassed": 3,
-  "invalidRejected": 21,
-  "failures": []
-}

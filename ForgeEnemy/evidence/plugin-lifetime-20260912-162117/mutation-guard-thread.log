@@ -1,2 +1,0 @@
-FAIL 23/24 Native plugin integration cases; no GTFO execution.
-session.wrong-thread-callback-is-not-invoked: Expected rejection.
