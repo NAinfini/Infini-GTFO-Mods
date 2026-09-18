@@ -21,10 +21,8 @@ public static class ObservedListDeclarations
             new HandlerShape().Inputs("items").Outputs("value"), IsEmptyHandler, new[] { "world" }),
         ObservedDeclaration.Primitive("forge.condition.list.contains", "列表包含", "指定的实体在这个候选列表里时通过。",
             new HandlerShape().Inputs("items", "item").Outputs("value"), ContainsHandler),
-        ObservedDeclaration.Node("forge.modifier.list.count", "query", "列表数量", "数出候选列表里有几个成员。",
-            ObservedDeclaration.Inputs(ObservedDeclaration.Many("items")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Integer("value")), ObservedDeclaration.NoParameters,
-            new HandlerShape().Inputs("items").Outputs("value"), CountHandler, new[] { "world" }));
+        ObservedDeclaration.Primitive("forge.modifier.list.count", "列表数量", "数出候选列表里有几个成员。",
+            new HandlerShape().Inputs("items").Outputs("value"), CountHandler));
 
     /// <summary>Whether the list has no members. The answer is the list's own length: the row never asks the world
     /// whether something exists, so an empty list can only mean empty.</summary>

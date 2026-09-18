@@ -12,13 +12,9 @@ internal static class VectorDeclarations
 {
     internal static IReadOnlyList<PureNode> Nodes { get; } = new[]
     {
-        PureModule.Row("forge.modifier.value.distance", "modifier", "两点距离", "按两个位置算出以米为单位的距离。",
-            PureModule.Inputs(PureModule.PortWithUnit("from", "vector3", "m"), PureModule.PortWithUnit("to", "vector3", "m")),
-            PureModule.Outputs(PureModule.PortWithUnit("value", "number", "m")), PureModule.Parameters(), (JsonElement?)null,
+        PureModule.OperatorRow("forge.modifier.value.distance", "两点距离", "按两个位置算出以米为单位的距离。",
             new HandlerShape().Inputs("from", "to").Outputs("value"), PureModule.Distance),
-        PureModule.Row("forge.modifier.value.direction", "modifier", "两点方向", "给出从第一个位置指向第二个位置的单位向量，长度永远是 1。",
-            PureModule.Inputs(PureModule.PortWithUnit("from", "vector3", "m"), PureModule.PortWithUnit("to", "vector3", "m")),
-            PureModule.Outputs(PureModule.Typed("value", "vector3")), PureModule.Parameters(), (JsonElement?)null,
+        PureModule.OperatorRow("forge.modifier.value.direction", "两点方向", "给出从第一个位置指向第二个位置的单位向量，长度永远是 1。",
             new HandlerShape().Inputs("from", "to").Outputs("value"), PureModule.Direction)
     };
 }

@@ -18,9 +18,7 @@ public static class ObservedCollectionDeclarations
 
     /// <summary>The declared rows in registration order, in the one table this family owns.</summary>
     public static ObservedFamily Family { get; } = ObservedFamily.Declare(
-        ObservedDeclaration.Node("forge.selector.target.distinct", "query", "按稳定实体身份去重", "去掉重复的目标。",
-            ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
+        ObservedDeclaration.Primitive("forge.selector.target.distinct", "按稳定实体身份去重", "去掉重复的目标。",
             new HandlerShape().Inputs("candidates").Outputs("targets").Parameters("empty"), Distinct),
         ObservedDeclaration.Primitive("forge.selector.target.limit", "限制最多目标数", "最多留下这么多个。",
             new HandlerShape().Inputs("candidates", "max_targets").Outputs("targets").Parameters("empty"), Limit),
@@ -28,12 +26,7 @@ public static class ObservedCollectionDeclarations
             ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Integer("seed")),
             ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")), ObservedDeclaration.Parameters(ObservedDeclaration.EmptyPolicyParameter()),
             new HandlerShape().Inputs("candidates", "seed").Outputs("targets").Parameters("empty"), Shuffle),
-        ObservedDeclaration.Node("forge.selector.target.random", "query", "从候选里随机取 N 个", "随机挑几个，同一个种子结果一样。",
-            ObservedDeclaration.Inputs(ObservedDeclaration.Many("candidates"), ObservedDeclaration.Integer("count"),
-                ObservedDeclaration.Integer("seed")),
-            ObservedDeclaration.Outputs(ObservedDeclaration.Many("targets")),
-            ObservedDeclaration.Parameters(ObservedDeclaration.StructuralEnumValues("seed_mode", SeedModes),
-                ObservedDeclaration.EmptyPolicyParameter()),
+        ObservedDeclaration.Primitive("forge.selector.target.random", "从候选里随机取 N 个", "随机挑几个，同一个种子结果一样。",
             new HandlerShape().Inputs("candidates", "count", "seed").Outputs("targets").Parameters("seed_mode", "empty"), Random),
         ObservedDeclaration.Node("forge.selector.target.union", "query", "合并目标集合", "把两组目标合成一组。",
             ObservedDeclaration.Inputs(ObservedDeclaration.Many("a"), ObservedDeclaration.Many("b")),

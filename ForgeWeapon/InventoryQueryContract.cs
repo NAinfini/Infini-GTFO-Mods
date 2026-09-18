@@ -53,29 +53,16 @@ public static class InventoryQueryContract
     /// <summary>The held-item condition, with the catalog's own ports: the holder, the item resource and how many
     /// of it the condition asks for, answered as one boolean. The card is the row's own label and description,
     /// spelled as the catalog spells them.</summary>
-    public const string InventoryItemRowDocument = """
+    public static readonly string InventoryItemRowDocument = RuntimeJson.From(new
     {
-      "id": "forge.condition.predicate.inventory_item",
-      "owner": "forge.module.gtfo.weapon",
-      "kind": "condition",
-      "label": "持有指定物品",
-      "version": "1.0.0",
-      "parameters": { "description": "判断背包里有没有指定物品。" },
-      "graph": {
-        "domains": ["map", "room", "enemy", "weapon", "tool", "consumable", "player", "logic"],
-        "execution": "query",
-        "inputs": [
-          { "id": "holder", "type": "entity" },
-          { "id": "item", "type": "resource", "resourceKind": "item", "schema": "forge.resource.item" },
-          { "id": "count", "type": "integer" }
-        ],
-        "outputs": [
-          { "id": "value", "type": "boolean" }
-        ],
-        "parameters": []
-      }
-    }
-    """;
+        id = InventoryItemCapability,
+        owner = ModuleDefinition.ProviderId,
+        kind = "condition",
+        label = "持有指定物品",
+        version = "1.0.0",
+        parameters = new { description = "判断背包里有没有指定物品。" },
+        graph = BehaviorOperatorGraphSource.Get(InventoryItemCapability)
+    }).GetRawText();
 
     /// <summary>The two capability documents. Both are declared by this file and by nothing else: a second
     /// declaration of either id is refused at registration as a conflict.</summary>

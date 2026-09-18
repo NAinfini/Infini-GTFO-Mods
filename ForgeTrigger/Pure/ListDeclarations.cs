@@ -23,10 +23,7 @@ internal static class ListDeclarations
 
     internal static IReadOnlyList<PureNode> Nodes { get; } = new[]
     {
-        PureModule.Row("forge.modifier.list.element_at", "modifier", "按序号取列表项", "按序号从列表里取一项，越界时可以取边界、回绕或取空。",
-            PureModule.Inputs(PureModule.Many("items", "string"), PureModule.Integer("index")),
-            PureModule.Outputs(PureModule.Text("value")),
-            PureModule.Parameters(PureModule.InlineEnumParameter("clamp", ClampPolicies)), (JsonElement?)null,
+        PureModule.OperatorRow("forge.modifier.list.element_at", "按序号取列表项", "按序号从列表里取一项，越界时可以取边界、回绕或取空。",
             new HandlerShape().Inputs("items", "index").Outputs("value").Parameters("clamp"), ElementAt)
     };
 
