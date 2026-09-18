@@ -460,26 +460,8 @@ public static class EnvironmentContract
     /// text the plan computes, which is what lets a line name a door or count the generators that are live; the
     /// optional filter names the world event object the sound is placed on.</summary>
     private static object Audio() => Capability(AudioCapability, "action", "播放音效",
-        "在每台被寻址的客户端上播放一条游戏音效，可带一行自由文本字幕。", new
-        {
-            domains = Domains,
-            execution = "presentation",
-            inputs = new object[]
-            {
-                Port("in", "execution"),
-                Many("viewers", "entity", new[] { "gtfo.player" }),
-                Port("sound", "integer"),
-                Optional("subtitle", "string"),
-                Optional("filter", "string")
-            },
-            outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.audio_play") },
-            parameters = Array.Empty<object>(),
-            recipients = new
-            {
-                input = "viewers", target = "entity", cardinality = "many",
-                requires = new[] { AudioPermission }, result = "result"
-            }
-        });
+        "在每台被寻址的客户端上播放一条游戏音效，可带一行自由文本字幕。",
+        PrimitiveGraphSource.Get(AudioCapability));
 
     /// <summary>`a-sound-stop`: the loop the author picked, stopped on each addressed client. The game's own
     /// entry for a stop is the `PlaySound` member carrying the stop event the audio bank pairs with that loop, so

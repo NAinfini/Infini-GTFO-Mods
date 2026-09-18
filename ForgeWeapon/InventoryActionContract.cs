@@ -55,48 +55,23 @@ public static class InventoryActionContract
     /// of it; splitting the name would invent a distinction the native path does not have.</summary>
     public const string WritePermission = "gtfo.inventory.write";
 
+    private static string PrimitiveRowDocument(string capability, string label, string description)
+        => RuntimeJson.From(new
+        {
+            id = capability,
+            owner = ModuleDefinition.ProviderId,
+            kind = "action",
+            label,
+            version = "1.0.0",
+            parameters = new { description },
+            graph = PrimitiveGraphSource.Get(capability)
+        }).GetRawText();
+
     /// <summary>The `give` row: the catalog's own ports, plus the `item` resource the native add needs and the
     /// catalog row names as well. Every port here is one the handler really reads and the shape below declares
     /// exactly this set, because the registration refuses a handler whose shape and row disagree.</summary>
-    public const string GiveRowDocument = """
-    {
-      "id": "forge.action.inventory.give",
-      "owner": "forge.module.gtfo.weapon",
-      "kind": "action",
-      "label": "给予 / 扣除物品（消耗品、资源包）",
-      "version": "1.0.0",
-      "parameters": { "description": "在容量和权限允许时给出物品。" },
-      "graph": {
-        "domains": ["map", "tool", "consumable", "player"],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "inventories", "type": "entity", "cardinality": "many" },
-          { "id": "item", "type": "resource", "resourceKind": "item", "schema": "forge.resource.item" },
-          { "id": "quantity", "type": "integer" },
-          { "id": "charges", "type": "integer" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.inventory.give",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" },
-              { "id": "quantity", "type": "integer" },
-              { "id": "target_count", "type": "integer" }
-            ] }
-        ],
-        "parameters": [
-          { "id": "capacity_policy", "type": "enum", "role": "structural", "required": true,
-            "values": ["reject", "clamp", "drop"] }
-        ],
-        "recipients": { "input": "inventories", "target": "entity", "cardinality": "many",
-          "requires": ["inventory.give"], "result": "result" }
-      }
-    }
-    """;
+    public static readonly string GiveRowDocument = PrimitiveRowDocument(
+        "forge.action.inventory.give", "给予 / 扣除物品（消耗品、资源包）", "在容量和权限允许时给出物品。");
 
     /// <summary>The `consume` row: the catalog's ports with one change, recorded here because the row cannot
     /// carry a port no handler reads. The native removal is one packet-sending call per unit
@@ -104,42 +79,8 @@ public static class InventoryActionContract
     /// port at all: the handle kind has no member, so there is nothing for such a port to carry. The handler
     /// refuses a `charges` request by name rather than pretending to spend charges apart from the count.
     /// The shape below declares exactly the ports the handler reads, and the row declares exactly that set.</summary>
-    public const string ConsumeRowDocument = """
-    {
-      "id": "forge.action.inventory.consume",
-      "owner": "forge.module.gtfo.weapon",
-      "kind": "action",
-      "label": "扣除物品",
-      "version": "1.0.0",
-      "parameters": { "description": "按事务扣掉堆叠或使用次数。" },
-      "graph": {
-        "domains": ["map", "tool", "consumable", "player"],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "items", "type": "entity", "cardinality": "many" },
-          { "id": "item", "type": "resource", "resourceKind": "item", "schema": "forge.resource.item" },
-          { "id": "count", "type": "integer" },
-          { "id": "charges", "type": "integer" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.inventory.consume",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" },
-              { "id": "count", "type": "integer" },
-              { "id": "target_count", "type": "integer" }
-            ] }
-        ],
-        "parameters": [],
-        "recipients": { "input": "items", "target": "entity", "cardinality": "many",
-          "requires": ["inventory.consume"], "result": "result" }
-      }
-    }
-    """;
+    public static readonly string ConsumeRowDocument = PrimitiveRowDocument(
+        "forge.action.inventory.consume", "扣除物品", "按事务扣掉堆叠或使用次数。");
 
     /// <summary>The capability rows this package owns, in the order the catalog lists them, each declared only
     /// when its handler is supplied: a declared action nothing answers is a promise this package does not keep.

@@ -747,10 +747,6 @@ public static class TriggerZoneContract
     public const string EnteredFact = "trigger_zone.entered";
     public const string ExitedFact = "trigger_zone.exited";
 
-    /// <summary>The catalog's domain list for these rows: a zone is placed by the map author and can be wired from
-    /// map, room, enemy, weapon, tool and consumable behaviours alike.</summary>
-    internal static readonly string[] Domains = { "map", "room", "enemy", "weapon", "tool", "consumable" };
-
     /// <summary>Every trigger row, in declaration order, as (fact, capability).</summary>
     public static readonly IReadOnlyList<(string Fact, string Capability)> Rows = Array.AsReadOnly(new[]
     {
@@ -781,17 +777,7 @@ public static class TriggerZoneContract
         {
             id = capability, owner = ProviderId, kind = "trigger", label, version = "1.0.0",
             parameters = new { description },
-            graph = new
-            {
-                domains = Domains, execution = "host", inputs = Array.Empty<object>(),
-                outputs = new object[]
-                {
-                    new { id = "next", type = "execution" },
-                    new { id = "zone", type = "entity", entityKinds = new[] { "gtfo.zone" } },
-                    new { id = "target", type = "entity" }
-                },
-                parameters = Array.Empty<object>()
-            }
+            graph = PrimitiveGraphSource.Get(capability)
         };
 
     /// <summary>The two capability rows in <see cref="Rows"/> order.</summary>

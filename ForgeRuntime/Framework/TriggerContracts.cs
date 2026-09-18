@@ -61,72 +61,8 @@ public static class TriggerContracts
         }
       ],
       "capabilities": [
-        {
-          "id": "forge.trigger.combat.damage_applied",
-          "owner": "forge.contract.trigger",
-          "kind": "trigger",
-          "label": "实际伤害提交完成",
-          "version": "1.0.0",
-          "parameters": {
-            "description": "伤害真的打上去了，数字是实际值。",
-            "summary": "伤害真的打上去了，数字是实际值。",
-            "summaryEn": "Fires when damage is really applied; the number is what actually landed.",
-            "labelEn": "Damage applied",
-            "support": "authoring-contract-only"
-          },
-          "graph": {
-            "domains": [
-              "enemy",
-              "weapon",
-              "tool",
-              "consumable",
-              "player"
-            ],
-            "execution": "host",
-            "inputs": [],
-            "outputs": [
-              {
-                "id": "next",
-                "type": "execution"
-              },
-              {
-                "entityKinds": ["gtfo.player", "gtfo.enemy"],
-                "id": "source",
-                "type": "entity",
-                "nullable": true
-              },
-              {
-                "id": "target",
-                "type": "entity"
-              },
-              {
-                "id": "amount",
-                "type": "number",
-                "unit": "hp"
-              },
-              {
-                "id": "damage_kind",
-                "type": "enum",
-                "schema": "damage_kind",
-                "nullable": true,
-                "optional": true
-              },
-              {
-                "id": "limb",
-                "type": "integer",
-                "nullable": true,
-                "optional": true
-              },
-              {
-                "id": "friendly_fire",
-                "type": "boolean",
-                "nullable": true,
-                "optional": true
-              }
-            ],
-            "parameters": []
-          }
-        },
+    """ + PrimitiveContracts.DamageAppliedCapabilityJson + """
+        ,
         {
           "id": "forge.trigger.combat.health_changed",
           "owner": "forge.contract.trigger",

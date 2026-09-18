@@ -107,22 +107,16 @@ public static class DoorActionContract
     /// <summary>The open row, spelled exactly as the catalog carries it: the recipients and the one structural
     /// bypass policy. The catalog's `duration` port is gone on both sides, because the door's own interaction
     /// entry takes no caller-set duration.</summary>
-    public static object OpenRow() => Row(OpenCapability, "请求打开门", "请求打开门。",
-        new object[]
-        {
-            Port("in", "execution"),
-            Many("doors", "entity", new[] { MapObjectModule.EntityKind })
-        },
-        new object[]
-        {
-            Port("next", "execution"),
-            ResultPort("forge.result.map.door_open",
-                Field("target", "entity"), EnumField("status", "execution_outcome"),
-                EnumField("committed", "commit_state"), Field("code", "string"),
-                Field("target_count", "integer"))
-        },
-        new object[] { Structural("bypass_policy", true, "respect", "force") },
-        Recipients("doors", OpenPermission));
+    public static object OpenRow() => new
+    {
+        id = OpenCapability,
+        owner = ModuleDefinition.ProviderId,
+        kind = "action",
+        label = "请求打开门",
+        version = "1.0.0",
+        parameters = new { description = "请求打开门。" },
+        graph = PrimitiveGraphSource.Get(OpenCapability)
+    };
 
     /// <summary>The close row, spelled exactly as the catalog carries it: the recipients and nothing else. Both
     /// structural policies are gone on both sides, because the native interaction entry carries neither an

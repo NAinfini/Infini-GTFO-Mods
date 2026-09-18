@@ -110,28 +110,14 @@ public static class WeaponMeleeHitContract
     }
 
     /// <summary>The literal JSON of the row.</summary>
-    public const string RowDocument = """
+    public static readonly string RowDocument = RuntimeJson.From(new
     {
-      "id": "forge.trigger.combat.melee_hit",
-      "owner": "forge.module.gtfo.weapon",
-      "kind": "trigger",
-      "label": "近战挥击命中",
-      "version": "1.0.0",
-      "parameters": { "description": "一次近战挥击打中了目标。" },
-      "graph": {
-        "domains": ["enemy", "weapon", "tool", "consumable", "player"],
-        "execution": "host",
-        "inputs": [],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "entityKinds": ["gtfo.player", "gtfo.enemy"], "id": "source", "type": "entity" },
-          { "id": "target", "type": "entity" },
-          { "id": "limb", "type": "integer", "nullable": true },
-          { "id": "damage", "type": "number", "unit": "hp" },
-          { "id": "charged", "type": "boolean", "nullable": true }
-        ],
-        "parameters": []
-      }
-    }
-    """;
+        id = MeleeHitCapability,
+        owner = ModuleDefinition.ProviderId,
+        kind = "trigger",
+        label = "近战挥击命中",
+        version = "1.0.0",
+        parameters = new { description = "一次近战挥击打中了目标。" },
+        graph = PrimitiveGraphSource.Get(MeleeHitCapability)
+    }).GetRawText();
 }
