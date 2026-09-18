@@ -37,10 +37,14 @@ public static class RuntimeLogCodes
     public const string BindingRegistered = "binding.registered";
     public const string WorldBegan = "world.began";
     public const string TriggerFired = "trigger.fired";
+    public const string DispatchStarted = "dispatch.started";
+    public const string DispatchFinished = "dispatch.finished";
     public const string EventRejected = "event.rejected";
     public const string BudgetExceeded = "budget.exceeded";
     public const string EventDeferred = "event.deferred";
     public const string EventCancelled = "event.cancelled";
+    public const string EntryStarted = "entry.started";
+    public const string EntryFinished = "entry.finished";
     public const string StepStarted = "step.started";
     public const string StepFinished = "step.finished";
     public const string EntryStopped = "entry.stopped";
@@ -101,7 +105,12 @@ public readonly struct RuntimeLogRecord
     public IReadOnlyList<string>? Permissions { get; init; }
     public string? Entry { get; init; }
     public string? Step { get; init; }
+    /// <summary>The resolved plan node kind for step lifecycle records: action, control, query or pure.</summary>
+    public string? NodeKind { get; init; }
     public string? Binding { get; init; }
+    /// <summary>Structured trigger-gate counters, present only on gate refusal records.</summary>
+    public long? GateAccumulated { get; init; }
+    public long? GateFired { get; init; }
     /// <summary>The actual generated level layout. Only ever set for <see cref="RuntimeLogCodes.MapLayoutGenerated"/>;
     /// the writer serializes it as the record's own `layout` object and the website validates that shape strictly.</summary>
     public RuntimeLogLayout? Layout { get; init; }

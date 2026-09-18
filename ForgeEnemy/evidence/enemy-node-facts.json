@@ -76,9 +76,9 @@
       "producer": "ForgeEnemy/Native/Observation/EnemyEntityObserver.cs publishes the enemy health pair into the shared snapshot; ForgeEnemy no longer owns a duplicate health query row."
     },
     {
-      "capability": "forge.query.enemy.alive",
-      "read": "RuntimeEntitySnapshot.LifeState == \"alive\"",
-      "producer": "the same observer"
+      "capability": "forge.query.entity.life_state",
+      "read": "ForgeRuntime Observation reads RuntimeEntitySnapshot.LifeState and returns recipient_life_state for gtfo.enemy",
+      "producer": "ForgeEnemy observer publishes the life state into the shared snapshot; ForgeRuntime owns the query."
     },
     {
       "capability": "forge.query.enemy.type",
@@ -91,9 +91,14 @@
       "producer": "the same observer's own EB_States -> ai_state table; the two native members it maps to hibernation are EB_States.Hibernating (0) and the squid boss's own hibernation (12), the same pair forge.trigger.enemy.awakened treats as the sleeping baseline"
     },
     {
-      "capability": "forge.query.enemy.where",
-      "read": "RuntimeEntitySnapshot.Position plus RuntimeQuerySession.TryZone, which answers through this provider's registered EntityZones responder (AIG_CourseNode.m_zone -> AIG_Layer.m_type / dimension / local index)",
-      "gap": "the kernel reports `entity-zone-unknown` when the responder answers null, so a provider cannot tell `this entity stands in no zone` from `I could not place it`. The row answers the zone port as null in both cases; a kernel seam that distinguishes the two is a request in this slice's integration.json"
+      "capability": "forge.query.entity.position",
+      "read": "ForgeRuntime Observation reads RuntimeEntitySnapshot.Position for the enemy.",
+      "producer": "ForgeEnemy observer publishes the shared snapshot position."
+    },
+    {
+      "capability": "forge.query.entity.zone",
+      "read": "RuntimeQuerySession reads the enemy zone through ForgeEnemy's EntityZones responder (AIG_CourseNode.m_zone -> layer/dimension/local index).",
+      "gap": "entity-zone-unknown means the provider could not resolve a zone; this remains an explicit refusal."
     },
     {
       "capability": "forge.query.enemy.tagged",
@@ -113,6 +118,6 @@
     "forge.action.enemy.mark in multiplayer: the row is a `presentation` step now, so the host decides it and every addressed player builds the marker on its own machine; whether every client's screen and the host's own screen really show it (the audience is `SNet.SessionHub.PlayersInSession`, and whether a request addressed to the host's own session loops back through the transport) needs two clients in game.",
     "forge.action.enemy.target: whether PropagateTargetFull on a player agent really makes the enemy pursue that player, and what PropagateTargetLimited's chance is measured against.",
     "forge.action.enemy.kill: whether InstantDead(true) really ends the life of every enemy family (weak, boss) and whether the death flow then publishes forge.trigger.enemy.death_started / combat.killed.",
-    "forge.query.enemy.where: a zone read for an enemy standing outside every zone."
+    "forge.query.entity.zone: a zone read for an enemy standing outside every zone."
   ]
 }

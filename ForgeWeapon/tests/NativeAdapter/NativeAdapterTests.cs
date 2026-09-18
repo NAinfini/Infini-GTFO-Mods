@@ -691,7 +691,8 @@ public sealed class NativeAdapterTests
         var deployed = w.Session!.Adapter.Published!.Outputs.GetProperty("deployed").GetProperty("id").GetString()!;
         var equipment = w.Session.Adapter.ObserveEquipment(entity);
         Require(equipment != null && equipment.Tags.SequenceEqual(new[] { "deployed", deployed }) && equipment.Position.SequenceEqual(new[] { 1d, 2d, 3d })
-            && equipment.Faction == p.Reference.Id, "The equipment observer did not name its open placement.");
+            && equipment.Faction == "player" && equipment.Parent == p.Reference,
+            "The equipment observer did not separate player faction from the owning player identity.");
     }
 
     // The deployment fact reports where the world instance stands, read from that instance after the spawn body

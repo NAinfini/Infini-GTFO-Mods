@@ -11,7 +11,6 @@ namespace ForgeDevelopment.Native;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 [BepInDependency("NAinfini.ForgeRuntime", ">=1.0.0")]
-[BepInDependency("NAinfini.ForgeMap", ">=1.0.0")]
 [BepInDependency("NAinfini.InfiniTweaks", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
 {

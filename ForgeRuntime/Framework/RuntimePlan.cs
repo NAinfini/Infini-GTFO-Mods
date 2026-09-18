@@ -180,9 +180,7 @@ internal static class RuntimePlan
         ["forge.control.flow.once"] = new(new[] { "first", "later" }, Array.Empty<ControlPort>(), Array.Empty<ControlPort>()),
         ["forge.control.flow.wait_event"] = new(new[] { "received", "timeout" }, Array.Empty<ControlPort>(),
             new[] { new ControlPort("message", "string"), new ControlPort("payload", "number") }),
-        // A flow that ends has no exit: nothing after it runs, which is why the table declares no execution output.
-        ["forge.control.flow.end"] = new(Array.Empty<string>(), Array.Empty<ControlPort>(), Array.Empty<ControlPort>()),
-        ["forge.event.message.emit"] = new(new[] { "next" }, Array.Empty<ControlPort>(), Array.Empty<ControlPort>())
+        ["forge.control.message.emit"] = new(new[] { "next" }, Array.Empty<ControlPort>(), Array.Empty<ControlPort>())
     };
     /// <summary>The when-present guard (rule 142.3): the one control whose value output the loader resolves from the
     /// plan's own contract instead of pinning it here, because the author chose the class it carries.</summary>

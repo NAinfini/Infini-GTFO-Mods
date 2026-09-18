@@ -32,7 +32,6 @@ internal sealed class EnemyNodeValueReads
     /// <summary>A value read with no enemy domain behind it. It is a refusal and not an empty value: the rows
     /// exist, this session just cannot read them.</summary>
     internal const string SourceUnavailableCode = "enemy-value-source-unavailable";
-    internal const string PositionUnavailableCode = "position-unavailable";
     internal const string TypeUnavailableCode = "enemy-type-unavailable";
     internal const string StateUnavailableCode = "enemy-state-unavailable";
     internal const string TagUnavailableCode = "enemy-tag-unavailable";
@@ -76,10 +75,8 @@ internal sealed class EnemyNodeValueReads
     /// declared with a shape in `EnemyNodeValueContract.ValueShapes`.</summary>
     internal static IReadOnlyDictionary<string, EvaluatorHandler> Evaluators() => new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
     {
-        [EnemyNodeValueContract.AliveHandler] = Evaluate(Alive),
         [EnemyNodeValueContract.TypeHandler] = Evaluate(Type),
         [EnemyNodeValueContract.SleepingHandler] = Evaluate(Sleeping),
-        [EnemyNodeValueContract.WhereHandler] = Evaluate(Where),
         [EnemyNodeValueContract.TaggedHandler] = Evaluate(Tagged),
         [EnemyNodeValueContract.GroupHandler] = Evaluate(Group)
     };
@@ -112,11 +109,6 @@ internal sealed class EnemyNodeValueReads
     // value row's whole contract is which ports it carries and which refusal it raises, and neither needs a
     // dispatch to be exercised.
 
-    /// <summary>The life state is the one place the provider publishes whether an enemy is alive, so the answer
-    /// is its own comparison: `alive` is alive, every other state the frame can carry is not.</summary>
-    internal static JsonElement AnswerAlive(RuntimeEntitySnapshot snapshot)
-        => RuntimeJson.From(new { value = snapshot.LifeState == "alive" });
-
     /// <summary>The official type id as decimal text — the same spelling the `enemy-type` mount matcher compares,
     /// so a value an author reads and a mount an author writes are one string.</summary>
     internal static JsonElement AnswerType(uint? type)
@@ -135,24 +127,6 @@ internal sealed class EnemyNodeValueReads
         return RuntimeJson.From(new { value = state == HibernatingState });
     }
 
-    /// <summary>Position is the frame's own vector; the zone is the kernel's zone read, which answers through
-    /// this provider's registered `EntityZones` responder. A frame without three coordinates refuses, and so does
-    /// a life this provider cannot place — a course node, zone or layer that does not read, or a course node that
-    /// names no zone at all — with the provider's own code, so "cannot be placed" never arrives as an absent zone
-    /// a selector would drop the entity over.</summary>
-    internal static JsonElement AnswerWhere(EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
-    {
-        if (snapshot.Position.Count != 3)
-            throw new RuntimeContractException(PositionUnavailableCode, "This provider publishes no position for the life.");
-        if (!context.Query.TryZone(reference, out var zone, out var code))
-            throw new RuntimeContractException(code, "This life's zone does not read.");
-        return RuntimeJson.From(new
-        {
-            position = new[] { snapshot.Position[0], snapshot.Position[1], snapshot.Position[2] },
-            zone
-        });
-    }
-
     private static JsonElement AnswerTagged(EnemyEntityObserver.TagReading? tag)
     {
         if (tag is not { } reading)
@@ -160,17 +134,11 @@ internal sealed class EnemyNodeValueReads
         return RuntimeJson.From(new { value = reading.Tagged, remaining = (double)reading.RemainingSeconds });
     }
 
-    private static JsonElement Alive(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerAlive(snapshot);
-
     private static JsonElement Type(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerType(reads.ReadType(reference));
 
     private static JsonElement Sleeping(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerSleeping(snapshot);
-
-    private static JsonElement Where(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
-        => AnswerWhere(context, reference, snapshot);
 
     private static JsonElement Tagged(EnemyNodeValueReads reads, EvaluationContext context, EntityReference reference, RuntimeEntitySnapshot snapshot)
         => AnswerTagged(reads.ReadTag(reference));

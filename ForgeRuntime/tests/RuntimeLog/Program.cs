@@ -501,8 +501,80 @@ Case("kernel records step.started and step.finished under the executing binding'
         && started.RootEventId == "evt-steps" && started.CommandId == finished.CommandId
         && started.Plan is { PlanId: "test.records.plan", ResourceRevision: "1" }, "step.started required fields or attribution");
     Check(finished.Level == RuntimeLogLevel.Info && finished.Provider == RecordFixture.ActionProvider && finished.Step == "B"
+        && finished.NodeKind == "action"
         && finished.Result is { Status: "succeeded", Commit: "confirmed", Reason: "committed" }, "step.finished level or result");
+    Check(started.NodeKind == "action", "step.started did not carry the resolved node kind");
     Check(fixture.Records(RuntimeLogCodes.EntryStopped).Length == 0, "a succeeded entry recorded a stop");
+});
+
+Case("kernel records paired trigger, entry and behavior-node boundaries", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Info);
+    fixture.Kernel.ElevateLogging();
+    fixture.Start();
+    fixture.AdvanceAndCollect("evt-boundaries");
+
+    var dispatchBefore = fixture.Records(RuntimeLogCodes.DispatchStarted).Single(r => r.EventId == "evt-boundaries");
+    var dispatchAfter = fixture.Records(RuntimeLogCodes.DispatchFinished).Single(r => r.EventId == "evt-boundaries");
+    Check(dispatchBefore.Level == RuntimeLogLevel.Trace && dispatchBefore.Provider == RecordFixture.TriggerProvider
+        && dispatchBefore.Binding == RecordFixture.TriggerBinding && dispatchBefore.Result == null,
+        "dispatch.started is not the trigger-before boundary");
+    Check(dispatchAfter.Provider == RecordFixture.TriggerProvider && dispatchAfter.Binding == RecordFixture.TriggerBinding
+        && dispatchAfter.Result is { Status: "processed", Reason: "dispatched" },
+        "dispatch.finished is not the trigger-after boundary");
+
+    var entryBefore = fixture.Records(RuntimeLogCodes.EntryStarted).Single(r => r.EventId == "evt-boundaries");
+    var entryAfter = fixture.Records(RuntimeLogCodes.EntryFinished).Single(r => r.EventId == "evt-boundaries");
+    Check(entryBefore.Entry == "A" && entryBefore.Plan is { PlanId: "test.records.plan" } && entryBefore.Result == null,
+        "entry.started is not the behavior-entry before boundary");
+    Check(entryAfter.Entry == "A" && entryAfter.Plan is { PlanId: "test.records.plan" }
+        && entryAfter.Result is { Status: "succeeded", Reason: "completed" },
+        "entry.finished is not the behavior-entry after boundary");
+
+    var stepBefore = fixture.Records(RuntimeLogCodes.StepStarted).Single(r => r.EventId == "evt-boundaries");
+    var stepAfter = fixture.Records(RuntimeLogCodes.StepFinished).Single(r => r.EventId == "evt-boundaries");
+    Check(stepBefore.CommandId == stepAfter.CommandId && stepBefore.Step == "B" && stepAfter.Step == "B"
+        && stepBefore.NodeKind == "action" && stepAfter.NodeKind == "action",
+        "behavior-node before/after records are not paired by command and node kind");
+});
+
+Case("authoring behavior trace carries trigger, entry and node values", () => {
+    var fixture = new RecordFixture(RuntimeLogLevel.Off);
+    var trace = new List<RuntimeBehaviorTraceRecord>();
+    using var subscription = fixture.Kernel.ObserveBehaviorTrace(trace.Add);
+    Check(subscription.IsActive, "behavior trace subscription did not become active");
+    fixture.Start();
+    fixture.AdvanceAndCollect("evt-deep-trace");
+
+    var triggerBefore = trace.Single(r => r.Scope == "trigger" && r.Phase == "before");
+    var triggerAfter = trace.Single(r => r.Scope == "trigger" && r.Phase == "after");
+    Check(triggerBefore.EventId == "evt-deep-trace"
+        && triggerBefore.Inputs is { } triggerFrame
+        && triggerFrame.TryGetProperty("target", out _),
+        "trigger before did not carry the accepted event frame");
+    Check(triggerAfter.Result is { Status: "processed", Reason: "dispatched" },
+        "trigger after did not carry the dispatch result");
+
+    var entryBefore = trace.Single(r => r.Scope == "behavior-entry" && r.Phase == "before");
+    var entryAfter = trace.Single(r => r.Scope == "behavior-entry" && r.Phase == "after");
+    Check(entryBefore.Entry == "A" && entryBefore.Plan is { PlanId: "test.records.plan" },
+        "entry before did not carry the behavior identity");
+    Check(entryAfter.Result is { Status: "succeeded", Reason: "completed" },
+        "entry after did not carry the behavior result");
+
+    var nodeBefore = trace.Single(r => r.Scope == "behavior-node" && r.Phase == "before");
+    var nodeAfter = trace.Single(r => r.Scope == "behavior-node" && r.Phase == "after");
+    Check(nodeBefore.Step == "B" && nodeBefore.NodeKind == "action"
+        && nodeBefore.Inputs is { } inputs && inputs.TryGetProperty("target", out _)
+        && inputs.GetProperty("amount").GetDouble() == 3,
+        "node before did not carry resolved inputs");
+    Check(nodeBefore.Parameters is { ValueKind: JsonValueKind.Object },
+        "node before did not carry resolved parameters");
+    Check(nodeAfter.CommandId == nodeBefore.CommandId && nodeAfter.Outputs is { ValueKind: JsonValueKind.Object }
+        && nodeAfter.Result is { Status: "succeeded", Commit: "confirmed", Reason: "committed" },
+        "node after did not carry outputs/result or pair with node before");
+
+    subscription.Dispose();
+    Check(!subscription.IsActive, "disposed behavior trace subscription stayed active");
 });
 
 Case("kernel records a failed step and entry.stopped one step before the entry's end", () => {

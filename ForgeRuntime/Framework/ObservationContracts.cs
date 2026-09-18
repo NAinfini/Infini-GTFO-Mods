@@ -20,33 +20,52 @@ public static class ObservationContracts
     public const string EntityHealthBinding = ProviderId + ".binding.entity_health";
     public const string EntityHealthHandler = "runtime.query.entity_health";
 
+    public const string EntityLifeStateCapability = "forge.query.entity.life_state";
+    public const string EntityLifeStateBinding = ProviderId + ".binding.entity_life_state";
+    public const string EntityLifeStateHandler = "runtime.query.entity_life_state";
+
+    public const string EntityOwnerCapability = "forge.query.entity.owner";
+    public const string EntityOwnerBinding = ProviderId + ".binding.entity_owner";
+    public const string EntityOwnerHandler = "runtime.query.entity_owner";
+
     public const string PositionUnavailableCode = "position-unavailable";
     public const string HealthUnavailableCode = "health-unavailable";
     public const string HealthKindUnsupportedCode = "health-kind-unsupported";
+    public const string LifeStateKindUnsupportedCode = "life-state-kind-unsupported";
 
     public static readonly HandlerShape EntityPositionShape =
         new HandlerShape().Inputs("entity").Outputs("position");
     public static readonly HandlerShape EntityHealthShape =
         new HandlerShape().Inputs("entity").Outputs("value", "maximum", "fraction");
+    public static readonly HandlerShape EntityLifeStateShape =
+        new HandlerShape().Inputs("entity").Outputs("state");
+    public static readonly HandlerShape EntityOwnerShape =
+        new HandlerShape().Inputs("entity").Outputs("owner");
 
     private static IReadOnlyDictionary<string, EvaluatorHandler> Evaluators { get; } =
         new Dictionary<string, EvaluatorHandler>(StringComparer.Ordinal)
         {
             [EntityPositionHandler] = EntityPosition,
-            [EntityHealthHandler] = EntityHealth
+            [EntityHealthHandler] = EntityHealth,
+            [EntityLifeStateHandler] = EntityLifeState,
+            [EntityOwnerHandler] = EntityOwner
         };
 
     private static IReadOnlyDictionary<string, HandlerShape> Shapes { get; } =
         new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
         {
             [EntityPositionHandler] = EntityPositionShape,
-            [EntityHealthHandler] = EntityHealthShape
+            [EntityHealthHandler] = EntityHealthShape,
+            [EntityLifeStateHandler] = EntityLifeStateShape,
+            [EntityOwnerHandler] = EntityOwnerShape
         };
 
     private static readonly BindingSupport[] Support =
     {
         new(EntityPositionBinding, "implementation-only", Array.Empty<string>()),
-        new(EntityHealthBinding, "implementation-only", Array.Empty<string>())
+        new(EntityHealthBinding, "implementation-only", Array.Empty<string>()),
+        new(EntityLifeStateBinding, "implementation-only", Array.Empty<string>()),
+        new(EntityOwnerBinding, "implementation-only", Array.Empty<string>())
     };
 
     public static RuntimeModule Module() => new(RuntimeKernel.ApiVersion, RegistryJson(),
@@ -65,12 +84,16 @@ public static class ObservationContracts
         capabilities = new[]
         {
             Capability(EntityPositionCapability, "任意实体位置", "读任意一个可观察实体的位置。"),
-            Capability(EntityHealthCapability, "生命值", "读一个玩家或敌人的当前生命、最大生命与生命比例。")
+            Capability(EntityHealthCapability, "生命值", "读一个玩家或敌人的当前生命、最大生命与生命比例。"),
+            Capability(EntityLifeStateCapability, "生命状态", "读一个玩家或敌人的存活、倒地或死亡状态。"),
+            Capability(EntityOwnerCapability, "读取所属者", "读取观察器明确发布的父级/所属者实体；没有时返回空。")
         },
         bindings = new[]
         {
             Binding(EntityPositionBinding, EntityPositionCapability, EntityPositionHandler),
-            Binding(EntityHealthBinding, EntityHealthCapability, EntityHealthHandler)
+            Binding(EntityHealthBinding, EntityHealthCapability, EntityHealthHandler),
+            Binding(EntityLifeStateBinding, EntityLifeStateCapability, EntityLifeStateHandler),
+            Binding(EntityOwnerBinding, EntityOwnerCapability, EntityOwnerHandler)
         }
     }).GetRawText();
 
@@ -124,6 +147,31 @@ public static class ObservationContracts
             maximum,
             fraction = maximum > 0d ? current / maximum : 0d
         });
+    }
+
+    public static JsonElement EntityLifeState(EvaluationContext context)
+    {
+        var snapshot = Snapshot(context, out _);
+        if (snapshot.Kind != "gtfo.player" && snapshot.Kind != "gtfo.enemy")
+            throw new RuntimeContractException(LifeStateKindUnsupportedCode,
+                "Life state is currently defined only for player and enemy entities.");
+        var state = snapshot.LifeState switch
+        {
+            "alive" => 0,
+            "downed" => 1,
+            "dead" => 2,
+            _ => throw new RuntimeContractException("entity-life-state", "Unknown life state.")
+        };
+        return RuntimeJson.From(new { state });
+    }
+
+    /// <summary>Reads the explicit parent/owner relation a domain observer published. Parent is the shared
+    /// observation field for ownership/lifetime containment; absence is a real nullable answer, never a guessed
+    /// player from faction, tags or an entity id.</summary>
+    public static JsonElement EntityOwner(EvaluationContext context)
+    {
+        var snapshot = Snapshot(context, out _);
+        return RuntimeJson.From(new { owner = snapshot.Parent });
     }
 
     private static RuntimeEntitySnapshot Snapshot(EvaluationContext context, out EntityReference reference)

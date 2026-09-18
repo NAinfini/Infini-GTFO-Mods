@@ -9,9 +9,16 @@ var checks = new List<CheckRow>();
 void Check(string id, bool passed) => checks.Add(new(id, passed));
 IEnumerable<TypeDefinition> Walk(TypeDefinition t) => new[] { t }.Concat(t.NestedTypes.SelectMany(Walk));
 string Hash(string p) { using var s = File.OpenRead(p); using var h = SHA256.Create(); return Convert.ToHexString(h.ComputeHash(s)); }
-using var host = AssemblyDefinition.ReadAssembly(args[1]);
-using var sdk = AssemblyDefinition.ReadAssembly(args[2]);
-using var development = AssemblyDefinition.ReadAssembly(args[3]);
+using var resolver = new DefaultAssemblyResolver();
+resolver.AddSearchDirectory(Path.Combine(args[0], "core"));
+resolver.AddSearchDirectory(Path.Combine(args[0], "interop"));
+resolver.AddSearchDirectory(Path.GetDirectoryName(Path.GetFullPath(args[1]))!);
+resolver.AddSearchDirectory(Path.GetDirectoryName(Path.GetFullPath(args[2]))!);
+resolver.AddSearchDirectory(Path.GetDirectoryName(Path.GetFullPath(args[3]))!);
+var reader = new ReaderParameters { AssemblyResolver = resolver };
+using var host = AssemblyDefinition.ReadAssembly(args[1], reader);
+using var sdk = AssemblyDefinition.ReadAssembly(args[2], reader);
+using var development = AssemblyDefinition.ReadAssembly(args[3], reader);
 var interop = new Dictionary<string, AssemblyDefinition>(StringComparer.Ordinal);
 TypeDefinition[] GameTypes(string scope)
 {
@@ -19,7 +26,7 @@ TypeDefinition[] GameTypes(string scope)
     {
         var path = Path.Combine(args[0], "interop", scope + ".dll");
         if (!File.Exists(path)) return Array.Empty<TypeDefinition>();
-        interop[scope] = assembly = AssemblyDefinition.ReadAssembly(path);
+        interop[scope] = assembly = AssemblyDefinition.ReadAssembly(path, reader);
     }
     return assembly.MainModule.Types.SelectMany(Walk).ToArray();
 }
@@ -33,6 +40,9 @@ bool Patch(TypeDefinition t) => t.CustomAttributes.Any(a => a.AttributeType.Full
 MethodReference[] Calls(params TypeDefinition[] roots) => roots.SelectMany(Walk)
     .SelectMany(t => t.Methods).Where(m => m.HasBody)
     .SelectMany(m => m.Body.Instructions).Select(i => i.Operand).OfType<MethodReference>().ToArray();
+MethodReference[] CallsMethod(MethodDefinition method) => method.HasBody
+    ? method.Body.Instructions.Select(i => i.Operand).OfType<MethodReference>().ToArray()
+    : Array.Empty<MethodReference>();
 
 string[] diagnostics = { "RuntimeDiagnostics", "AuthoringMonitor", "PerformanceMonitor", "PerformanceDiagnostics", "DiagnosticsReport", "TelemetryBridge", "Settings" };
 Check("host.no-diagnostics", !hostTypes.Any(t => diagnostics.Contains(t.Name)));
@@ -47,8 +57,8 @@ var plugin = types.Single(t => t.FullName == "ForgeDevelopment.Native.Plugin");
 var identity = plugin.CustomAttributes.Single(a => a.AttributeType.Name == "BepInPlugin");
 Check("plugin.identity", identity.ConstructorArguments.Select(a => a.Value).SequenceEqual(
     new object[] { "NAinfini.ForgeDevelopment", "Infini Forge Development", ReleaseVersion("NAinfini-ForgeDevelopment") }));
-// The host dependency's minimum version comes from the built host plugin, never from a copy pinned here: the
-// shipped loader parses the literal as a SemVer range, so it carries the `>=` floor of the host's own version.
+// Development pins the host version declared by the built Runtime plugin. It does not carry a second range
+// policy beside the release set: changing the host version means changing this package's release contract too.
 var hostIdentity = hostTypes.Single(t => t.FullName == "ForgeRuntime.Plugin")
     .CustomAttributes.Single(a => a.AttributeType.Name == "BepInPlugin").ConstructorArguments.Select(a => a.Value).ToArray();
 Check("plugin.runtime-dependency", plugin.CustomAttributes.Where(a => a.AttributeType.Name == "BepInDependency")
@@ -85,6 +95,13 @@ var runtimeCalls = Calls(tracerRuntime);
 Check("development.tracer.config-driven-install", runtimeCalls.Any(m => m.DeclaringType.Name == "Harmony" && m.Name == "CreateProcessor")
     && runtimeCalls.Any(m => m.DeclaringType.Name == "RecTracer" && m.Name == "Parse"));
 Check("development.tracer.runtime-switch", tracerRuntime.Methods.Any(m => m.Name == "SetProfileEnabled"));
+var recRuntime = types.Single(t => t.Name == "RecRuntime");
+Check("development.behavior-trace-subscription", Calls(recRuntime)
+    .Any(m => m.DeclaringType.FullName == "ForgeRuntime.Framework.RuntimeKernel" && m.Name == "ObserveBehaviorTrace"));
+var recForge = types.Single(t => t.Name == "RecForge");
+var behaviorTraceWriter = recForge.Methods.Single(m => m.Name == "RecordBehaviorTrace");
+Check("development.behavior-trace-recorder", CallsMethod(behaviorTraceWriter)
+    .Any(m => m.DeclaringType.Name == "RecSession" && m.Name == "Write"));
 var session = types.Single(t => t.Name == "RecSession");
 var sessionCalls = Calls(session);
 Check("development.recorder.segments", session.Methods.Any(m => m.Name == "Open") && session.Methods.Any(m => m.Name == "Stop")

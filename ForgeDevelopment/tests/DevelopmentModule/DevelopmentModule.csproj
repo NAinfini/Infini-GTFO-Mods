@@ -19,6 +19,7 @@
   </Target>
   <ItemGroup>
     <Compile Include="../../Native/DevelopmentModule.cs" />
+    <Compile Include="../../Native/BehaviorTraceContract.cs" />
     <Compile Include="../../Native/DiagnosticSessions.cs" />
     <Compile Include="../../Native/DiagnosticHandlers.cs" />
     <Compile Include="Program.cs;ModuleWorld.cs" />

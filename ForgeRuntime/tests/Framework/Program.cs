@@ -41,6 +41,34 @@ void RejectCode(Action action, string code, string name)
     Check(b.IsRegistered, "rejected registration does not damage other module");
 }
 {
+    var s = new Scenario();
+    var trace = new List<RuntimeBehaviorTraceRecord>();
+    using var subscription = s.Kernel.ObserveBehaviorTrace(trace.Add);
+    var a = s.Register("example.alpha");
+    s.Plan("alpha", "example.alpha");
+    a.Publish(s.Event("trace", "example.alpha"));
+    var tick = s.Kernel.Advance(1, true);
+    Check(tick.CommandsExecuted == 1, "behavior trace fixture executed one command");
+    Check(trace.Count(r => r.Scope == "trigger" && r.Phase == "before") == 1
+        && trace.Count(r => r.Scope == "trigger" && r.Phase == "after") == 1,
+        "behavior trace captures trigger before and after");
+    Check(trace.Count(r => r.Scope == "behavior-entry" && r.Phase == "before") == 1
+        && trace.Count(r => r.Scope == "behavior-entry" && r.Phase == "after") == 1,
+        "behavior trace captures entry before and after");
+    var nodeBefore = trace.Single(r => r.Scope == "behavior-node" && r.Phase == "before");
+    var nodeAfter = trace.Single(r => r.Scope == "behavior-node" && r.Phase == "after");
+    Check(nodeBefore.NodeKind == "action" && nodeBefore.Inputs is { } inputs
+        && inputs.TryGetProperty("target", out _)
+        && nodeBefore.Parameters is { } parameters && parameters.GetProperty("amount").GetDouble() == 5,
+        "behavior trace before carries resolved action inputs and parameters");
+    Check(nodeAfter.CommandId == nodeBefore.CommandId && nodeAfter.Outputs is { } outputs
+        && outputs.GetProperty("actual").GetDouble() == 5
+        && nodeAfter.Result is { Status: "succeeded", Commit: "confirmed" },
+        "behavior trace after carries action outputs and committed result");
+    subscription.Dispose();
+    Check(!subscription.IsActive, "behavior trace subscription disposes without a gameplay provider");
+}
+{
     var s = new Scenario(); var a = s.Register("example.alpha"); s.Plan("alpha", "example.alpha");
     a.Publish(s.Event("life", "example.alpha")); s.Life = 2;
     var stale = s.Kernel.Advance(1, true);
@@ -65,6 +93,27 @@ void RejectCode(Action action, string code, string name)
     Check(s.Kernel.Advance(1, true).CommandsExecuted == 1, "module unregister preserves independent module tasks");
     var replacement = s.Register("example.alpha");
     Check(replacement.IsRegistered && !s.Kernel.HasSubscribers(Fixture.Trigger("example.alpha")), "re-register does not resurrect old plans/tasks");
+}
+{
+    var s = new Scenario(); var a = s.Register("example.alpha"); var b = s.Register("example.beta");
+    var scope = new AuthoringRoomScope(2, 1, 7);
+    Check(s.Kernel.ResolveAuthoringRoom(1, "Assets/Rooms/Test.prefab", scope).Refusal
+        == AuthoringRoomResolution.ResolverUnavailable, "missing room resolver is an explicit authoring refusal");
+    a.RegisterAuthoringRoomResolver((world, source, address) =>
+        new AuthoringRoomResolution(null, new[] { new AuthoringRoomHit(101, 202) }));
+    var answer = s.Kernel.ResolveAuthoringRoom(1, "Assets/Rooms/Test.prefab", scope);
+    Check(answer.Room is { GeomorphInstanceId: 101, ZoneInstanceId: 202 },
+        "the registered room resolver is the one authoring answer");
+    RejectCode(() => b.RegisterAuthoringRoomResolver((_, _, _) =>
+        new AuthoringRoomResolution(null, Array.Empty<AuthoringRoomHit>())),
+        "authoring-room-resolver-conflict", "a second provider cannot install a second room resolver");
+    a.Dispose();
+    Check(s.Kernel.ResolveAuthoringRoom(1, "Assets/Rooms/Test.prefab", scope).Refusal
+        == AuthoringRoomResolution.ResolverUnavailable, "unregistering the owner removes the authoring room resolver");
+    b.RegisterAuthoringRoomResolver((_, _, _) =>
+        new AuthoringRoomResolution(AuthoringRoomResolution.NoRoom, Array.Empty<AuthoringRoomHit>()));
+    Check(s.Kernel.ResolveAuthoringRoom(1, "Assets/Rooms/Test.prefab", scope).Refusal == AuthoringRoomResolution.NoRoom,
+        "a new provider may own the room resolver after the previous owner unregisters");
 }
 {
     var s = new Scenario(); var a = s.Register("example.alpha"); s.Plan("alpha", "example.alpha");

@@ -10,18 +10,12 @@ using ForgeTrigger.Targeting;
 /// exactly like one that works.</summary>
 internal static class RegistryTests
 {
-    /// <summary>The rows this batch registers: the life-state conditions that read the world through the step's own
-    /// query session, each under the `observe` role its query tier asks for.</summary>
-    private static readonly string[] RegisteredRows =
-    {
-        "forge.condition.predicate.alive", "forge.condition.predicate.player_downed"
-    };
-
     /// <summary>The condition rows the authoring node list does not have. They are deleted with the rows they
     /// implemented, so the guard here is that none of them comes back as a registered capability: the comparison
     /// node answers the same questions from values the plan already has.</summary>
     private static readonly string[] DeletedRows =
     {
+        "forge.condition.predicate.alive", "forge.condition.predicate.player_downed",
         "forge.condition.predicate.count", "forge.condition.predicate.distance",
         "forge.condition.predicate.entity_type", "forge.condition.predicate.exists",
         "forge.condition.predicate.has_tag", "forge.condition.predicate.team_relation",
@@ -77,14 +71,6 @@ internal static class RegistryTests
         check(declared.All(row => bindings.Any(binding => binding.GetProperty("id").GetString() == row.BindingId
                 && binding.GetProperty("role").GetString() == row.Role)),
             "every registered row carries the role its own declaration gave it");
-        foreach (var capabilityId in RegisteredRows)
-        {
-            var binding = bindings.SingleOrDefault(row => row.GetProperty("capabilityId").GetString() == capabilityId);
-            check(binding.ValueKind == JsonValueKind.Object
-                && binding.GetProperty("role").GetString() == "observe"
-                && binding.GetProperty("status").GetString() == "implemented",
-                "the manifest carries this batch's registered row: " + capabilityId);
-        }
         foreach (var (capabilityId, waitingFor) in HeldBack)
             check(!capabilities.Contains(capabilityId, StringComparer.Ordinal),
                 "a row still waiting for " + waitingFor + " is not advertised: " + capabilityId);

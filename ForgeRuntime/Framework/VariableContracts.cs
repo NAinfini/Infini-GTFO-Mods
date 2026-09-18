@@ -19,8 +19,7 @@ namespace ForgeRuntime.Framework;
 /// (<c>g-once</c>).</item>
 /// <item><c>forge.control.flow.wait_event</c> — wait for a custom message or an engine event, with an optional
 /// deadline, and leave by `received` or by `timeout` (<c>g-wait</c>).</item>
-/// <item><c>forge.control.flow.end</c> — end this flow now (<c>g-end</c>).</item>
-/// <item><c>forge.event.message.emit</c> — send a custom message another behaviour can receive (<c>g-message</c>).
+/// <item><c>forge.control.message.emit</c> — send a custom message another behaviour can receive (<c>g-message</c>).
 /// </item>
 /// <item><c>forge.trigger.status.event_received</c> — the entry point a behaviour hangs on to receive those
 /// messages, and the row a `g-wait` names when it waits for one.</item>
@@ -38,8 +37,7 @@ public static class VariableContracts
     public const string WriteCapability = "forge.variable.store.write";
     public const string OnceCapability = "forge.control.flow.once";
     public const string WaitCapability = "forge.control.flow.wait_event";
-    public const string EndCapability = "forge.control.flow.end";
-    public const string EmitCapability = "forge.event.message.emit";
+    public const string EmitCapability = "forge.control.message.emit";
     public const string MessageReceivedCapability = "forge.trigger.status.event_received";
     public const string NamedReadCapability = "forge.object.named.read";
     public const string NamedWriteCapability = "forge.object.named.write";
@@ -47,7 +45,6 @@ public static class VariableContracts
     public const string WriteBinding = ProviderId + ".binding.write";
     public const string OnceBinding = ProviderId + ".binding.once";
     public const string WaitBinding = ProviderId + ".binding.wait";
-    public const string EndBinding = ProviderId + ".binding.end";
     public const string EmitBinding = ProviderId + ".binding.emit";
     public const string NamedReadBinding = ProviderId + ".binding.named_read";
     public const string NamedWriteBinding = ProviderId + ".binding.named_write";
@@ -96,7 +93,7 @@ public static class VariableContracts
 
     /// <summary>The kernel's own module. It is registered like any other built-in provider, so a plan pins these
     /// bindings by the same lock every other binding uses.</summary>
-    internal static RuntimeModule Module() => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
+    public static RuntimeModule Module() => new(RuntimeKernel.ApiVersion, RuntimeJson.From(new
     {
         providers = new[] { new { id = ProviderId, kind = "native", version = "1.0.0", dependencies = Array.Empty<string>() } },
         capabilities = new object[]
@@ -113,9 +110,6 @@ public static class VariableContracts
             new { id = WaitCapability, owner = ProviderId, kind = "control", label = "等待消息或事件",
                 version = "1.0.0", parameters = new { description = "等到指定消息或事件时走 received，超时走 timeout。" },
                 graph = WaitGraph() },
-            new { id = EndCapability, owner = ProviderId, kind = "control", label = "结束流程",
-                version = "1.0.0", parameters = new { description = "立刻结束当前流程；后面的步骤不再执行，已发生的写入保留。" },
-                graph = EndGraph() },
             new { id = EmitCapability, owner = ProviderId, kind = "control", label = "发送消息",
                 version = "1.0.0", parameters = new { description = "发一条自定义消息，别的行为可以接收或等待它。" },
                 graph = EmitGraph() },
@@ -135,7 +129,6 @@ public static class VariableContracts
             Binding(WriteBinding, WriteCapability, "runtime.variable.write", "execute"),
             Binding(OnceBinding, OnceCapability, "runtime.control.once", "execute"),
             Binding(WaitBinding, WaitCapability, "runtime.control.wait_event", "execute"),
-            Binding(EndBinding, EndCapability, "runtime.control.end", "execute"),
             Binding(EmitBinding, EmitCapability, "runtime.message.emit", "execute"),
             Binding(MessageReceivedBinding, MessageReceivedCapability, "runtime.trigger.message_received", "observe"),
             Binding(NamedReadBinding, NamedReadCapability, "runtime.object.named_read", "execute"),
@@ -146,7 +139,7 @@ public static class VariableContracts
     new[]
     {
         Support(ReadBinding), Support(WriteBinding), Support(OnceBinding), Support(WaitBinding),
-        Support(EndBinding), Support(EmitBinding), Support(MessageReceivedBinding),
+        Support(EmitBinding), Support(MessageReceivedBinding),
         Support(NamedReadBinding), Support(NamedWriteBinding)
     });
 
@@ -239,15 +232,6 @@ public static class VariableContracts
             new { id = "message", type = "string", role = "structural", required = false },
             new { id = "timeout", type = "integer", role = "structural", required = false }
         }
-    };
-
-    private static object EndGraph() => new
-    {
-        domains = Domains,
-        execution = "host",
-        inputs = new object[] { Port("in", "execution") },
-        outputs = Array.Empty<object>(),
-        parameters = Array.Empty<object>()
     };
 
     /// <summary>One custom message carries its name and one number on `value`, the same port the receive row

@@ -61,6 +61,12 @@ public sealed class Plugin : BasePlugin
             harmony = new Harmony(PluginGuid);
             hostAttempted = true;
             GameRuntimeBridge.Initialize(logLevel);
+            // Authoring is the one mode that promises complete behaviour-editor observability. Elevate while
+            // registration is still open so built-in, already-registered and later domain providers all emit
+            // Trace lifecycle records for the whole session; Play keeps the configured player-tier level.
+            if (ConfiguredMode == RuntimeMode.Authoring && GameRuntimeBridge.Kernel is { } authoringKernel
+                && GameRuntimeBridge.Suspension == null)
+                authoringKernel.ElevateLogging();
             harmony.PatchAll(typeof(Plugin).Assembly);
             LevelLifecycle.Subscribe();
             frameworkMonitor = AddComponent<FrameworkMonitor>();

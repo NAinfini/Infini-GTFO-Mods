@@ -347,10 +347,8 @@ internal sealed class Scene : IDisposable
         var evaluators = EnemyModule.NodeEvaluators();
         var handler = capabilityId switch
         {
-            EnemyNodeValueContract.AliveCapability => EnemyNodeValueContract.AliveHandler,
             EnemyNodeValueContract.TypeCapability => EnemyNodeValueContract.TypeHandler,
             EnemyNodeValueContract.SleepingCapability => EnemyNodeValueContract.SleepingHandler,
-            EnemyNodeValueContract.WhereCapability => EnemyNodeValueContract.WhereHandler,
             EnemyNodeValueContract.TaggedCapability => EnemyNodeValueContract.TaggedHandler,
             EnemyNodeValueContract.GroupCapability => EnemyNodeValueContract.GroupHandler,
             _ => throw new InvalidOperationException("Not a node value row: " + capabilityId)

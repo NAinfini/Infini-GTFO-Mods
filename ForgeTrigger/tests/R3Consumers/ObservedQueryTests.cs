@@ -17,7 +17,6 @@ internal static class ObservedQueryTests
     /// rows, and only the rows named here are asserted one by one.</summary>
     private static readonly string[] QueryRows =
     {
-        "forge.condition.predicate.alive", "forge.condition.predicate.player_downed",
         "forge.selector.target.distinct", "forge.selector.target.limit", "forge.selector.target.shuffle",
         "forge.selector.target.random", "forge.selector.target.union", "forge.selector.target.intersection",
         "forge.selector.target.difference", "forge.selector.target.self", "forge.selector.target.owner",
@@ -35,7 +34,6 @@ internal static class ObservedQueryTests
         Declaration(check);
         Existence(check, Reject);
         KindAndTag(check);
-        LifeStates(check, Reject);
         Collections(check, Reject);
         SeededSelection(check, Reject);
         Roles(check, Reject);
@@ -62,22 +60,7 @@ internal static class ObservedQueryTests
                 && module.BindingSupport.Any(support => support.BindingId == node.BindingId),
                 "a declared observation row answers as a query step and is registered: " + id);
         }
-        // The two conditions this batch keeps declare exactly the catalog's own ports, in its own order: the port
-        // list of a row is what a plan wires, and a reordered or renamed one would still register.
-        foreach (var (id, inputs, outputs) in new[]
-        {
-            ("forge.condition.predicate.alive", "subject,life_state", "value"),
-            ("forge.condition.predicate.player_downed", "subject", "value")
-        })
-        {
-            var graph = ObservedQueryModule.Nodes.Single(row => row.CapabilityId == id).Graph;
-            check(Ports(graph, "inputs") == inputs && Ports(graph, "outputs") == outputs,
-                "the declared condition carries the catalog's own ports: " + id);
-        }
     }
-
-    private static string Ports(JsonElement graph, string side)
-        => string.Join(",", graph.GetProperty(side).EnumerateArray().Select(port => port.GetProperty("id").GetString()));
 
     /// <summary>Three answers, two of which are the same `false` for the author and one of which is a refusal: a
     /// live reference, a world or life the kernel proved stale, and an observation it could not make.</summary>
@@ -109,42 +92,6 @@ internal static class ObservedQueryTests
         check(ObservedEntityNodes.HasTag(kernel, reference, "burning") && !ObservedEntityNodes.HasTag(kernel, reference, "frozen"),
             "has_tag: the observed tags decide, ordinal");
     }
-    /// <summary>The life-state conditions read the one observation the session makes: `alive` compares the observed
-    /// state with the requested member and refuses a member outside the catalog's own set, and `player_downed` asks
-    /// for the one state a player life is in between the downed transition and its revive or death.</summary>
-    private static void LifeStates(Action<bool, string> check, Action<string, string, Action> reject)
-    {
-        var alive = Condition("alive-state", "alive");
-        var downed = Condition("downed-state", "downed");
-        var dead = Condition("dead-state", "dead");
-        using var world = new ObservationWorld(new[] { alive, downed, dead });
-        var session = world.Session();
-        check(ObservedConditionDeclarations.LifeState(session, alive.Ref) == "alive"
-            && ObservedConditionDeclarations.LifeState(session, downed.Ref) == "downed"
-            && ObservedConditionDeclarations.LifeState(session, dead.Ref) == "dead",
-            "life state: the observed state decides, and every catalog member is readable");
-        check(ObservedConditionDeclarations.LifeStates.SequenceEqual(new[] { "alive", "downed", "dead" }),
-            "life state: the condition spells the catalog's own set once");
-        check(ObservedConditionDeclarations.IsLifeState("alive", "alive")
-            && ObservedConditionDeclarations.IsLifeState("downed", "downed")
-            && !ObservedConditionDeclarations.IsLifeState("alive", "downed")
-            && !ObservedConditionDeclarations.IsLifeState("dead", "alive"),
-            "alive: the condition is exactly the requested member, measured on the observed state");
-        check(ObservedConditionDeclarations.IsLifeState("downed", "downed")
-            && !ObservedConditionDeclarations.IsLifeState("alive", "downed"),
-            "player_downed: a downed life answers and a living one does not");
-        reject("alive: a life state outside the catalog's set", "entity-life-state",
-            () => ObservedConditionDeclarations.IsLifeState("alive", "wounded"));
-        reject("life state: an unobservable subject", "entity-query-incomplete",
-            () => ObservedConditionDeclarations.LifeState(session, alive.Ref with { LifeEpoch = 9 }));
-    }
-
-    /// <summary>One life-state condition's subject: a recorded life whose observer answers the state it was built
-    /// with, so the reads above are exercised through the real public registration path.</summary>
-    private static RuntimeEntitySnapshot Condition(string id, string lifeState, double x = 0, double y = 0, string? faction = null)
-        => new(new EntityReference("test.condition:" + id, 1, 1), "player", faction, lifeState,
-            Array.Empty<string>(), new[] { "test.receiver.health" }, new[] { x, y, 0d });
-
     /// <summary>The set algebra the seven collection selectors answer with: full identity in, one reference per
     /// identity out, and one order — the ordinal key of world epoch, id and life epoch — except where the catalog
     /// says the authored order is the answer.</summary>

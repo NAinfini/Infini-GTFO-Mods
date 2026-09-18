@@ -154,8 +154,8 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
         var tags = placement != null && !placement.Recalled
             ? new[] { "deployed", placement.Entity.Id }
             : new[] { deployed || (placement?.Recalled ?? false) ? "deployed" : "inventory" };
-        return new RuntimeEntitySnapshot(reference, "equipment", handle.Owner.Id, "alive", tags,
-            Array.Empty<string>(), point);
+        return new RuntimeEntitySnapshot(reference, "equipment", "player", "alive", tags,
+            Array.Empty<string>(), point, parent: handle.Owner);
     }
 
     /// <summary>Whether one deployed reference still names an open placement, read from this provider's own
@@ -182,8 +182,8 @@ internal sealed class EquipmentNativeAdapter : IAttackNativeReads
         var point = Position(placement.Instance);
         if (point == null) return null;
         var tags = placement.Recalled ? new[] { "recalled" } : new[] { "deployed", placement.Handle.ResourceId };
-        return new RuntimeEntitySnapshot(reference, "deployable", owner.Id, "alive", tags,
-            Array.Empty<string>(), point);
+        return new RuntimeEntitySnapshot(reference, "deployable", "player", "alive", tags,
+            Array.Empty<string>(), point, parent: owner);
     }
 
     /// <summary>A deployed world object appeared. The native instance is matched to the backpack life that holds

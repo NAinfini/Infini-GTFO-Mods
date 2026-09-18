@@ -403,6 +403,13 @@ public sealed partial class RuntimeKernel
         // so a slot this table does not hold names a step no activation produced a value for; the refusal is the
         // slot's own, not a claim about the source's kind.
         RuntimeJson.Require(step.NodeKind is "pure" or "query", "from-step-slot", step.NodeId);
+        var stepPlan = new RuntimeLogPlan { PlanId = item.Plan.Plan.Id, ResourceId = item.Plan.Plan.ResourceId,
+            ResourceRevision = item.Plan.Plan.ResourceRevision };
+        var traceOrigin = new StepOrigin(pending.Event, in stepPlan, item.Entry.NodeId);
+        var commandId = string.Concat(CommandPrefixOf(pending), step.CommandSuffix);
+        LogStepStarted(in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId, step.NodeKind);
+        JsonElement? traceInputs = null, traceParameters = step.Parameters;
+        var deepTraceStarted = false;
         JsonElement frame;
         try
         {
@@ -441,6 +448,11 @@ public sealed partial class RuntimeKernel
             var parameters = step.Parameters;
             if (merged != null) { parameters = RuntimeJson.From(merged); RuntimeJson.Parameters(parameters, capability); }
             parameters = RuntimeJson.ResolveEnumParameters(parameters, capability);
+            var inputFrame = RuntimeJson.From(inputs);
+            traceInputs = inputFrame; traceParameters = parameters;
+            TraceStep("before", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, inputFrame, parameters);
+            deepTraceStarted = true;
             var evaluator = registry.Evaluators[step.BindingId];
             var session = step.NodeKind == "query" ? BeginQuery(step.NodeId) : NoQuery(step.NodeId);
             // The event being dispatched is the whole context a step is evaluated in: its actor roles come from the
@@ -451,7 +463,7 @@ public sealed partial class RuntimeKernel
             var actors = ActorContext(pending.Event, item);
             foreach (var role in RequiredActors(step.BindingId))
                 RuntimeJson.Require(actors.Get(role) != null, "actor-missing", role);
-            var result = evaluator(new EvaluationContext(step.NodeId, parameters, RuntimeJson.From(inputs), session, actors, relations, CurrentTick, EntityInstance));
+            var result = evaluator(new EvaluationContext(step.NodeId, parameters, inputFrame, session, actors, relations, CurrentTick, EntityInstance));
             // A refused read is a rejected step, never a frame that silently holds fewer candidates.
             RuntimeJson.Require(queryRefusal == null, step.NodeKind == "query" ? queryRefusal! : RuntimeAbiCodes.PureWorldPort, step.NodeId);
             var outputs = RuntimeJson.Rows(step.Contract, "outputs");
@@ -475,13 +487,48 @@ public sealed partial class RuntimeKernel
         {
             // The first refusal the session recorded outranks whatever the evaluator reported, so an exhausted
             // budget reads as the one `query-budget` code whether the evaluator threw or returned a short frame.
-            throw new RuntimeContractException(step.NodeKind == "query" ? queryRefusal! : RuntimeAbiCodes.PureWorldPort,
-                ex.Code + ": " + ex.Message);
+            var code = step.NodeKind == "query" ? queryRefusal! : RuntimeAbiCodes.PureWorldPort;
+            if (!deepTraceStarted)
+                TraceStep("before", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                    step.NodeKind, traceInputs, traceParameters);
+            LogStepFinished(in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, CommandStatuses.Rejected, null, code);
+            TraceStep("after", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, traceInputs, traceParameters, null,
+                new RuntimeLogResult { Status = CommandStatuses.Rejected, Reason = code });
+            throw new RuntimeContractException(code, ex.Code + ": " + ex.Message);
         }
         // A refusal the evaluator raised keeps its own code: the more specific the code, the closer it points the
         // author at the node to repair. Only a failure with no code at all is encoded here.
-        catch (RuntimeContractException) { throw; }
-        catch (Exception ex) { throw new RuntimeContractException("pure-evaluation-failed", ex.GetType().Name + ": " + ex.Message); }
+        catch (RuntimeContractException ex)
+        {
+            if (!deepTraceStarted)
+                TraceStep("before", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                    step.NodeKind, traceInputs, traceParameters);
+            LogStepFinished(in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, CommandStatuses.Rejected, null, ex.Code);
+            TraceStep("after", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, traceInputs, traceParameters, null,
+                new RuntimeLogResult { Status = CommandStatuses.Rejected, Reason = ex.Code });
+            throw;
+        }
+        catch (Exception ex)
+        {
+            if (!deepTraceStarted)
+                TraceStep("before", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                    step.NodeKind, traceInputs, traceParameters);
+            LogStepFinished(in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, CommandStatuses.Failed, null, "pure-evaluation-failed");
+            TraceStep("after", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+                step.NodeKind, traceInputs, traceParameters, null,
+                new RuntimeLogResult { Status = CommandStatuses.Failed, Reason = "pure-evaluation-failed" });
+            throw new RuntimeContractException("pure-evaluation-failed", ex.GetType().Name + ": " + ex.Message);
+        }
+        LogStepFinished(in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+            step.NodeKind, CommandStatuses.Succeeded, null, "evaluated");
+        TraceStep("after", in traceOrigin, step.ProviderId, step.NodeId, step.BindingId, commandId,
+            step.NodeKind, traceInputs, traceParameters, frame,
+            new RuntimeLogResult { Status = CommandStatuses.Succeeded, Reason = "evaluated" });
         stepFrames[stepIndex] = frame;
         validatedSlots.Add(stepIndex);
         return frame;

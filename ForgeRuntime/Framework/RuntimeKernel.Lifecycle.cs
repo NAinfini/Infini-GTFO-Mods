@@ -33,6 +33,8 @@ public sealed partial class RuntimeKernel
         NoEntityObservationMutation();
         RuntimeJson.Require(!notifyingLifecycle, "lifecycle-observer-mutation",
             "Lifecycle observers are read-only; only their subscription may be disposed.");
+        RuntimeJson.Require(!notifyingBehaviorTrace, "behavior-trace-observer-mutation",
+            "Behavior trace observers are read-only; only their subscription may be disposed.");
     }
     private void AcceptRuntimeWork(bool allowStarting = false)
     {
@@ -70,6 +72,7 @@ public sealed partial class RuntimeKernel
         ClearLifecycleWork("runtime-stopped");
         NotifyLifecycle(RuntimeLifecycleKind.StartupChanged);
         lifecycleObservers.Clear();
+        ClearBehaviorTraceObservers();
     }
     private void ClearLifecycleWork(string code)
     {

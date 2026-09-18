@@ -54,7 +54,6 @@ internal static class Cases
         Suite.Test("a checkpoint restores values and latches over reloaded plans", CheckpointRestore);
         Suite.Test("a released subject loses only its own variables", ScopeRelease);
         Suite.Test("the host snapshot reproduces a world on another host", HostSnapshot);
-        Suite.Test("end stops the region it is in", EndStopsTheRegion);
         Suite.Test("an undeclared variable is refused by name", UndeclaredRefusal);
         Suite.Test("a node whose type disagrees with the declaration is refused", TypeMismatch);
         Suite.Test("a named variable declared in variables[] is refused", NamedScopeRefusal);
@@ -177,7 +176,7 @@ internal static class Cases
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // g-once, g-wait, g-end, g-message
+    // g-once, g-wait, g-message
     // ---------------------------------------------------------------------------------------------------------
     private static void OncePerMount()
     {
@@ -201,13 +200,12 @@ internal static class Cases
         var builder = Variables(world, "test.vars.wait.recv", ("test.branch", "level", "number"), ("test.payload", "level", "number"))
             .Initial("test.branch", 9).Initial("test.payload", 0);
         var wait = new Dictionary<string, object?> { ["target"] = VariableContracts.MessageReceivedBinding, ["message"] = "test.power_on" };
-        builder.Step("AOnce", "control", VariableContracts.OnceBinding, new Dictionary<string, object?>(), Array.Empty<object>(), new int?[] { 1, 2 });
-        var waiting = builder.Step("BWait", "control", VariableContracts.WaitBinding, wait, Array.Empty<object>(), new int?[] { 3, 4 });
-        builder.Step("CEnd", "control", VariableContracts.EndBinding, new Dictionary<string, object?>(), Array.Empty<object>(), Array.Empty<int?>());
+        builder.Step("AOnce", "control", VariableContracts.OnceBinding, new Dictionary<string, object?>(), Array.Empty<object>(), new int?[] { 1, null });
+        var waiting = builder.Step("BWait", "control", VariableContracts.WaitBinding, wait, Array.Empty<object>(), new int?[] { 2, 3 });
         var received = builder.Port("outputs", VariableContracts.WaitBinding, wait, "received");
         var timeout = builder.Port("outputs", VariableContracts.WaitBinding, wait, "timeout");
         Suite.Check(received == Received && timeout == TimedOut, "the wait's two exits are received then timeout");
-        WriteStep(builder, "test.branch", "DReceived", new[] { PlanBuilder.Literal(ValueSlot(builder, "test.branch"), 1) }, 5);
+        WriteStep(builder, "test.branch", "DReceived", new[] { PlanBuilder.Literal(ValueSlot(builder, "test.branch"), 1) }, 4);
         WriteStep(builder, "test.branch", "ETimeout", new[] { PlanBuilder.Literal(ValueSlot(builder, "test.branch"), 0) }, null);
         var payload = builder.Port("outputs", VariableContracts.WaitBinding, wait, "payload");
         WriteStep(builder, "test.payload", "FWritePayload",
@@ -244,31 +242,6 @@ internal static class Cases
         world.Advance(13);
         Suite.Check(Branch(world) == 0, "the deadline leaves by the timeout exit");
         Suite.Check(Entries(world.Kernel).Count == 1, "the timeout wrote once");
-    }
-
-    private static void EndStopsTheRegion()
-    {
-        var world = new VariableFixture();
-        var builder = Variables(world, "test.vars.end", ("test.stopped", "level", "number")).Initial("test.stopped", 0);
-        // Two regions of one sequence: the first ends the flow, so the second never runs. Without the `end` step the
-        // walk would advance to the next region and write, which is what the control plan below shows.
-        builder.Step("ASequence", "control", "forge.contract.control.binding.sequence", new Dictionary<string, object?>(), Array.Empty<object>(), new int?[] { 1, 2 });
-        builder.Step("BEnd", "control", VariableContracts.EndBinding, new Dictionary<string, object?>(), Array.Empty<object>(), Array.Empty<int?>());
-        WriteStep(builder, "test.stopped", "CWriteStopped", new[] { PlanBuilder.Literal(ValueSlot(builder, "test.stopped"), 1) }, null);
-        world.Load(builder.Build());
-        world.Ping("p1");
-        world.Advance(10);
-        Suite.Check(!Entries(world.Kernel).ContainsKey("test.stopped|level||-1"), "the region after the end step never runs");
-
-        var control = new VariableFixture();
-        var second = Variables(control, "test.vars.end.control", ("test.continued", "level", "number")).Initial("test.continued", 0);
-        second.Step("ASequence", "control", "forge.contract.control.binding.sequence", new Dictionary<string, object?>(), Array.Empty<object>(), new int?[] { 1, 2 });
-        second.Step("BOnce", "control", VariableContracts.OnceBinding, new Dictionary<string, object?>(), Array.Empty<object>(), new int?[] { null, null });
-        WriteStep(second, "test.continued", "CWriteContinued", new[] { PlanBuilder.Literal(ValueSlot(second, "test.continued"), 1) }, null);
-        control.Load(second.Build());
-        control.Ping("p1");
-        control.Advance(10);
-        Suite.Check(Value(control, "test.continued|level||-1") == 1, "the same shape without the end step does run the next region");
     }
 
     // ---------------------------------------------------------------------------------------------------------

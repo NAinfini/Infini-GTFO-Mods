@@ -26,6 +26,7 @@ internal static class Program
     private static int Main()
     {
         Registration();
+        BehaviorTraceVocabulary();
         ShapeAlignment();
         SuccessPaths();
         Refusals();
@@ -96,6 +97,35 @@ internal static class Program
         // default is the authoring case, so the plugin cannot forget to pass it.
         using var authoring = new ModuleWorld();
         Check(authoring.Registered, "the gate defaults to the authoring case");
+    }
+
+    /// <summary>The recorder-facing behavior trace vocabulary is explicit: trigger dispatch, behavior entry
+    /// and behavior node each have before/after boundaries, while refusal/defer/cancel/stop remain named terminal
+    /// states. Development tooling therefore never infers debug phases from arbitrary log strings.</summary>
+    private static void BehaviorTraceVocabulary()
+    {
+        var expected = new (string Code, string Scope, string Moment)[]
+        {
+            (RuntimeLogCodes.TriggerFired, "trigger", "accepted"),
+            (RuntimeLogCodes.DispatchStarted, "trigger", "before"),
+            (RuntimeLogCodes.DispatchFinished, "trigger", "after"),
+            (RuntimeLogCodes.EventRejected, "trigger", "rejected"),
+            (RuntimeLogCodes.EventDeferred, "trigger", "deferred"),
+            (RuntimeLogCodes.EventCancelled, "trigger", "cancelled"),
+            (RuntimeLogCodes.EntryStarted, "behavior-entry", "before"),
+            (RuntimeLogCodes.EntryFinished, "behavior-entry", "after"),
+            (RuntimeLogCodes.EntryStopped, "behavior-entry", "stopped"),
+            (RuntimeLogCodes.StepStarted, "behavior-node", "before"),
+            (RuntimeLogCodes.StepFinished, "behavior-node", "after")
+        };
+        foreach (var row in expected)
+        {
+            Check(BehaviorTraceContract.TryClassify(row.Code, out var phase), "trace phase is classified: " + row.Code);
+            Check(phase.Scope == row.Scope && phase.Moment == row.Moment,
+                "trace phase matches the stable debug vocabulary: " + row.Code);
+        }
+        Check(!BehaviorTraceContract.TryClassify(RuntimeLogCodes.PlanLoaded, out _),
+            "non-behavior records do not pretend to be behavior trace phases");
     }
 
     /// <summary>Each handler's own declared port set has to be the capability's own: the kernel resolves the shape

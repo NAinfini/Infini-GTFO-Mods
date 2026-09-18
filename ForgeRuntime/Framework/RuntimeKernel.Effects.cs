@@ -574,11 +574,11 @@ public sealed partial class RuntimeKernel
         };
         var origin = new StepOrigin(slot.Origin, in plan, slot.NodeId);
         CommandResult result;
-        LogStepStarted(in origin, slot.ProviderId, slot.NodeId, slot.BindingId, commandId);
+        LogStepStarted(in origin, slot.ProviderId, slot.NodeId, slot.BindingId, commandId, "action");
         try { result = NormalizeInvokedResult(handler(context)); }
         catch (RuntimeContractException error) { result = CommandResult.Rejected(error.Code, CommandResult.TruncateDetail(error.Message)); }
         catch (Exception error) { result = CommandResult.FailedUnknown("handler-exception", CommandResult.TruncateDetail(error.GetType().Name + ": " + error.Message)); }
-        LogStepFinished(in origin, slot.ProviderId, slot.NodeId, slot.BindingId, commandId, in result);
+        LogStepFinished(in origin, slot.ProviderId, slot.NodeId, slot.BindingId, commandId, "action", in result);
         pulseReceipts?.Add(new CommandReceipt(commandId, slot.Origin.EventId, slot.Origin.CauseId,
             slot.Origin.RootEventId ?? slot.Origin.EventId, slot.PlanId, slot.ResourceId, slot.ResourceRevision,
             slot.NodeId, slot.BindingId, WorldEpoch, CurrentTick, result));

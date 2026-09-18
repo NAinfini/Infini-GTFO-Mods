@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using HarmonyLib;
+using ForgeRuntime.Framework;
 using HostPlugin = ForgeRuntime.Plugin;
 
 namespace ForgeDevelopment.Native;
@@ -21,6 +22,7 @@ internal static class RecRuntime
     private static readonly object Gate = new();
     private static readonly List<string> Started = new();
     private static Harmony? _harmony;
+    private static RuntimeBehaviorTraceSubscription? _behaviorTrace;
     private static long _nextKernelPoll;
     private static string _lastLevel = "";
     private static long _lastEpoch = long.MinValue;
@@ -52,7 +54,7 @@ internal static class RecRuntime
         Stage("session");
         Try("log", RecLog.Start, RecLog.Stop);
         if (Settings.RecorderTrace.Value) Try("tracer", LoadTrace, RecTracerRuntime.UninstallAll);
-        Try("forge_kernel", WireForge, () => RecForge.Stop(_harmony));
+        Try("forge_kernel", WireForge, UnwireForge);
         WriteStartup();
     }
 
@@ -209,12 +211,21 @@ internal static class RecRuntime
     {
         _harmony = new Harmony(Plugin.PluginGuid + ".RecForge");
         RecForge.Start(_harmony);
+        var runtime = HostPlugin.Runtime ?? throw new InvalidOperationException("Forge Runtime is unavailable to the authoring recorder.");
+        _behaviorTrace = runtime.ObserveBehaviorTrace(RecForge.RecordBehaviorTrace);
         var previous = DevelopmentModule.Sink;
         DevelopmentModule.Sink = record =>
         {
             previous(record);
             RecForge.RecordDiagnostic(record);
         };
+    }
+
+    private static void UnwireForge()
+    {
+        _behaviorTrace?.Dispose();
+        _behaviorTrace = null;
+        RecForge.Stop(_harmony);
     }
 
     private static void WriteStartup()
@@ -252,7 +263,7 @@ internal static class RecRuntime
         switch (name)
         {
             case "forge_kernel":
-                RecForge.Stop(_harmony);
+                UnwireForge();
                 break;
             case "tracer":
                 RecTracerRuntime.UninstallAll();

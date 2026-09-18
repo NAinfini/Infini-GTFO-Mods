@@ -308,7 +308,10 @@ internal sealed class RuntimeLogWriter : IRuntimeLogSink, IDisposable
         }
         Optional(json, "entry", r.Entry);
         Optional(json, "step", r.Step);
+        Optional(json, "nodeKind", r.NodeKind);
         Optional(json, "binding", r.Binding);
+        if (r.GateAccumulated is long gateAccumulated) json.WriteNumber("gateAccumulated", gateAccumulated);
+        if (r.GateFired is long gateFired) json.WriteNumber("gateFired", gateFired);
         if (r.Result is RuntimeLogResult result)
         {
             json.WriteStartObject("result");

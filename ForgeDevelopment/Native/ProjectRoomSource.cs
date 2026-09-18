@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using ForgeMap.Native;
+using ForgeRuntime.Framework;
+using HostPlugin = ForgeRuntime.Plugin;
 
 namespace ForgeDevelopment.Native;
 
@@ -7,8 +8,8 @@ namespace ForgeDevelopment.Native;
 /// The game-bound half of the development diagnostics' room resolution: the adapter that hands the one room
 /// resolver to the scan, translated into the plain answer the scan speaks.
 ///
-/// The rule itself lives with the generated level — <see cref="TriggerZoneRoomResolver"/> names an authored room
-/// by the prefab object its `Assets/` path loads and the native zone the locator carries — so this file owns no
+/// The rule itself lives with the map provider that registered Runtime's authoring-room resolver: it names an
+/// authored room by the prefab object its `Assets/` path loads and the native zone the locator carries, so this file owns no
 /// matching, no prefab identity and no second answer to the same question. It exists only because the scan is
 /// the game-independent half of the report and must not name a native type: a build that installs no adapter
 /// leaves the scan with no resolver, and a scan with no resolver refuses every authored room instead of
@@ -25,8 +26,10 @@ internal static class ProjectRoomSource
     /// so the scan's own cardinality rule reports them as the candidates an author can look at.</summary>
     internal static ProjectRoomAnswer Resolve(long worldEpoch, string sourcePrefab, ProjectRoomScope zone)
     {
-        var answer = TriggerZoneRoomResolver.Resolve(worldEpoch, sourcePrefab,
-            new TriggerZoneRoomScope(zone.Dimension, zone.Layer, zone.LocalZoneIndex));
+        var runtime = HostPlugin.Runtime;
+        if (runtime == null) return ProjectRoomAnswer.Refused(ProjectReferenceReason.CreationContextUnverified);
+        var answer = runtime.ResolveAuthoringRoom(worldEpoch, sourcePrefab,
+            new AuthoringRoomScope(zone.Dimension, zone.Layer, zone.LocalZoneIndex));
         if (answer.Rooms.Count == 0) return ProjectRoomAnswer.Refused(Reason(answer.Refusal));
         var hits = new List<ProjectRoomHit>(answer.Rooms.Count);
         foreach (var room in answer.Rooms)
@@ -40,8 +43,8 @@ internal static class ProjectRoomSource
     /// still no candidate: the zone held no such room.</summary>
     private static ProjectReferenceReason Reason(string? refusal) => refusal switch
     {
-        TriggerZoneRoomResolution.ZoneUnresolved => ProjectReferenceReason.ZoneUnresolved,
-        TriggerZoneRoomResolution.NoRoom => ProjectReferenceReason.NoCandidate,
+        AuthoringRoomResolution.ZoneUnresolved => ProjectReferenceReason.ZoneUnresolved,
+        AuthoringRoomResolution.NoRoom => ProjectReferenceReason.NoCandidate,
         null => ProjectReferenceReason.NoCandidate,
         _ => ProjectReferenceReason.CreationContextUnverified
     };

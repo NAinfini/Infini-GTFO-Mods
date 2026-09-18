@@ -193,31 +193,77 @@ public sealed partial class RuntimeKernel
             Tick = CurrentTick, WorldEpoch = WorldEpoch, EventId = eventId, Binding = bindingId, Entry = refusal.NodeId,
             Plan = new RuntimeLogPlan { PlanId = refusal.PlanId, ResourceId = "", ResourceRevision = "" },
             Result = new RuntimeLogResult { Status = CommandStatuses.Rejected, Reason = refusal.Code },
-            Detail = "accumulated=" + refusal.Accumulated + " fired=" + refusal.Fired });
+            GateAccumulated = refusal.Accumulated, GateFired = refusal.Fired });
     }
 
-    private void LogStepStarted(in StepOrigin origin, string provider, string step, string bindingId, string commandId)
+    /// <summary>One accepted event immediately before its claimed entries begin walking.</summary>
+    private void LogDispatchStarted(string provider, RuntimeEvent origin)
+    {
+        if (logSink == null || !LogGate(provider).IsEnabled(RuntimeLogLevel.Trace)) return;
+        WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Trace, Code = RuntimeLogCodes.DispatchStarted, Provider = provider,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, EventId = origin.EventId, CauseId = origin.CauseId,
+            RootEventId = origin.RootEventId ?? origin.EventId, Binding = origin.BindingId });
+    }
+
+    /// <summary>The matching dispatch boundary after every claimed entry has either completed or refused.</summary>
+    private void LogDispatchFinished(string provider, RuntimeEvent origin, string status, string reason)
+    {
+        var level = status is CommandStatuses.Failed or CommandStatuses.Rejected ? RuntimeLogLevel.Error : RuntimeLogLevel.Info;
+        if (logSink == null || !LogGate(provider).IsEnabled(level)) return;
+        WriteLog(new RuntimeLogRecord { Level = level, Code = RuntimeLogCodes.DispatchFinished, Provider = provider,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, EventId = origin.EventId, CauseId = origin.CauseId,
+            RootEventId = origin.RootEventId ?? origin.EventId, Binding = origin.BindingId,
+            Result = new RuntimeLogResult { Status = status, Reason = reason } });
+    }
+
+    /// <summary>One plan entry immediately before its activation begins.</summary>
+    private void LogEntryStarted(in StepOrigin origin, string provider, string bindingId)
+    {
+        if (logSink == null || !LogGate(provider).IsEnabled(RuntimeLogLevel.Trace)) return;
+        WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Trace, Code = RuntimeLogCodes.EntryStarted, Provider = provider,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, EventId = origin.EventId, CauseId = origin.CauseId,
+            RootEventId = origin.RootEventId, Plan = origin.Plan, Entry = origin.Entry, Binding = bindingId });
+    }
+
+    /// <summary>The matching entry boundary; terminal command and control refusals are carried as the reason.</summary>
+    private void LogEntryFinished(in StepOrigin origin, string provider, string bindingId, string status, string reason)
+    {
+        var level = status is CommandStatuses.Failed or CommandStatuses.Rejected ? RuntimeLogLevel.Error : RuntimeLogLevel.Info;
+        if (logSink == null || !LogGate(provider).IsEnabled(level)) return;
+        WriteLog(new RuntimeLogRecord { Level = level, Code = RuntimeLogCodes.EntryFinished, Provider = provider,
+            Tick = CurrentTick, WorldEpoch = WorldEpoch, EventId = origin.EventId, CauseId = origin.CauseId,
+            RootEventId = origin.RootEventId, Plan = origin.Plan, Entry = origin.Entry, Binding = bindingId,
+            Result = new RuntimeLogResult { Status = status, Reason = reason } });
+    }
+
+    private void LogStepStarted(in StepOrigin origin, string provider, string step, string bindingId, string commandId, string nodeKind)
     {
         if (logSink == null || !LogGate(provider).IsEnabled(RuntimeLogLevel.Trace)) return;
         WriteLog(new RuntimeLogRecord { Level = RuntimeLogLevel.Trace, Code = RuntimeLogCodes.StepStarted, Provider = provider,
             Tick = CurrentTick, WorldEpoch = WorldEpoch, CommandId = commandId, EventId = origin.EventId, CauseId = origin.CauseId,
-            RootEventId = origin.RootEventId, Plan = origin.Plan, Entry = origin.Entry, Step = step, Binding = bindingId });
+            RootEventId = origin.RootEventId, Plan = origin.Plan, Entry = origin.Entry, Step = step, NodeKind = nodeKind, Binding = bindingId });
     }
 
-    private void LogStepFinished(in StepOrigin origin, string provider, string step, string bindingId, string commandId, in CommandResult result)
+    private void LogStepFinished(in StepOrigin origin, string provider, string step, string bindingId, string commandId,
+        string nodeKind, string status, string? commit, string reason)
     {
-        var level = StepLevel(result);
+        var level = StepLevel(status, commit);
         if (logSink == null || !LogGate(provider).IsEnabled(level)) return;
         WriteLog(new RuntimeLogRecord { Level = level, Code = RuntimeLogCodes.StepFinished, Provider = provider,
             Tick = CurrentTick, WorldEpoch = WorldEpoch, CommandId = commandId, EventId = origin.EventId, CauseId = origin.CauseId,
-            RootEventId = origin.RootEventId, Plan = origin.Plan, Entry = origin.Entry, Step = step, Binding = bindingId,
-            Result = new RuntimeLogResult { Status = result.Status, Commit = result.CommitState, Reason = result.Code } });
+            RootEventId = origin.RootEventId, Plan = origin.Plan, Entry = origin.Entry, Step = step, NodeKind = nodeKind, Binding = bindingId,
+            Result = new RuntimeLogResult { Status = status, Commit = commit, Reason = reason } });
     }
+
+    private void LogStepFinished(in StepOrigin origin, string provider, string step, string bindingId, string commandId,
+        string nodeKind, in CommandResult result)
+        => LogStepFinished(in origin, provider, step, bindingId, commandId, nodeKind,
+            result.Status, result.CommitState, result.Code);
 
     /// <summary>Step result codes are the kernel's own: nothing is normalized here, and a code the reason table does not list
     /// is a table gap to report rather than something the kernel invents.</summary>
-    private static RuntimeLogLevel StepLevel(in CommandResult result)
-        => result.Status == CommandStatuses.Failed || result.CommitState == CommitStates.Unknown
+    private static RuntimeLogLevel StepLevel(string status, string? commit)
+        => status == CommandStatuses.Failed || commit == CommitStates.Unknown
             ? RuntimeLogLevel.Error : RuntimeLogLevel.Info;
 
     private void LogEntryStopped(in StepOrigin origin, string step, string commandId)

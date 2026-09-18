@@ -6,24 +6,12 @@ using ForgeEnemy.Native.Observation;
 using ForgeRuntime.Framework;
 using static T;
 
-/// <summary>Focused cases for the six enemy-domain Data read operators not already owned by ForgeRuntime. Each
-/// one answers the ports its contract declares and refuses explicitly when its domain-specific read is unavailable.</summary>
+/// <summary>Focused cases for the four enemy-domain Data reads that remain domain-specific after generic
+/// position, life-state and health reads moved to ForgeRuntime.</summary>
 internal static class ValueCases
 {
     internal static void Run()
     {
-        Case("value.alive-follows-the-life-state", () =>
-        {
-            using var s = new Scene();
-            var enemy = Scene.NewEnemy();
-            var reference = s.Track(enemy);
-            Check(s.Evaluate(EnemyNodeValueContract.AliveCapability, new { enemy = reference }).GetProperty("value").GetBoolean(),
-                "A live enemy did not read alive.");
-            enemy.Alive = false;
-            Check(!s.Evaluate(EnemyNodeValueContract.AliveCapability, new { enemy = reference }).GetProperty("value").GetBoolean(),
-                "A dead enemy did not read dead.");
-        });
-
         Case("value.type-answers-the-blocks-persistent-id", () =>
         {
             using var s = new Scene();
@@ -66,60 +54,6 @@ internal static class ValueCases
             var reference = s.Track(enemy);
             Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.SleepingCapability, new { enemy = reference }))
                 == EnemyNodeValueReads.StateUnavailableCode, "A life with no behaviour machine did not refuse by name.");
-        });
-
-        Case("value.where-answers-position-and-zone", () =>
-        {
-            using var s = new Scene();
-            var enemy = Scene.NewEnemy();
-            enemy.Position = (1.5f, -2f, 3f);
-            enemy.CourseNode = new AIG_CourseNode
-            {
-                m_zone = new AIG_Zone { m_dimensionIndex = 2, LocalIndex = 5, m_layer = new AIG_Layer { m_type = 1 } }
-            };
-            var reference = s.Track(enemy);
-            var answer = s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = reference });
-            var position = answer.GetProperty("position");
-            Check(position.GetArrayLength() == 3 && Math.Abs(position[0].GetDouble() - 1.5) < 0.001
-                && Math.Abs(position[1].GetDouble() + 2) < 0.001 && Math.Abs(position[2].GetDouble() - 3) < 0.001,
-                "The position is not the enemy's own.");
-            var zone = RuntimeJson.Entity(answer.GetProperty("zone"));
-            Check(zone.Id == RuntimeZones.Id(2, 1, 5), "The zone is not the enemy's own course node's zone: " + zone.Id);
-            Check(zone.WorldEpoch == s.Kernel.WorldEpoch, "The zone belongs to another world.");
-        });
-
-        Case("value.where-refuses-a-life-that-names-no-zone", () =>
-        {
-            using var s = new Scene();
-            var enemy = Scene.NewEnemy();
-            enemy.CourseNode = new AIG_CourseNode { m_zone = null };
-            var reference = s.Track(enemy);
-            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = reference }))
-                == EnemyModule.ZoneUnknownCode, "A life whose course node names no zone was answered instead of refused.");
-        });
-
-        Case("value.where-refuses-a-life-it-cannot-place", () =>
-        {
-            using var s = new Scene();
-            var unplaceable = s.Track(Scene.NewEnemy(9, 30));
-            var answered = s.Kernel.ZoneOfEntity(unplaceable);
-            Check(!answered.Answered && answered.Code == EnemyModule.ZoneUnknownCode,
-                "A life with no course node was not refused by name: " + answered.Code);
-            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = unplaceable }))
-                == EnemyModule.ZoneUnknownCode, "The where row answered a life this provider cannot place.");
-            var layerless = Scene.NewEnemy(10, 40);
-            layerless.CourseNode = new AIG_CourseNode { m_zone = new AIG_Zone { m_layer = null } };
-            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = s.Track(layerless) }))
-                == EnemyModule.ZoneUnknownCode, "A zone naming no layer was answered instead of refused.");
-            var nowhere = Scene.NewEnemy(11, 50);
-            nowhere.CourseNode = new AIG_CourseNode { m_zone = null };
-            var nowhereReference = s.Track(nowhere);
-            var standingNowhere = s.Kernel.ZoneOfEntity(nowhereReference);
-            Check(!standingNowhere.Answered && standingNowhere.Zone == null
-                && standingNowhere.Code == EnemyModule.ZoneUnknownCode,
-                "A life whose course node names no zone was not refused by name: " + standingNowhere.Code);
-            Check(Scene.Refusal(() => s.Evaluate(EnemyNodeValueContract.WhereCapability, new { enemy = nowhereReference }))
-                == EnemyModule.ZoneUnknownCode, "The where row answered a life whose course node names no zone.");
         });
 
         Case("value.tagged-answers-the-flag-and-the-time-left", () =>
@@ -232,11 +166,11 @@ internal static class ValueCases
             // The rows are the ones this provider registers, so the shape the kernel resolved is the statement:
             // a row that declared a different port set would have failed registration in the scene's own
             // constructor. What is asserted here is the family's own vocabulary.
-            Check(EnemyNodeValueContract.CapabilityIds.Length == 7, "The value family is not seven rows.");
+            Check(EnemyNodeValueContract.CapabilityIds.Length == 4, "The value family is not four domain-specific rows.");
             foreach (var capability in EnemyNodeValueContract.CapabilityIds)
                 Check(capability.StartsWith("forge.query.enemy.", StringComparison.Ordinal),
                     "The row is not spelled as the values section's own grammar: " + capability);
-            Check(EnemyNodeValueContract.WhereHandler != EnemyNodeValueContract.TaggedHandler, "Two rows share a handler.");
+            Check(EnemyNodeValueContract.TypeHandler != EnemyNodeValueContract.TaggedHandler, "Two rows share a handler.");
         });
     }
 }

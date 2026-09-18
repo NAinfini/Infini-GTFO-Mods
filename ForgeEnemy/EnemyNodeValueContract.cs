@@ -52,10 +52,6 @@ public static class EnemyNodeValueContract
     /// <summary>The entity input every row takes.</summary>
     public const string EnemyPort = "enemy";
 
-    /// <summary>`v-e-alive`: whether the enemy is alive.</summary>
-    public const string AliveCapability = "forge.query.enemy.alive";
-    public const string AliveHandler = "gtfo.enemy.value.alive";
-
     /// <summary>`v-e-type`: the official enemy type id.</summary>
     public const string TypeCapability = "forge.query.enemy.type";
     public const string TypeHandler = "gtfo.enemy.value.type";
@@ -63,10 +59,6 @@ public static class EnemyNodeValueContract
     /// <summary>`v-e-sleep`: whether the enemy is hibernating.</summary>
     public const string SleepingCapability = "forge.query.enemy.sleeping";
     public const string SleepingHandler = "gtfo.enemy.value.sleeping";
-
-    /// <summary>`v-e-where`: position and the zone it stands in.</summary>
-    public const string WhereCapability = "forge.query.enemy.where";
-    public const string WhereHandler = "gtfo.enemy.value.where";
 
     /// <summary>`v-e-tagged`: the tag flag and the tag time left.</summary>
     public const string TaggedCapability = "forge.query.enemy.tagged";
@@ -83,7 +75,7 @@ public static class EnemyNodeValueContract
     /// <summary>Every capability id this contract names, in the same order as <see cref="ValueRows"/>.</summary>
     public static readonly string[] CapabilityIds =
     {
-        AliveCapability, TypeCapability, SleepingCapability, WhereCapability, TaggedCapability, GroupCapability
+        TypeCapability, SleepingCapability, TaggedCapability, GroupCapability
     };
 
     /// <summary>Every handler name this contract declares, in the same order as
@@ -91,7 +83,7 @@ public static class EnemyNodeValueContract
     /// also its shape key, so a registration cannot supply an evaluator whose ports were never declared.</summary>
     public static readonly string[] HandlerNames =
     {
-        AliveHandler, TypeHandler, SleepingHandler, WhereHandler, TaggedHandler, GroupHandler
+        TypeHandler, SleepingHandler, TaggedHandler, GroupHandler
     };
 
     /// <summary>Every binding id this contract declares, in the same order.</summary>
@@ -107,22 +99,11 @@ public static class EnemyNodeValueContract
     /// values only — no `next`, no `result`, no handle, and no write.</summary>
     public static IReadOnlyList<object> ValueRows() => Array.AsReadOnly(new[]
     {
-        ValueRow(AliveCapability, "敌人是否存活", "读一个敌人是否还活着。",
-            "Reads whether one enemy is still alive.",
-            new object[] { new { id = "value", type = "boolean" } }),
         ValueRow(TypeCapability, "敌人类型", "读一个敌人的类型标识。",
             "Reads one enemy's official type id (EnemyDataBlock.persistentID) as decimal text.",
             new object[] { new { id = "value", type = "string" } }),
         OperatorValueRow(SleepingCapability, "敌人是否休眠", "读一个敌人是否处于休眠。",
             "Reads whether one enemy is still hibernating."),
-        ValueRow(WhereCapability, "敌人位置与所在区域", "读一个敌人的位置和它所在的区域。",
-            "Reads one enemy's world position and the zone it stands in.",
-            new object[]
-            {
-                new { id = "position", type = "vector3", unit = "m" },
-                new { id = "zone", type = "resource", resourceKind = RuntimeZones.ResourceKind,
-                    schema = "forge.resource." + RuntimeZones.ResourceKind }
-            }),
         ValueRow(TaggedCapability, "敌人是否被标记", "读一个敌人是否被生物追踪器标记，以及标记还剩多久。",
             "Reads whether one enemy still carries a BioTracker tag, and how many seconds of it are left.",
             new object[]
@@ -153,10 +134,8 @@ public static class EnemyNodeValueContract
     /// through the evaluator table, and a `query` row is evaluated on demand by definition.</summary>
     public static IReadOnlyList<object> ValueBindings() => Array.AsReadOnly(new object[]
     {
-        ValueBinding(AliveCapability, AliveHandler),
         ValueBinding(TypeCapability, TypeHandler),
         ValueBinding(SleepingCapability, SleepingHandler),
-        ValueBinding(WhereCapability, WhereHandler),
         ValueBinding(TaggedCapability, TaggedHandler),
         ValueBinding(GroupCapability, GroupHandler)
     });
@@ -165,8 +144,7 @@ public static class EnemyNodeValueContract
     /// read owns no object and writes nothing, so no row carries a permission.</summary>
     public static IReadOnlyList<BindingSupport> ValueSupport() => Array.AsReadOnly(new[]
     {
-        ValueSupport(AliveCapability), ValueSupport(TypeCapability),
-        ValueSupport(SleepingCapability), ValueSupport(WhereCapability), ValueSupport(TaggedCapability),
+        ValueSupport(TypeCapability), ValueSupport(SleepingCapability), ValueSupport(TaggedCapability),
         ValueSupport(GroupCapability)
     });
 
@@ -174,10 +152,8 @@ public static class EnemyNodeValueContract
     /// here so the native read layer cannot describe a second layout.</summary>
     public static IReadOnlyDictionary<string, HandlerShape> ValueShapes() => new Dictionary<string, HandlerShape>(StringComparer.Ordinal)
     {
-        [AliveHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
         [TypeHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
         [SleepingHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value"),
-        [WhereHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("position", "zone"),
         [TaggedHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("value", "remaining"),
         [GroupHandler] = new HandlerShape().Inputs(EnemyPort).Outputs("state", "group_type", "patrol_frustration")
     };

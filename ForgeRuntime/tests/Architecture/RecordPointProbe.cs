@@ -10,8 +10,9 @@ using ForgeRuntime.Framework;
 internal static class RecordPointProbe
 {
     private static readonly string[] ExpectedCodes = { "log.dropped", "log.level", "plan.loaded", "plan.rejected",
-        "registration.rejected", "binding.registered", "world.began", "trigger.fired", "event.rejected", "budget.exceeded",
-        "event.deferred", "event.cancelled", "step.started", "step.finished", "entry.stopped", "observer.failed", "runtime.suspended" };
+        "registration.rejected", "binding.registered", "world.began", "trigger.fired", "dispatch.started", "dispatch.finished",
+        "event.rejected", "budget.exceeded", "event.deferred", "event.cancelled", "entry.started", "entry.finished",
+        "step.started", "step.finished", "entry.stopped", "observer.failed", "runtime.suspended", "map.layout-generated" };
 
     internal static void Run(Action<bool, string> check)
     {
@@ -40,6 +41,38 @@ internal static class RecordPointProbe
         // I-DIAG: only step.finished carries a commit, so no other record point may set one.
         var commitSites = recordPoints.Where(m => CommitStates(m) && m.Name != "LogStepFinished").Select(m => m.Name).ToArray();
         check(commitSites.Length == 0, "a record point other than step.finished set commit: " + string.Join(", ", commitSites));
+
+        // Behavior-editor trace coverage is architectural, not a convention at call sites. The main dispatch walk
+        // owns trigger/entry boundaries and the common step boundary used by action/control/presentation/owner;
+        // EvaluateStep owns the lazily evaluated pure/query nodes. If either route loses a paired record point,
+        // ForgeDevelopment would silently lose a class of nodes.
+        var advance = typeof(RuntimeKernel).GetMethod("AdvanceCore", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(RuntimeKernel).FullName, "AdvanceCore");
+        foreach (var name in new[] { "LogDispatchStarted", "LogDispatchFinished", "LogEntryStarted", "LogEntryFinished", "LogStepStarted", "LogStepFinished" })
+            check(Calls(advance, name), "Advance no longer reaches behavior trace boundary " + name);
+        var evaluate = typeof(RuntimeKernel).GetMethod("EvaluateStep", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(RuntimeKernel).FullName, "EvaluateStep");
+        check(Calls(evaluate, "LogStepStarted") && Calls(evaluate, "LogStepFinished"),
+            "pure/query evaluation no longer emits paired behavior-node trace boundaries");
+    }
+
+    private static bool Calls(MethodInfo source, string targetName)
+    {
+        var text = source.GetMethodBody()?.GetILAsByteArray();
+        if (text == null) return false;
+        for (var i = 0; i < text.Length;)
+        {
+            var opcode = OpCode(text, i);
+            var operand = i + opcode.Size;
+            var size = OperandBytes(opcode, text, operand);
+            if (opcode.OperandType == OperandType.InlineMethod && operand + 4 <= text.Length)
+            {
+                var target = source.Module.ResolveMethod(BitConverter.ToInt32(text, operand));
+                if (target?.DeclaringType == typeof(RuntimeKernel) && target.Name == targetName) return true;
+            }
+            i = operand + size;
+        }
+        return false;
     }
 
     /// <summary>A record point sets commit when its IL stores a commit into the result it builds. The record types are
@@ -53,14 +86,15 @@ internal static class RecordPointProbe
         for (var i = 0; i < text.Length;)
         {
             var opcode = OpCode(text, i);
+            var operand = i + opcode.Size;
             if (opcode.OperandType == OperandType.InlineMethod)
             {
-                var target = method.Module.ResolveMethod(BitConverter.ToInt32(text, i + 1));
+                var target = method.Module.ResolveMethod(BitConverter.ToInt32(text, operand));
                 if (target is { Name: "set_Commit", DeclaringType: { } owner } && owner == typeof(RuntimeLogResult)
                     && previous != OpCodes.Ldnull) return true;
             }
             previous = opcode;
-            i += 1 + (opcode.Size == 2 ? 1 : 0) + OperandBytes(opcode.OperandType);
+            i = operand + OperandBytes(opcode, text, operand);
         }
         return false;
     }
@@ -93,10 +127,11 @@ internal static class RecordPointProbe
         for (var i = 0; i < text.Length;)
         {
             var opcode = OpCode(text, i);
-            var size = OperandBytes(opcode.OperandType);
-            var call = opcode.OperandType == OperandType.InlineMethod && i + 5 <= text.Length;
-            var token = call ? BitConverter.ToInt32(text, i + 1) : 0;
-            i += 1 + (opcode.Size == 2 ? 1 : 0) + size;
+            var operand = i + opcode.Size;
+            var size = OperandBytes(opcode, text, operand);
+            var call = opcode.OperandType == OperandType.InlineMethod && operand + 4 <= text.Length;
+            var token = call ? BitConverter.ToInt32(text, operand) : 0;
+            i = operand + size;
             if (!call || token == 0) continue;
             var target = method.Module.ResolveMethod(token);
             if (target != null && TextBuilders.Contains(target.DeclaringType?.FullName + "::" + target.Name, StringComparer.Ordinal))
@@ -122,11 +157,12 @@ internal static class RecordPointProbe
 
     // ECMA-335 instruction operands are a metadata or call-site token, a four-byte branch target, a byte, an eight-byte
     // integer, a four-byte float, a switch table or nothing at all.
-    private static int OperandBytes(OperandType type) => type switch
+    private static int OperandBytes(OpCode opcode, byte[] text, int operandAt) => opcode.OperandType switch
     {
         OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType or OperandType.InlineTok
             or OperandType.InlineString or OperandType.InlineSig or OperandType.InlineBrTarget
-            or OperandType.InlineSwitch or OperandType.InlineI or OperandType.ShortInlineR => 4,
+            or OperandType.InlineI or OperandType.ShortInlineR => 4,
+        OperandType.InlineSwitch => operandAt + 4 <= text.Length ? 4 + 4 * BitConverter.ToInt32(text, operandAt) : 4,
         OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
         OperandType.InlineVar => 2,
         OperandType.InlineI8 or OperandType.InlineR => 8,

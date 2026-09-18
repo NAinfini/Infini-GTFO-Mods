@@ -87,7 +87,8 @@ internal sealed class ModuleWorld : IDisposable
             new object?[]
             {
                 origin, 3L, "fixture.development.command", planId, "fixture.development.resource", "1", nodeId,
-                RuntimeJson.From(parameters ?? new { }), RuntimeJson.From(inputs), false
+                RuntimeJson.From(parameters ?? new { }), RuntimeJson.From(inputs), false,
+                (Func<EntityReference, object?>)(_ => null)
             }, null)!;
     }
 

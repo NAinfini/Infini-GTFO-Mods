@@ -24,8 +24,7 @@ public sealed partial class RuntimeKernel
     /// checkpoint carries, and it is a separate table because nothing in it is authored, named or read by a plan.</summary>
     internal readonly RuntimeTriggerGateStore triggerGates = new();
     /// <summary>The suspended `g-wait` steps, by the binding they are waiting on. A wait is the dispatch's own
-    /// resource: it is released by the timeout, by the event that wakes it, by the world ending and by `g-end`
-    /// ending the flow that reached it.</summary>
+    /// resource: it is released by the timeout, by the event that wakes it, or by the world ending.</summary>
     private readonly Dictionary<string, List<WaitJob>> waits = new(StringComparer.Ordinal);
 
     /// <summary>One suspended `g-wait`. It carries the work item and step to re-enter, the two outputs it may leave
@@ -95,13 +94,13 @@ public sealed partial class RuntimeKernel
     /// <summary>Whether one control capability id is dispatched here rather than by the first-step walker.</summary>
     private static bool IsVariableControl(string? control) => control is
         VariableContracts.ReadCapability or VariableContracts.WriteCapability or VariableContracts.OnceCapability
-        or VariableContracts.WaitCapability or VariableContracts.EndCapability or VariableContracts.EmitCapability
+        or VariableContracts.WaitCapability or VariableContracts.EmitCapability
         or VariableContracts.NamedReadCapability or VariableContracts.NamedWriteCapability;
 
     /// <summary>
     /// One variable, object, latch, message or wait step. A null return leaves the walk where the step sent it: a
-    /// value step continues at `next`, a `once` at `first` or `later`, a `g-end` ends the flow outright, and a
-    /// `g-wait` suspends it until the event it named arrives or its deadline passes.
+    /// value step continues at `next`, a `once` at `first` or `later`, and a `g-wait` suspends it until the event
+    /// it named arrives or its deadline passes. A branch with no successor ends naturally.
     /// </summary>
     private string? EnterVariableControl(Work item, int stepIndex, ResolvedStep step, Pending pending,
         JsonElement inputs, JsonElement parameters, out int? cursor)
@@ -164,14 +163,6 @@ public sealed partial class RuntimeKernel
                 // nor a node id may contain one.
                 var key = item.Plan.Plan.Id + ":" + item.Entry.NodeId + ":" + step.NodeId;
                 cursor = Successor(step, variables.ClaimOnce(key) ? 0 : 1);
-                return null;
-            }
-            case VariableContracts.EndCapability:
-            {
-                // Ending the flow ends the whole walk, not only the innermost region: the enclosing controls are
-                // dropped with it, so nothing after this step runs in this dispatch.
-                controlWalk.Clear();
-                cursor = null;
                 return null;
             }
             case VariableContracts.EmitCapability:

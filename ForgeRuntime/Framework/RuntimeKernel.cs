@@ -18,6 +18,8 @@ public sealed partial class RuntimeModuleHandle : IDisposable
     public bool IsRegistered => kernel.IsRegistered(ProviderId, Generation);
     public DispatchResult Publish(RuntimeEvent value) => kernel.Publish(this, value);
     public int CancelScope(string scopeId) => kernel.CancelScope(this, scopeId);
+    /// <summary>Cancel one live handle owned by this module using the same kernel path as plan-level cancellation.</summary>
+    public int CancelHandle(JsonElement value, JsonElement port, string detail) => kernel.CancelHandle(this, value, port, detail);
     /// <summary>The gate of one of this module's own bindings. Resolved once — at registration, where the binding is
     /// already a fact of this module — and then read as one boolean before an event value is built.</summary>
     public RuntimeSubscriptionGate SubscriptionGate(string bindingId) => kernel.SubscriptionGate(ProviderId, bindingId);
@@ -200,6 +202,7 @@ public sealed partial class RuntimeKernel
         // reason the pending snapshot carries (source-lifecycle / plan-unloaded); cancel and unload count before removal.
         StopScheduledSource(provider, null, "module-unregistered"); StopStateSource(provider, null, "module-unregistered");
         RemoveLifecycleObservers(provider, handle.Generation);
+        RemoveAuthoringRoomResolver(provider, handle.Generation);
         modules.Remove(provider); registry.Providers.Remove(provider);
         foreach (var id in ownedBindings) { registry.Bindings.Remove(id); registry.Handlers.Remove(id); registry.Evaluators.Remove(id); registry.Support.Remove(id); registry.Shapes.Remove(id); }
         foreach (var id in ownedCaps) { registry.Capabilities.Remove(id); registry.CapabilityRegistrants.Remove(id); }
@@ -775,11 +778,17 @@ public sealed partial class RuntimeKernel
                 }
                 eventsThisTick++; commandsThisTick += count; processed++;
                 foreach (var group in groups) { planTickUsage.TryGetValue(group.Plan.Plan.Id, out var used); planTickUsage[group.Plan.Plan.Id] = (used.Events + 1, used.Commands + group.Steps); }
+                LogDispatchStarted(pending.Provider, pending.Event);
+                TraceTrigger("before", pending.Provider, pending.Event);
                 var failed = false;
+                string? dispatchFailure = null;
                 foreach (var item in active)
                 {
                     var stepPlan = new RuntimeLogPlan { PlanId = item.Plan.Plan.Id, ResourceId = item.Plan.Plan.ResourceId, ResourceRevision = item.Plan.Plan.ResourceRevision };
                     var stepOrigin = new StepOrigin(pending.Event, in stepPlan, item.Entry.NodeId);
+                    LogEntryStarted(in stepOrigin, pending.Provider, pending.Event.BindingId);
+                    TraceEntry("before", in stepOrigin, pending.Provider, pending.Event.BindingId);
+                    string? entryStatus = null, entryReason = null;
                     // An activation's memo is `pure`/`query` results; `query` and `pure` steps are never dispatched
                     // directly, they are read on demand by whichever step's input names them via `fromStepSlot`.
                     // The same table holds what a `control` step wrote when it was entered and what an `action`
@@ -807,6 +816,8 @@ public sealed partial class RuntimeKernel
                         // already quoted: this dispatch's publisher and event, and this step's own plan and node.
                         var commandId = string.Concat(CommandPrefixOf(pending), step.CommandSuffix);
                         CommandResult? result = null; var invoked = false; int? next = null; var stopped = false;
+                        JsonElement? traceInputs = null, traceParameters = step.Parameters;
+                        var deepTraceStarted = false;
                         // `step.*` belongs to the provider of the binding that executes the step, which is not the entry's
                         // trigger binding: a trigger may route into another package's action.
                         var stepProvider = step.ProviderId;
@@ -814,6 +825,10 @@ public sealed partial class RuntimeKernel
                         // dispatch below is charged the same as an action: a control is a step too.
                         stepExecutions++;
                         if (StepBudgetSpent(item.Plan.Plan.Limits)) { controlFailure = RuntimeAbiCodes.DispatchStepBudget; break; }
+                        var presentationTier = step.NodeKind == "action" && IsPresentationStep(step);
+                        var ownerTier = step.NodeKind == "action" && !presentationTier && IsOwnerStep(step);
+                        var traceKind = presentationTier ? "presentation" : ownerTier ? "owner" : step.NodeKind;
+                        LogStepStarted(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId, traceKind);
                         try
                         {
                             RuntimeJson.Require(item.Plan.Modules.All(m => IsRegistered(m.Key, m.Value)), "binding-lifecycle", step.BindingId);
@@ -868,11 +883,11 @@ public sealed partial class RuntimeKernel
                                 RuntimeJson.Parameters(parameters, capability);
                             }
                             parameters = RuntimeJson.ResolveEnumParameters(parameters, capability);
-                            var presentationTier = IsPresentationStep(step);
-                            // The owner tier is the presentation tier's sibling with one difference: what the
-                            // recipient writes is world state, so the step's own receipt still records a dispatch
-                            // rather than a write made here, but the holder's result is a real commit.
-                            var ownerTier = !presentationTier && IsOwnerStep(step);
+                            var inputFrame = RuntimeJson.From(inputs);
+                            traceInputs = inputFrame; traceParameters = parameters;
+                            TraceStep("before", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                traceKind, inputFrame, parameters);
+                            deepTraceStarted = true;
                             if (step.NodeKind == "control")
                             {
                                 // Control routing is internal to the kernel: no handler lookup, no command receipt —
@@ -880,9 +895,24 @@ public sealed partial class RuntimeKernel
                                 // place, so `next`, `then`, `pulse` and `body` share one walker. A control that refuses
                                 // — a stale handle, an exhausted budget — rejects the event; it never invents a command.
                                 int? controlCursor = null;
-                                try { controlFailure = EnterControl(item, stepIndex, step, pending, RuntimeJson.From(inputs), parameters, out controlCursor); }
+                                try { controlFailure = EnterControl(item, stepIndex, step, pending, inputFrame, parameters, out controlCursor); }
                                 catch (RuntimeContractException ex) { controlFailure = ex.Code; }
-                                if (controlFailure != null) break;
+                                if (controlFailure != null)
+                                {
+                                    LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                        traceKind, CommandStatuses.Rejected, null, controlFailure);
+                                    TraceStep("after", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                        traceKind, inputFrame, parameters, null,
+                                        new RuntimeLogResult { Status = CommandStatuses.Rejected, Reason = controlFailure });
+                                    entryStatus = CommandStatuses.Rejected; entryReason = controlFailure;
+                                    break;
+                                }
+                                LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                    traceKind, CommandStatuses.Succeeded, null, "routed");
+                                JsonElement? controlOutputs = stepFrames.TryGetValue(stepIndex, out var routedFrame) ? routedFrame : null;
+                                TraceStep("after", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                    traceKind, inputFrame, parameters, controlOutputs,
+                                    new RuntimeLogResult { Status = CommandStatuses.Succeeded, Reason = "routed" });
                                 // A control routes the walk itself: it writes no receipt and produces no command, so
                                 // it leaves the step body exactly where the walk continues.
                                 cursor = controlCursor;
@@ -896,8 +926,16 @@ public sealed partial class RuntimeKernel
                                 // receipt, and the code says so instead of claiming a command nobody ran on this
                                 // machine. The recorded result carries no commit and no fact, so an entrypoint that
                                 // continues past a presentation step never sees a committed write it did not make.
-                                var presented = EnterPresentation(item.Plan, step, pending, commandId, RuntimeJson.From(inputs), out var presentationResult);
-                                if (presented != null) { controlFailure = presented; break; }
+                                var presented = EnterPresentation(item.Plan, step, pending, commandId, inputFrame, out var presentationResult);
+                                if (presented != null)
+                                {
+                                    result = presentationResult;
+                                    LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId, traceKind, in presentationResult);
+                                    TraceStep("after", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                        traceKind, inputFrame, parameters, presentationResult.Outputs, TraceResult(in presentationResult));
+                                    entryStatus = presentationResult.Status; entryReason = presentationResult.Code;
+                                    controlFailure = presented; break;
+                                }
                                 result = presentationResult;
                             }
                             else if (ownerTier)
@@ -906,8 +944,16 @@ public sealed partial class RuntimeKernel
                                 // host resolved the inputs and decided the timing, and the holder runs the same
                                 // handler through the owner entry point. The walk continues on a confirmed commit,
                                 // so an owner step may sit in the middle of an entry.
-                                var owned = EnterOwner(item.Plan, step, pending, commandId, RuntimeJson.From(inputs), out var ownerResult);
-                                if (owned != null) { controlFailure = owned; break; }
+                                var owned = EnterOwner(item.Plan, step, pending, commandId, inputFrame, out var ownerResult);
+                                if (owned != null)
+                                {
+                                    result = ownerResult;
+                                    LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId, traceKind, in ownerResult);
+                                    TraceStep("after", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                        traceKind, inputFrame, parameters, ownerResult.Outputs, TraceResult(in ownerResult));
+                                    entryStatus = ownerResult.Status; entryReason = ownerResult.Code;
+                                    controlFailure = owned; break;
+                                }
                                 result = ownerResult;
                             }
                             else
@@ -915,12 +961,10 @@ public sealed partial class RuntimeKernel
                                 // The step's binding decides who runs what: a handler the provider registered runs
                                 // here, and nothing about the walk is special to an action.
                                 var handler = registry.Handlers[step.BindingId];
-                                LogStepStarted(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId);
                                 // A step whose card carries a duration option opens its effect before the handler
                                 // runs: the handle is the kernel's, and the clock and the layer count are only made
                                 // real once the command says it committed. A `handle-budget` refusal here is a
                                 // pre-invocation failure like any other, so nothing is written for it.
-                                var inputFrame = RuntimeJson.From(inputs);
                                 var effect = step.Effect is { } duration ? BeginEffect(step, duration, item.Plan.Plan, inputFrame, pending.Event, CommandPrefixOf(pending)) : null;
                                 if (effect != null && pending.Schedule == null) pulseFacts[step.BindingId] = pending;
                                 currentCommand = new CommandContext(pending.Event, simulationTick, commandId, item.Plan.Plan.Id, item.Plan.Plan.ResourceId, item.Plan.Plan.ResourceRevision, step.NodeId, parameters, inputFrame, isHost, EntityInstance)
@@ -950,6 +994,14 @@ public sealed partial class RuntimeKernel
                         var commandResult = result ?? (invoked
                             ? CommandResult.FailedUnknown("null-result", "Handler returned null after invocation.")
                             : CommandResult.Rejected("precondition-failed", "Precondition failed before handler invocation."));
+                        if (!deepTraceStarted)
+                        {
+                            TraceStep("before", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                                traceKind, traceInputs, traceParameters);
+                            deepTraceStarted = true;
+                        }
+                        TraceStep("after", in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId,
+                            traceKind, traceInputs, traceParameters, commandResult.Outputs, TraceResult(in commandResult));
                         // An action's own result row is a value a later step reads through `fromStepSlot`, so it is
                         // published into the same activation table a `pure`/`query`/`control` step's frame goes into:
                         // one slot table per activation, and one place a step's outputs are read from.
@@ -961,13 +1013,22 @@ public sealed partial class RuntimeKernel
                             && !(commandResult.Status == CommandStatuses.Partial && commandResult.CommitState == CommitStates.Confirmed))
                         { cursor = null; stopped = true; }
                         else next = step.Successors.Count > 0 ? step.Successors[0] : null;
-                        LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId, in commandResult);
+                        LogStepFinished(in stepOrigin, stepProvider, step.NodeId, step.BindingId, commandId, traceKind, in commandResult);
+                        if (stopped) { entryStatus = commandResult.Status; entryReason = commandResult.Code; }
                         // The stop shares the code table's level line with step.finished, and is written only when the entry
                         // really had a step left: the last step of an entry stops nothing.
                         if (stopped && step.Successors.Count > 0) LogEntryStopped(in stepOrigin, step.NodeId, commandId);
                         cursor = next;
                         continueWalk: ;
                     }
+                    if (controlFailure != null && entryStatus == null)
+                    { entryStatus = CommandStatuses.Rejected; entryReason = controlFailure; }
+                    var finalEntryStatus = entryStatus ?? CommandStatuses.Succeeded;
+                    var finalEntryReason = entryReason ?? "completed";
+                    LogEntryFinished(in stepOrigin, pending.Provider, pending.Event.BindingId,
+                        finalEntryStatus, finalEntryReason);
+                    TraceEntry("after", in stepOrigin, pending.Provider, pending.Event.BindingId,
+                        new RuntimeLogResult { Status = finalEntryStatus, Reason = finalEntryReason });
                     // A control that refused — a stale handle, an exhausted iteration or step budget — stops this
                     // entry's walk and is reported as the event's rejection instead of an invented command result.
                     if (controlFailure != null)
@@ -977,8 +1038,14 @@ public sealed partial class RuntimeKernel
                         else LogEventRejected(pending.Event.BindingId, pending.Event.EventId, controlFailure, pending.Provider);
                         events.Add(new EventReceipt(pending.Event.EventId, "rejected", controlFailure));
                         failed = true;
+                        dispatchFailure ??= controlFailure;
                     }
                 }
+                var finalDispatchStatus = failed ? CommandStatuses.Rejected : "processed";
+                var finalDispatchReason = failed ? (dispatchFailure ?? "rejected") : "dispatched";
+                LogDispatchFinished(pending.Provider, pending.Event, finalDispatchStatus, finalDispatchReason);
+                TraceTrigger("after", pending.Provider, pending.Event,
+                    new RuntimeLogResult { Status = finalDispatchStatus, Reason = finalDispatchReason });
                 if (pending.Schedule != null && pending.Schedule.Handle.Status == "active"
                     && pending.Schedule.TotalPulses is { } pulses && pending.Schedule.Index >= pulses)
                     EndSchedule(pending.Schedule, "completed", "all-pulses-dispatched");

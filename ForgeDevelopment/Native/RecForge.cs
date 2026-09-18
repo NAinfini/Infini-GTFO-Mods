@@ -85,6 +85,11 @@ internal static class RecForge
             json.WriteString("code", local.Code ?? "");
             json.WriteString("level", local.Level.ToString());
             json.WriteString("provider", local.Provider ?? "");
+            if (BehaviorTraceContract.TryClassify(local.Code, out var phase))
+            {
+                json.WriteString("traceScope", phase.Scope);
+                json.WriteString("tracePhase", phase.Moment);
+            }
             Optional(json, "subjectProvider", local.SubjectProvider);
             Optional(json, "commandId", local.CommandId);
             Optional(json, "eventId", local.EventId);
@@ -93,7 +98,10 @@ internal static class RecForge
             Optional(json, "path", local.Path);
             Optional(json, "entry", local.Entry);
             Optional(json, "step", local.Step);
+            Optional(json, "nodeKind", local.NodeKind);
             Optional(json, "binding", local.Binding);
+            if (local.GateAccumulated is long gateAccumulated) json.WriteNumber("gateAccumulated", gateAccumulated);
+            if (local.GateFired is long gateFired) json.WriteNumber("gateFired", gateFired);
             if (local.Plan is { } plan)
             {
                 json.WriteStartObject("plan");
@@ -119,6 +127,49 @@ internal static class RecForge
             if (local.Frame is { } frame) json.WriteNumber("kernelFrame", frame);
             json.WriteNumber("kernelTick", local.Tick);
             json.WriteNumber("kernelWorldEpoch", local.WorldEpoch);
+        });
+    }
+
+    /// <summary>Authoring-only deep behavior trace. Unlike the regular kernel log this carries the values a node
+    /// actually saw and produced. Runtime clones these values only while a subscriber exists, and this callback
+    /// serializes them immediately into the bounded recorder queue.</summary>
+    internal static void RecordBehaviorTrace(RuntimeBehaviorTraceRecord record)
+    {
+        if (!RecSession.Active) return;
+        RecSession.Write("forge", "behavior", json =>
+        {
+            json.WriteString("traceScope", record.Scope);
+            json.WriteString("tracePhase", record.Phase);
+            json.WriteString("provider", record.Provider ?? "");
+            json.WriteString("binding", record.Binding ?? "");
+            json.WriteString("eventId", record.EventId ?? "");
+            Optional(json, "causeId", record.CauseId);
+            json.WriteString("rootEventId", record.RootEventId ?? record.EventId ?? "");
+            Optional(json, "entry", record.Entry);
+            Optional(json, "step", record.Step);
+            Optional(json, "nodeKind", record.NodeKind);
+            Optional(json, "commandId", record.CommandId);
+            if (record.Plan is { } plan)
+            {
+                json.WriteStartObject("plan");
+                json.WriteString("planId", plan.PlanId);
+                json.WriteString("resourceId", plan.ResourceId);
+                json.WriteString("resourceRevision", plan.ResourceRevision);
+                json.WriteEndObject();
+            }
+            if (record.Inputs is { } inputs) { json.WritePropertyName("inputs"); inputs.WriteTo(json); }
+            if (record.Parameters is { } parameters) { json.WritePropertyName("parameters"); parameters.WriteTo(json); }
+            if (record.Outputs is { } outputs) { json.WritePropertyName("outputs"); outputs.WriteTo(json); }
+            if (record.Result is { } result)
+            {
+                json.WriteStartObject("result");
+                json.WriteString("status", result.Status);
+                Optional(json, "commit", result.Commit);
+                json.WriteString("reason", result.Reason);
+                json.WriteEndObject();
+            }
+            json.WriteNumber("kernelTick", record.Tick);
+            json.WriteNumber("kernelWorldEpoch", record.WorldEpoch);
         });
     }
 

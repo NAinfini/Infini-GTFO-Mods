@@ -25,10 +25,10 @@ internal static class ObservationDataTests
         var equipment = new EntityReference("gtfo.equipment:4", 1, 1);
         using var world = new World(new[]
         {
-            Snapshot(player, "gtfo.player", 42, 100),
-            Snapshot(enemy, "gtfo.enemy", 30, 120),
+            Snapshot(player, "gtfo.player", 42, 100, "downed"),
+            Snapshot(enemy, "gtfo.enemy", 30, 120, "dead"),
             Snapshot(noHealth, "gtfo.player", null, null),
-            Snapshot(equipment, "gtfo.equipment", 10, 10)
+            Snapshot(equipment, "gtfo.equipment", 10, 10, parent: player)
         });
 
         var playerValue = ObservationContracts.EntityHealth(world.Context(player));
@@ -50,6 +50,24 @@ internal static class ObservationDataTests
             () => ObservationContracts.EntityHealth(world.Context(equipment)),
             "health is not silently widened to every entity kind");
 
+        var position = ObservationContracts.EntityPosition(world.Context(player)).GetProperty("position");
+        Check(position.EnumerateArray().Select(x => x.GetDouble()).SequenceEqual(new[] { 1d, 2d, 3d }),
+            "generic position reads the shared snapshot");
+
+        Check(ObservationContracts.EntityLifeState(world.Context(player)).GetProperty("state").GetInt32() == 1,
+            "downed maps to recipient_life_state index 1");
+        Check(ObservationContracts.EntityLifeState(world.Context(enemy)).GetProperty("state").GetInt32() == 2,
+            "dead maps to recipient_life_state index 2");
+        Reject(ObservationContracts.LifeStateKindUnsupportedCode,
+            () => ObservationContracts.EntityLifeState(world.Context(equipment)),
+            "life state is not silently widened to non-agent entities");
+
+        var owner = ObservationContracts.EntityOwner(world.Context(equipment)).GetProperty("owner");
+        Check(RuntimeJson.Entity(owner) == player,
+            "generic owner reads the explicit snapshot parent and not faction or tags");
+        Check(ObservationContracts.EntityOwner(world.Context(enemy)).GetProperty("owner").ValueKind == JsonValueKind.Null,
+            "an entity with no published owner returns the contract's nullable owner");
+
         var module = ObservationContracts.Module();
         var registry = RuntimeJson.Parse(module.RegistryJson);
         var healthRow = RuntimeJson.Rows(registry, "capabilities")
@@ -62,15 +80,17 @@ internal static class ObservationDataTests
             "runtime observation registry contains no old domain health query ids");
         Check(module.Evaluators.Keys.OrderBy(x => x, StringComparer.Ordinal)
                 .SequenceEqual(new[] { ObservationContracts.EntityHealthHandler,
-                    ObservationContracts.EntityPositionHandler }.OrderBy(x => x, StringComparer.Ordinal)),
-            "observation provider owns exactly position and health evaluators");
+                    ObservationContracts.EntityLifeStateHandler, ObservationContracts.EntityOwnerHandler,
+                    ObservationContracts.EntityPositionHandler }
+                    .OrderBy(x => x, StringComparer.Ordinal)),
+            "observation provider owns exactly position, health, life-state and owner evaluators");
 
         return checks;
     }
 
     private static RuntimeEntitySnapshot Snapshot(EntityReference reference, string kind,
-        double? health, double? maximum) => new(reference, kind, null, "alive",
-        Array.Empty<string>(), Array.Empty<string>(), new[] { 1d, 2d, 3d }, health, maximum);
+        double? health, double? maximum, string lifeState = "alive", EntityReference? parent = null) => new(reference, kind, null, lifeState,
+        Array.Empty<string>(), Array.Empty<string>(), new[] { 1d, 2d, 3d }, health, maximum, parent: parent);
     private sealed class World : IDisposable
     {
         private readonly RuntimeModuleHandle handle;
