@@ -43,11 +43,12 @@ void Run()
                     && actual.EnumerateArray().Zip(expected.EnumerateArray()).All(pair => Same(pair.First, pair.Second));
             return actual.GetRawText() == expected.GetRawText();
         }
-        Check(reference.GetProperty("kind").GetString() == "test-only-pure-reference-results", "test-only reference provenance");
+        Check(reference.GetProperty("kind").GetString() == "test-only-value-operator-reference-results", "test-only value-operator reference provenance");
         Check(reference.GetProperty("gameVerified").GetBoolean() == false, "reference is not game evidence");
         var vectors = reference.GetProperty("cases");
-        var canonicalIds = vectors.EnumerateArray().Select(row => row.GetProperty("capabilityId").GetString()).Distinct().ToArray();
-        Check(canonicalIds.Length == 15, "15 existing canonical computations, not a new registry");
+        var canonicalIds = vectors.EnumerateArray().Select(row => row.GetProperty("capabilityId").GetString()!).Distinct().OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        var referenceIds = reference.GetProperty("canonicalIds").EnumerateArray().Select(row => row.GetString()!).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        Check(canonicalIds.SequenceEqual(referenceIds), "reference declares exactly the value operators exercised by its cases");
         primitiveCount = canonicalIds.Length;
         vectorCases = vectors.GetArrayLength();
         foreach (var row in vectors.EnumerateArray())

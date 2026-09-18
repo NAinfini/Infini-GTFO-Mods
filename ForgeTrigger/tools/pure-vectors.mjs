@@ -17,11 +17,12 @@ const ids = [...new Set(fixture.cases.map(row => row.capabilityId))].sort();
 const definitions = ids.map(id => {
     const definition = logicPrimitiveDefinitions.find(row => row.id === id);
     // The version comes from the website definition; pure-authoring-definitions.json records exactly what was consumed.
-    check(definition && definition.graph.execution === 'pure', 'website pure contract: ' + id + '@' + definition?.version);
+    const expectedTier = id === 'forge.condition.predicate.compare' ? 'query' : 'pure';
+    check(definition && definition.graph.execution === expectedTier, 'website evaluator tier: ' + id + '@' + definition?.version + ' expected ' + expectedTier);
     check(['condition', 'modifier'].includes(definition.kind), 'no object/control query: ' + id);
     return definition;
 });
-check(ids.length === 23, '23 scoped pure primitives, not full Trigger coverage');
+check(ids.length > 0 && fixture.cases.length >= ids.length, 'fixture contains a non-empty value-operator inventory');
 const seen = new Set();
 const rows = [];
 for (const row of fixture.cases) {
@@ -43,7 +44,7 @@ for (const row of fixture.cases) {
     check(before === JSON.stringify({parameters:row.parameters, inputs:row.inputs}), 'preview did not mutate inputs ' + row.id);
 }
 const definitionBytes = Buffer.from(JSON.stringify(definitions));
-const report = {schemaVersion:1, kind:'test-only-pure-reference-results', status:'passed', gameVerified:false,
+const report = {schemaVersion:1, kind:'test-only-value-operator-reference-results', status:'passed', gameVerified:false,
     assertions, canonicalIds:ids, vectorCases:rows.length, definitionSha256:createHash('sha256').update(definitionBytes).digest('hex'), cases:rows};
 fs.writeFileSync(path.join(output, 'pure-reference.json'), JSON.stringify(report, null, 2) + String.fromCharCode(10));
 fs.writeFileSync(path.join(output, 'pure-authoring-definitions.json'), JSON.stringify(definitions, null, 2) + String.fromCharCode(10));

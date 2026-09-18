@@ -637,8 +637,9 @@
       "inputs": {
         "value": 1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": 1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "67-round",
@@ -649,8 +650,9 @@
       "inputs": {
         "value": -1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": -1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "68-round",
@@ -817,8 +819,9 @@
       "inputs": {
         "value": 1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": 1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "82-round",
@@ -829,8 +832,9 @@
       "inputs": {
         "value": -1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": -1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "83-round",
@@ -997,8 +1001,9 @@
       "inputs": {
         "value": 1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": 1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "97-round",
@@ -1009,8 +1014,9 @@
       "inputs": {
         "value": -1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": -1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "98-round",
@@ -1177,8 +1183,9 @@
       "inputs": {
         "value": 1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": 1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "112-round",
@@ -1189,8 +1196,9 @@
       "inputs": {
         "value": -1.7976931348623157e+308
       },
-      "outcome": "value",
-      "golden": -1.7976931348623157e+308
+      "outcome": "rejected",
+      "expectedCode": "invalid-integer",
+      "errorPattern": "Invalid integer input"
     },
     {
       "id": "123-compare",

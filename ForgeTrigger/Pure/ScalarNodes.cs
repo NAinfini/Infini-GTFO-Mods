@@ -115,6 +115,8 @@ public static class ScalarNodes
             ScalarRounding.Truncate => Math.Truncate(value),
             _ => throw new RuntimeContractException("pure-operation", "Unknown rounding mode.")
         };
+        if (rounded < -RuntimeJson.MaxSafeInteger || rounded > RuntimeJson.MaxSafeInteger)
+            throw new RuntimeContractException("invalid-integer", "Rounded result must be a safe integer.");
         return PureNumbers.Result(rounded);
     }
 }
