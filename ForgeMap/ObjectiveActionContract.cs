@@ -119,64 +119,10 @@ public static class ObjectiveActionContract
     };
 
     private static object State() => Action(StateCapability, StateBindingId, StateHandlerName, "强制完成目标",
-        "改变任务目标的状态。", new
-        {
-            domains = Domains,
-            execution = "host",
-            inputs = new object[]
-            {
-                Port("in", "execution"),
-                // The catalog's own inputs, in its own order and with its own types. The recipient port is the
-                // catalog's resource input declared as the one reference this build can lay out and non-optional
-                // the way every action's recipient port is; the two expected-value inputs are optional because the
-                // interaction struct has no field to compare one against.
-                Resource("objectives", "objective", "forge.resource.objective"),
-                Port("state", "string"),
-                Optional("expected_state", "string")
-            },
-            outputs = new object[] { Port("next", "execution"), Result("forge.result.map.objective_state") },
-            parameters = new object[]
-            {
-                Enum("layer", Layers, required: true),
-                Integer("chain", required: true),
-                Integer("sub_objective"),
-                Integer("item_id"),
-                Number("extra_time")
-            },
-            recipients = new
-            {
-                input = "objectives", target = "resource", cardinality = "one",
-                requires = new[] { "objective.state" }, result = "result"
-            }
-        });
+        "改变任务目标的状态。", PrimitiveGraphSource.Get(StateCapability));
 
     private static object Phase() => Action(PhaseCapability, PhaseBindingId, PhaseHandlerName, "推进进程目标一步",
-        "切换任务目标的阶段。", new
-        {
-            domains = Domains,
-            execution = "host",
-            inputs = new object[]
-            {
-                Port("in", "execution"),
-                Resource("objectives", "objective", "forge.resource.objective"),
-                Port("phase", "string"),
-                Optional("expected_phase", "string")
-            },
-            outputs = new object[] { Port("next", "execution"), Result("forge.result.map.objective_phase") },
-            parameters = new object[]
-            {
-                Enum("layer", Layers, required: true),
-                Integer("chain", required: true),
-                Enum("transition_policy", TransitionPolicies, required: true),
-                Integer("event_break_index"),
-                Integer("event_index")
-            },
-            recipients = new
-            {
-                input = "objectives", target = "resource", cardinality = "one",
-                requires = new[] { "objective.phase" }, result = "result"
-            }
-        });
+        "切换任务目标的阶段。", PrimitiveGraphSource.Get(PhaseCapability));
 
     private static object Extraction() => Action(ExtractionCapability, ExtractionBindingId, ExtractionHandlerName,
         "设置撤离可用状态", "把整层自己的出口条件装上或卸下。", new

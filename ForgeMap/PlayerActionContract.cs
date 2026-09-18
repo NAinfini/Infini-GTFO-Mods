@@ -141,51 +141,7 @@ public static class PlayerActionContract
         label = "修改感染值",
         version = "1.0.0",
         parameters = new { description = "改变感染值。" },
-        graph = new
-        {
-            domains = Domains,
-            execution = "host",
-            inputs = new object[]
-            {
-                new { id = "in", type = "execution" },
-                new { id = "targets", type = "entity", cardinality = "many" },
-                new { id = "source", type = "entity",
-                    entityKinds = new[] { PlayerStateContract.EntityKind } },
-                new { id = "amount", type = "number" },
-                new { id = "resistance", type = "number" },
-                new { id = "cap", type = "number" }
-            },
-            outputs = new object[]
-            {
-                new { id = "next", type = "execution" },
-                new
-                {
-                    id = "result", type = "result", schema = "forge.result.player.infection_change",
-                    fields = new object[]
-                    {
-                        new { id = "target", type = "entity" },
-                        new { id = "status", type = "enum", schema = "execution_outcome" },
-                        new { id = "committed", type = "enum", schema = "commit_state" },
-                        new { id = "code", type = "string" },
-                        new { id = "amount", type = "number" },
-                        new { id = "target_count", type = "integer" }
-                    }
-                }
-            },
-            parameters = new object[]
-            {
-                new
-                {
-                    id = "operation", type = "enum", role = "structural", required = true,
-                    values = new[] { "set", "add", "subtract" }, set = "value_operation"
-                }
-            },
-            recipients = new
-            {
-                input = "targets", target = "entity", cardinality = "many",
-                requires = new[] { InfectionPermission }, result = "result"
-            }
-        }
+        graph = PrimitiveGraphSource.Get(InfectionCapabilityId)
     };
 
     /// <summary>One execute binding row: this provider's own id, the catalog capability it implements, and the

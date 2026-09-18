@@ -2263,6 +2263,22 @@
       "role": "a game entry this provider calls: a non-getter member whose effect is the action it names, reached through the handler of the row that declares it."
     },
     {
+      "id": "wardenobjectiveeventdata-set-customsubobjective",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.WardenObjectiveEventData",
+      "isStatic": false,
+      "signature": "System.Void GameData.WardenObjectiveEventData::set_CustomSubObjective(Localization.LocalizedText)",
+      "role": "a game entry this provider calls: a non-getter member whose effect is the action it names, reached through the handler of the row that declares it."
+    },
+    {
+      "id": "wardenobjectiveeventdata-set-customsubobjectiveheader",
+      "assembly": "Modules-ASM.dll",
+      "type": "GameData.WardenObjectiveEventData",
+      "isStatic": false,
+      "signature": "System.Void GameData.WardenObjectiveEventData::set_CustomSubObjectiveHeader(Localization.LocalizedText)",
+      "role": "a game entry this provider calls: a non-getter member whose effect is the action it names, reached through the handler of the row that declares it."
+    },
+    {
       "id": "wardenobjectiveeventdata-set-dialogueid",
       "assembly": "Modules-ASM.dll",
       "type": "GameData.WardenObjectiveEventData",

@@ -268,7 +268,8 @@ internal static class Fixture
             new object?[]
             {
                 origin, 0L, "test.alarm.command", "test.alarm.plan", "test.alarm.resource", "1", "test.alarm.node",
-                RuntimeJson.From(parameters ?? new { }), RuntimeJson.From(inputs ?? new { }), isHost
+                RuntimeJson.From(parameters ?? new { }), RuntimeJson.From(inputs ?? new { }), isHost,
+                new Func<EntityReference, object?>(_ => null)
             }, null)!;
         return handler(context);
     }

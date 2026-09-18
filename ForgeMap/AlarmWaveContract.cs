@@ -37,13 +37,9 @@ public static class AlarmWaveContract
     public const string WaveStartCapability = "forge.action.map.wave_start";
     public const string WaveStopCapability = "forge.action.map.wave_stop";
 
-    /// <summary>The three things the scan row can do to the one instance kind a scan and an alarm share. `start`
-    /// is the activation a plan ran before the merge, `complete` is the interaction that solves the puzzle for the
-    /// players in it, and `reset` is the deactivation that puts the instance back to the state it had before it
-    /// was activated — the game has no separate reset member, and that is the one it has.
-    ///
-    /// The old `forge.action.map.scan_start` id is gone: one instance, one row.</summary>
-    public static readonly string[] ScanOperations = { "start", "complete", "reset" };
+    /// <summary>The three dynamic scan-state changes: start the existing chained puzzle, force it solved, or
+    /// deactivate/reset it. Placement, participants and quorum stay in scan/objective Data rather than this Outcome.</summary>
+    public static readonly string[] ScanOperations = { "start", "force_complete", "reset" };
 
     /// <summary>The handler names the native half supplies, one per row. They are this provider's own vocabulary:
     /// a binding names the handler the registration must carry, and the runtime refuses an implemented binding
@@ -69,7 +65,7 @@ public static class AlarmWaveContract
     /// the game ignores is a choice an author would keep making, so the rulings had them deleted.</summary>
     public static readonly HandlerShape ScanStateShape = new HandlerShape()
         .Inputs("scan").Outputs("result")
-        .Parameters("operation");
+        .Parameters("mode");
     public static readonly HandlerShape WaveStartShape = new HandlerShape()
         .Inputs("wave", "budget", "count", "seed", "interval").Outputs("result", "wave_handle");
     public static readonly HandlerShape WaveStopShape = new HandlerShape()
@@ -138,109 +134,26 @@ public static class AlarmWaveContract
     /// Each row is its own constant so the registration can take them one at a time — the Map declaration's
     /// capability array is a shared file and one insertion per batch is how the integration adds them — and
     /// <see cref="CapabilitiesJson"/> is the same three in catalog order for a reader that wants the whole set.</summary>
-    public const string ScanStateCapabilityJson = """
-    {
-      "id": "forge.action.map.scan_state",
-      "owner": "forge.module.gtfo.map",
-      "kind": "action",
-      "label": "启动、强制完成或重置扫描",
-      "version": "1.0.0",
-      "parameters": { "description": "对已绑定的扫描执行启动、强制完成或重置；扫描与警报共用同一种链式谜题实例。" },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "scan", "type": "resource", "resourceKind": "chained-puzzle", "schema": "forge.resource.chained-puzzle" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.map.scan_state",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" }
-            ] }
-        ],
-        "parameters": [
-          { "id": "operation", "type": "enum", "role": "structural", "required": true, "values": [ "start", "complete", "reset" ] }
-        ]
-        ,"recipients": { "input": "scan", "target": "resource", "cardinality": "one", "requires": [ "scan.control" ], "result": "result" }
-      }
-    }
-    """;
+    public static string ScanStateCapabilityJson => CapabilityJson(
+        ScanStateCapability, "启动、强制完成或重置扫描",
+        "对已绑定的扫描执行启动、强制完成或重置；扫描与警报共用同一种链式谜题实例。");
 
-    public const string WaveStartCapabilityJson = """
-    {
-      "id": "forge.action.map.wave_start",
-      "owner": "forge.module.gtfo.map",
-      "kind": "action",
-      "label": "开始具名波次",
-      "version": "1.0.0",
-      "parameters": { "description": "开始一波具名的敌人。" },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "wave", "type": "resource", "resourceKind": "wave", "schema": "forge.resource.wave" },
-          { "id": "budget", "type": "integer" },
-          { "id": "count", "type": "integer" },
-          { "id": "seed", "type": "integer" },
-          { "id": "interval", "type": "integer", "unit": "tick" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.map.wave_start",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" },
-              { "id": "budget", "type": "integer" }
-            ] },
-          { "id": "wave_handle", "type": "handle", "handleKind": "effect", "lifetime": "encounter" }
-        ],
-        "parameters": []
-        ,"recipients": { "input": "wave", "target": "resource", "cardinality": "one", "requires": [ "wave.control" ], "result": "result", "handle": "wave_handle" }
-      }
-    }
-    """;
+    public static string WaveStartCapabilityJson => CapabilityJson(
+        WaveStartCapability, "开始具名波次", "开始一波具名的敌人。");
 
-    public const string WaveStopCapabilityJson = """
+    public static string WaveStopCapabilityJson => CapabilityJson(
+        WaveStopCapability, "停止可定位的具名波次", "停掉一波敌人，并决定未刷的怎么办。");
+
+    private static string CapabilityJson(string id, string label, string description) => RuntimeJson.From(new
     {
-      "id": "forge.action.map.wave_stop",
-      "owner": "forge.module.gtfo.map",
-      "kind": "action",
-      "label": "停止可定位的具名波次",
-      "version": "1.0.0",
-      "parameters": { "description": "停掉一波敌人，并决定未刷的怎么办。" },
-      "graph": {
-        "domains": [ "map", "room", "logic" ],
-        "execution": "host",
-        "inputs": [
-          { "id": "in", "type": "execution" },
-          { "id": "waves", "type": "handle", "handleKind": "effect", "lifetime": "encounter" },
-          { "id": "reason", "type": "string" }
-        ],
-        "outputs": [
-          { "id": "next", "type": "execution" },
-          { "id": "result", "type": "result", "schema": "forge.result.map.wave_stop",
-            "fields": [
-              { "id": "target", "type": "entity" },
-              { "id": "status", "type": "enum", "schema": "execution_outcome" },
-              { "id": "committed", "type": "enum", "schema": "commit_state" },
-              { "id": "code", "type": "string" }
-            ] }
-        ],
-        "parameters": [
-          { "id": "pending_spawns_policy", "type": "enum", "role": "structural", "required": true, "values": [ "cancel", "finish" ] }
-        ]
-        ,"recipients": { "input": "waves", "target": "handle", "cardinality": "one", "requires": [ "wave.control" ], "result": "result" }
-      }
-    }
-    """;
+        id,
+        owner = ProviderId,
+        kind = "action",
+        label,
+        version = "1.0.0",
+        parameters = new { description },
+        graph = PrimitiveGraphSource.Get(id)
+    }).GetRawText();
 
     /// <summary>The three rows in catalog order, as the array a registry's capability section carries. The order
     /// is the catalog's own, so a diff of this array against the website's rows is positional.</summary>

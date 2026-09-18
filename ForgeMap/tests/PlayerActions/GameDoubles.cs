@@ -36,12 +36,14 @@ namespace UnityEngine
 /// interop's own type and not the BCL one — so the fixture declares that type instead of aliasing it.</summary>
 namespace Il2CppSystem.Collections.Generic
 {
-    public sealed class HashSet<T>
+    public sealed class HashSet<T> : IEnumerable<T>
     {
         private readonly List<T> _items = new();
         public bool Contains(T item) => _items.Contains(item);
         public void Add(T item) => _items.Add(item);
         public int Count => _items.Count;
+        public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
 

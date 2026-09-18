@@ -67,11 +67,7 @@ internal static class GenericPlayerActions
     internal const string ImpulseStrengthRequiredCode = "impulse-strength-required";
     internal const string ImpulseStrengthRangeCode = "impulse-strength-out-of-range";
     internal const string ImpulseDirectionCode = "impulse-direction-invalid";
-    internal const string ImpulseSourceCode = "impulse-source-unresolved";
-    internal const string ImpulseSourceExcludedCode = "impulse-source-excluded";
     internal const string ImpulseTargetKindCode = "impulse-target-kind";
-    internal const string ImpulseRecipientCode = "impulse-recipient-unresolved";
-    internal const string ImpulseFalloffCode = "impulse-falloff-unsupported";
 
     internal const string AmountRangeCode = "amount-out-of-range";
     internal const string OperationCode = "stamina-operation-unsupported";
@@ -161,38 +157,22 @@ internal static class GenericPlayerActions
 
     // ------------------------------------------------------------------ impulse
 
-    internal static CommandResult Impulse(CommandContext context) => Impulse(context.Parameters, context.Inputs);
+    internal static CommandResult Impulse(CommandContext context) => Impulse(context.Inputs);
 
-    /// <summary>`forge.action.combat.impulse`: one directional push at each recipient. The direction is either the
-    /// plan's own vector or the source-to-recipient line, the horizontal and vertical parts are separate authored
-    /// numbers, and the recipient set is dispatched by reference kind.</summary>
-    internal static CommandResult Impulse(JsonElement parameters, JsonElement inputs)
+    /// <summary>`forge.action.combat.impulse`: applies one pure push vector to each player recipient. Direction
+    /// normalization, falloff and target/source filtering are composed before this Outcome; this handler receives
+    /// only the direction and scalar strength it must commit.</summary>
+    internal static CommandResult Impulse(JsonElement inputs)
     {
-        if (!TryAuthored(parameters, "horizontal", out double horizontal) || !TryAuthored(parameters, "vertical", out double vertical))
+        if (!inputs.TryGetProperty("strength", out var strengthElement) || strengthElement.ValueKind != JsonValueKind.Number)
+            return CommandResult.Rejected(ImpulseStrengthRequiredCode);
+        double strength = strengthElement.GetDouble();
+        if (!double.IsFinite(strength) || strength <= 0 || strength > MaximumStrength)
             return CommandResult.Rejected(ImpulseStrengthRangeCode);
-        if (Math.Abs(horizontal) > MaximumStrength || Math.Abs(vertical) > MaximumStrength)
-            return CommandResult.Rejected(ImpulseStrengthRangeCode);
-        if (horizontal == 0 && vertical == 0) return CommandResult.Rejected(ImpulseStrengthRequiredCode);
-        // The two falloff switches of the draft are refused rather than approximated: the game's own force falloff
-        // lives inside `DamageUtil.DoExplosionDamage` (dump.cs 597967), which is positional and applies damage
-        // beside the push, and this row may do neither.
-        if (Flag(parameters, "falloff_distance") || Flag(parameters, "falloff_vertical"))
-            return CommandResult.Rejected(ImpulseFalloffCode);
-
-        bool includeSource = Flag(parameters, "include_source");
-        bool directionPresent = Present(inputs, "direction");
-        if (!TryVector(inputs, "direction", out var direction) && directionPresent)
+        if (!TryVector(inputs, "direction", out var direction) || !Finite(direction) || direction.sqrMagnitude <= 0f)
             return CommandResult.Rejected(ImpulseDirectionCode);
-        if (!Finite(direction)) return CommandResult.Rejected(ImpulseDirectionCode);
-        bool hasSource = Present(inputs, "source");
-        var source = default(EntityReference);
-        var sourcePosition = Vector3.zero;
-        if (hasSource)
-        {
-            source = RuntimeJson.Entity(inputs.GetProperty("source"));
-            if (!TryPosition(source, out sourcePosition)) return CommandResult.Rejected(ImpulseSourceCode);
-        }
-        if (!directionPresent && !hasSource) return CommandResult.Rejected(ImpulseDirectionCode);
+        var force = direction.normalized * (float)strength;
+        if (!Finite(force)) return CommandResult.Rejected(ImpulseDirectionCode);
 
         var targets = Targets(inputs, "targets");
         if (targets.Length == 0) return CommandResult.Rejected(NoTargetsCode);
@@ -207,29 +187,17 @@ internal static class GenericPlayerActions
                 => new(target, status, state, code, strength, targets.Length);
 
             if (players == null || !players.CanCommit) { rows.Add(Row("rejected", CommitStates.None, AuthorityCode)); continue; }
-            if (IsKind(target, EnemyKind)) { rows.Add(Row("rejected", CommitStates.None, ImpulseRecipientCode)); continue; }
             if (!IsKind(target, PlayerKind)) { rows.Add(Row("rejected", CommitStates.None, ImpulseTargetKindCode)); continue; }
-            if (hasSource && !includeSource && target == source)
-            { rows.Add(Row("rejected", CommitStates.None, ImpulseSourceExcludedCode)); continue; }
             var agent = players.CurrentAgent(target);
             if (agent == null) { rows.Add(Row("rejected", CommitStates.None, StaleCode)); continue; }
             PlayerLocomotion? locomotion;
-            Vector3 origin;
             try
             {
                 locomotion = agent.Locomotion;
-                origin = agent.Position;
             }
             catch (Exception) { rows.Add(Row("rejected", CommitStates.None, StaleCode)); continue; }
             if (locomotion == null || locomotion.Pointer == IntPtr.Zero)
             { rows.Add(Row("rejected", CommitStates.None, StaleCode)); continue; }
-
-            var line = directionPresent ? direction : origin - sourcePosition;
-            if (line.sqrMagnitude <= 0f && vertical == 0)
-            { rows.Add(Row("rejected", CommitStates.None, ImpulseDirectionCode)); continue; }
-            var force = horizontal == 0 ? Vector3.zero : line.normalized * (float)horizontal;
-            force.y += (float)vertical;
-            if (!Finite(force)) { rows.Add(Row("rejected", CommitStates.None, ImpulseDirectionCode)); continue; }
 
             float applied = force.magnitude;
             float readback;

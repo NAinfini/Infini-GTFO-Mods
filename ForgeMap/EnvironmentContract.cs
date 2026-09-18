@@ -492,28 +492,9 @@ public static class EnvironmentContract
     /// — `WardenIntel` is a `LocalizedText` and its own string constructor is what this row writes — so a plan
     /// can broadcast computed text such as a door name or "5 / 7 connected".</summary>
     private static object Intel() => Capability(IntelCapability, "action", "播报情报",
-        "向被寻址的玩家播报一行情报文本，文本由计划在运行时计算。", new
-        {
-            domains = Domains,
-            execution = "presentation",
-            inputs = new object[]
-            {
-                Port("in", "execution"),
-                Many("viewers", "entity", new[] { "gtfo.player" }),
-                Port("text", "string")
-            },
-            outputs = new object[] { Port("next", "execution"), Result("forge.result.presentation.hud_message") },
-            parameters = Array.Empty<object>(),
-            recipients = new
-            {
-                input = "viewers", target = "entity", cardinality = "many",
-                requires = new[] { IntelPermission }, result = "result"
-            }
-        });
+        "向被寻址的玩家播报一行情报文本，文本由计划在运行时计算。",
+        PrimitiveGraphSource.Get(IntelCapability));
 
-    /// <summary>`a-dialogue`: the game's own "nearest player says a line" entry. Which player is nearest is
-    /// decided on each client from that client's own position, which is why this row is a presentation entry and
-    /// why the tier refuses to commit anything: the choice is a local fact, not a world write.</summary>
     private static object Dialogue() => Capability(DialogueCapability, "action", "最近的玩家说一句台词",
         "让离指定世界对象最近的玩家播一条语音，可选指向该对象的过滤器。", new
         {

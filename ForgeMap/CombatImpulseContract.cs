@@ -4,27 +4,16 @@ using ForgeRuntime.Framework;
 
 namespace ForgeMap;
 
-/// <summary>The `forge.action.combat.impulse` row (ruling R1, generic-player batch): one directional impulse
-/// applied to whoever the plan named, player or enemy. It pushes and never damages — the amount of harm a push
-/// does is the damage row's business, and keeping the two apart is what lets one action serve a melee shove, an
-/// explosion's knockback and a class-dash without any of them owning the other's side effect.
+/// <summary>The `forge.action.combat.impulse` Outcome: apply one pure movement impulse to player recipients.
 ///
-/// The recipient set is one set, not two rows: the catalog's own rule is that a capability has one binding owner,
-/// and a receiver that can be either kind is dispatched inside the one handler (`GenericPlayerActions.Impulse`).
-/// The row therefore declares a plain entity recipient with no `entityKinds` narrowing, which is the only shape in
-/// which one step can name both a player and an enemy.
+/// The behavior graph computes the direction and scalar strength before this Outcome runs. Normalization, distance
+/// falloff, source exclusion and target selection are composition concerns and stay in Operators/Selectors rather
+/// than being duplicated as hidden action parameters. The native write is `PlayerLocomotion.AddExternalPushForce`;
+/// no damage entry is submitted.
 ///
-/// The direction is an input port and not a parameter: an author computes it (a shooter's aim, a source-to-target
-/// vector, a fixed world axis) and the row only applies it. `direction` absent means the handler derives the
-/// source-to-target line, which is the shape an explosion's push has; a command with neither a direction nor a
-/// solvable source is refused rather than pushed along an axis nobody asked for.
-///
-/// The native write is the recipient's own push channel: `PlayerLocomotion.AddExternalPushForce` for a player (the
-/// same channel the game's push damage writes). The enemy half is refused by name — this provider has no way to turn
-/// a `gtfo.enemy` reference into a native `EnemyAgent` — and `falloff_distance`/`falloff_vertical` are refused too:
-/// the game's own force falloff lives inside `DamageUtil.DoExplosionDamage`, which is positional and applies damage
-/// beside the push, and this row may do neither. There is no `effect` handle: an impulse is one velocity write and
-/// has no state of its own to restore, which is why this row registers no restore callback.</summary>
+/// Enemy knockback is intentionally not claimed here: current native evidence reaches enemies through a distinct
+/// push/damage packet. That path remains a separate pending capability until it can be modeled without pretending
+/// that a damage-carrying packet is the same operation as a pure player impulse.</summary>
 public static class CombatImpulseContract
 {
     public const string CapabilityId = "forge.action.combat.impulse";
@@ -35,7 +24,7 @@ public static class CombatImpulseContract
     /// it may apply an impulse before it can.</summary>
     public const string Permission = "combat.impulse";
 
-    public static readonly string[] Domains = { "map", "room", "enemy", "weapon", "tool", "consumable", "player" };
+
 
     /// <summary>Every code this handler answers with, in the row's own result contract. `authority-or-phase` is the
     /// host gate, the two target codes are the request's shape, and the rest name the recipient or the native write
@@ -48,20 +37,15 @@ public static class CombatImpulseContract
         "impulse-strength-required",
         "impulse-strength-out-of-range",
         "impulse-direction-invalid",
-        "impulse-source-unresolved",
-        "impulse-source-excluded",
-        "impulse-falloff-unsupported",
         "impulse-target-kind",
-        "impulse-recipient-unresolved",
         "stale-or-unsupported-recipient",
         "native-commit-exception"
     };
 
-    /// <summary>The one shape of the handler: the recipient collection, the two optional entity/vector inputs and
-    /// the five structural parameters the falloff and the caster question are read from.</summary>
+    /// <summary>The one shape of the handler: the player recipients plus the direction and strength Data already
+    /// computed by the behavior graph. Falloff, normalization and source filtering are separate Operators.</summary>
     public static readonly HandlerShape Shape = new HandlerShape()
-        .Inputs("targets", "direction", "source").Outputs("result")
-        .Parameters("horizontal", "vertical", "falloff_distance", "falloff_vertical", "include_source");
+        .Inputs("targets", "direction", "strength").Outputs("result");
 
     /// <summary>The capability row: `host` execution, because a push changes where a body is and every machine has
     /// to see the same one.</summary>
@@ -72,49 +56,8 @@ public static class CombatImpulseContract
         kind = "action",
         label = "施加冲量",
         version = "1.0.0",
-        parameters = new { description = "给玩家或敌人一个带方向的推力，只推不伤。" },
-        graph = new
-        {
-            domains = Domains,
-            execution = "host",
-            inputs = new object[]
-            {
-                new { id = "in", type = "execution" },
-                new { id = "targets", type = "entity", cardinality = "many" },
-                new { id = "direction", type = "vector3", optional = true },
-                new { id = "source", type = "entity", optional = true }
-            },
-            outputs = new object[]
-            {
-                new { id = "next", type = "execution" },
-                new
-                {
-                    id = "result", type = "result", schema = "forge.result.combat.impulse", codes = Codes,
-                    fields = new object[]
-                    {
-                        new { id = "target", type = "entity" },
-                        new { id = "status", type = "enum", schema = "execution_outcome" },
-                        new { id = "committed", type = "enum", schema = "commit_state" },
-                        new { id = "code", type = "string" },
-                        new { id = "strength", type = "number" },
-                        new { id = "target_count", type = "integer" }
-                    }
-                }
-            },
-            parameters = new object[]
-            {
-                new { id = "horizontal", type = "number", role = "structural", required = false, unit = "mps" },
-                new { id = "vertical", type = "number", role = "structural", required = false, unit = "mps" },
-                new { id = "falloff_distance", type = "boolean", role = "structural", required = false },
-                new { id = "falloff_vertical", type = "boolean", role = "structural", required = false },
-                new { id = "include_source", type = "boolean", role = "structural", required = false }
-            },
-            recipients = new
-            {
-                input = "targets", target = "entity", cardinality = "many",
-                requires = new[] { Permission }, result = "result"
-            }
-        }
+        parameters = new { description = "给玩家一个带方向和强度的纯冲量；方向和强度由行为图计算。" },
+        graph = PrimitiveGraphSource.Get(CapabilityId)
     };
 
     /// <summary>The one execute binding row: this provider's own id, the canonical capability and the handler the

@@ -151,6 +151,87 @@
       "authority": "host decides; the write is the holder client's own instance"
     },
     {
+      "capability": "forge.action.weapon.property",
+      "binding": "forge.module.gtfo.weapon.binding.weapon_property",
+      "handler": "gtfo.weapon.property",
+      "status": "implemented",
+      "ports": {
+        "equipment": "entity input — the instance whose own block is replaced",
+        "value": "number input — the field's own unit, the unit the specific row for that field uses; add/subtract resolve it against the instance's original value at the write",
+        "duration": "integer input (tick) — the effect handle's life; absent means the instance's own life",
+        "field": "structural enum — the ledger's own vocabulary; a name outside it is refused with override-field-unknown",
+        "operation": "structural enum — set/add/subtract; anything else is refused with weapon-mode-unsupported",
+        "result": "forge.result.weapon.property; fields target/status/committed/code then field/value"
+      },
+      "nativeWritePoints": [
+        {
+          "field": "fire_rate",
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "float ShotDelay (0x8C), written as the reciprocal of the rate",
+          "readSite": "Gear.BulletWeaponArchetype.Update 0x145C950 at 0x145D2C6; clients Gear.BulletWeaponSynced.UpdateRegular 0x145E5B0 at 0x145E689",
+          "derivation": "same write point as the fire_rate row above (wpnovr Q1/Q2); the reciprocal is the applier's own arithmetic and reads nothing new"
+        },
+        {
+          "field": "burst_count",
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "int BurstShotCount (0xCC), copied into Gear.BWA_Burst / Gear.BWA_SemiBurst.m_burstMax (0x60) by their own Setup",
+          "readSite": "Gear.BWA_Burst.Setup 0x145B970 / Gear.BWA_SemiBurst.Setup 0x145BD20",
+          "derivation": "decoded instruction (wpnovr Q2, recorded in the fire_mode row below)"
+        },
+        {
+          "field": "spread_cone",
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "float ShotgunConeSize (0xD4) / float ShotgunBulletSpread (0xD8)",
+          "readSite": "Gear.BulletWeapon.Fire 0x145FB30 at 0x13C3176 / 0x13C3246",
+          "derivation": "same write point as the spread row above (wpnovr Q4)"
+        },
+        {
+          "field": "spread_movement_scale",
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "float HipFireSpread (0xA4)",
+          "readSite": "Gear.BulletWeapon.Fire 0x145FB30 at 0x145FBFE",
+          "derivation": "same write point as the spread row above (wpnovr Q4)"
+        },
+        {
+          "field": "spread_aim_scale",
+          "type": "GameData.ArchetypeDataBlock",
+          "member": "float AimSpread (0xA8)",
+          "readSite": "Gear.BulletWeapon.Fire 0x145FB30 at 0x145FC13",
+          "derivation": "same write point as the spread row above (wpnovr Q4)"
+        },
+        {
+          "field": "recoil_horizontal",
+          "type": "GameData.RecoilDataBlock",
+          "member": "MinMaxValue horizontalScale (0x60), minimum only",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EE32",
+          "derivation": "same write point as the recoil row above (wpnovr Q3)"
+        },
+        {
+          "field": "recoil_vertical",
+          "type": "GameData.RecoilDataBlock",
+          "member": "MinMaxValue verticalScale (0x68), minimum only",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EE2B",
+          "derivation": "same write point as the recoil row above (wpnovr Q3)"
+        },
+        {
+          "field": "recoil_recovery",
+          "type": "GameData.RecoilDataBlock",
+          "member": "float spring (0x48)",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EE0C",
+          "derivation": "same write point as the recoil row above (wpnovr Q3)"
+        },
+        {
+          "field": "recoil_camera_kick",
+          "type": "GameData.RecoilDataBlock",
+          "member": "MinMaxValue power (0x40), minimum only",
+          "readSite": "FPS_RecoilSystem.ApplyRecoil 0x193EDD0 at 0x193EFC1",
+          "derivation": "same write point as the recoil row above (wpnovr Q3)"
+        }
+      ],
+      "notInTheVocabulary": "ArchetypeDataBlock.Damage (0x6C) and every other member the design's own field list names (spread_pattern, clip size, ammo cost, the stagger and precision multipliers) have no decoded read site in the shipped code, so the generic row refuses those names with override-field-unknown instead of writing a value nothing re-reads.",
+      "authority": "host decides; the write is the holder client's own instance"
+    },
+    {
       "capability": "forge.action.weapon.cooldown_reset",
       "binding": "forge.module.gtfo.weapon.binding.weapon_cooldown_reset",
       "handler": "gtfo.weapon.cooldown_reset",

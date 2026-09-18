@@ -129,7 +129,7 @@ internal static class CommandContexts
             new[]
             {
                 typeof(RuntimeEvent), typeof(long), typeof(string), typeof(string), typeof(string), typeof(string),
-                typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool)
+                typeof(string), typeof(JsonElement), typeof(JsonElement), typeof(bool), typeof(Func<EntityReference, object?>)
             }, null) ?? throw new InvalidOperationException("CommandContext's own constructor was not found.");
 
     private static readonly MethodInfo ResolveEnumParameters = typeof(RuntimeJson)
@@ -142,7 +142,7 @@ internal static class CommandContexts
         return (CommandContext)Constructor.Invoke(new object?[]
         {
             origin, 0L, "test.command", "test.plan", "author.resource", "revision-1", "A_action",
-            Resolve(parameters), Bag(inputs), isHost
+            Resolve(parameters), Bag(inputs), isHost, new Func<EntityReference, object?>(_ => null)
         })!;
     }
 

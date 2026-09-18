@@ -193,7 +193,10 @@ public sealed class PlayerActionTests
     {
         using var world = new PlayerActionWorld();
         var a = world.Spawn(A, state: PlayerLocomotion.PLOC_State.Downed);
-        a.Agent.m_warpableStates = new HashSet<PlayerLocomotion.PLOC_State> { PlayerLocomotion.PLOC_State.Stand };
+        a.Agent.m_warpableStates = new Il2CppSystem.Collections.Generic.HashSet<PlayerLocomotion.PLOC_State>
+        {
+            PlayerLocomotion.PLOC_State.Stand
+        };
         var inputs = PlayerActionWorld.Frame(("players", new[] { a.Reference }), ("destination", Position(1, 1, 1)),
             ("rotation", Position(0, 0, 0)));
 

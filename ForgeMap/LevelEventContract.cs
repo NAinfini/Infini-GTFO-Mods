@@ -278,33 +278,23 @@ public static class LevelEventContract
     /// one, exactly as the objective action rows already do.</summary>
     public static object[] ActionRows() => new object[]
     {
-        ActionRow(ObjectiveTimerCapability, "目标倒计时加时或重置",
-            "给目标倒计时加时间，或者把它重置回起点。",
-            new object[]
-            {
-                Port("in", "execution"),
-                ResourcePort("objectives", "objective", "forge.resource.objective"),
-                Number("seconds")
-            },
-            new object[] { Enum("operation", TimerOperations, required: true) },
-            "forge.result.map.objective_timer", new[] { ("seconds", "number") },
-            new { input = "objectives", target = "resource", cardinality = "one", requires = new[] { "objective.timer" }, result = "result" }),
-        ActionRow(DimensionCapability, "全队闪入、传送进维度或清空维度",
-            "把整队闪一下、按名单逐个传送进另一个维度，或者清空一个维度。",
-            new object[]
-            {
-                Port("in", "execution"), ManyPort("players", "entity", new[] { "gtfo.player" }),
-                OptionalInteger("dimension"), VectorList("positions", "m"), VectorList("look_dirs", null)
-            },
-            new object[] { Enum("mode", DimensionModes, required: true) },
-            "forge.result.player.dimension", new[] { ("dimension", "integer") },
-            new { input = "players", target = "entity", cardinality = "many", requires = new[] { "player.dimension" }, result = "result" }),
+        PrimitiveActionRow(ObjectiveTimerCapability, "目标倒计时加时或重置",
+            "给目标倒计时加时间，或者把它重置回起点。"),
+        PrimitiveActionRow(DimensionCapability, "全队闪入、传送进维度或清空维度",
+            "把整队闪一下、按名单逐个传送进另一个维度，或者清空一个维度。"),
         ActionRow(ExpeditionEndCapability, "立即通关 / 全队倒地也算通关",
             "以明确的结果结束远征。",
             new object[] { Port("in", "execution"), Port("participants", "entity", new[] { "gtfo.player" }) },
             new object[] { Enum("ending", ExpeditionOutcomes, required: true) },
             "forge.result.map.expedition_end", Array.Empty<(string, string)>(),
             new { input = "participants", target = "entity", cardinality = "one", requires = new[] { "expedition.end" }, result = "result" })
+    };
+
+    private static object PrimitiveActionRow(string capability, string label, string description) => new
+    {
+        id = capability, owner = ProviderId, kind = "action", label, version = "1.0.0",
+        parameters = new { description },
+        graph = PrimitiveGraphSource.Get(capability)
     };
 
     /// <summary>The three action binding rows, in the same order.</summary>

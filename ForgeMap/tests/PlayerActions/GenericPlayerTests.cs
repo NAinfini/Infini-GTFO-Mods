@@ -166,105 +166,57 @@ public sealed class GenericPlayerTests
     // ---------------------------------------------------------------- impulse
 
     [Fact]
-    public void Impulse_pushes_a_player_along_the_authored_direction()
+    public void Impulse_pushes_a_player_along_the_authored_direction_and_strength()
     {
         using var world = new GenericPlayerWorld();
         var target = world.Spawn(1UL, position: new Vector3(1f, 0f, 3f));
         var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal = 5.0, vertical = 2.0 }),
-            PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("direction", new[] { 1.0, 0.0, 0.0 })));
+            PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("direction", new[] { 3.0, 4.0, 0.0 }), ("strength", 5.0)));
 
         Assert.Equal(CommandStatuses.Succeeded, result.Status);
         Assert.Equal(CommitStates.Confirmed, result.CommitState);
         var force = Assert.Single(target.Agent.Locomotion!.Pushes);
-        Assert.Equal(5f, force.x, 3);
-        Assert.Equal(2f, force.y, 3);
+        Assert.Equal(3f, force.x, 3);
+        Assert.Equal(4f, force.y, 3);
         Assert.Equal(0f, force.z, 3);
         var row = Rows(result)[0];
         Assert.Equal(new[] { "target", "status", "committed", "code", "strength", "target_count" },
             row.EnumerateObject().Select(property => property.Name).ToArray());
-        Assert.Equal("succeeded", row.GetProperty("status").GetString());
         Assert.Equal(GenericPlayerActions.ImpulseAppliedCode, row.GetProperty("code").GetString());
     }
 
-    [Fact]
-    public void Impulse_derives_the_direction_from_the_source_and_excludes_it()
-    {
-        using var world = new GenericPlayerWorld();
-        var source = world.Spawn(1UL, position: new Vector3(0f, 0f, 0f));
-        var target = world.Spawn(2UL, position: new Vector3(0f, 0f, 4f));
-        var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal = 3.0 }),
-            PlayerActionWorld.Frame(("targets", new[] { target.Reference, source.Reference }), ("source", source.Reference)));
-
-        Assert.Equal(CommandStatuses.Partial, result.Status);
-        var force = Assert.Single(target.Agent.Locomotion!.Pushes);
-        Assert.Equal(3f, force.z, 3);
-        Assert.Empty(source.Agent.Locomotion!.Pushes);
-        Assert.Equal(GenericPlayerActions.ImpulseSourceExcludedCode, Rows(result)[1].GetProperty("code").GetString());
-    }
-
     [Theory]
-    [InlineData(0.0, 0.0, GenericPlayerActions.ImpulseStrengthRequiredCode)]
-    [InlineData(500.0, 0.0, GenericPlayerActions.ImpulseStrengthRangeCode)]
-    public void Impulse_refuses_a_strength_it_cannot_apply(double horizontal, double vertical, string code)
+    [InlineData(0.0, GenericPlayerActions.ImpulseStrengthRangeCode)]
+    [InlineData(500.0, GenericPlayerActions.ImpulseStrengthRangeCode)]
+    public void Impulse_refuses_a_strength_it_cannot_apply(double strength, string code)
     {
         using var world = new GenericPlayerWorld();
         var target = world.Spawn(1UL);
         var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal, vertical }),
-            PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("direction", new[] { 1.0, 0.0, 0.0 })));
+            PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("direction", new[] { 1.0, 0.0, 0.0 }), ("strength", strength)));
         Assert.Equal(CommandStatuses.Rejected, result.Status);
         Assert.Equal(code, result.Code);
     }
 
     [Fact]
-    public void Impulse_refuses_a_request_with_no_direction_and_no_source()
+    public void Impulse_requires_direction_and_strength_as_data_inputs()
     {
         using var world = new GenericPlayerWorld();
         var target = world.Spawn(1UL);
-        var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal = 1.0 }),
-            PlayerActionWorld.Frame(("targets", new[] { target.Reference })));
-        Assert.Equal(GenericPlayerActions.ImpulseDirectionCode, result.Code);
+        Assert.Equal(GenericPlayerActions.ImpulseStrengthRequiredCode,
+            GenericPlayerActions.Impulse(PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("direction", new[] { 1.0, 0.0, 0.0 }))).Code);
+        Assert.Equal(GenericPlayerActions.ImpulseDirectionCode,
+            GenericPlayerActions.Impulse(PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("strength", 1.0))).Code);
     }
 
     [Fact]
-    public void Impulse_refuses_the_falloff_switches_it_cannot_honour()
+    public void Impulse_refuses_non_player_recipients()
     {
         using var world = new GenericPlayerWorld();
-        var target = world.Spawn(1UL);
-        var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal = 1.0, falloff_distance = true }),
-            PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("direction", new[] { 1.0, 0.0, 0.0 })));
-        Assert.Equal(GenericPlayerActions.ImpulseFalloffCode, result.Code);
-    }
-
-    [Fact]
-    public void Impulse_refuses_an_enemy_recipient_it_cannot_resolve_and_another_kind_by_name()
-    {
-        using var world = new GenericPlayerWorld();
-        var enemy = world.Kernel is not null
-            ? new EntityReference("gtfo.enemy:7", world.Kernel.WorldEpoch, 1)
-            : throw new InvalidOperationException();
-        var door = new EntityReference("gtfo.map_object:door-1", world.Kernel.WorldEpoch, 1);
-        var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal = 1.0 }),
-            PlayerActionWorld.Frame(("targets", new[] { enemy, door }), ("direction", new[] { 1.0, 0.0, 0.0 })));
-        Assert.Equal(GenericPlayerActions.ImpulseRecipientCode, Rows(result)[0].GetProperty("code").GetString());
-        Assert.Equal(GenericPlayerActions.ImpulseTargetKindCode, Rows(result)[1].GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public void Impulse_refuses_a_source_of_a_kind_it_cannot_resolve()
-    {
-        using var world = new GenericPlayerWorld();
-        var target = world.Spawn(1UL);
         var enemy = new EntityReference("gtfo.enemy:7", world.Kernel.WorldEpoch, 1);
         var result = GenericPlayerActions.Impulse(
-            PlayerActionWorld.Parameters(new { horizontal = 1.0 }),
-            PlayerActionWorld.Frame(("targets", new[] { target.Reference }), ("source", enemy)));
-        Assert.Equal(GenericPlayerActions.ImpulseSourceCode, result.Code);
+            PlayerActionWorld.Frame(("targets", new[] { enemy }), ("direction", new[] { 1.0, 0.0, 0.0 }), ("strength", 1.0)));
+        Assert.Equal(GenericPlayerActions.ImpulseTargetKindCode, Rows(result)[0].GetProperty("code").GetString());
     }
 
     // ---------------------------------------------------------------- stamina
@@ -481,13 +433,15 @@ public sealed class GenericPlayerTests
 
     private static readonly ConstructorInfo EvaluationConstructor = typeof(EvaluationContext)
         .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-        .Single(constructor => constructor.GetParameters().Length == 6);
+        .Single(constructor => constructor.GetParameters().Length == 8);
 
-    /// <summary>One read-only frame as the kernel hands it to an evaluator. A case's read uses no world session and
-    /// no trigger context, so the three reference halves are null: a row that read them would fail here.</summary>
+    /// <summary>One evaluator frame for the movement reader. This row consumes only its typed inputs and the
+    /// explicit reader delegate, so query/actor/relation context is intentionally absent; the current context
+    /// still carries the required tick and entity-instance resolver slots.</summary>
     private static EvaluationContext Context(object inputs, object parameters)
         => (EvaluationContext)EvaluationConstructor.Invoke(new object?[]
         {
-            "movement-state-case", RuntimeJson.From(parameters), RuntimeJson.From(inputs), null, null, null
+            "movement-state-case", RuntimeJson.From(parameters), RuntimeJson.From(inputs), null, null, null, 0L,
+            new Func<EntityReference, object?>(_ => null)
         });
 }

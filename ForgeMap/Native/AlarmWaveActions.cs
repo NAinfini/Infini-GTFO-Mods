@@ -228,7 +228,7 @@ internal sealed class AlarmWaveActions
     private static CommandResult ScanState(CommandContext context)
     {
         if (!IsHost(context)) return AlarmRow(context, MapActionOutcome.Refused(AuthorityCode));
-        if (Operation(context) is not { } operation)
+        if (Mode(context) is not { } mode)
             return AlarmRow(context, MapActionOutcome.Refused(OperationCode));
         if (Resource(context, "scan") is not { } resource)
             return AlarmRow(context, MapActionOutcome.Refused(NoScanResourceCode));
@@ -242,33 +242,33 @@ internal sealed class AlarmWaveActions
         if (instance.WasCollected || instance.Data == null) return AlarmRow(context, MapActionOutcome.Refused(AlarmUnavailableCode));
         // All three operations address an instance that is already there, so none mints a handle: the scan row
         // publishes no handle port, and a stop row addresses a wave rather than a puzzle.
-        if (operation != "start") return AlarmRow(context, Interact(instance, operation));
+        if (mode != "start") return AlarmRow(context, Interact(instance, mode));
         if (instance.IsActive) return AlarmRow(context, MapActionOutcome.AlreadyInState(AlarmAlreadyActiveCode));
         if (instance.IsSolved) return AlarmRow(context, MapActionOutcome.Refused(AlarmAlreadySolvedCode));
         if (instance.NRofPuzzles() <= 0) return AlarmRow(context, MapActionOutcome.Refused(AlarmNoCoresCode));
         return AlarmRow(context, StartPuzzle(instance));
     }
 
-    /// <summary>The row's `operation`, or null when the request named one this row does not carry. The parameter is
+    /// <summary>The row's `mode`, or null when the request named one this row does not carry. The parameter is
     /// structural, so it is read from the plan's own parameters rather than from a wired port.</summary>
-    private static string? Operation(CommandContext context)
+    private static string? Mode(CommandContext context)
     {
         if (context.Parameters.ValueKind != JsonValueKind.Object
-            || !context.Parameters.TryGetProperty("operation", out var member)
+            || !context.Parameters.TryGetProperty("mode", out var member)
             || member.ValueKind != JsonValueKind.String) return null;
-        var operation = member.GetString();
-        return operation != null && Array.IndexOf(AlarmWaveContract.ScanOperations, operation) >= 0 ? operation : null;
+        var mode = member.GetString();
+        return mode is "start" or "force_complete" or "reset" ? mode : null;
     }
 
     /// <summary>The two interactions that act on an instance already in the world. `complete` solves it — the same
     /// entry the game's own scanner uses when the players finish it — and `reset` deactivates it, which is the one
     /// member that puts a chained puzzle back to its pre-activation status.</summary>
-    private static MapActionOutcome Interact(ChainedPuzzleInstance instance, string operation)
+    private static MapActionOutcome Interact(ChainedPuzzleInstance instance, string mode)
     {
-        instance.AttemptInteract(operation == "complete"
+        instance.AttemptInteract(mode == "force_complete"
             ? eChainedPuzzleInteraction.Solve
             : eChainedPuzzleInteraction.Deactivate);
-        return MapActionOutcome.Issued(operation == "complete" ? ScanCompletedCode : ScanResetCode);
+        return MapActionOutcome.Issued(mode == "force_complete" ? ScanCompletedCode : ScanResetCode);
     }
 
     /// <summary>The `forge.action.map.wave_start` handler: one Mastermind survival wave, started through the

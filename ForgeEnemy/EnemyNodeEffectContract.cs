@@ -94,90 +94,23 @@ public static class EnemyNodeEffectContract
     /// `capabilities` array.</summary>
     public static string CapabilityRowsJson => string.Join(",\n", CapabilityRows);
 
-    private const string KillRow = """
+    private static string KillRow => RuntimeJson.From(new
     {
-      "id": "forge.action.enemy.kill",
-      "owner": "forge.module.gtfo.enemy",
-      "kind": "action",
-      "label": "直接杀死敌人",
-      "version": "1.0.0",
-      "parameters": {
-        "description": "直接杀死目标敌人。",
-        "summary": "无条件结束这些敌人的生命，走游戏自己的立即死亡入口。",
-        "summaryEn": "Ends the target enemies' lives unconditionally through the game's own instant-death entry.",
-        "labelEn": "Kill enemy",
-        "support": "implementation-only"
-      },
-      "graph": {
-        "domains": [
-          "map",
-          "room",
-          "enemy",
-          "tool",
-          "consumable",
-          "player"
-        ],
-        "execution": "host",
-        "inputs": [
-          {
-            "id": "in",
-            "type": "execution"
-          },
-          {
-            "entityKinds": ["gtfo.enemy"],
-            "id": "targets",
-            "type": "entity",
-            "cardinality": "many"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "next",
-            "type": "execution"
-          },
-          {
-            "id": "result",
-            "type": "result",
-            "schema": "forge.result.enemy.kill",
-            "fields": [
-              {
-                "id": "target",
-                "type": "entity"
-              },
-              {
-                "id": "status",
-                "type": "enum",
-                "schema": "execution_outcome"
-              },
-              {
-                "id": "committed",
-                "type": "enum",
-                "schema": "commit_state"
-              },
-              {
-                "id": "code",
-                "type": "string"
-              },
-              {
-                "id": "target_count",
-                "type": "integer"
-              }
-            ]
-          }
-        ],
-        "parameters": [],
-        "recipients": {
-          "input": "targets",
-          "target": "entity",
-          "cardinality": "many",
-          "requires": [
-            "gtfo.enemy.life.write"
-          ],
-          "result": "result"
-        }
-      }
-    }
-    """;
+        id = KillCapability,
+        owner = ProviderId,
+        kind = "action",
+        label = "直接杀死敌人",
+        version = "1.0.0",
+        parameters = new
+        {
+            description = "直接杀死目标敌人。",
+            summary = "无条件结束这些敌人的生命，走游戏自己的立即死亡入口。",
+            summaryEn = "Ends the target enemies' lives unconditionally through the game's own instant-death entry.",
+            labelEn = "Kill enemy",
+            support = "implementation-only"
+        },
+        graph = PrimitiveGraphSource.Get(KillCapability)
+    }).GetRawText();
 
     private const string RemoveRow = """
     {
