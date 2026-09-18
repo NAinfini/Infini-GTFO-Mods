@@ -230,9 +230,8 @@ public static class PlayerStateContract
     /// same field and neither is derived from the other.</summary>
     public static IReadOnlyList<object> ValueRows() => Array.AsReadOnly(new[]
     {
-        ValueRow(InfectionValueCapability, "玩家感染值", "读一个玩家当前的感染值。",
-            "Reads one player's current infection value.",
-            new object[] { new { id = "value", type = "number" } }),
+        OperatorValueRow(InfectionValueCapability, "玩家感染值", "读一个玩家当前的感染值。",
+            "Reads one player's current infection value."),
         ValueRow(DownedValueCapability, "玩家是否倒地", "读一个玩家是否倒地、是否还活着。",
             "Reads whether one player is downed and whether the life is still alive.",
             new object[] { new { id = "value", type = "boolean" }, new { id = "alive", type = "boolean" } }),
@@ -250,9 +249,8 @@ public static class PlayerStateContract
                 new { id = "clip_max", type = "integer" },
                 new { id = "reserve", type = "integer" }
             }),
-        ValueRow(CarriedItemValueCapability, "玩家背负的大件物品", "读一个玩家背包里背着的大件物品。",
-            "Reads the expedition item one player carries in the backpack.",
-            new object[] { new { id = "item", type = "entity", nullable = true } }),
+        OperatorValueRow(CarriedItemValueCapability, "玩家背负的大件物品", "读一个玩家背包里背着的大件物品。",
+            "Reads the expedition item one player carries in the backpack."),
         ValueRow(ToolValueCapability, "玩家工具能源与消耗品数量",
             "读一个玩家手上物品的职业弹药池（工具能源）和背包里的消耗品堆叠。",
             "Reads the class-ammunition pool of the item one player is holding, and the consumable stacks in the backpack.",
@@ -282,6 +280,17 @@ public static class PlayerStateContract
             outputs,
             parameters = Array.Empty<object>()
         }
+    };
+
+    private static object OperatorValueRow(string id, string label, string description, string descriptionEn) => new
+    {
+        id,
+        owner = ProviderId,
+        kind = "state",
+        label,
+        version = "1.0.0",
+        parameters = new { description, descriptionEn },
+        graph = BehaviorOperatorGraphSource.Get(id)
     };
 
     /// <summary>The seven query bindings, one per value row, paired with <see cref="ValueRows"/> by position.</summary>

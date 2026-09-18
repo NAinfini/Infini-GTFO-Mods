@@ -113,9 +113,8 @@ public static class EnemyNodeValueContract
         ValueRow(TypeCapability, "敌人类型", "读一个敌人的类型标识。",
             "Reads one enemy's official type id (EnemyDataBlock.persistentID) as decimal text.",
             new object[] { new { id = "value", type = "string" } }),
-        ValueRow(SleepingCapability, "敌人是否休眠", "读一个敌人是否处于休眠。",
-            "Reads whether one enemy is still hibernating.",
-            new object[] { new { id = "value", type = "boolean" } }),
+        OperatorValueRow(SleepingCapability, "敌人是否休眠", "读一个敌人是否处于休眠。",
+            "Reads whether one enemy is still hibernating."),
         ValueRow(WhereCapability, "敌人位置与所在区域", "读一个敌人的位置和它所在的区域。",
             "Reads one enemy's world position and the zone it stands in.",
             new object[]
@@ -203,6 +202,17 @@ public static class EnemyNodeValueContract
             outputs,
             parameters = Array.Empty<object>()
         }
+    };
+
+    private static object OperatorValueRow(string id, string label, string description, string descriptionEn) => new
+    {
+        id,
+        owner = ProviderId,
+        kind = "state",
+        label,
+        version = "1.0.0",
+        parameters = new { description, descriptionEn },
+        graph = BehaviorOperatorGraphSource.Get(id)
     };
 
     private static object ValueBinding(string capabilityId, string handler) => new

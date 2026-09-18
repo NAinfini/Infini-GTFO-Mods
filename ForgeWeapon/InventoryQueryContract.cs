@@ -39,29 +39,16 @@ public static class InventoryQueryContract
     /// <summary>The equipment-ammunition row: the equipment life it reads, and the three numbers the player
     /// row's own answer carries, under the same names. `clip_max` is what the weapon itself reports rather than
     /// what the loaded rounds imply, so a partly filled magazine reads as one.</summary>
-    public const string EquipmentAmmoRowDocument = """
+    public static readonly string EquipmentAmmoRowDocument = RuntimeJson.From(new
     {
-      "id": "forge.query.equipment.ammo",
-      "owner": "forge.module.gtfo.weapon",
-      "kind": "state",
-      "label": "装备剩余弹药",
-      "version": "1.0.0",
-      "parameters": { "description": "读一件装备的弹匣、弹匣容量和备用弹药。" },
-      "graph": {
-        "domains": ["map", "weapon", "logic"],
-        "execution": "query",
-        "inputs": [
-          { "id": "equipment", "type": "entity", "entityKinds": ["gtfo.equipment"] }
-        ],
-        "outputs": [
-          { "id": "clip", "type": "integer" },
-          { "id": "clip_max", "type": "integer" },
-          { "id": "reserve", "type": "integer" }
-        ],
-        "parameters": []
-      }
-    }
-    """;
+        id = EquipmentAmmoCapability,
+        owner = ModuleDefinition.ProviderId,
+        kind = "state",
+        label = "装备剩余弹药",
+        version = "1.0.0",
+        parameters = new { description = "读一件装备的弹匣、弹匣容量和备用弹药。" },
+        graph = BehaviorOperatorGraphSource.Get(EquipmentAmmoCapability)
+    }).GetRawText();
 
     /// <summary>The held-item condition, with the catalog's own ports: the holder, the item resource and how many
     /// of it the condition asks for, answered as one boolean. The card is the row's own label and description,
