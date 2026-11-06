@@ -96,6 +96,8 @@ internal static class ResourceHud
         using var _ = Telemetry.Measure("ResourceHudRender");
         var player = __instance.Player;
         if (_restoring || !Settings.ResourceHud.Value || player == null || player.IsLocallyOwned) return;
+        // Native UpdateName dereferences the marker and its name text; both are gone while the level is torn down.
+        if (GameStateManager.CurrentStateName != eGameStateName.InLevel || __instance.m_marker == null || __instance.m_marker.m_playerName == null) return;
         NativeVisibility.TryAdd(__instance.Pointer, (__instance, __instance.m_extraInfoVisible));
         var held = HeldPack();
         var text = Text;
